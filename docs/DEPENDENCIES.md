@@ -44,6 +44,4 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 
 ## Enforcement
 
-Hooks blockieren Änderungen an `Client/package.json` und `**/*.csproj`, die Pakete einführen, die nicht in dieser Liste stehen.
-
-> **Status: Hook noch nicht implementiert** – wird als Teil des Rewrite-Setups ergänzt.
+Hooks blockieren Änderungen an `Client/package.json`, `**/*.csproj` und `docs/DEPENDENCIES.md` durch den Agenten vollständig. Alle drei Dateien müssen vom User manuell bearbeitet werden.

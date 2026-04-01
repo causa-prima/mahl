@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 43 | 2026-04-01 | SKELETON (Neustart-Vorbereitung) | Gesamter Anwendungscode gelöscht (Backend + Frontend), nur Qualitäts-Configs behalten. Dependency-Hook eingerichtet (blockiert Agent-Edits auf package.json, *.csproj, DEPENDENCIES.md). Git-Setup (SSH, user identity). Bereit für US-904 mit Gherkin + Outside-In ATDD. Details: `session_043.md` |
 | 42 | 2026-03-26 | SKELETON (Dokumentation) | Dokumentations-Großüberarbeitung: ARCHITECTURE.md (0c Hexagonal Architecture), CODING_GUIDELINE_CSHARP.md (internal-Pflicht, Stryker-Guards), TDD_PROCESS.md (Outside-In ATDD, US-Tag im Testnamen), neues E2E_TESTING.md (BDD/Gherkin, Traceability, Quality Gate), REVIEW_CHECKLIST.md (Architecture Layer + Test-Audit), 4 Skills, neuer domain_visibility-Hook (11 Tests). Details: `session_042.md` |
 | 41 | 2026-03-26 | SKELETON (Architektur-Diskussion) | Grundsatzentscheidungen: Hexagonal Architecture, Infrastructure Layer, BDD/Gherkin, Outside-In ATDD, Spec-driven E2E Gate, Neustart Backend. Kein Code. Details: `session_041.md` |
 | 40 | 2026-03-26 | SKELETON (Qualität/Tooling) | Branch Coverage 100% via Coverlet + dotnet-test.py-Erweiterung (line-level Gaps); Vitest V8 Coverage (Frontend); `SumType.Unreachable<T>()` extrahiert (Stryker-Suppress zentralisiert); `[ExcludeFromCodeCoverage]` auf `Match<T>` für structurally unreachable `_`-Arm; Switch-vs-Ternary-Tradeoff explizit entschieden. 168 Tests ✅, Stryker 100% (197 Mutanten). Details: `session_040.md` |

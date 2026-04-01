@@ -17,6 +17,30 @@ kritische-regeln:
 
 ---
 
+## Session 043 – 2026-04-01 – Neustart-Vorbereitung
+
+### Was lief gut
+- Lösch-Entscheidung (was behalten, was löschen) war klar und strukturiert – Liste → Diskussion → Umsetzung
+- Dependency-Hook sofort beim ersten echten Einsatz verifiziert (DEPENDENCIES.md-Edit korrekt geblockt)
+- `importlib.util` für Bindestrich-Dateinamen war die richtige Lösung – sauber und wiederverwendbar
+- 1-Commit-Entscheidung (statt 2) war richtig: sachlich zusammengehörende Änderungen gehören zusammen
+
+### Was war schwierig / Fehler
+- **`git rm -r` durch Bash-Hook geblockt**: Der Pattern-Check matcht auch `git rm -r`. Der Hook ist korrekt, aber für diesen Anwendungsfall unbequem – User musste direkt in der Shell ausführen
+- **`!`-Präfix nicht copy-pasteable im Chat**: Copy-paste eines Befehls mit `!` aus der Antwort ins Chat-Fenster übernimmt das `!` nicht. Hinweis an User muss expliziter sein
+- **Stale `index.lock`**: Zweimal aufgetreten – wahrscheinlich durch gleichzeitig offenen VS Code oder parallele Claude-Session. Lösung: `rm .git/index.lock` – kein großes Problem, aber überraschend
+
+### Learnings
+- **Beim Hinweis auf manuell auszuführende Befehle** immer explizit erwähnen: "Das `!` muss manuell getippt werden – copy-paste funktioniert nicht"
+- **Hook-Imports mit Bindestrichen**: `importlib.util.spec_from_file_location` ist der richtige Weg; Pattern in `test_dependency_allowlist.py` als Vorlage für künftige Bindestrich-Hooks
+
+### Dokumentations-Änderungen
+- AGENT_MEMORY.md: Neustart-Stand aktualisiert (im Commit enthalten)
+- DEPENDENCIES.md: Enforcement-Sektion aktualisiert (vom User manuell)
+- Keine weiteren Änderungen
+
+---
+
 ## Session 042 – 2026-03-26 – Dokumentations-Großüberarbeitung
 
 ### Was lief gut
