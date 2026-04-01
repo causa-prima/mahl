@@ -1,6 +1,25 @@
 # Glossar & Fachliches Domänenmodell
 
+<!--
+wann-lesen: Bei jedem Benennen von Typen, Variablen, Methoden oder Endpoints – Begriffe aus diesem Glossar sind im Code bindend
+kritische-regeln:
+  - Nur die hier definierten deutschen/englischen Begriffe verwenden (Ubiquitous Language)
+  - Synonyme (z.B. "Möhre" statt "Karotte") sind kein gültiger Code-Name
+-->
+
+## Inhalt
+
+| Abschnitt | Domäne | Enthaltene Begriffe |
+|-----------|--------|---------------------|
+| 1. Zutaten & Einheiten | Stammdaten | Zutat, Zutaten-Modifizierer, Zutaten-Alias, Basiseinheit, Umrechnungsfaktor, Non-Food-Item |
+| 2. Rezepte | Rezeptverwaltung | Rezept, Rezept-Variante, Zubereitungszeit, Rezept-Zutat, Sub-Rezept, Schritt, Basis-Portion, Planungs-Portion, Import-Pool, Koch-Historie, Kochmodus |
+| 3. Planung | Wochenplanung | Planungs-Pool, Wochen-Pool, Wochenplan, Plan-Eintrag, Harte Regel, Sortier-Regel, Fallback-Strategie, Esser-Profil, Slot, Globale/Tages-/Session-Regel |
+| 4. Einkauf | Einkaufsliste | Einkaufsliste, Einkaufslisten-Eintrag, Delta-Menge, Fix-Eintrag, Shop-Kategorie |
+| 5. Klassifizierung | Taxonomie | Tag (DAG-Struktur) |
+
 Dieses Dokument definiert die **Ubiquitäre Sprache** (Ubiquitous Language) für das Projekt "Mahl". Diese Begriffe sind in allen Anforderungen, User Stories und im Code bindend zu verwenden.
+
+**Sprach-Konvention:** In Dokumentation und User Stories: Deutsch. In Code-Identifiern (Klassen, DTOs, Endpoints, Variablen): Englisch. Format der Einträge: `Deutscher Begriff (EnglishIdentifier)` – der englische Term ist der Code-Name.
 
 ## 1. Kern-Domäne: Zutaten & Einheiten
 
@@ -51,10 +70,16 @@ Die zeitliche Aufwandsabschätzung für ein *Rezept*.
 *   **Komponenten:** Vorbereitungszeit, Kochzeit, Backzeit, Ruhezeit.
 *   **Gesamtzeit:** Summe aller Komponenten.
 
+### Quantity (Menge)
+Eine Mengenangabe, bestehend aus einer positiven Zahl und einer Einheit – oder keine Angabe.
+*   **Varianten:** `Specified(value: decimal > 0, unit: NonEmptyTrimmedString)` | `Unspecified`
+*   **Verwendung:** Rezept-Zutaten, Einkaufslisten-Einträge, Basis-Portion.
+*   **Code-Typ:** `Quantity` (Sum-Type im Domain-Layer)
+
 ### Rezept-Zutat (Recipe Ingredient)
 Die Verwendung einer *Zutat* in einem spezifischen *Rezept*.
-*   **Datenstruktur:** Referenz auf *Zutat* (oder *Sub-Rezept*), Menge (Zahl), Einheit, gewählter *Modifizierer* (optional).
-*   **Beispiel:** "500g" (Menge) "Tomaten" (Zutat) "stückig" (Modifizierer).
+*   **Datenstruktur:** Referenz auf *Zutat* (oder *Sub-Rezept*), *Quantity*, gewählter *Modifizierer* (optional).
+*   **Beispiel:** "500g" (*Quantity*) "Tomaten" (Zutat) "stückig" (Modifizierer).
 
 ### Sub-Rezept (Sub-Recipe)
 Ein *Rezept*, das in einem anderen Rezept als *Rezept-Zutat* referenziert wird.

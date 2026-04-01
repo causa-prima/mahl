@@ -226,6 +226,112 @@ dotnet_naming_style.pascal_case.word_separator =
 dotnet_naming_style.pascal_case.capitalization = pascal_case
 
 dotnet_naming_style.begins_with_i.required_prefix = I
-dotnet_naming_style.begins_with_i.required_suffix = 
-dotnet_naming_style.begins_with_i.word_separator = 
+dotnet_naming_style.begins_with_i.required_suffix =
+dotnet_naming_style.begins_with_i.word_separator =
 dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+#### Analyzer Suppressions ####
+# NOTE on glob patterns: In .NET's editorconfig implementation, `dir/**/*.cs` does NOT match
+# root-level files in `dir/` (only subdirectories). Use `{dir,dir/**}/*.cs` to match both.
+
+# --- Server project (ASP.NET Core) – root and all subdirectories ---
+[{Server,Server/**}/*.cs]
+# MA0004 / CA2007: ConfigureAwait(false) is a no-op in ASP.NET Core – no SynchronizationContext.
+dotnet_diagnostic.MA0004.severity = none
+dotnet_diagnostic.CA2007.severity = none
+# CA1515: Aktiviert – erzwingt internal für alle Typ-Deklarationen in Server/ (ARCHITECTURE.md 0c).
+#         Kein InternalsVisibleTo geplant; Tests greifen ausschließlich über HTTP-Ports zu.
+dotnet_diagnostic.CA1515.severity = warning
+# CA1062: "Validate non-null parameters" – covered by <Nullable>enable</Nullable>+WarningsAsErrors
+#         for internal calls; HTTP-boundary validation is a separate concern (model validation,
+#         tech debt). Applies here because CA1062 fires even on Func<> parameters and EF methods.
+dotnet_diagnostic.CA1062.severity = none
+
+# --- Domain types: Value Object helpers (Server/Types/) ---
+[Server/Types/*.cs]
+# CA2225: Provide named alternates for conversion operators – our implicit/explicit operators are
+#         intentional internal API surface; named duplicates would add noise without benefit.
+dotnet_diagnostic.CA2225.severity = none
+# CA1000: Static factory on generic type – NonEmptyList<T>.Create; T is always inferred from the
+#         argument so callers never need to specify it explicitly.
+dotnet_diagnostic.CA1000.severity = none
+
+# --- Domain types: Sum-Types and domain records (Server/Domain/) ---
+[Server/Domain/*.cs]
+# MA0008: Add StructLayoutAttribute – domain structs are not P/Invoke types; StructLayout is
+#         irrelevant outside native-interop scenarios.
+dotnet_diagnostic.MA0008.severity = none
+
+# --- Recipe.cs: RecipeIngredient and RecipeStep are co-located intentionally ---
+[Server/Domain/Recipe.cs]
+# MA0048: File name must match type name – RecipeIngredient and RecipeStep are semantically
+#         inseparable parts of the Recipe aggregate; splitting them into separate files would
+#         fragment the aggregate without improving readability (documented decision).
+dotnet_diagnostic.MA0048.severity = none
+
+# --- Endpoint registration methods ---
+[Server/Endpoints/*.cs]
+# MA0051: Method is too long – MapXxxEndpoints methods are declarative route-registration lists;
+#         splitting them would scatter related routes without improving clarity (tech debt: extract
+#         handler methods in a future refactoring pass).
+dotnet_diagnostic.MA0051.severity = none
+
+# --- EF Core entities: List<T> and mutable setters required by EF Core change tracking ---
+[Server/Data/DatabaseTypes/*.cs]
+# CA1056: URI-like properties should use System.Uri – EF Core entities use string? for URL columns;
+#         a ValueConverter for Uri↔string would add complexity without benefit (DbType is not public API).
+dotnet_diagnostic.CA1056.severity = none
+dotnet_diagnostic.MA0016.severity = none
+# CA1002: List<T> vs Collection<T> – EF Core requires List<T> for navigation collections.
+dotnet_diagnostic.CA1002.severity = none
+# CA2227: Remove property setter – EF Core requires mutable setters for navigation collections.
+dotnet_diagnostic.CA2227.severity = none
+
+# --- Seed data ---
+[Server/Data/SeedDataExtensions.cs]
+# S1075: Hardcoded absolute URIs – seed data contains real recipe source URLs; intentionally literal.
+dotnet_diagnostic.S1075.severity = none
+# MA0051: SeedDatabase is a 313-line method by design; splitting it would hide the data structure.
+dotnet_diagnostic.MA0051.severity = none
+
+# --- Razor Pages (framework convention: Error.cshtml.cs → class ErrorModel) ---
+[Server/Pages/*.cs]
+# MA0048: File name must match type name – Razor Pages convention: PageName.cshtml.cs / PageNameModel.
+dotnet_diagnostic.MA0048.severity = none
+
+# --- Program.cs: integration-testing entry point ---
+[Server/Program.cs]
+# S1118: Add protected ctor or static – public partial class Program is the canonical ASP.NET Core
+#        integration-testing entry point; it must be public partial and cannot be static.
+dotnet_diagnostic.S1118.severity = none
+
+# --- Generated migrations: root-level files directly in Server/Migrations/ ---
+[{Server/Migrations,Server/Migrations/**}/*.cs]
+dotnet_diagnostic.MA0051.severity = none
+dotnet_diagnostic.MA0048.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+# --- Test project ---
+# {Server.Tests,Server.Tests/**}/*.cs matches both root-level and subdirectory .cs files.
+# [Server.Tests/**/*.cs] alone would miss root-level files (e.g. EndpointsTestsBase.cs).
+[{Server.Tests,Server.Tests/**}/*.cs]
+# CA1707: Test method naming uses underscores by convention (MethodName_Scenario_Result per TDD_PROCESS.md).
+dotnet_diagnostic.CA1707.severity = none
+# CA1806: ParameterlessConstructor_Throws tests intentionally create instances that immediately throw;
+#         the created value never exists, which CA1806 misreads as "unused return value".
+dotnet_diagnostic.CA1806.severity = none
+# S2187: EndpointsTestsBase is an abstract base class; its tests live in derived classes.
+dotnet_diagnostic.S2187.severity = none
+# MA0004 / CA2007: ConfigureAwait not needed in test context.
+dotnet_diagnostic.MA0004.severity = none
+dotnet_diagnostic.CA2007.severity = none
+# CA1515: Test classes are always public (xUnit requires it); no value in making them internal.
+dotnet_diagnostic.CA1515.severity = none
+# CA2234: Pass Uri instead of string for HttpClient – test code uses string URLs for readability.
+dotnet_diagnostic.CA2234.severity = none
+# CA1054: URI-like parameters should use Uri – ARecipe() builder uses string? intentionally
+#         because RecipeDbType.SourceUrl stays string? (EF Core; no value converter).
+dotnet_diagnostic.CA1054.severity = none
+# CA1062: Validate non-null parameters – test methods receive data from xUnit theory attributes
+#         and internal test builders; null contract is enforced by NRT + WarningsAsErrors.
+dotnet_diagnostic.CA1062.severity = none

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage" enabled="true">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!-- Nur mahl.Server messen, Test-Assembly ausschließen -->
+          <Include>[mahl.Server]*</Include>
+          <!-- Gleiche Ausschlüsse wie stryker-config.json -->
+          <ExcludeByFile>**/Migrations/**,**/SeedDataExtensions.cs,**/MahlDbContext.cs,**/*DbType.cs,**/Program.cs,**/*.cshtml,**/*.cshtml.cs,**/*.generated.cs,**/Helpers.cs</ExcludeByFile>
+          <!-- Auto-Properties haben keine echten Branches -->
+          <SkipAutoProps>true</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

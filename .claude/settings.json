@@ -1,0 +1,64 @@
+{
+  "permissions": {
+    "allow": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-bash-permission.py" }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-blocking.py" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-nonblocking.py" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/check-memory.sh" }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh" }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/task-completed.sh" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh" }
+        ]
+      }
+    ]
+  }
+}

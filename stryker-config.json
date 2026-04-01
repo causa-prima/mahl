@@ -1,0 +1,20 @@
+{
+  "stryker-config": {
+    "project": "Server/mahl.Server.csproj",
+    "test-projects": ["Server.Tests/mahl.Server.Tests.csproj"],
+    "coverage-analysis": "off",
+    "additional-timeout": 15000,
+    "reporters": ["html", "cleartext", "json"],
+    "mutate": [
+      "**/*.cs",
+      "!**/Migrations/**",
+      "!**/SeedDataExtensions.cs",
+      "!**/MahlDbContext.cs",
+      "!**/*DbType.cs",
+      "!**/Program.cs",
+      "!**/*.cshtml.cs",
+      "!**/Helpers.cs",
+      "!**/SeedData.sql"
+    ]
+  }
+}

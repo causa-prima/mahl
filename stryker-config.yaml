@@ -1,6 +1,0 @@
-stryker-config:
-    mutation-level: "Complete"
-    mutate: [
-      "!**/UnexpectedInstanceTypeException.cs"
-    ]
-    #test-case-filter: "FullyQualifiedName~NonEmptyTrimmedStringTests"

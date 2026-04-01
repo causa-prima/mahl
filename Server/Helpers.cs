@@ -1,13 +1,12 @@
 ﻿namespace mahl.Server;
 
-using mahl.Shared;
 using OneOf.Types;
 
 public static class Helpers
 {
     internal static IResult CreateProblemWithTraceId(HttpContext context) =>
         Results.Problem(
-            extensions: new Dictionary<string, object?>()
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 [Constants.TraceIdString] = System.Diagnostics.Activity.Current?.TraceId.ToHexString()
                                             ?? context.TraceIdentifier
@@ -37,8 +36,13 @@ public static class Helpers
         Type typeToConstruct,
         T itemToMap,
         string error)
-        => logger.LogError(
-            $"Error constructing {typeToConstruct.Name} with this instance of {typeof(T).Name}:"
-                            + " {@itemToMap}, Error: {error}", itemToMap, error);
+    {
+        // CA1848: LoggerMessage delegates require static partial methods and are incompatible with generic T.
+#pragma warning disable CA1848
+        logger.LogError(
+            "Error constructing {TypeName} with this instance of {ItemTypeName}: {@ItemToMap}, Error: {Error}",
+            typeToConstruct.Name, typeof(T).Name, itemToMap, error);
+#pragma warning restore CA1848
+    }
 
 }

@@ -383,3 +383,9 @@ FodyWeavers.xsd
 # Application specific
 appsettings.Local.json
 appsettings.*.Local.json
+
+# Frontend build output (served by ASP.NET Core in dev/prod)
+Server/wwwroot/
+
+# Claude Code temporary working files
+.claude/tmp/
