@@ -57,7 +57,7 @@ Begründung angeben, wenn ein Agent ausgelassen wird.
 
 ### Gate 4: Learnings & Dokumentation (PFLICHT)
 
-- [ ] Eintrag in `docs/history/lessons_learned.md` erstellt ("keine Learnings" nur mit Begründung akzeptabel)
+- [ ] Eintrag in `docs/kaizen/lessons_learned.md` erstellt ("keine Learnings" nur mit Begründung akzeptabel)
 - [ ] **Dokumentations-Änderungsvorschläge:** Für jede Kern-Dokument-Datei explizit geprüft: Anpassung nötig? Falls ja: Änderung dem User **vorschlagen** und auf Bestätigung warten – nicht eigenständig anpassen.
 - [ ] `docs/AGENT_MEMORY.md` aktualisiert (Status, technische Schuld, offene Fragen)
 - [ ] Commit mit aussagekräftiger Message (`US-XXX: ...`)
@@ -68,7 +68,6 @@ Begründung angeben, wenn ein Agent ausgelassen wird.
 Am Ende jeder Phase (SKELETON, MVP, V1, ...) zusätzlich:
 
 - [ ] **Großes Code-Review:** Alle Review-Agenten auf das gesamte neue Code-Delta der Phase laufen lassen (nicht nur geänderte Dateien)
-- [ ] **Lessons Learned Review:** Alle bisherigen Einträge in `docs/history/lessons_learned.md` durchsehen – wiederkehrende Muster → strukturelle Lösung vorschlagen
 - [ ] **Dokumentations-Konsistenz:** Alle Kern-Dokumente auf Veralterung prüfen (Specs, Glossar, Architecture)
 
 ### Non-Functional (gilt immer)

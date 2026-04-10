@@ -22,7 +22,7 @@ Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentati
 - `CLAUDE.md` (Projekt-Root)
 - `docs/AGENT_MEMORY.md`
 - `docs/` – alle Markdown-Dateien, **außer** `docs/history/sessions/` (Session-Logs, keine Richtlinien)
-- `docs/history/decisions.md` und `docs/history/lessons_learned.md` (explizit einschließen)
+- `docs/history/decisions.md`, `docs/kaizen/lessons_learned.md`, `docs/kaizen/principles.md`, `docs/kaizen/countermeasures.md` (explizit einschließen)
 - `.claude/skills/` – alle Skill-Definitionen
 - `.claude/agents/` – alle Agenten-Definitionen (falls vorhanden)
 - `.claude/settings.json`

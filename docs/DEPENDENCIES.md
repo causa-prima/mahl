@@ -32,15 +32,48 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 
 ## Allowlist
 
-> **Status: Wird vor dem Rewrite abgestimmt.**
+> Freigegeben Session 044 (2026-04-01). Begründungen in `docs/history/decisions.md`.
 
 ### TypeScript / npm
 
-*(leer – wird vor dem Rewrite befüllt)*
+| Paket | Kategorie |
+|-------|-----------|
+| `vite` | Build |
+| `@vitejs/plugin-react` | Build |
+| `typescript` | Build |
+| `react` | Framework |
+| `react-dom` | Framework |
+| `@types/react` | Framework |
+| `@types/react-dom` | Framework |
+| `@mui/material` | UI |
+| `@mui/icons-material` | UI |
+| `@emotion/react` | UI (Peer) |
+| `@emotion/styled` | UI (Peer) |
+| `react-router` | Routing |
+| `@tanstack/react-query` | Data Fetching |
+| `neverthrow` | ROP |
+| `vitest` | Testing |
+| `@vitest/coverage-v8` | Testing |
+| `@testing-library/react` | Testing |
+| `@playwright/test` | E2E Testing |
 
 ### C# / NuGet
 
-*(leer – wird vor dem Rewrite befüllt)*
+| Paket | Projekt |
+|-------|---------|
+| `Npgsql.EntityFrameworkCore.PostgreSQL` | Infrastructure |
+| `Microsoft.EntityFrameworkCore.Design` | Server (Design-Time) |
+| `Microsoft.AspNetCore.OpenApi` | Server |
+| `OneOf` | Server |
+| `Serilog.AspNetCore` | Server |
+| `Serilog.Sinks.Console` | Server |
+| `Serilog.Sinks.File` | Server |
+| `Microsoft.AspNetCore.Mvc.Testing` | Server.Tests |
+| `Microsoft.NET.Test.Sdk` | Server.Tests |
+| `xunit` | Server.Tests |
+| `xunit.runner.visualstudio` | Server.Tests |
+| `AwesomeAssertions` | Server.Tests |
+| `coverlet.collector` | Server.Tests |
 
 ## Enforcement
 

@@ -68,11 +68,21 @@ type RecipeId = string & { readonly __brand: 'RecipeId' };
 type IngredientName = string & { readonly __brand: 'IngredientName' };
 
 // Factory Function (analog zu static Create() in C#)
-function makeRecipeId(value: string): Result<RecipeId, string> {
+// Fehlertyp ist immer ValidationError – kein nackter string (selbstdokumentierend,
+// erweiterbar um code/field ohne Breaking Change)
+function makeRecipeId(value: string): Result<RecipeId, ValidationError> {
   if (!value || value.trim().length === 0)
-    return err('RecipeId darf nicht leer sein');
+    return err({ message: 'RecipeId darf nicht leer sein' });
   return ok(value as RecipeId);
 }
+```
+
+**Fehlertyp:** Factory Functions geben immer `Result<T, ValidationError>` zurück – **kein `Result<T, string>`**.
+`ValidationError` ist in `src/types/validationError.ts` definiert:
+
+```typescript
+/** Validierungsfehler aus Domain-Factory-Functions und Service-Layer. */
+export type ValidationError = { readonly message: string }
 ```
 
 **Faustregel:** Wenn ein String-Parameter mehrere verschiedene Konzepte darstellen könnte (z.B. `id` für Rezept, Zutat und Wochenpool), braucht jedes Konzept einen eigenen Branded Type.
@@ -120,23 +130,24 @@ Verwende die Bibliothek **`neverthrow`** für Fehlerbehandlung ohne Exceptions. 
 
 ```typescript
 import { ok, err, Result, ResultAsync } from 'neverthrow';
+import type { ValidationError } from '../types/validationError';
 
-// Factory Function gibt Result zurück
-function createIngredientName(input: string): Result<IngredientName, string> {
+// Factory Function gibt Result zurück – Fehlertyp ist ValidationError, nie string
+function makeIngredientName(input: string): Result<IngredientName, ValidationError> {
   const trimmed = input?.trim();
   if (!trimmed)
-    return err('Name darf nicht leer sein');
-  if (trimmed.length > 100)
-    return err('Name darf maximal 100 Zeichen haben');
+    return err({ message: 'Name darf nicht leer sein' });
+  if (trimmed.length > 200)
+    return err({ message: 'Name darf maximal 200 Zeichen haben' });
   return ok(trimmed as IngredientName);
 }
 
 // Verkettung (analog zu .Bind() / .Match() in C#)
-const result = createIngredientName(rawInput)
+const result = makeIngredientName(rawInput)
   .andThen(name => saveIngredient(name))  // ResultAsync
   .match(
     (saved) => toast.success(`${saved.name} gespeichert`),
-    (error) => toast.error(error),
+    (error) => toast.error(error.message),
   );
 ```
 
@@ -152,9 +163,9 @@ const result = createIngredientName(rawInput)
 
 ```typescript
 // src/domain/recipe.ts – Pure Domain Functions
-export function validateRecipeTitle(
+export function makeRecipeTitle(
   title: string
-): Result<RecipeTitle, string> { ... }
+): Result<RecipeTitle, ValidationError> { ... }
 
 export function calculateTotalCalories(
   ingredients: ReadonlyArray<RecipeIngredient>
@@ -188,7 +199,7 @@ Diese Richtlinie gilt für Test-Code mit den folgenden Abschwächungen:
 
 ```typescript
 // Test-Beispiel – pragmatisch aber typsicher
-const validName = createIngredientName('Tomaten')._unsafeUnwrap();
+const validName = makeIngredientName('Tomaten')._unsafeUnwrap();
 // _unsafeUnwrap() ist in Tests OK, weil der Wert bekannt gültig ist
 ```
 

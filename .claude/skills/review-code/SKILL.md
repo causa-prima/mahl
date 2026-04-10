@@ -65,11 +65,12 @@ Kein Mutant darf stillschweigend ignoriert werden.
 
 Scope bestimmt, welche Agenten nötig sind (siehe `docs/LLM_PROMPT_TEMPLATE.md`):
 
-| Scope | Agenten |
-|-------|---------|
-| Kleine Änderung (<3 Dateien) | `code-quality` |
-| Mittlere Änderung | `code-quality` + `functional` + `test-quality` |
-| Große Änderung / Neues Feature | Alle: `code-quality`, `functional`, `test-quality`, ggf. `ux-ui`, `security` |
+| Was wurde geändert? | Agenten |
+|--------------------|---------|
+| Änderung ohne Verhaltensänderung (z. B. Rename, Refactoring ohne Logik-Änderung) | `code-quality` |
+| Neue Funktionalität oder Verhaltensänderung (Domain/Application-Layer) | `code-quality` + `functional` + `test-quality` |
+| + API-Grenze, User-Input oder Auth berührt | + `security` |
+| + Frontend-Komponenten geändert | + `ux-ui` |
 
 **Hinweis an Agenten:** Die Projekt-Guidelines (`docs/CODING_GUIDELINE_*.md`) haben Vorrang vor
 agenten-eigenen Checklisten. Abweichungen müssen explizit begründet werden.

@@ -192,6 +192,27 @@ Shared-Typen (`NonEmptyTrimmedString`, `NonEmptyList<T>`, etc.) liegen in `Serve
 
 ---
 
+## 4b. SKELETON-Phase: Scope-Constraints
+
+Diese Constraints gelten nur für die **SKELETON-Phase**. Sie rahmen was implementiert wird und verhindern Over-Engineering vor dem MVP.
+
+| Constraint | Details |
+|------------|---------|
+| **AlwaysInStock hat keine Wirkung** | Das Feld existiert in der DB (Vorbereitung für US-906), wird aber im SKELETON nicht ausgewertet. Die Einkaufslisten-Generierung ignoriert es. |
+| **Kein PUT /api/ingredients** | Edit-UI und Rename-Endpoint sind MVP (US-614-analog). Im SKELETON ist nur POST/GET/DELETE + restore. |
+| **WeeklyPool ohne Datumslogik** | Kein `PlannedDate`, keine Kalender-Zuordnung. Der Pool ist eine flache Liste ohne zeitliche Strukturierung. |
+| **Shopping-List-Generierung: Delete+Recreate** | Beim `POST /api/shopping-list/generate` werden alle bestehenden Items gelöscht und neu berechnet. Kein Diff/Delta, kein Tracking welche Zutat aus welchem Rezept. AlwaysInStock-Filter inaktiv. |
+| **Alle Listen alphabetisch nach Name sortiert** | `GET /api/ingredients` und `GET /api/recipes` geben ihre Einträge alphabetisch nach Name/Titel zurück. |
+
+### DB-Inkonsistenz: Listen vs. Einzel-Endpoints
+
+Verhalten wenn `Create()` einen DB-Datensatz nicht rekonstruieren kann (z.B. durch manuelle DB-Eingriffe oder fehlgeschlagene Migrationen):
+
+- **Listen-Endpoints** (z.B. `GET /api/ingredients`, `GET /api/recipes`): Korrupte Einträge werden **übersprungen** und der Fehler geloggt. Die Liste enthält nur konsistente Einträge — kein 500.
+- **Einzel-Endpoints** (z.B. `GET /api/ingredients/{id}`, `GET /api/recipes/{id}`): `500 Internal Server Error`, `Content-Type: application/problem+json`, Body: `{ "detail": "DB inconsistency in {Entity} #{id}: {Fehlermeldung}", "traceId": "..." }`.
+
+---
+
 ## 5. TDD-Prozess (verbindlich)
 
 > Vollständige Beschreibung: **`docs/TDD_PROCESS.md`**

@@ -2,9 +2,11 @@
 
 > **Status:** Nicht gestartet
 >
-> **Voraussetzung:** SKELETON vollständig abgeschlossen (✅ done)
+> **Voraussetzung:** SKELETON vollständig abgeschlossen
 >
 > **Wann lesen:** Beim Start der MVP-Phase.
+>
+> **Wichtig:** Alle DB-Schema-Details, API-Routen und Verhaltenserwartungen in dieser Datei sind **vorläufige Planungsgrundlagen**, keine fixierten Specs. Für jede User Story entstehen die verbindlichen Verhaltenserwartungen erst im `gherkin-workshop`. Impl.-Details emergieren aus Tests.
 
 ---
 

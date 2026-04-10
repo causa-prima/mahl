@@ -389,3 +389,7 @@ Server/wwwroot/
 
 # Claude Code temporary working files
 .claude/tmp/
+
+# Playwright test artifacts
+test-results/
+playwright-report/

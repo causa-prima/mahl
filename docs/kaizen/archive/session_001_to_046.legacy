@@ -17,6 +17,89 @@ kritische-regeln:
 
 ---
 
+## Session 046 – 2026-04-02 – Prozess-Arbeit (Skill-Reviews + implementing-scenario)
+
+### Was lief gut
+- gherkin-workshop Review-Loop: 3 Iterationen, Reviewer fand echte Probleme, Findings kritisch bewertet statt blind übernommen (ein False-Positive-CRITICAL in Iteration 2 korrekt erkannt und verworfen)
+- User-Korrekturen während der Arbeit direkt und ohne Diskussion eingearbeitet
+- implementing-scenario klar aus dem Warum abgeleitet (nicht mechanisch aus Schritt-Liste)
+
+### Was war unvollständig
+- **gherkin-workshop-Review ohne skill-creator-Prinzipien:** Der Review-Loop hat allgemeine Qualitätskriterien geprüft, aber NICHT explizit die skill-creator-Qualitätsprinzipien (Progressive Disclosure, Lean-Prompt, Theory of Mind, Warum statt MUST, imperative Form). **Konsequenz:** gherkin-workshop muss in der nächsten Session erneut durch den Review-Loop – diesmal mit den skill-creator-Prinzipien als explizitem Bewertungsmaßstab.
+- **implementing-scenario noch gar nicht reviewt:** Skill wurde neu erstellt aber noch kein einziger Review-Zyklus durchgeführt.
+
+### Was war schwierig / Fehler
+- **Edit-Tool zu schnell durch Python ersetzt:** Bei erstem Edit-Fehler (mehrzeiliger old_string über Leerzeilen) sofort Python-Fallback genutzt statt Ursache zu untersuchen. **Learning:** Bei Edit-Tool-Fehler erst prüfen: zu langer Match? Sonderzeichen? Erst dann Fallback.
+- **Reviewer-Agenten mit Iterations-Vorwissen informiert:** In Iteration 2 stand im Prompt „das ist die zweite Review-Iteration". Das kann den Reviewer beeinflussen (weniger kritisch, weil er denkt „ist ja schon reviewt worden"). **Learning:** Reviewer-Agenten bekommen KEINE Information über frühere Iterationen – jeder Review beginnt unvoreingenommen.
+- **Qualitätsprinzipien des skill-creators nicht explizit als Bewertungsmaßstab genannt:** Reviewer haben den Skill gegen eigene Kriterien bewertet, aber nicht explizit gegen die skill-creator-Prinzipien (Progressive Disclosure, Lean-Prompt, Theory of Mind, Warum statt MUST). **Learning:** Reviewer-Prompt muss die skill-creator-Qualitätsprinzipien explizit als Bewertungsmaßstab benennen.
+
+### Learnings für nächste Session
+- **Beide Skills reviewen:** gherkin-workshop (nochmals, diesmal mit skill-creator-Prinzipien) + implementing-scenario (erstmals). Für beide gilt: Reviewer bekommt (a) Skill, (b) relevante Projekt-Guidelines als Fachinhalt-Referenz, (c) skill-creator-Qualitätsprinzipien als Instruktions-Qualitäts-Maßstab – und kein Vorwissen über frühere Iterationen
+- gherkin-workshop für US-904 anwenden (Feature-File vervollständigen, Freigabe)
+- TDD_PROCESS.md: innerer Loop / Unit-Test-Pflicht für Domain-Typen explizit ergänzen
+
+### Dokumentations-Änderungen
+- `CLAUDE.md`: Navigations-Tabelle `implementing-feature` → `implementing-scenario` (umgesetzt)
+- `TDD_PROCESS.md`: innerer Loop expliziter (auf nächste Session verschoben)
+- `ARCHITECTURE.md`, `GLOSSARY.md`, `REVIEW_CHECKLIST.md`, `NFR.md`: kein Änderungsbedarf
+
+---
+
+## Session 045 – 2026-04-02 – Prozess-Arbeit (Gherkin-Workshop + TDD-Klarstellungen)
+
+### Was lief gut
+- ATDD-vs-Guidelines-Spannung klar herausgearbeitet und sauber aufgelöst (Double-Loop-TDD)
+- `gherkin-workshop` Skill systematisch entworfen, durch skill-creator reviewt und alle HIGH/MEDIUM-Findings eingearbeitet
+- `ValidationError`-Typ als konsequente Verbesserung der TypeScript-Guideline dokumentiert
+- E2E-Test-Infrastruktur aufgebaut und ROT-Status sauber verifiziert
+
+### Was war schwierig / Fehler
+- **TDD-Verstoß:** Implementierung (domain/ingredient.ts) vor rotem Unit-Test begonnen. Ursache: mentaler Sprung in die GREEN-Phase, ohne zu prüfen welcher konkrete Test rot ist. **Learning:** Vor jedem Produktionscode explizit fragen: „Welcher Test ist gerade rot, der diesen Code erzwingt?"
+- **skill-creator nicht proaktiv genutzt:** Skill erst auf Hinweis des Users durch skill-creator reviewt, statt es von Anfang an zu tun. **Learning:** Skill-creator bei jeder Skill-Erstellung/-Änderung von Beginn an einbinden.
+- **Gherkin-Workshop nur 1 Review-Runde:** Weitere Runden nötig bis keine HIGH-Findings mehr – nicht mehr im Kontext möglich.
+
+### Learnings für nächste Session
+- Vor Implementierung: immer prüfen ob der äußere E2E-Loop oder ein innerer Unit-Test der aktuelle treibende Test ist
+- Gherkin-Workshop für US-904 durchlaufen, bevor Implementierung startet
+- Weitere Review-Runden für `gherkin-workshop`-Skill
+- `implementing-feature` → `implementing-scenario` umbauen (ein Szenario pro Kontext)
+
+### Dokumentations-Änderungen
+- `CODING_GUIDELINE_TYPESCRIPT.md`: `ValidationError`-Typ eingeführt (umgesetzt)
+- `TDD_PROCESS.md`: innerer Loop expliziter (auf nächste Session verschoben)
+- `implementing-feature` Skill: innerer Loop + Umbenennung (auf nächste Session verschoben)
+
+---
+
+## Session 044 – 2026-04-01 – Projekt-Setup (Greenfield)
+
+### Was lief gut
+- Svelte-Evaluation war inhaltlich fundiert (MD3-Lücke + Immutability-Konflikt als strukturelle Ausschlussgründe)
+- AwesomeAssertions- und xUnit-v3-Entscheidungen sauber recherchiert und dokumentiert
+- Paket-Update-Analyse (NuGet + npm) vollständig und differenziert (patch/minor vs. major, xunit v3 Kompatibilität erkannt)
+- npm-WSL-Problem schnell diagnostiziert und Workaround (cmd.exe) etabliert und dokumentiert
+
+### Was war schwierig / Fehler
+- **Infrastructure-Pfad falsch angelegt:** User erstellte `.claude/Infrastructure/mahl.Infrastructure.csproj` statt `Infrastructure/mahl.Infrastructure.csproj`. Ursache: Meine Anweisung sagte nur "Datei anlegen" ohne explizit zu erwähnen dass das `Infrastructure/`-Verzeichnis noch nicht existiert. **Learning:** Bei neuen Verzeichnissen immer explizit `mkdir Infrastructure/` als ersten Schritt nennen.
+- **5-Punkte-Begründung im ersten Anlauf unvollständig:** Punkt 4 ("warum Alternativen ausscheiden") fehlte bei mehreren Paketen – Nachbessern nötig. **Learning:** Checkliste intern vor Ausgabe durchgehen.
+- **Kein Code implementiert:** Die gesamte Session war Setup. Der TDD-Zyklus für US-904 beginnt erst in Session 045. Das war unvermeidlich (Greenfield), aber bei der Zeitplanung realistischer kommunizieren.
+
+### Learnings für nächste Session
+- Playwright-Konfiguration (`playwright.config.ts`) und Vite-Konfiguration (`vite.config.ts`) zuerst schreiben – blockieren den E2E-Test
+- Beim ersten Playwright-Test explizit prüfen, ob `npx playwright install chromium` via cmd.exe ausgeführt wurde
+- Bei neuen Verzeichnissen in User-Anweisungen immer `mkdir` explizit vorwegnehmen
+
+### Dokumentations-Änderungen
+- `docs/DEV_WORKFLOW.md`: npm via cmd.exe, Playwright-Setup-Befehl, E2E-Test-Befehl, OpenAPI-URL-Korrektur – **umgesetzt**
+- `docs/SKELETON_SPEC.md`: PUT nach MVP verschoben – **umgesetzt**
+- `docs/history/decisions.md`: 4 neue Einträge – **umgesetzt**
+- `docs/ARCHITECTURE.md`: kein Änderungsbedarf
+- `docs/CODING_GUIDELINE_CSHARP.md`: kein Änderungsbedarf
+- `docs/GLOSSARY.md`: kein Änderungsbedarf
+- `docs/NFR.md`: kein Änderungsbedarf
+
+---
+
 ## Session 043 – 2026-04-01 – Neustart-Vorbereitung
 
 ### Was lief gut

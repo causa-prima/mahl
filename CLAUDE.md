@@ -11,7 +11,7 @@
 | Aufgabe | Lies |
 |---------|------|
 | Session starten / Status prüfen | `docs/AGENT_MEMORY.md` |
-| Feature implementieren | Skill `implementing-feature` verwenden (startet 6-Schritt-Workflow) |
+| Szenario implementieren | Skill `implementing-scenario` verwenden (ein Szenario pro Durchlauf, Double-Loop TDD) |
 | Backend-Endpoint schreiben | `docs/ARCHITECTURE.md` (inkl. Sektion 0c Hexagonal Architecture) → `docs/SKELETON_SPEC.md` (API-Sektion) |
 | E2E Testing / BDD/Gherkin / Outside-In ATDD | `docs/E2E_TESTING.md` |
 | C#-Code schreiben (Backend, Tests) | `docs/CODING_GUIDELINE_GENERAL.md` → `docs/CODING_GUIDELINE_CSHARP.md` (enthält Verweise auf ROP/SumTypes/Stryker-Ergänzungen) |
@@ -24,7 +24,10 @@
 | Definition of Done / NFRs | `docs/NFR.md` |
 | Autor-Self-Review | `docs/REVIEW_CHECKLIST.md` |
 | Review-Agent beauftragen | `docs/LLM_PROMPT_TEMPLATE.md` (Sektion "Agents") |
-| Learnings dokumentieren | `docs/history/lessons_learned.md` |
+| Learnings dokumentieren | `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/PROCESS.md`) |
+| Verhaltensprinzipien (immer gültig) | `docs/kaizen/principles.md` |
+| Maßnahmen-Tracking | `docs/kaizen/countermeasures.md` |
+| Retro durchführen | Skill `kaizen` verwenden |
 | Technische Schuld tracken | `docs/AGENT_MEMORY.md` (Sektion "Technische Schuld") |
 | Langsame Befehle dokumentieren | `docs/slow-commands.md` |
 | Befehl ausführen (Timeout / Auswahl) | `docs/DEV_WORKFLOW.md` (Sektion "Befehlsauswahl & Timeouts") |

@@ -233,6 +233,10 @@ def test_allow_patterns() -> int:
         ("chmod +x script.sh", "chmod +x solo"),
         # Python: nur .claude/
         ("python3 .claude/scripts/stryker-summary.py", "python3 .claude/scripts/"),
+        ("python3 .claude/scripts/jenga_score.py", "jenga_score.py"),
+        ("python3 .claude/scripts/jenga_score.py --file docs/kaizen/lessons_learned.md", "jenga_score.py mit --file"),
+        ("python3 .claude/scripts/retro_report.py", "retro_report.py"),
+        ("python3 .claude/scripts/retro_report.py --current docs/kaizen/lessons_learned.md", "retro_report.py mit --current"),
         ("python3 .claude/hooks/check-code-quality-blocking.py", "python3 .claude/hooks/"),
         # sed \r-Bereinigung
         ("sed -i 's/\\r//' some-file.sh", "sed \\r"),

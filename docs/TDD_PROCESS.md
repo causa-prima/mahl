@@ -15,7 +15,7 @@ kritische-regeln:
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Outside-In ATDD | Double-Loop TDD, Reihenfolge (Gherkin→Frontend→Backend→Code), Regeln | Vor dem Start jeder User Story |
+| Outside-In ATDD | Three-Loop TDD: äußer (Gherkin/E2E), mittler (Integration), inner (Unit je Schicht); Regeln | Vor dem Start jeder User Story |
 | Phase 1 – RED | Einen Test schreiben, fehlschlagen bestätigen, Business-Entscheidungen dokumentieren | Vor jeder neuen Implementierung |
 | Phase 2 – GREEN | Kleinstmögliche Implementierung, Gold-Plating-Check, alle Tests grün | Während der Implementierung |
 | Phase 3 – REFACTOR | Checkliste: Minimalität, Duplikate, Lesbarkeit, Guideline-Compliance | Nach jedem GREEN |
@@ -38,23 +38,34 @@ Erst wenn der aktuelle RED→GREEN→REFACTOR-Zyklus vollständig abgeschlossen 
 Beim Implementieren einer User Story gilt immer diese Reihenfolge:
 
 ```
-1. Gherkin-Szenario schreiben  →  rot (noch kein Step-Code)
-2. Frontend E2E-Test schreiben  →  rot (Backend nicht implementiert)
-3. Backend Integration-Test schreiben  →  rot (Endpoint nicht implementiert)
-4. Minimale Implementierung  →  grün (alle Tests grün)
-5. Refactor
+1. Gherkin-Szenario schreiben         →  rot (noch kein Step-Code)
+2. Frontend E2E-Test schreiben        →  rot (Backend nicht implementiert)
+3. Backend Integration-Test schreiben →  rot (Endpoint nicht implementiert)
+4. Implementierung je Schicht         →  pro Schicht: eigener roter Unit-Test → grün → Refactor
+5. Refactor (Integration-Ebene)
 ```
 
-Der äußere Loop (Gherkin → E2E-Test) treibt den inneren Loop (Backend-Test → Implementierung):
+Es gibt drei Loop-Ebenen. Der äußere Loop treibt den mittleren, der mittlere treibt den inneren:
 
 ```
-äußere Schleife: Gherkin → E2E-Test → rot
-  innere Schleife: Backend-Test → rot → Implementierung → grün → Refactor
-    → äußere Schleife fortsetzen bis Gherkin grün
+äußere Schleife:  Gherkin → E2E-Test → rot
+  mittlere Schleife:  Integration-Test → rot → (Schichten implementieren) → grün → Refactor
+    innere Schleife:  Unit-Test (je Schicht) → rot → minimale Implementierung → grün → Refactor
+    innere Schleife:  Unit-Test (nächste Schicht) → rot → ...
+  → mittlere Schleife: Integration-Test grün? → weiter; sonst nächste Schicht
+→ äußere Schleife fortsetzen bis Gherkin grün
 ```
+
+**Schichten, die einen eigenen roten Unit-Test brauchen (Beispiele):**
+- C# Custom Value Types (z. B. `IngredientName`, `Unit`) – eigener Konstruktor-/Validierungstest (entsteht im Inner Loop, wenn der Outer Loop eine Validierungsregel fordert – kein proaktives Schreiben)
+- TypeScript Branded Types / Domain-Objekte (z. B. `IngredientId`, `ingredient.ts`) – eigener Unit-Test (analog: im Inner Loop, wenn durch Outer Loop gefordert)
+- Services / Use-Case-Klassen – Unit-Test vor der Implementierung
+- Repository-Logik (soweit nicht durch Integration-Test abgedeckt)
+- React-Komponenten – Vitest-Komponenten-Test vor der Implementierung
 
 **Regeln:**
 - Kein Backend- oder E2E-Test ohne darüberliegendes Gherkin-Szenario
+- Kein Produktionscode für eine Schicht ohne fehlschlagenden Test auf dieser Schicht
 - Kein Produktionscode ohne fehlschlagenden Backend-Test
 - Das Gherkin-Szenario ist die Spec – es darf nicht nachträglich angepasst werden, um die Implementierung zu bestätigen
 
@@ -136,7 +147,7 @@ Führe die Tests nochmals aus und bestätige grün.
 
 ---
 
-**Wichtig:** Wenn du merkst, dass du Tests erst nach der Implementierung schreibst, halte an, dokumentiere das als Learning in `docs/history/lessons_learned.md`, und schreibe für den Rest der Story Tests zuerst.
+**Wichtig:** Wenn du merkst, dass du Tests erst nach der Implementierung schreibst, halte an, dokumentiere das als Learning in `docs/kaizen/lessons_learned.md`, und schreibe für den Rest der Story Tests zuerst.
 
 ## Test-Ausführung
 

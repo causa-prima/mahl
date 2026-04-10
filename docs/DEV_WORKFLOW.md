@@ -174,7 +174,7 @@ cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet build"
 
 # Run (Backend API)
 cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet run --project Server"
-# → läuft auf https://localhost:7xxx / http://localhost:5059 (Swagger unter /swagger)
+# → läuft auf https://localhost:7xxx / http://localhost:5059 (OpenAPI JSON unter /openapi/v1.json)
 
 # Seed-Daten laden (10 Rezepte + 45 Zutaten)
 cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet run --project Server -- --seed-data"
@@ -184,13 +184,25 @@ cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet run --project Ser
 
 ## Frontend
 
+> **WSL-Hinweis:** `npm` in WSL zeigt auf die Windows-nvm-Installation mit defekten Pfaden. Alle npm-Befehle via `cmd.exe /c` ausführen (analog zu dotnet):
+
 ```bash
-cd Client
-npm install       # einmalig
-npm run dev       # → http://localhost:5173
+# npm install (einmalig)
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm install"
+
+# Playwright-Browser installieren (einmalig nach npm install)
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npx playwright install chromium"
+
+# Dev-Server
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run dev"
+# → http://localhost:5173
 
 # Produktions-Build (Output → Server/wwwroot/)
-npm run build
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run build"
+
+# npm update / audit
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm update"
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm audit fix"
 ```
 
 **Vite-Proxy:** Entwicklung proxied `/api/*` auf `http://localhost:5059` (Backend).
@@ -209,8 +221,11 @@ python3 .claude/scripts/dotnet-test.py --filter TestMethodName
 # Vollständiger Output (kein Filtern)
 python3 .claude/scripts/dotnet-test.py --verbose
 
-# Frontend Tests
-cd Client && npm run test
+# Frontend Unit-Tests
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run test"
+
+# E2E-Tests (Playwright)
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run test:e2e"
 ```
 
 ---

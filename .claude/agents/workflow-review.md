@@ -26,7 +26,7 @@ Lies alle folgenden Dateien vollständig:
 4. `docs/REVIEW_CHECKLIST.md`
 5. `docs/LLM_PROMPT_TEMPLATE.md`
 6. `docs/DEV_WORKFLOW.md`
-7. `docs/history/lessons_learned.md`
+7. `docs/kaizen/lessons_learned.md`
 8. `.claude/skills/implementing-feature/SKILL.md`
 9. `.claude/skills/closing-session/SKILL.md`
 10. `.claude/skills/review-code/SKILL.md`
