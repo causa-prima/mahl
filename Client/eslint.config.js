@@ -48,16 +48,76 @@ export default defineConfig([
       // Category 1 – Parameterlose Komponenten und Hooks sind valide React-Patterns.
       // `const Spinner = () => <div />` soll erlaubt sein.
       'functional/functional-parameters': 'off',
+
+      // throw ist in exhaustive-switch-Handlern (default: never) und für echte technische
+      // Ausnahmezustände (5xx, Netzwerk) erlaubt. functional/no-throw-statements ist zu
+      // aggressiv: es würde auch `throw new Error(...)` in default-never-Zweigen blockieren,
+      // die für strukturelle Vollständigkeit nötig sind. Enforcement via Review-Checkliste.
+      'functional/no-throw-statements': 'off',
     },
   },
+
+  // --- ROP: neverthrow-Shortcuts verboten (außer in Tests) ---
+  // .isOk() / .isErr() sind partielle Checks – stattdessen .match(ok, err) verwenden.
+  // ._unsafeUnwrap() ist ein expliziter Laufzeit-Fehler-Auslöser – nur in Tests erlaubt.
   {
-    files: ['src/components/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[property.name='isOk']",
+          message: "isOk() nicht verwenden. Stattdessen .match(ok => ..., err => ...) (neverthrow) nutzen. Siehe CODING_GUIDELINE_TYPESCRIPT.md Abschnitt 4.",
+        },
+        {
+          selector: "MemberExpression[property.name='isErr']",
+          message: "isErr() nicht verwenden. Stattdessen .match(ok => ..., err => ...) (neverthrow) nutzen. Siehe CODING_GUIDELINE_TYPESCRIPT.md Abschnitt 4.",
+        },
+        {
+          selector: "MemberExpression[property.name='_unsafeUnwrap']",
+          message: "_unsafeUnwrap() ist nur in Tests erlaubt. Im Produktionscode .match(ok => ..., err => ...) verwenden.",
+        },
+      ],
+    },
+  },
+
+  // --- fetch() verboten außerhalb von src/services/ ---
+  // API-Calls gehören ausschließlich in src/services/, nicht in Komponenten, Pages oder Hooks.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/services/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',
         {
           selector: "CallExpression[callee.name='fetch']",
-          message: "fetch() nicht direkt in Komponenten verwenden. API-Calls gehören in src/services/.",
+          message: "fetch() nicht direkt verwenden. API-Calls gehören ausschließlich in src/services/.",
+        },
+      ],
+    },
+  },
+
+  // --- React Query: Wrapper-Pflicht ---
+  // useQuery/useMutation nie direkt verwenden – stattdessen useResultQuery/useResultMutation.
+  // Ausnahme: die Wrapper-Dateien selbst dürfen direkt importieren.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      'src/hooks/useResultQuery.ts',
+      'src/hooks/useResultMutation.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tanstack/react-query',
+              importNames: ['useQuery', 'useMutation'],
+              message: "useQuery/useMutation nicht direkt verwenden. Stattdessen useResultQuery/useResultMutation aus src/hooks/ nutzen. Siehe CODING_GUIDELINE_TYPESCRIPT.md Abschnitt 4b.",
+            },
+          ],
         },
       ],
     },

@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 65 | 2026-04-18 | SKELETON (US-904 Szenario 1) | gherkin-workshop UX-Update (Guideline 6+7+5+3): "Zutat anlegen", Empty-State-Text, Undo-Toast, Loading-State-Szenarien. Implementing-Scenario Szenario 1 abgeschlossen: Empty State grün, Stryker Findings dokumentiert, Review-Agenten (4), test.skip für Szenario 2. |
 | 64 | 2026-04-18 | SKELETON (Kaizen-Retro) | Retro S056–S063: 5 Noise-Einträge gelöscht, 3 neue CMs (Annahmen-als-Fakten, Noise-in-LL, Guideline-ohne-Skill-Update), CM1 BEWÄHRT. Filter-Test für lessons_learned, Preprocessing-Schritt im kaizen-Skill, mv/cp im Bash-Hook erlaubt, „Aktueller Stand / Letzter Stand"-Block aus AGENT_MEMORY entfernt. |
 | 63 | 2026-04-17 | SKELETON (US-904 Szenario 1) | CA-Analyzer-Fixes (Server.Tests), Stryker MTP-Runner für xUnit v3 (0%→100% Backend), gherkin-workshop-Skill um UX-Guidelines erweitert. Commit + Frontend-Stryker-Suppressionen + US-904-Workshop (UX) ausstehend. |
 | 62 | 2026-04-17 | SKELETON (Infrastruktur) | Bash-Hook Review-Findings (#1 sed, #3 find/bash/dash/ksh, #5/#7 Kommentare – #4 npm-test-Lookahead bewusst nicht angewendet: Reviewer-Analyse falsch). Zweiter Code-Review (Refactoring): split_compound_command entschachtelt (flush-Helper + Early-Continues), impliziter return True explizit, is_compound_command entfernt, _ALLOW_REASON-Konstante. jenga_score.py + retro_report.py: minimaler Default-Output, --verbose für vollständige Ausgabe. |
