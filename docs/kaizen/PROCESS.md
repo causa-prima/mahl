@@ -5,6 +5,20 @@ wann-lesen: Beim Schreiben eines lessons_learned-Eintrags (Schwere/Kategorie/Kon
             beim Starten einer Retro, beim Bewerten einer Maßnahme.
 -->
 
+## Was gehört in lessons_learned?
+
+Ein Eintrag ist sinnvoll wenn er ein **Agenten-Verhalten** beschreibt das wieder auftreten könnte.
+
+**Nicht dokumentieren:**
+- Infrastruktur- oder Setup-Fehler die durch eine Konfigurationsänderung dauerhaft behoben sind
+  → Dieses Wissen gehört in `DEV_WORKFLOW.md`, eine Config-Datei oder einen Code-Kommentar
+- Reine Fakten über Tool-Verhalten ohne Konsequenz für künftiges Agenten-Verhalten
+
+**Test vor jedem Eintrag:** „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?"
+Nein → kein Eintrag. Ja → dokumentieren.
+
+---
+
 ## Eintrag-Format (lessons_learned.md)
 
 Einträge werden pro Session gruppiert:
@@ -127,6 +141,14 @@ Details: Kommentar-Header in `.claude/scripts/retro_report.py`.
 Die aktuelle `lessons_learned.md` wird nach `docs/kaizen/archive/` verschoben.
 Ablauf: Skill `kaizen`, Schritt 5.
 Der Jenga-Score startet automatisch neu – `jenga_score.py` liest immer nur die aktuelle Datei.
+
+---
+
+## Umsetzung offener Maßnahmen
+
+**Regel 1 – Sichtbarkeit:** Jede neue OFFEN-Maßnahme wird in derselben Retro-Session unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md` eingetragen. Falls inhaltlich zutreffend auch als Technische Schuld oder Offene Frage. Ablauf: Schritt 4 des `kaizen`-Skills.
+
+**Regel 2 – Eskalation:** Eine Maßnahme die nach 2 Retros noch OFFEN ist, wird in der nächsten Retro (Schritt 3, Abschnitt F) als ESKALIERT präsentiert. Der User entscheidet dann: Umsetzung priorisieren oder bewusst verwerfen (Begründung in der Maßnahme notieren).
 
 ---
 

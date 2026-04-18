@@ -28,6 +28,7 @@ Lies vor dem Start:
 - `docs/GLOSSARY.md` – Ubiquitäre Sprache (nur Begriffe daraus in Szenarien)
 - `docs/E2E_TESTING.md` – Gherkin-Konventionen, Tag-Schema, Traceability-Regeln
 - `docs/history/decisions.md` – Explizite Entwurfsentscheidungen (Constraints für Szenarien)
+- `docs/CODING_GUIDELINE_UX.md` – Interaction-Design-Prinzipien (Leer-Zustand, Feedback, Fehlermeldungen)
 - `features/` – Bestehende Feature-Files (Pattern-Konsistenz)
 
 ---
@@ -84,7 +85,13 @@ Welche Entscheidungen betreffen diese US?
 Welche Felder nimmt jede Operation als Eingabe?
 Pro Feld: Name, Typ (String / Zahl / Enum / Referenz), bekannte Constraints (NOT NULL, max. Länge, unique, etc.)
 
-Notiere A–D schriftlich – Schritt 2 übergibt sie verbatim an die Agents.
+**E) UX-Kontext (für Schritt 2, alle Agents):**
+Prüfe für jede Operation aus A) welche UX-Prinzipien zutreffen – notiere je "Relevant" oder "Nicht relevant" mit einem Satz Begründung:
+- **Prinzip 7 – Leerer Zustand:** Gibt es Listen oder Ansichten, die leer sein können? Bei "Relevant": Leerer Zustand erfordert Erklärungstext ("Noch keine X angelegt.") + nächste Aktion.
+- **Prinzip 3 – Sichtbares Feedback:** Gibt es mutierende Operationen, die auf eine Server-Antwort warten? Bei "Relevant": Lade- und Bestätigungszustand beschreiben.
+- **Prinzip 4 – Fehlermeldungen:** Gibt es Fehlerfälle mit UI-Fehlermeldungen? Bei "Relevant": Format "[Was ist falsch]." oder "[Was ist falsch] ([Constraint])." – Platzierung nahe am betroffenen Element.
+
+Notiere A–E schriftlich – Schritt 2 übergibt sie verbatim an die Agents.
 
 → TaskUpdate „0. Kontext laden": completed
 
@@ -120,6 +127,8 @@ Typische Frage-Kategorien:
 | Grenzfälle | „Was passiert wenn [Szenario X] und [Zustand Y] gleichzeitig gelten?" |
 | Fehlermeldungen | „Spezifische oder generische Meldung für [Fehlerfall]?" |
 | Latente Regeln | „Gibt es Regeln, die sich nicht aus den Akzeptanzkriterien ergeben, aber wichtig sind?" |
+| Technische Fehler | „Gibt es für diese Operation Fehlerverhalten jenseits der allgemeinen Behandlung (→ decisions.md: Querschnittliche Fehlerbehandlung)?" |
+| Draft-Saving | „Hat diese Story Formulare mit nicht-trivialem Eingabeaufwand? → Falls ja: Draft-Saving-Szenario einplanen." |
 
 ### grill-me für tiefere Exploration
 
@@ -143,6 +152,11 @@ Der Dialog ist abgeschlossen, wenn:
   applicable" markiert
 - Keine offenen Widersprüche bestehen – prüfe: Widerspricht Antwort X der Antwort Y
   zu derselben Entität / Operation / Zustand?
+- Technische Fehler: entweder story-spezifisches Verhalten dokumentiert, oder explizit
+  bestätigt dass die allgemeine Behandlung (decisions.md: Querschnittliche Fehlerbehandlung)
+  gilt – „keine Antwort" ist kein Abschluss
+- Draft-Saving: explizit entschieden ob Formulare dieser Story nicht-trivialen
+  Eingabeaufwand haben; bei Ja: Szenario eingeplant
 
 **Achtung:** Offenbart der Dialog eine Architekturentscheidung, die nicht in decisions.md
 steht (z.B. eine neue Verhaltenssemantik oder ein neues Zustandsmodell)? → Stopp.
@@ -166,6 +180,7 @@ Jeder Agent bekommt:
   (Paraphrasen können implizite Regeln verlieren, die der User beiläufig formuliert hat)
 - Constraints aus decisions.md (Schritt 0.C; nur US-bezogene + allgemeine Architekturregeln)
 - Bestehende Szenarien (Schritt 0.B; „keine" wenn neu)
+- UX-Kontext (Schritt 0.E) – welche UX-Prinzipien gelten, mit Relevanzbewertung
 
 **Warum parallel?** Jede Technik hat blinde Flecken. Example Mapping findet Business Rules,
 State-Transition findet vergessene Zustandskombinationen, Input-Partition findet

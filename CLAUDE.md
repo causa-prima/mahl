@@ -16,6 +16,7 @@
 | E2E Testing / BDD/Gherkin / Outside-In ATDD | `docs/E2E_TESTING.md` |
 | C#-Code schreiben (Backend, Tests) | `docs/CODING_GUIDELINE_GENERAL.md` → `docs/CODING_GUIDELINE_CSHARP.md` (enthält Verweise auf ROP/SumTypes/Stryker-Ergänzungen) |
 | TypeScript/React-Code schreiben | `docs/CODING_GUIDELINE_GENERAL.md` → `docs/CODING_GUIDELINE_TYPESCRIPT.md` |
+| Frontend-UX / Interaction Design | `docs/CODING_GUIDELINE_UX.md` |
 | Allgemeine Coding-Prinzipien (KISS, Naming, Komplexität) | `docs/CODING_GUIDELINE_GENERAL.md` |
 | Datenbank-Schema ändern | `docs/DEV_WORKFLOW.md` → `docs/SKELETON_SPEC.md` (DB-Sektion) |
 | Domain-Logik / Fachbegriff | `docs/GLOSSARY.md` → `docs/ARCHITECTURE.md` |

@@ -23,6 +23,22 @@ def _get_repo_root_win() -> str:
 REPO_ROOT_WIN: str = _get_repo_root_win()
 
 
+def run_npm(args: list[str], subdir: str = "Client") -> tuple[str, int]:
+    """Führt 'npm <args>' via cmd.exe aus. Gibt (combined_output, exit_code) zurück."""
+    cwd_win = REPO_ROOT_WIN + "\\" + subdir
+    quoted = [f'"{a}"' if " " in a and not a.startswith('"') else a for a in args]
+    cmd_inner = f"cd /d {cwd_win} && npm {' '.join(quoted)}"
+    result = subprocess.run(
+        ["cmd.exe", "/c", cmd_inner],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    return result.stdout, result.returncode
+
+
 def run_dotnet(args: list[str], cwd_win: str | None = None) -> tuple[str, int]:
     """Führt 'dotnet <args>' via cmd.exe aus. Gibt (combined_output, exit_code) zurück."""
     if cwd_win is None:

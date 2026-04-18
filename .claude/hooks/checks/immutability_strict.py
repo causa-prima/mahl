@@ -26,7 +26,7 @@ def check(inp: HookInput) -> list[str]:
     if CLASS_WITHOUT_RECORD.search(content_without_static_classes):
         violations.append(
             "⛔ `class` ohne `record` in Domain-Code erkannt.\n"
-            "  EF-Entities → `class` nur in `Server/Data/DatabaseTypes/`.\n"
+            "  EF-Entities → `class` nur in `Infrastructure/DatabaseTypes/`.\n"
             "  DTOs        → `record` mit `init;`.\n"
             "  Value Objects → `readonly record struct`."
         )

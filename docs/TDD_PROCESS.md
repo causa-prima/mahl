@@ -6,7 +6,7 @@ kritische-regeln:
   - IMMER EIN TEST AUF EINMAL – erst RED→GREEN→REFACTOR abschließen, dann nächster Test
   - GREEN = kleinstmögliche Implementierung; hardcodierte Rückgabe ist erlaubt und erwünscht
   - Jede Zeile ohne erzwingenden roten Test ist Gold-Plating → löschen
-  - Full State Assertion bei mutierenden Tests – ExcludingMissingMembers verboten
+  - Full State Assertion bei mutierenden Tests – BeEquivalentTo mit explizitem Excluding verwenden
   - Stryker-Ziel: 100% Mutation Coverage (Pflicht am Ende jeder Phase)
   - Branch-Coverage-Ziel: 100% (Coverlet / V8) – Unterschreitung = Build-Fehler
 -->
@@ -64,10 +64,10 @@ Es gibt drei Loop-Ebenen. Der äußere Loop treibt den mittleren, der mittlere t
 - React-Komponenten – Vitest-Komponenten-Test vor der Implementierung
 
 **Regeln:**
-- Kein Backend- oder E2E-Test ohne darüberliegendes Gherkin-Szenario
-- Kein Produktionscode für eine Schicht ohne fehlschlagenden Test auf dieser Schicht
-- Kein Produktionscode ohne fehlschlagenden Backend-Test
-- Das Gherkin-Szenario ist die Spec – es darf nicht nachträglich angepasst werden, um die Implementierung zu bestätigen
+- Backend- und E2E-Tests erst nach darüberliegendem Gherkin-Szenario anlegen
+- Produktionscode für eine Schicht erst nach einem fehlschlagenden Test auf dieser Schicht schreiben
+- Produktionscode erst nach fehlschlagendem Backend-Test schreiben
+- Das Gherkin-Szenario ist die Spec – nachträgliche Anpassungen zur Implementierungsbestätigung sind unzulässig
 
 **Vollständige BDD/Gherkin-Dokumentation:** `docs/E2E_TESTING.md`
 
@@ -255,7 +255,7 @@ GetAllIngredientsFromDb().Should().BeEquivalentTo(
 
 **`BeEquivalentTo` ist die Standardmethode.** `HaveCount`, `ContainSingle` etc. sind nur unterstützend erlaubt, wenn `BeEquivalentTo` allein nicht ausreicht (z. B. für Zusatzprüfungen wie `DeletedAt != null`). `HaveCount(n)` allein ist kein Full State.
 
-**`.Should().Contain(...)` ist verboten** – auch auf Strings. Es ist immer eine partielle Assertion:
+**`.Should().Contain(...)` ist immer eine partielle Assertion – auch auf Strings.** Stattdessen:
 - Für exakte String-Werte (inkl. Response-Bodies in Plain-Text) → `.Should().Be(exactString)`
 - Für JSON-Response-Bodies → `ReadFromJsonAsync<T>()` + typisierte Assertion auf Properties
 
@@ -272,7 +272,7 @@ Für `class`-basierte DB-Entities (EF Core) gilt dies nicht – dort werden ohne
 
 **Property-Ausschlüsse:**
 - `Excluding(x => x.PropName)` – erlaubt, wenn eine Property genuinen Ignorierungsgrund hat (auto-generierte Id, Timestamp). Muss explizit begründbar sein.
-- `ExcludingMissingMembers()` – **verboten**. Ignoriert stillschweigend alle fehlenden Properties; neue Properties im DTO bleiben ungetestet.
+- `ExcludingMissingMembers()` – ignoriert stillschweigend alle fehlenden Properties; neue Properties im DTO bleiben ungetestet. Stattdessen: explizites `Excluding(x => x.PropName)` mit Begründung.
 
 **API-Response vs. DB-State:**
 - **API-Response (DTO):** Id aus DB holen (`GetAllXxxFromDb()[0].Id`) und vollständig vergleichen – testet, dass die API die korrekte Id zurückgibt.
@@ -304,7 +304,7 @@ Diese Regel gilt für POST (anlegen), PUT/PATCH (ändern), DELETE (löschen/soft
 
 - **C# Backend:** Coverlet (collector) mit `coverlet.runsettings` – automatisch bei vollem Test-Lauf (`dotnet-test.py` ohne `--filter`). Threshold: 100% Branch + Line.
 - **TypeScript Frontend:** Vitest mit V8-Provider – `npm run test:coverage`. Threshold: 100% Branches, Functions, Lines, Statements.
-- **Suppressionen:** C# via `[ExcludeFromCodeCoverage]` + Begründung in `docs/history/decisions.md`; TS via `/* v8 ignore next */` + Begründung. Suppressionen ohne Begründung sind verboten.
+- **Suppressionen:** C# via `[ExcludeFromCodeCoverage]` + Begründung in `docs/history/decisions.md`; TS via `/* v8 ignore next */` + Begründung. Jede Suppression muss begründet sein.
 
 ### Stryker-Survivor behandeln
 
@@ -328,7 +328,7 @@ Die richtige Frage bei einem Survivor ist nie „Wie töte ich diesen Mutanten?"
 4. **Code neu schreiben → GREEN bestätigen.**
 5. **Stryker auf die Datei ausführen → Survivor darf nicht mehr erscheinen.**
 
-**`// Stryker disable`** ist ausschließlich für echte äquivalente Mutanten erlaubt – d. h. wenn es beobachtbar keinen Unterschied macht, ob der Mutant überlebt (z. B. Route-String `"/"` vs. `""` in ASP.NET Core = identisches Routing-Verhalten). Jede Suppression muss in `docs/history/decisions.md` begründet werden. Suppression als Erstreaktion auf einen Survivor ist **verboten**.
+**`// Stryker disable`** ist ausschließlich für echte äquivalente Mutanten erlaubt – d. h. wenn es beobachtbar keinen Unterschied macht, ob der Mutant überlebt (z. B. Route-String `"/"` vs. `""` in ASP.NET Core = identisches Routing-Verhalten). Jede Suppression muss in `docs/history/decisions.md` begründet werden. Als Erstreaktion auf einen Survivor zuerst Spec-Check durchführen: fehlenden Test schreiben oder Gold-Plating entfernen.
 
 **Bekannte äquivalente Mutanten – Defensive Guards:**
 

@@ -3,12 +3,11 @@
 <!--
 wann-lesen: Bei jedem Ausführen von Befehlen (Build, Test, Run, Migration, Stryker) und beim Entwickeln von Hooks
 kritische-regeln:
-  - dotnet test → python3 .claude/scripts/dotnet-test.py (Script, nicht cmd.exe direkt)
-  - dotnet stryker → python3 .claude/scripts/dotnet-stryker.py (Script, nicht cmd.exe direkt)
-  - alle anderen dotnet-Befehle: cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ..." (WSL hat kein .NET)
+  - Test- und Stryker-Aufrufe: immer Python-Wrapper aus .claude/scripts/ verwenden – Hook erzwingt das und zeigt den richtigen Befehl
+  - Alle anderen dotnet-Befehle: cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ..." (WSL hat kein .NET)
   - Pipes nach cmd.exe funktionieren nicht in WSL – Variable capturen oder Script verwenden
   - Timeouts immer setzen – Richtwerte in der Tabelle unten
-  - Stryker --mutate: Pfad ist projektrelativ (ohne Server/-Präfix)
+  - Stryker --mutate: Pfad ist projektrelativ (ohne Server/-Präfix für Backend, ohne Client/-Präfix für Frontend)
   - Shell-Scripts nach Write sofort: sed -i 's/\r//' datei.sh (NTFS-Zeilenenden)
 -->
 
@@ -16,7 +15,7 @@ kritische-regeln:
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Befehlsauswahl & Timeouts | Welche Befehle sind vorab genehmigt, Timeout-Richtwerte für alle relevanten Kommandos | Vor jedem lang laufenden Befehl |
+| Befehlsauswahl & Timeouts | Auto-deny/allow-once-Mechanismus, Timeout-Richtwerte für alle relevanten Kommandos | Vor jedem lang laufenden Befehl |
 | Bash-Befehle in WSL/cmd.exe | Pipe-Regeln, Varianten (Script / Variable / Datei / direkt) | Bei cmd.exe + Unix-Pipe-Problemen |
 | Tool-Call-Failure-Analyse | Root Cause → korrektes Muster ableiten → dokumentieren → wiederholen | Bei fehlgeschlagenen Befehlen |
 | KRITISCH: dotnet in WSL | `cmd.exe /c "..."` Wrapper-Pflicht, Beispiele | Immer wenn dotnet aufgerufen wird |
@@ -35,9 +34,12 @@ kritische-regeln:
 
 ## Befehlsauswahl & Timeouts (für Agenten)
 
-**Befehlsauswahl:** Vor dem Ausführen eines Befehls zuerst `.claude/settings.local.json` prüfen (Sektion `permissions.allow`). Nur dort gelistete Befehle sind vorab genehmigt. Wenn ein benötigter Befehl fehlt:
-1. Prüfen ob das Ziel effizient aus erlaubten Befehlen zusammengesetzt werden kann
-2. Falls nicht: beim User anfragen, ob der Befehl eingetragen werden darf – nicht einfach probieren
+**Befehlsauswahl:** Der Bash-Permission-Hook (`check-bash-permission.py`) entscheidet automatisch:
+- **Allow-Liste**: Befehle werden ohne Nachfrage ausgeführt.
+- **Wrong-Approach** (z.B. `dotnet test` direkt, `python3 /abs/path`): Immer blockiert – es gibt eine bessere Alternative. Kein Override möglich.
+- **Destruktiv** (z.B. `rm -rf`, `git reset --hard`): Auto-deny, aber per `# --allow-once` freigabefähig.
+- **Auto-deny**: Alle anderen Befehle werden automatisch abgelehnt.
+- **`# --allow-once`**: Marker an den Befehl hängen → Hook fragt den User. Wird geloggt in `.claude/tmp/denied-commands.log`.
 
 **Timeouts:** Vor jedem lang laufenden Prozess überlegen: *Wann sollte ich abbrechen?* Das Bash-Tool akzeptiert einen `timeout`-Parameter (Millisekunden). Richtwerte:
 
@@ -50,6 +52,10 @@ kritische-regeln:
 | `dotnet stryker` (vollständig) | ~2–3 min | 360 000 ms |
 | `npm install` | 30–120 s | 180 000 ms |
 | `npm run build` | 10–30 s | 60 000 ms |
+| `vitest-run.py` | 5–15 s | 30 000 ms |
+| `playwright-test.py` | 10–30 s | 60 000 ms |
+| `stryker-frontend.py` (eine Datei) | 1–3 min | 180 000 ms |
+| `stryker-frontend.py` (vollständig) | 2–5 min | 360 000 ms |
 | `docker-compose up -d` | 5–30 s | 60 000 ms |
 
 Wenn ein Prozess den Timeout überschreitet:
@@ -124,10 +130,16 @@ Parameter einfach weglassen oder "blind" variieren ist kein Debugging.
 
 .NET ist **nur auf dem Windows-Host** installiert – nicht in WSL.
 
-`dotnet test` und `dotnet stryker` immer via Projekt-Scripts (kapseln cmd.exe intern):
+Test- und Stryker-Aufrufe immer via Projekt-Scripts (kapseln cmd.exe intern):
 ```bash
-python3 .claude/scripts/dotnet-test.py [--project ...] [--filter ...] [--verbose]
+# Backend
+python3 .claude/scripts/dotnet-test.py [--filter ...] [--verbose]
 python3 .claude/scripts/dotnet-stryker.py [--mutate ...] [--detail]
+
+# Frontend
+python3 .claude/scripts/vitest-run.py [--filter ...] [--verbose]
+python3 .claude/scripts/playwright-test.py [--filter ...] [--verbose]
+python3 .claude/scripts/stryker-frontend.py [--mutate src/...] [--detail]
 ```
 
 Alle anderen dotnet-Befehle via cmd.exe-Wrapper:
@@ -212,20 +224,20 @@ cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm audit fix"
 ## Tests
 
 ```bash
-# Alle Tests
+# Backend Tests
 python3 .claude/scripts/dotnet-test.py
-
-# Einzelner Test
 python3 .claude/scripts/dotnet-test.py --filter TestMethodName
-
-# Vollständiger Output (kein Filtern)
 python3 .claude/scripts/dotnet-test.py --verbose
 
-# Frontend Unit-Tests
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run test"
+# Frontend Unit-Tests (vitest)
+python3 .claude/scripts/vitest-run.py
+python3 .claude/scripts/vitest-run.py --filter Pattern   # Substring-Match gegen Testname
+python3 .claude/scripts/vitest-run.py --verbose
 
 # E2E-Tests (Playwright)
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run test:e2e"
+python3 .claude/scripts/playwright-test.py
+python3 .claude/scripts/playwright-test.py --filter ingredients  # Datei- oder Testname-Filter
+python3 .claude/scripts/playwright-test.py --verbose
 ```
 
 ---
@@ -316,7 +328,14 @@ python3 .claude/scripts/dotnet-stryker.py --detail
 
 **Frontend (Stryker-JS):**
 ```bash
-cd Client && npx stryker run
+# Alle Dateien (~variabel)
+python3 .claude/scripts/stryker-frontend.py
+
+# Gezielt: eine Datei (Pfad relativ zu Client/)
+python3 .claude/scripts/stryker-frontend.py --mutate src/pages/IngredientsPage.tsx
+
+# Mit Survivor-Details (mehr Output-Zeilen)
+python3 .claude/scripts/stryker-frontend.py --detail
 ```
 
 ---

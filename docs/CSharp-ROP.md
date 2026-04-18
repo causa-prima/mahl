@@ -21,13 +21,12 @@ Voraussetzung: docs/CODING_GUIDELINE_CSHARP.md (Core-Regeln) bereits gelesen.
 | Abschluss der Kette | MUSS mit `.Match()` oder `.MatchAsync()` enden |
 | Async DB-Operationen | Dürfen *innerhalb* eines `.BindAsync()`-Lambdas early returns (`if/return`) nutzen – das Lambda ist eine abgeschlossene async Funktion, kein Orchestrierungsschritt |
 
-**Global verboten** (nicht nur in Endpoints, sondern im gesamten Produktionscode):
+**Im gesamten Produktionscode ausschließlich `.Match(ok => ..., err => ...)` oder `.MatchAsync(...)` verwenden** (Negativ-Beispiele):
 ```csharp
 if (result.IsT1) return ...;  // ❌ imperatives IsT-Check
 result.AsT0                   // ❌ ohne .Match()
 result.IsT0                   // ❌ imperatives IsT-Check
 ```
-Verwende stets `.Match(ok => ..., err => ...)` oder `.MatchAsync(...)`.
 
 **OneOf-Instanz erzeugen: impliziter Cast statt `FromT0` / `FromT1`**
 

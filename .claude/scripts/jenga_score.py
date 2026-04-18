@@ -17,10 +17,11 @@ import re
 import sys
 from collections import defaultdict
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kaizen_constants import SCHWERE_WEIGHTS
+
 REPO_ROOT = os.environ.get("CLAUDE_PROJECT_DIR", "/mnt/c/Users/kieritz/source/repos/mahl")
 DEFAULT_FILE = os.path.join(REPO_ROOT, "docs", "kaizen", "lessons_learned.md")
-
-DEDUCTIONS = {"KRITISCH": 25, "HOCH": 10, "MITTEL": 3, "GERING": 1}
 SESSION_DEDUCTION = 5
 START_SCORE = 100
 
@@ -58,7 +59,7 @@ def compute_score(sessions: int, findings: list[dict]) -> int:
     score = START_SCORE
     score -= sessions * SESSION_DEDUCTION
     for f in findings:
-        score -= DEDUCTIONS[f["schwere"]]
+        score -= SCHWERE_WEIGHTS[f["schwere"]]
     return score
 
 
@@ -114,6 +115,8 @@ def render_table(findings: list[dict]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Berechnet den Jenga-Score.")
     parser.add_argument("--file", default=DEFAULT_FILE, help="Pfad zur lessons_learned.md")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Zeigt Details: Sessions, Findings, Zähltabelle")
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
@@ -123,14 +126,15 @@ def main() -> int:
     sessions, findings = parse(args.file)
     score = compute_score(sessions, findings)
 
-    # Ausgabe
     status = "RETRO FÄLLIG" if score <= 0 else "OK"
-    print(f"\nJenga-Score: {score} / {START_SCORE}  [{status}]")
-    print(f"  Sessions: {sessions} × -{SESSION_DEDUCTION} = -{sessions * SESSION_DEDUCTION}")
-    print(f"  Findings: {len(findings)} gesamt")
-    print()
-    print("Zähltabelle:")
-    print(render_table(findings))
+    print(f"Jenga-Score: {score} / {START_SCORE}  [{status}]")
+
+    if args.verbose:
+        print(f"  Sessions: {sessions} × -{SESSION_DEDUCTION} = -{sessions * SESSION_DEDUCTION}")
+        print(f"  Findings: {len(findings)} gesamt")
+        print()
+        print("Zähltabelle:")
+        print(render_table(findings))
 
     return 0 if score > 0 else 2  # exit 2 = Retro fällig
 

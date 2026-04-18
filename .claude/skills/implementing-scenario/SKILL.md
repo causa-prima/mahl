@@ -92,6 +92,7 @@ Für jede Implementierungsschicht, die das Szenario berührt, einen vollständig
    `docs/CODING_GUIDELINE_GENERAL.md` gilt immer (sprachunabhängige Grundprinzipien)
    C# → `docs/CODING_GUIDELINE_CSHARP.md` (Endpoint/Validierung: + `CSharp-ROP.md`; neuer Sum-Type: + `CSharp-SumTypes.md`)
    TypeScript/React → `docs/CODING_GUIDELINE_TYPESCRIPT.md`
+   TypeScript/React-Komponenten (`src/components/`, `src/pages/`) → zusätzlich `docs/CODING_GUIDELINE_UX.md`
 2. Test schreiben (auf der passenden Ebene: Unit / Integration)
 3. Test ausführen, Fehlermeldung zeigen (beweist: roter Test fordert echtes Verhalten)
 4. Minimale Implementierung ("fake it till you make it" – hardcodierte Rückgabewerte sind erlaubt)
@@ -110,8 +111,7 @@ Wenn alle inneren Loops abgeschlossen sind: Playwright E2E-Test erneut ausführe
 Wenn noch rot: fehlende Verbindung identifizieren (Routing? API-Integration? Komponente?)
 und den entsprechenden inneren Loop nochmal durchlaufen.
 
-Aktualisiere `docs/AGENT_MEMORY.md` (Abschnitt "Aktueller Stand" → Feld "Letzter Stand"):
-  Szenario in Arbeit: $ARGUMENTS | Schritt: 3/6 – REFACTOR abgeschlossen | Nächstes: 4/6 – Autor-Review
+Aktualisiere `docs/AGENT_MEMORY.md` (Phase-Zeile): aktuellen Szenario-Schritt eintragen (z.B. „Schritt 3/6 – REFACTOR abgeschlossen").
 
 ── SCHRITT 4: AUTOR-REVIEW ──────────────────────────────────────────────────
 → TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": completed | TaskUpdate "Schritt 4: Autor-Review": in_progress
@@ -158,9 +158,8 @@ Falls ja, unterscheide nach Typ:
   - Strukturelle Änderung (neues Pattern, geänderte Policy):
     Vorschlag formulieren und User zur Genehmigung vorlegen. Nicht eigenständig anpassen.
 
-Aktualisiere `docs/AGENT_MEMORY.md` (Abschnitt "Aktueller Stand" → Feld "Letzter Stand"):
-  - Szenario $ARGUMENTS als abgeschlossen markieren
-  - Nächstes Szenario aus dem Feature-File benennen (nächster Aufruf: `/implementing-scenario ...`)
+Aktualisiere `docs/AGENT_MEMORY.md`:
+  - Phase-Zeile: Szenario als abgeschlossen markieren, nächstes Szenario benennen
   - Technische Schuld und offene Fragen aktualisieren
 
 Erstelle einen neuen Commit (kein Amend): `"US-XXX: [Szenario-Titel]"`

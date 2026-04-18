@@ -1,4 +1,9 @@
-"""Primitive-Obsession-Check: Nackte Built-in-Typen in Domain-Code."""
+"""
+Primitive-Obsession-Check: Nackte Built-in-Typen in Domain-Code.
+
+check_blocking: Properties mit nackten Primitives – blockierend (fast immer falsch).
+check_nonblocking: Parameter mit nackten Primitives – Hinweis (Factory-Methods dürfen Primitives nehmen).
+"""
 import re
 from .common import HookInput
 
@@ -19,35 +24,47 @@ TEST_PROJECT_PATHS = re.compile(
 
 
 def _filter_lines(content: str, line_filter: re.Pattern) -> str:
-    """Entfernt alle Zeilen, auf die der Filter zutrifft."""
     return "\n".join(line for line in content.splitlines() if not line_filter.search(line))
 
 
-def check(inp: HookInput) -> list[str]:
-    if not inp.is_cs:
-        return []
-    if inp.is_domain_excluded or inp.is_test:
-        return []
-    if TEST_PROJECT_PATHS.search(inp.file_path):
+def _is_excluded(inp: HookInput) -> bool:
+    return not inp.is_cs or inp.is_domain_excluded or inp.is_test or bool(TEST_PROJECT_PATHS.search(inp.file_path))
+
+
+def check_blocking(inp: HookInput) -> list[str]:
+    """Properties mit nackten Primitives – blockierend."""
+    if _is_excluded(inp):
         return []
 
-    new = _filter_lines(inp.new_content, ENDPOINT_MAPPING_LINE)
-    new = _filter_lines(new, ERROR_STRING_LINE)
-    prop_matches = PROPERTY_PATTERN.findall(new)
-    param_matches = PARAM_PATTERN.findall(new)
+    content = _filter_lines(inp.new_content, ENDPOINT_MAPPING_LINE)
+    content = _filter_lines(content, ERROR_STRING_LINE)
 
-    hits = []
-    if prop_matches:
-        hits.append(f"  Properties: {len(prop_matches)} Treffer")
-    if param_matches:
-        hits.append(f"  Parameter:  {len(param_matches)} Treffer")
+    if not PROPERTY_PATTERN.findall(content):
+        return []
 
-    if hits:
-        return [
-            "Primitive-Obsession-Hinweis: Nackte Built-in-Typen in Domain-Code erkannt.\n"
-            + "\n".join(hits) + "\n"
-            "Kapsle sie in Value Objects (z.B. `RecipeName`, `IngredientId`).\n"
-            "Ausnahmen: DTOs (`Shared/Dtos/`), EF-Entities (`DatabaseTypes/`), Tests.\n"
-            "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 2)."
-        ]
-    return []
+    return [
+        "⛔ Primitive-Obsession-Verletzung (blockierend): Nackte Built-in-Typen als Property in Domain-Code erkannt.\n"
+        "Kapsle sie in Value Objects (z.B. `RecipeName`, `IngredientId`).\n"
+        "Ausnahmen: DTOs (`Shared/Dtos/`), EF-Entities (`DatabaseTypes/`), Tests.\n"
+        "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 2)."
+    ]
+
+
+def check_nonblocking(inp: HookInput) -> list[str]:
+    """Parameter mit nackten Primitives – Hinweis (Factory-Methods dürfen Primitives nehmen)."""
+    if _is_excluded(inp):
+        return []
+
+    content = _filter_lines(inp.new_content, ENDPOINT_MAPPING_LINE)
+    content = _filter_lines(content, ERROR_STRING_LINE)
+
+    if not PARAM_PATTERN.findall(content):
+        return []
+
+    return [
+        "⚠ Primitive-Obsession-Hinweis: Nackte Built-in-Typen als Parameter in Domain-Code erkannt.\n"
+        "Prüfe ob Value Objects (z.B. `RecipeName`, `IngredientId`) passender wären.\n"
+        "Ausnahme: Factory-Methods und Value Objects nehmen bewusst Primitives als Input.\n"
+        "Ausnahmen: DTOs (`Shared/Dtos/`), EF-Entities (`DatabaseTypes/`), Tests.\n"
+        "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 2)."
+    ]

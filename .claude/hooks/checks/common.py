@@ -36,6 +36,8 @@ DOMAIN_EXCLUDED = re.compile(
 # Pfade, die von Immutability-Checks ausgenommen sind (DTOs bewusst NICHT ausgenommen)
 IMMUTABILITY_EXCLUDED = re.compile(
     r'[/\\](?:Migrations|DatabaseTypes)[/\\]'
+    r'|DbContext\.cs$'            # EF DbContext muss class sein – kein record
+    r'|(?:^|[/\\])Program\.cs$'  # public partial class Program für WebApplicationFactory
     r'|(?:Options|Settings)\.cs$'
     r'|[/\\](?:Tests?|test)[/\\]'
     r'|\.Tests[/\\]'          # e.g. Server.Tests/foo.cs

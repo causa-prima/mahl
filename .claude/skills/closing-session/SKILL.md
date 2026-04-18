@@ -27,12 +27,11 @@ TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
    - Welche Erkenntnisse gehören in `principles.md` oder `countermeasures.md`?
    Diese Punkte werden in Schritt 4 dokumentiert.
 
-   Falls Phasen-Abschluss (z.B. SKELETON → MVP):
-   - Großes Code-Review über das gesamte Phase-Delta starten (alle Review-Agenten)
-
 2. Dokumentations-Änderungsbedarf prüfen – **einziger Schritt mit User-Interaktion**:
 → TaskUpdate "1. Intern reflektieren": completed | TaskUpdate "2. Dokumentations-Änderungsbedarf prüfen": in_progress
    Prüfen: Muss irgendein Dokument angepasst werden? (AGENT_MEMORY, GLOSSARY, CODING_GUIDELINEs, etc.)
+   - Falls in dieser Session eine neue Guideline eingeführt oder wesentlich erweitert wurde: prüfen
+     welche Skills sie referenzieren sollen, und ob bestehende Feature-Files einen Retrofit-Workshop brauchen.
    - Falls ja: Vorschläge konkret formulieren und dem User **JETZT** präsentieren. **Warten auf Antwort.**
    - Falls nein: direkt mit Schritt 4 weitermachen.
 
@@ -68,11 +67,16 @@ TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
 
 8. `docs/AGENT_MEMORY.md` – vollständig aktualisieren:
 → TaskUpdate "6. Jenga-Score berechnen": completed | TaskUpdate "7. AGENT_MEMORY.md aktualisieren": in_progress
-   - Status-Tabelle, Nächste Prioritäten, Technische Schuld, Offene Fragen
-   - "Letzter Stand"-Absatz neu schreiben
+   - Phase-Zeile, Nächste Prioritäten, Technische Schuld, Offene Fragen
+   - **Bei Phasen-Abschluss (z.B. SKELETON → MVP):** Als erste Zeile unter "Nächste Prioritäten" eintragen:
+     ```
+     **Phasen-Review ausstehend:** Skill `review-code` über gesamtes Phase-Delta starten.
+     ```
    - **Bei Jenga-Score ≤ 0:** Unter "Nächste Prioritäten" als erste Zeile eintragen (exakter Text):
      ```
      **Retro fällig (Jenga-Score ≤ 0):** Nächste Session mit Skill `kaizen` beginnen.
      ```
-   - Score dem User mitteilen.
+   - Score **nicht** in AGENT_MEMORY schreiben (außer bei ≤ 0 als Trigger-Zeile oben).
 → TaskUpdate "7. AGENT_MEMORY.md aktualisieren": completed
+
+Score dem User mitteilen (nach TaskUpdate).

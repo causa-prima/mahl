@@ -16,12 +16,40 @@ Definitionen für Schwere, Kategorien, Kontext-Tags, BEWÄHRT- und Obsolet-Krite
 
 Lege zu Beginn folgende Task-Liste an:
 
+→ TaskCreate "0. Noise-Review: lessons_learned + Archiv bereinigen"
 → TaskCreate "1. retro_report.py ausführen"
 → TaskCreate "2. countermeasures.md reviewen"
 → TaskCreate "3. Findings präsentieren & Freigabe"
 → TaskCreate "4. Änderungen umsetzen"
 → TaskCreate "5. lessons_learned.md archivieren"
 → TaskCreate "6. AGENT_MEMORY.md aufräumen"
+
+---
+
+## 0. Noise-Review: lessons_learned + Archiv bereinigen
+
+→ TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": in_progress
+
+Lies `docs/kaizen/lessons_learned.md` und alle `*.md`-Dateien in `docs/kaizen/archive/`. Wende auf jeden Eintrag den Filter-Test aus `docs/kaizen/PROCESS.md` an:
+
+**Test:** „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?"
+
+Noise-Kandidaten sind Einträge die:
+- Ein Infrastruktur- oder Setup-Problem beschreiben das durch eine Konfigurationsänderung dauerhaft behoben ist
+- Reine Fakten über Tool-Verhalten dokumentieren ohne Konsequenz für künftiges Agenten-Verhalten
+
+Präsentiere Kandidaten als Tabelle:
+
+```
+| Datei | Session | Eintrag (Kurztitel) | Begründung |
+|-------|---------|---------------------|------------|
+```
+
+**Warte auf User-Freigabe** bevor gelöscht wird. Nur freigegebene Einträge entfernen.
+
+Falls keine Kandidaten gefunden: kurz melden ("Kein Noise gefunden – Preprocessing-CM wirkt.") und direkt mit Schritt 1 weitermachen.
+
+→ TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": completed | TaskUpdate "1. retro_report.py ausführen": in_progress
 
 ---
 
@@ -104,6 +132,12 @@ Präsentiere dem User folgende strukturierte Übersicht und **warte auf Freigabe
 
 ## E) Empfehlungen für Guidelines/Skills
 - ...
+
+## F) Eskalierte Maßnahmen (aus Script-Output Abschnitt 9)
+(Nur wenn Abschnitt 9 des Scripts ESKALIERT-Einträge enthält)
+| Eintrag | OFFEN seit | Entscheidung |
+|---------|-----------|--------------|
+| ...     | S...      | Priorisieren oder verwerfen? |
 ```
 
 Abschnitte die leer sind weglassen.
@@ -120,6 +154,7 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
    Bei echter Überschneidung: mit User absprechen
 3. `docs/kaizen/countermeasures.md` aktualisieren (Verweise auf principles.md oder Guideline-Änderungen aus Schritt 1+2 ergänzen)
 4. `docs/kaizen/PROCESS.md` aktualisieren falls neue Kontext-Tags vereinbart
+5. `docs/AGENT_MEMORY.md` unter „Nächste Prioritäten": Für jeden neuen OFFEN-Eintrag einen Punkt ergänzen (Kurzbeschreibung, Verweis auf countermeasures.md). Falls zutreffend auch als Technische Schuld oder Offene Frage eintragen.
 
 ---
 

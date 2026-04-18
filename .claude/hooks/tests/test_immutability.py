@@ -16,6 +16,13 @@ def test_dictionary_property_blocked():
     inp = make_input(DOMAIN_FILE, "public Dictionary<string, int> Map { get; init; }")
     assert immutability.check(inp) != []
 
+def test_blocking_message_format():
+    inp = make_input(DOMAIN_FILE, "public List<int> Items { get; init; }")
+    result = immutability.check(inp)
+    assert result != []
+    assert "⛔" in result[0]
+    assert "blockierend" in result[0]
+
 
 # --- erlaubt ---
 

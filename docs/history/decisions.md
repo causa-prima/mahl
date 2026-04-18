@@ -23,7 +23,9 @@ kritische-regeln:
 | Domain-Typ / Sum-Type schreiben | [Domain-Typen & Sum-Types](#domain-typen--sum-types) |
 | E2E-Test / Gherkin-Szenario schreiben | [Architektur & Prozess](#architektur--prozess) |
 | Frontend-Komponente schreiben | [Frontend & TypeScript](#frontend--typescript) |
+| Frontend-Fehlerbehandlung implementieren | [Querschnittliche Fehlerbehandlung](#querschnittliche-fehlerbehandlung-frontend) |
 | Mutation Testing / Stryker konfigurieren | [Test-Tooling & Stryker](#test-tooling--stryker) |
+| ETag / If-None-Match / If-Match implementieren | [HTTP-Caching & Optimistic Concurrency](#http-caching--optimistic-concurrency) |
 
 ---
 
@@ -321,6 +323,116 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 
 ---
 
+## Querschnittliche Fehlerbehandlung (Frontend)
+
+### Service-Layer + Custom Hooks + match()-Pflicht
+
+**Entscheidung:** Drei-Schichten-Muster für alle Backend-Aufrufe:
+
+```
+Service-Funktion   →  ResultAsync<T, DomainError>    (Fehler explizit im Typ)
+Custom Hook        →  MutationState<T, DomainError>  (Discriminated Union)
+Komponente         →  match() mit Pflichtfeldern      (Compile-Fehler bei fehlendem Fall)
+QueryCache.onError →  Toast                          (Netzwerk/500 ohne Boilerplate)
+```
+
+**Enforcement:** `match()` nutzt Mapped Types – `{ [K in TError['kind']]: ... }`. Fehlt ein Fall im übergebenen Objekt → Compile-Fehler. Gilt für Fehler-Unions, Success-Unions und äußere Zustände (idle/pending/success/error). Details: `docs/CODING_GUIDELINE_TYPESCRIPT.md` Abschnitt 4b.
+
+**Implementierungsdetail:** Domain-Fehler (`Err`) reisen als Rückgabewert durch React Querys Success-Pfad – kein `throw` für erwartete Fehler. Der generische Wrapper `useResultMutation<TData, TError, TVariables>` kapselt React Query vollständig; Custom Hooks reduzieren sich auf eine Zeile.
+
+**Allgemeine Fehler** (Netzwerk, 5xx) werfen nativ und werden von `QueryCache.onError` zentral als Toast angezeigt – Komponenten sehen nur domänenspezifische Fehler.
+
+**Aktueller Code-Stand:** `src/services/ingredientsApi.ts` nutzt noch plain Promise – Migration auf dieses Muster ausstehend (wird bei US-904 Szenario 2 mitgemacht).
+
+**Verworfen:**
+- Plain Promise allein: Fehlerfall unsichtbar im Typ, kein Enforcement möglich
+- F# + Fable + Elmish: Agenten schreiben diesen Stack zu unzuverlässig – Versions-Drift zwischen Fable 2/3/4, Interop-Halluzinationen, schwache Fehlerdiagnose bei Fable-Compiler-Fehlern
+
+---
+
+### Fehler-Kategorien: drei Typen, globaler HTTP-Interceptor
+
+**Entscheidung:** Das Frontend unterscheidet genau drei Fehler-Kategorien. Alle werden global im HTTP-Interceptor behandelt – kein per-Endpoint-Code für technische Fehler.
+
+| Kategorie | Auslöser | Verhalten |
+|-----------|----------|-----------|
+| Netzwerkfehler | `TypeError` (kein Response) + HTTP 504 | Toast: „Server nicht erreichbar. Bitte Verbindung prüfen." |
+| Serverfehler | HTTP 500, 502, 503 | Toast: „Ein unerwarteter Fehler ist aufgetreten." |
+| Auth-Fehler | HTTP 401, 403 | Kein Toast – Redirect zur Login-Seite + Rückkehr-URL |
+
+4xx (außer 401/403) sind Business-Fehler – werden per-Komponente behandelt, nicht global.
+
+504 fällt unter Netzwerkfehler (Semantik: Server hat die Anfrage nie verarbeitet), nicht unter Serverfehler.
+
+**Verworfen:** Per-Endpoint-Texte für technische Fehler – nicht skalierbar, kein UX-Mehrwert.
+
+---
+
+### Toast: nicht-blockierend, ~5 Sekunden Auto-Dismiss
+
+**Entscheidung:** Technische Fehler erscheinen als Toast (nicht-blockierend, oben rechts), auto-dismiss nach ~5s.
+
+**Verworfen:** Modal – zu aggressiv für transiente Fehler. Banner – sinnvoll erst für anhaltende Fehler (Offline-Modus, V1-Scope).
+
+---
+
+### Console.error Format
+
+**Entscheidung:** `[API Error] METHOD /path | Status: NNN | TraceId: xxx`
+
+Beispiel: `[API Error] POST /api/ingredients | Status: 500 | TraceId: 00-abc123...`
+
+URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** geloggt – Security-Konvention, auch wenn aktuelle Daten nicht sensibel sind. TraceId aus `ProblemDetails.traceId` ist der Verbindungspunkt zum Backend-Log.
+
+---
+
+### Kein automatisches Retry
+
+**Entscheidung:** Der Interceptor unternimmt keinen automatischen Retry. Manueller Retry-Button im Toast: V1-Scope.
+
+**Begründung:** Retry bei nicht-idempotenten Operationen (POST, DELETE) riskiert Duplikate oder Doppellöschungen. Komplexität überwiegt Nutzen für Single-User-App.
+
+---
+
+### Draft-Saving-Prinzip: per Feature, nicht global
+
+**Entscheidung:** Formulare mit nicht-trivialem Eingabeaufwand speichern ihren Zustand in `localStorage` – pro Feature implementiert, nicht im globalen Interceptor.
+
+**Begründung:** Der Interceptor kennt keinen Formular-Zustand. Draft-Saving ist eine Feature-Entscheidung.
+
+**Trigger im Gherkin-Workshop:** Schritt 1 fragt explizit: „Hat diese Story Formulare mit nicht-trivialem Eingabeaufwand? → Falls ja: Draft-Saving-Szenario einplanen."
+
+---
+
+### ProblemDetails: Standard für Exceptions, `errorCode` für Domain-Fehler
+
+**Entscheidung:**
+- Unbehandelte Exceptions → Standard-ProblemDetails (ASP.NET Core Default). Kein `errorCode`, kein `detail`.
+- Behandelte Domain-Fehler → Standard-ProblemDetails erweitert um `errorCode` (maschinenlesbar) + `detail` (menschenlesbar, deutsch):
+
+```json
+{
+  "type": "...",
+  "title": "...",
+  "status": 409,
+  "detail": "Eine Zutat mit dem Namen 'Tomaten' existiert bereits.",
+  "errorCode": "INGREDIENT_DUPLICATE",
+  "traceId": "00-abc123..."
+}
+```
+
+**Begründung `errorCode`:** Frontend brancht zuverlässig ohne Text zu parsen. `detail` ist änderbar, `errorCode` ist API-Vertrag.
+
+---
+
+### Backend-Logging: Applikationslogs und Access Logs getrennt
+
+**Entscheidung:** Applikationslogs (Exceptions, Domain-Events, TraceIds) und Access Logs (HTTP-Requests) sind getrennte Concerns. Access Logs in Produktion auf `Warning`+ gedrosselt.
+
+**Scope:** Serilog und Produktions-Log-Infrastruktur sind kein MVP-Scope. Development: Console-Output von ASP.NET Core reicht. TraceId ist der zentrale Debug-Pfad (Frontend `console.error` → Backend-Log).
+
+---
+
 ## Frontend & TypeScript
 
 ### Frontend-Framework: React 18+ mit Material UI v7
@@ -389,6 +501,36 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 
 ---
 
+### HTTP-Mocking in Frontend-Tests: MSW statt `vi.stubGlobal('fetch', ...)`
+
+**Entscheidung:** Alle Frontend-Tests, die HTTP-Calls involvieren, verwenden MSW (`msw/node`) als einzigen Mocking-Layer auf HTTP-Ebene.
+
+**Begründung:** `vi.stubGlobal('fetch', ...)` mockt die Implementierung (die Funktion `fetch`), nicht den HTTP-Kontrakt. Ein Test der `expect(mockFetch).toHaveBeenCalledWith('/api/ingredients')` prüft, ist beim Wechsel von `fetch` auf `axios` sofort rot – nicht weil die URL falsch ist, sondern weil die Implementierung sich ändert. MSW intercepted auf Netzwerk-Ebene und ist damit unabhängig davon, welches HTTP-Primitiv (`fetch`, `axios`, `XMLHttpRequest`) die Service-Funktion intern nutzt.
+
+**Konsequenz:** Tests gegen Service-Funktionen (`ingredientsApi.ts` etc.) und Komponenten-Tests die HTTP-Calls auslösen, setzen Handler via `server.use(http.get('/api/...', () => HttpResponse.json(...)))` und kennen keine Implementierungsdetails der Service-Schicht.
+
+**Verworfen:** `vi.stubGlobal('fetch', ...)` – koppelt Test an Implementierung statt Kontrakt. `nock` – unterstützt kein modernes `fetch`. `fetchMock`/`jest-fetch-mock` – gleicher falscher Schnitt wie stubGlobal.
+
+---
+
+### Stryker-JS: `main.tsx` aus `mutate` ausgeschlossen
+
+**Entscheidung:** `!src/main.tsx` in `Client/stryker.config.json`.
+
+**Begründung:** Bootstrap-Code (`createRoot`, `QueryClientProvider`, `StrictMode`) – kein testbarer Domänen- oder Anwendungslogik-Anteil. Kein sinnvoller Unit-Test möglich.
+
+---
+
+### Stryker.NET + xUnit v3: MTP Runner erforderlich
+
+**Entscheidung:** `"test-runner": "mtp"` in `stryker-config.json`. Test-Projekt: `OutputType=Exe`, `UseMicrosoftTestingPlatformRunner=true`, `TestingPlatformDotnetTestSupport=true` in `Server.Tests/mahl.Server.Tests.csproj`.
+
+**Begründung:** Stryker.NET 4.x unterstützt xUnit v3 (`xunit.v3`) nicht über den klassischen VSTest-Runner – Mutanten werden als "Survived" reportiert, obwohl Tests sie korrekt killen würden (verifiziert: manuell falsche Route → Test schlägt fehl, aber Stryker sieht es nicht). xUnit v3 nutzt ein anderes Ausführungsmodell als xUnit v2. Der MTP (Microsoft Testing Platform) Runner, verfügbar ab Stryker 4.13, löst die Inkompatibilität. `TestingPlatformDotnetTestSupport=true` stellt sicher, dass `dotnet test` weiterhin funktioniert.
+
+**Verworfen:** Weiterhin VSTest-Runner – 0% Mutation Score für alle Endpoints trotz korrekter Tests.
+
+---
+
 ## Code-Qualität & Abhängigkeiten
 
 ### CA1515: `internal`-Pflicht via Analyzer erzwungen
@@ -420,3 +562,57 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 **Entscheidung:** Die Allowlist (`DEPENDENCIES.md`) enthält nur Package-Namen, keine Versionen. Versionen gehören ausschließlich in `.csproj`/`package.json`. Die Allowlist ist ein Zugangskontroll-Mechanismus, kein Versionsmanagement-Tool – Pinning erzeugt eine dritte Quelle die zwangsläufig divergiert und den Dependency-Hook bei legitimen Updates blockiert.
 
 **Verworfen:** Versionen in Allowlist – Divergenzrisiko, unklare Semantik, Wartungsaufwand ohne Sicherheitsgewinn (CVEs besser via `dotnet list package --vulnerable` / `npm audit`).
+
+---
+
+## HTTP-Caching & Optimistic Concurrency
+
+### Globale ETag-Policy: alle mutierbaren Ressourcen
+
+**Entscheidung:** Alle Endpoints erhalten ETags – keine Ausnahmen.
+
+**Begründung:** Jeder GET-Endpoint profitiert von HTTP-Caching (304). PUT/PATCH/DELETE brauchen zusätzlich If-Match für Optimistic Concurrency. Die Unterscheidung "mutierbar vs. nicht mutierbar" ist irrelevant – ETags sind auf GET unabhängig davon sinnvoll. Cross-Cutting-Concern: sobald die Grundstruktur steht, kostet jede weitere Entity minimal.
+
+---
+
+### Zwei Verwendungszwecke: HTTP-Caching und Optimistic Concurrency
+
+**Entscheidung:** Derselbe ETag-Wert wird für beide Zwecke eingesetzt:
+
+| Zweck | Request-Header | Response-Status |
+|-------|---------------|-----------------|
+| HTTP-Caching | `If-None-Match: "..."` bei GET | 304 Not Modified |
+| Optimistic Concurrency | `If-Match: "..."` bei PUT/PATCH/DELETE | 412 Precondition Failed |
+
+---
+
+### ETag-Quelle: xmin (Single Resource) / Content-Hash (Collection)
+
+**Entscheidung:**
+
+**Single-Resource-Endpoints** (`GET /api/ingredients/{id}` etc.):
+ETag = PostgreSQL `xmin`-Wert des Rows, hex-kodiert (z.B. `"a3f2c1b4"`).
+EF Core Npgsql: `UseXminAsConcurrencyToken()`. Keine extra Spalte – PostgreSQL pflegt xmin automatisch.
+
+**Collection-Endpoints** (`GET /api/ingredients` etc.):
+ETag = SHA-256-Hash der serialisierten JSON-Response-Body (hex-kodiert).
+
+**Begründung Single-Resource xmin:**
+xmin koppelt HTTP-ETag und EF Core Concurrency-Token in einem Mechanismus. EF Core wirft `DbUpdateConcurrencyException` automatisch wenn xmin beim UPDATE nicht mehr übereinstimmt → 412. 304-Check ist ein billiger `SELECT xmin`-Query ohne Full-Row-Fetch.
+
+Content-Hash für Single Resources würde zwei getrennte Checks erfordern (Hash-Vergleich + EF Core xmin intern) – redundant und inkonsistent.
+
+**Begründung Collection Content-Hash:**
+Kein einzelner DB-Wert bildet den Collection-Zustand korrekt ab. `MAX(xmin)` ist DELETE-blind. `SUM(xmin)` wäre für modernes PostgreSQL (9.4+: VACUUM FREEZE ändert xmin nicht mehr) korrekt und günstig, ist aber kein etabliertes Muster und PostgreSQL-spezifisch. Content-Hash ist portabel, verständlich und für diese App schnell genug.
+
+**Verworfen:** `MAX(xmin)` für Collections – blind gegenüber Deletes.
+**Verworfen:** `SUM(xmin)` für Collections – korrekt für PostgreSQL 9.4+, aber kein etabliertes Muster; eingeschränkte Portabilität.
+**Verworfen:** Content-Hash für Single Resources – bricht die EF Core Concurrency-Token-Kopplung.
+
+---
+
+### Implementierungsreihenfolge
+
+**Entscheidung:** ETag-Support wird pro Endpoint beim Szenario-Schritt eingebaut, der den Endpoint erstmalig mit echten DB-Daten belegt. Nicht in Skeleton-Stubs (hardcoded Antworten haben keinen sinnvollen ETag).
+
+`GET /api/ingredients` erhält ETag-Support in US-904 Szenario 2 (erster GET mit echten DB-Rows).

@@ -28,8 +28,8 @@ Sprachspezifische Umsetzungen: `docs/CODING_GUIDELINE_CSHARP.md` · `docs/CODING
 
 Wähle immer die einfachste Lösung, die den Anforderungen genügt.
 
-- Keine Abstraktionen für hypothetische Zukunft.
-- Keine Überabstraktion, die mehr als eine Aufgabe vereinheitlichen soll.
+- Abstraktionen nur für bewiesenen, gegenwärtigen Bedarf anlegen.
+- Jede Abstraktion löst genau eine Aufgabe.
 - Drei ähnliche Code-Stellen sind besser als eine voreilige Abstraktion.
 - Wenn eine Lösung erklärt werden muss, weil sie clever ist: Vereinfachen.
 - Die richtige Menge Komplexität ist das Minimum, das für die aktuelle Aufgabe nötig ist.
@@ -49,7 +49,7 @@ Wähle immer die einfachste Lösung, die den Anforderungen genügt.
 - Eine Methode / Funktion hat maximal ~20 Zeilen. Größer → Refactoring-Kandidat.
 - Verschachtelung tiefer als 3 Ebenen → Pattern Matching oder Extraktion erwägen.
 - Duplikate oder Copy-Paste-Code → gemeinsamen Helper extrahieren.
-- Kein toter Code (auskommentierter Code, ungenutzte Variablen/Importe).
+- Toten Code (auskommentierter Code, ungenutzte Variablen/Importe) sofort entfernen.
 
 ---
 

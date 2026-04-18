@@ -61,6 +61,10 @@ Die Step-Definitionen (z.B. `When ich ein Rezept … anlege`) werden im Test-Cod
 | `@US-NNN-happy-path` | Szenario | Erfolgreicher Standardpfad |
 | `@US-NNN-error` | Szenario | Fachlicher Fehlerfall (400/409/422) |
 | `@US-NNN-edge-case` | Szenario | Grenzfall / Sonderverhalten |
+| `@NFR-<domain>` | Feature | Querschnittliche NFR-Feature-Datei (z.B. `@NFR-resilience`) |
+| `@NFR-<domain>-<typ>` | Szenario | NFR-Szenario nach Fehler-Typ (z.B. `@NFR-resilience-network`) |
+
+NFR-Features haben keine US-ID. Der CI-Validator behandelt `@NFR-*`-Tags als eigene Klasse – Traceability-Pflicht gilt analog: jedes `@NFR-*`-Szenario braucht einen grünen E2E-Test.
 
 ---
 

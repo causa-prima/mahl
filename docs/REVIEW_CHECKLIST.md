@@ -29,6 +29,13 @@ Gehe jeden Punkt durch. Findings sofort fixen – erst dann Review-Agenten start
 
 Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken bedeutet: "Geprüft, kein Problem gefunden."
 
+## Endpoints
+
+- [ ] Neuer GET-Endpoint? → `ETag`-Header gesetzt + `If-None-Match` → 304 implementiert?
+  → Single Resource: xmin (`UseXminAsConcurrencyToken()`). Collection: SHA-256-Hash der Response-Body.
+- [ ] Neuer PUT/PATCH/DELETE-Endpoint? → `If-Match`-Prüfung implementiert (fehlend → 428, Mismatch → 412)?
+  → Muster: `CODING_GUIDELINE_CSHARP.md` Abschnitt 6.
+
 ## Architecture Layer (aus `ARCHITECTURE.md` Sektion 0c)
 
 - [ ] Neue Typ-Deklarationen (`class`/`record`/`struct`/`interface`/`enum`) in `Server/` sind `internal`? Kein `public` ohne explizite Begründung.
@@ -98,6 +105,17 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 - [ ] Tests hängen voneinander ab oder teilen mutable State?
 - [ ] Mutierender Endpoint-Test (POST/PUT/PATCH/DELETE): Wird der DB-Zustand nach der Aktion mit **Full State Assertion** (`GetAllXxx()` + `BeEquivalentTo`) geprüft – nicht nur die HTTP-Response? Damit wird sichergestellt, dass genau die erwarteten Änderungen in der DB gelandet sind und keine unerwarteten Seiteneffekte aufgetreten sind (weder fehlende Änderungen noch ungewollte Mutationen anderer Einträge).
   → Auch Fehlerpfade: Zustand nach einem Fehler muss dem Ausgangszustand entsprechen (`BeEquivalentTo(stateBeforeAction)`).
+- [ ] (Frontend) Werden HTTP-Calls in Tests auf falscher Ebene gemockt (`vi.mock` auf Service-Modulen, `vi.stubGlobal('fetch', ...)` o.ä.)? → Ausschließlich MSW verwenden. Service-Funktionen sind Implementierungsdetails – sie werden durch den Komponenten-Test via MSW abgedeckt, nicht direkt getestet. Siehe `CODING_GUIDELINE_TYPESCRIPT.md` Abschnitt 6.
+
+## UI/UX (aus `CODING_GUIDELINE_UX.md`)
+
+- [ ] Least Surprise: Tut jede Aktion exakt das, was Label, Position und Kontext erwarten lassen?
+- [ ] Don't Make Me Think: Braucht ein Element einen Tooltip oder eine Erklärung um verstanden zu werden? → Label oder Struktur überarbeiten bis der Tooltip überflüssig ist.
+- [ ] Sichtbares Feedback: Hat jede Aktion ohne direkten UI-Zustandswechsel einen Toast oder Inline-Feedback? Zeigt jede wartende Aktion einen Ladezustand?
+- [ ] Fehlermeldungen: Ist jede Fehlermeldung konkret ("Name darf nicht leer sein.") und nah am betroffenen Element platziert?
+- [ ] Destructive Actions: Bevorzugt Soft-Delete mit Wiederherstellungsmöglichkeit im UI. Bestätigungsdialog nur wenn Soft-Delete nicht machbar.
+- [ ] Terminologie: Verwendet die UI ausschließlich Begriffe aus `docs/GLOSSARY.md`? Keine Synonyme in Labels, Buttons, Fehlermeldungen oder leeren Zuständen.
+- [ ] Leere Zustände: Erklärt jede potenziell leere Liste (1) warum sie leer ist und (2) was der Nutzer tun kann?
 
 ## Test-Audit (aus `E2E_TESTING.md`)
 

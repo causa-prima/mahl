@@ -2,6 +2,7 @@
   "stryker-config": {
     "project": "Server/mahl.Server.csproj",
     "test-projects": ["Server.Tests/mahl.Server.Tests.csproj"],
+    "test-runner": "mtp",
     "coverage-analysis": "off",
     "additional-timeout": 15000,
     "reporters": ["html", "cleartext", "json"],

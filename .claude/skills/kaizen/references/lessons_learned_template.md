@@ -20,6 +20,8 @@ Kontext:    TDD | C#-Code | TS-Code | Review | Agent-Prompt | Skill-Nutzung |
 
 Alle drei Tags sind Pflicht. Definitionen und Reaktionsregeln: docs/kaizen/PROCESS.md
 
+Vor dem Eintrag prüfen: Gab es ein falsches Agenten-Verhalten das wieder auftreten kann? Nein → kein Eintrag (Infra-Wissen → DEV_WORKFLOW.md / Config). Details: docs/kaizen/PROCESS.md
+
 Nach der Sitzung prüfen: Gehört ein Eintrag in principles.md oder countermeasures.md?
 KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumentieren.
 -->

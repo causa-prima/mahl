@@ -7,8 +7,12 @@ Entitäten und ihre Zustände: [aus Schritt 0]
 Constraints: [aus Schritt 0/1]
 Bestehende Szenarien: [falls vorhanden, sonst „keine"]
 Glossar-Entitäten: [aus Schritt 0]
+UX-Kontext: [aus Schritt 0.E – welche UX-Prinzipien gelten, mit Relevanzbewertung]
 
 Arbeite diese Struktur durch:
+Berücksichtige im UX-Kontext als "Relevant" markierte Prinzipien: Sichtbare UI-Zustände
+(Leer-Zustand, Lade-Zustand) sind ebenfalls Zustände in der Matrix – nicht nur Entitäts-Zustände.
+
 1. ZUSTANDS-MATRIX: Für jede betroffene Entität:
    - Liste alle möglichen Zustände
    - Liste alle Operationen der US

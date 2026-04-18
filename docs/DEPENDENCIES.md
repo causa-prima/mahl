@@ -18,7 +18,7 @@ Externe Abh채ngigkeiten haben immer einen Preis: Wartungsaufwand, Sicherheitsfl�
 
 ## Prozess: Neues Paket hinzuf체gen
 
-**Die Allowlist darf vom Agenten nicht eigenst채ndig erweitert werden.** Jede Erweiterung erfordert eine explizite Freigabe durch den User.
+**Jede Erweiterung erfordert eine explizite Freigabe durch den User.**
 
 Der Agent bereitet daf체r eine Anfrage mit folgenden f체nf Punkten vor:
 
@@ -56,6 +56,11 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begr체ndung in `docs/histo
 | `@vitest/coverage-v8` | Testing |
 | `@testing-library/react` | Testing |
 | `@playwright/test` | E2E Testing |
+| `happy-dom` | Testing |
+| `@stryker-mutator/core` | Testing |
+| `@stryker-mutator/vitest-runner` | Testing |
+| `@stryker-mutator/typescript-checker` | Testing |
+| `msw` | Testing |
 
 ### C# / NuGet
 
@@ -69,8 +74,9 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begr체ndung in `docs/histo
 | `Serilog.Sinks.Console` | Server |
 | `Serilog.Sinks.File` | Server |
 | `Microsoft.AspNetCore.Mvc.Testing` | Server.Tests |
+| `Microsoft.EntityFrameworkCore.InMemory` | Server.Tests |
 | `Microsoft.NET.Test.Sdk` | Server.Tests |
-| `xunit` | Server.Tests |
+| `xunit.v3` | Server.Tests |
 | `xunit.runner.visualstudio` | Server.Tests |
 | `AwesomeAssertions` | Server.Tests |
 | `coverlet.collector` | Server.Tests |

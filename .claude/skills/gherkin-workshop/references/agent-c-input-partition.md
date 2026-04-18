@@ -7,6 +7,7 @@ Eingabefelder der US (mit Typen und Constraints): [aus Schritt 0]
 Constraints: [aus Schritt 0/1]
 Bestehende Szenarien: [falls vorhanden, sonst „keine"]
 Glossar-Entitäten: [aus Schritt 0]
+UX-Kontext: [aus Schritt 0.E – welche UX-Prinzipien gelten, mit Relevanzbewertung]
 
 Arbeite für JEDES Eingabefeld durch:
 1. FELDTYP: (String / Zahl / Enum / Referenz / Collection)
@@ -31,6 +32,11 @@ Ausgabe – pro Eingabefeld eine Partitionstabelle, dann eine Szenario-Tabelle:
 | Tag-Kategorie | Szenario-Titel | Given (Ausgangszustand) | When (Aktion) | Then (Ergebnis) |
 |---|---|---|---|---|
 | error | ... | ... | ... | ... |
+
+Fehlermeldungsformat (Guideline 4, wenn UX-Kontext Prinzip 4 als "Relevant" markiert):
+Then-Spalte bei Fehlerfällen muss konkreten Fehlermeldungstext enthalten.
+Format: „sehe ich die Fehlermeldung ‚[Was ist falsch].'" oder „‚[Was ist falsch] ([Constraint]).'"
+Platzierung nahe am betroffenen Eingabefeld – kein generisches „Fehler aufgetreten".
 
 Gherkin-Konventionen: Fachliche Sprache gemäß GLOSSARY.md – keine HTTP-Codes, kein SQL.
 Technische Kürzel koppeln das Szenario an die Implementierungsschicht und brechen bei

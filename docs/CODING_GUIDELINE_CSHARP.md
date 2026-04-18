@@ -19,6 +19,7 @@ kritische-regeln:
 | 3. Illegal States Unrepresentable | Private Ctors, Factory-Methoden, Default-Ctor bei struct absichern | Beim Erstellen von Domain-Typen |
 | 4. Pure Functions & Extension Methods | Extension Methods für Geschäftslogik, OneOf als Rückgabe | Beim Kapseln von Logik ohne Seiteneffekte |
 | 5. Domain-Typen (Architektur) | Systemgrenz-Architektur (Write/Read-Pfad), Dependency Rule, Typ-Deklarationen sind `internal`, Typ-Struktur, Datei-Orte, kanonisches Beispiel | Beim Anlegen neuer Entities oder Umstrukturierung des Domain-Layers |
+| 6. Endpoints: ETag-Pflicht | ETag für alle Endpoints: xmin (Single Resource), Content-Hash (Collection), 304/412/428-Muster | Bei jedem neuen Endpoint |
 
 **Ergänzende Richtlinien (separate Dateien):**
 
@@ -127,7 +128,7 @@ public readonly record struct ValidName
 
 Das kanonische Entity-Beispiel steht weiter unten (Sektion "Kanonisches Beispiel"): `Ingredient.Create(Guid, NonEmptyTrimmedString, NonEmptyTrimmedString)` – kein roher `string`.
 
-Halte dich bei allem von dir erstellem oder gereviewtem Code strikt an dieses Paradigma. Code, der mutable state (set), exceptions für Business Logic oder "nackte" Primitive (wie string title) in Konstruktoren von Entitäten nutzt, ist fehlerhaft.
+Halte dich bei allem von dir erstellem oder gereviewtem Code strikt an dieses Paradigma. Prüfe: Hält Code mutable state (set), exceptions für Business Logic und nackte Primitive (wie string title) aus Entitäts-Konstruktoren heraus? Das ist der Maßstab.
 
 5. Domain-Typen (Pflicht für alle Entities mit Create-Vorgängen):
 
@@ -240,3 +241,23 @@ group.MapGet("/{id:int}", async (int id, MahlDbContext db) =>
         e      => Results.Problem(e.Value, statusCode: StatusCodes.Status500InternalServerError));
 });
 ```
+
+## 6. Endpoints – ETag-Pflicht
+
+Alle Endpoints implementieren ETag-Support.
+Entscheidung + Begründung: `docs/history/decisions.md` → Sektion "HTTP-Caching & Optimistic Concurrency".
+
+**ETag-Quelle:**
+- Single-Resource-Endpoint: `xmin`-Wert des Rows (PostgreSQL, via Npgsql `UseXminAsConcurrencyToken()`), hex-kodiert: `$"\"{xmin:x8}\""`. Zugriff: `(uint)db.Entry(row).Property("xmin").CurrentValue!`
+- Collection-Endpoint: SHA-256-Hash der serialisierten Response-Body (erster 16 Zeichen hex genügen).
+
+**Pflicht-Verhalten:**
+| Endpoint | Situation | Header | Response |
+|----------|-----------|--------|----------|
+| GET | ETag unverändert | `If-None-Match` trifft zu | 304 |
+| GET | ETag geändert | – | 200 + `ETag`-Header |
+| PUT/PATCH/DELETE | `If-Match` fehlt | – | 428 |
+| PUT/PATCH/DELETE | `If-Match` stimmt nicht | `If-Match` ≠ aktuellem ETag | 412 |
+| PUT/PATCH/DELETE | `If-Match` stimmt | EF Core prüft `xmin` beim `SaveChanges` nochmals | – |
+
+`UseXminAsConcurrencyToken()` in `OnModelCreating` konfigurieren, bevor der erste GET-Endpoint für eine Entity gebaut wird.

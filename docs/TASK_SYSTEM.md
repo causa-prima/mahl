@@ -20,6 +20,10 @@ Sobald eine Aufgabe **≥ 3 größere Schritte** erfordert, wird eine Task-Liste
 **Abgeschlossene Tasks:** Kurze Listen → `completed` stehen lassen. Lange Listen → beim
 Betreten des nächsten Steps löschen (statt `completed` zu setzen).
 
+**Neuer Task-Block (z.B. neuer Skill-Aufruf):** Vor dem Anlegen neuer Tasks alle noch offenen
+Tasks aus dem vorherigen Block explizit schließen (`completed`) oder löschen (`TaskStop`).
+Ausnahme: Die neuen Tasks sind Erweiterungen des laufenden Blocks – dann einfach anhängen.
+
 **Plan-Änderungen (Einfügung zwischen bestehende Tasks):**
 - ≤ 2 nachfolgende Tasks: löschen + neu anlegen (korrekte Reihenfolge)
 - Sonst: Einschub-Notation `"2b. Titel"` (Threshold empirisch anpassen)

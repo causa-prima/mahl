@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests für check-bash-permission.py – verifiziert deny/allow/fall-through."""
+"""Tests für check-bash-permission.py – verifiziert deny/allow/ask."""
 import sys
 import os
 
@@ -8,7 +8,6 @@ from importlib import import_module
 
 hook = import_module("check-bash-permission")
 check_command = hook.check_command
-is_compound_command = hook.is_compound_command
 split_compound_command = hook.split_compound_command
 has_unsafe_output_redirect = hook.has_unsafe_output_redirect
 
@@ -21,14 +20,14 @@ class Colors:
 
 
 def assert_decision(command: str, expected: str, description: str = "") -> bool:
-    decision, reason = check_command(command)
+    decision, reason, log_type = check_command(command)
     label = description or command
     if decision == expected:
         print(f"  {Colors.GREEN}PASS{Colors.RESET} [{expected:12s}] {label}")
         return True
     else:
         print(f"  {Colors.RED}FAIL{Colors.RESET} [{expected:12s}] {label}")
-        print(f"       Got: {decision!r} | reason: {reason[:80] if reason else ''}")
+        print(f"       Got: {decision!r} (log_type={log_type!r}) | reason: {reason[:80] if reason else ''}")
         return False
 
 
@@ -49,7 +48,7 @@ def test_compound_detection() -> int:
         ('echo "hello && world"', False, "AND in Double-Quotes"),
     ]
     for command, expected, desc in compound_cases:
-        result = is_compound_command(command)
+        result = len(split_compound_command(command)) > 1
         if result == expected:
             print(f"  {Colors.GREEN}PASS{Colors.RESET} [compound={str(expected):5s}] {desc}")
         else:
@@ -125,7 +124,7 @@ def test_redirect_detection() -> int:
 
 
 def test_deny_patterns() -> int:
-    print(f"\n{Colors.BOLD}=== Deny-Patterns ==={Colors.RESET}")
+    print(f"\n{Colors.BOLD}=== Wrong-Approach-Patterns (kein Override ohne Marker) ==={Colors.RESET}")
     failures = 0
 
     deny_cases = [
@@ -141,31 +140,12 @@ def test_deny_patterns() -> int:
         ('cmd.exe /c "cd /d C:\\mahl && dotnet stryker --mutate src/Foo.cs"', "Stryker --mutate allein"),
         # WSL: Pipe in cmd.exe
         ('cmd.exe /c "cd /d C:\\mahl && dotnet test" | tail -60', "Pipe nach cmd.exe"),
-        # find destruktiv
-        ("find . -delete", "find -delete"),
-        ("find . -name '*.cs' -delete", "find -name -delete"),
-        ("find . -maxdepth 1 -delete", "find -maxdepth -delete"),
-        ("find . -exec rm -rf {} +", "find -exec rm"),
-        ("find . -execdir rm {} ;", "find -execdir rm"),
-        # rm destruktiv
-        ("rm -rf /tmp/build", "rm -rf"),
-        ("rm -r some-directory", "rm -r"),
-        ("rm -fR dir", "rm -fR"),
         # python3 mit absolutem Pfad
         ("python3 /tmp/script.py", "python3 /tmp/"),
         ("python3 /absolute/path/script.py", "python3 absoluter Pfad"),
         ("python3 ~/scripts/foo.py", "python3 ~/..."),
         ("python3 /mnt/c/Users/kieritz/source/repos/mahl/.claude/scripts/dotnet-test.py", "python3 absoluter Pfad zu .claude-Script"),
-        # python3 -c mit rm -rf
-        ("python3 -c 'import os; os.system(\"rm -rf /\")'", "python3 -c mit rm -rf"),
-        # git destruktiv
-        ("git push --force origin main", "Force-Push"),
-        ("git reset --hard HEAD~1", "Hard-Reset"),
-        ("git clean -fd", "git clean -f"),
-        ("git clean -xfd", "git clean -xf"),
-        ("git checkout .", "git checkout ."),
-        ("git restore .", "git restore ."),
-        # git add -f
+        # git add -f: Secrets-Risiko, kein Override
         ("git add -f .env", "git add -f"),
         ("git add secrets.json --force", "git add --force am Ende"),
         ("git add -f .", "git add -f ."),
@@ -174,6 +154,21 @@ def test_deny_patterns() -> int:
         ("cat /dev/null > Server/Program.cs", "cat > .cs-Datei"),
         ("grep foo file > output.cs", "grep > .cs"),
         ("sort input.txt > sorted.cs", "sort > .cs"),
+        # cmd.exe type → Read-Tool verwenden
+        ('cmd.exe /c "type C:\\Users\\kieritz\\source\\repos\\mahl\\docs\\GLOSSARY.md"', "cmd.exe type"),
+        ('output=$(cmd.exe /c "type C:\\Users\\kieritz\\source\\repos\\mahl\\docs\\GLOSSARY.md")', "output=$(cmd.exe type)"),
+        # Frontend Tests: immer via Python-Script, nie direkt
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test"', "npm run test direkt"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test -- run"', "npm run test -- run direkt"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test:e2e"', "npm run test:e2e direkt"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npx vitest run"', "npx vitest run via cmd.exe"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npx playwright test"', "npx playwright test via cmd.exe"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npx stryker run"', "npx stryker run via cmd.exe"),
+        ("npx vitest run", "npx vitest run (WSL direkt)"),
+        ("npx playwright test e2e/ingredients.spec.ts", "npx playwright test (WSL direkt)"),
+        ("npx stryker run", "npx stryker run (WSL direkt)"),
+        ("npm run test", "npm run test (WSL direkt)"),
+        ("npm run test:e2e", "npm run test:e2e (WSL direkt)"),
     ]
 
     for command, desc in deny_cases:
@@ -196,8 +191,9 @@ def test_allow_patterns() -> int:
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef migrations remove"', "dotnet ef migrations remove"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef migrations list"', "dotnet ef migrations list"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef database update"', "dotnet ef database update"),
-        # npm run
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\\\Client && npm run build"', "npm run build"),
+        # npm run / npm audit
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run build"', "npm run build"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm audit"', "npm audit"),
         # python3 -m pytest auf .claude/
         ("python3 -m pytest .claude/hooks/tests/ -p no:cacheprovider -s -q", "pytest .claude/hooks/"),
         ("python3 -m pytest .claude/ -q", "pytest .claude/ kurz"),
@@ -231,6 +227,18 @@ def test_allow_patterns() -> int:
         ("touch Server/Domain/NewType.cs", "touch"),
         ("chmod +x .claude/hooks/new-hook.sh", "chmod +x"),
         ("chmod +x script.sh", "chmod +x solo"),
+        # rm: einzelne Dateien (ohne -r/-R)
+        ("rm Client/src/services/ingredientsApi.test.ts", "rm einzelne Datei"),
+        ("rm -f some-file.ts", "rm -f (kein -r)"),
+        ("rm file1.ts file2.ts", "rm mehrere Dateien"),
+        # mv: Dateien verschieben/umbenennen (kaizen-Archivierung)
+        ("mv docs/kaizen/lessons_learned.md docs/kaizen/archive/session_056_to_063.md", "mv kaizen archivieren"),
+        ("mv docs/kaizen/lessons_learned.md docs/kaizen/archive/session_064_to_070.md", "mv kaizen archivieren 2"),
+        ("mv some-file.ts other-file.ts", "mv umbenennen"),
+        # cp: Dateien kopieren (ohne -r/-R)
+        ("cp .claude/skills/kaizen/references/lessons_learned_template.md docs/kaizen/lessons_learned.md", "cp template"),
+        ("cp some-file.ts backup-file.ts", "cp einfach"),
+        ("cp -p source.txt dest.txt", "cp -p (preserve, kein -r)"),
         # Python: nur .claude/
         ("python3 .claude/scripts/stryker-summary.py", "python3 .claude/scripts/"),
         ("python3 .claude/scripts/jenga_score.py", "jenga_score.py"),
@@ -266,6 +274,26 @@ def test_allow_patterns() -> int:
             'output=$(cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build Server.Tests 2>&1")\necho "$output" | grep -E "(error|warning CS|Build succeeded)" | head -30',
             "Variable-Capture dotnet build + grep | head",
         ),
+        # dotnet run via cmd.exe
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet run --project Server"', "dotnet run --project Server"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet run --project Server" &', "dotnet run im Hintergrund"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && set ASPNETCORE_URLS=http://localhost:5059 && dotnet run --project Server"', "dotnet run mit Env-Var"),
+        # docker-compose via cmd.exe
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && docker-compose up -d"', "docker-compose up via cmd.exe"),
+        # npm run build/dev/lint/preview via cmd.exe (kein Wrapper nötig)
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run dev"', "npm run dev"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run build"', "npm run build"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint"', "npm run lint"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test:coverage"', "npm run test:coverage (kein Wrapper)"),
+        # Frontend-Wrapper-Scripts
+        ("python3 .claude/scripts/vitest-run.py", "vitest-run.py"),
+        ("python3 .claude/scripts/vitest-run.py --filter IngredientsPage", "vitest-run.py --filter"),
+        ("python3 .claude/scripts/vitest-run.py --verbose", "vitest-run.py --verbose"),
+        ("python3 .claude/scripts/playwright-test.py", "playwright-test.py"),
+        ("python3 .claude/scripts/playwright-test.py --filter ingredients", "playwright-test.py --filter"),
+        ("python3 .claude/scripts/stryker-frontend.py", "stryker-frontend.py"),
+        ("python3 .claude/scripts/stryker-frontend.py --mutate src/pages/IngredientsPage.tsx", "stryker-frontend.py --mutate"),
+        ("python3 .claude/scripts/stryker-frontend.py --detail", "stryker-frontend.py --detail"),
         # Compound aus erlaubten Segmenten
         ("ls -la && echo done", "Compound: ls && echo"),
         ("grep foo file | wc -l", "Compound: grep | wc"),
@@ -282,22 +310,22 @@ def test_allow_patterns() -> int:
     return failures
 
 
-def test_fall_through() -> int:
-    print(f"\n{Colors.BOLD}=== Fall-Through / Ask (User entscheidet) ==={Colors.RESET}")
+def test_deny() -> int:
+    print(f"\n{Colors.BOLD}=== Deny (kein Match / destruktiv) ==={Colors.RESET}")
     failures = 0
 
-    fall_through_cases = [
+    deny_cases = [
         # Word-Boundary korrekt
         ("lsof", "lsof (NICHT ls)"),
         ("lsblk", "lsblk (NICHT ls)"),
         ("catalog something", "catalog (NICHT cat)"),
-        # python3 außerhalb .claude/ (relativ → fall-through, nicht deny)
+        # python3 außerhalb .claude/ (relativ → deny)
         ("python3 ./one_off_analysis.py", "python3 relative path (nicht .claude/)"),
         ("python3 -c 'print(1)'", "python3 -c"),
-        # dotnet ef database drop → ask
+        ("python3 -c 'import os; os.system(\"rm -rf /\")'", "python3 -c mit rm -rf (Obfuskation → deny)"),
+        # dotnet ef database drop → deny
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef database drop"', "dotnet ef database drop"),
         # dotnet: andere Subcommands nicht erlaubt
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet run"', "dotnet run"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet publish"', "dotnet publish"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet format"', "dotnet format"),
         # Falsche Variable → kein Auto-Allow
@@ -305,6 +333,10 @@ def test_fall_through() -> int:
             'result=$(cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build")\necho "$result"',
             "Variable-Capture falsche Variable (result statt output)",
         ),
+        # cp -r: rekursives Kopieren → deny
+        ("cp -r docs/ backup/", "cp -r (rekursiv)"),
+        ("cp -R src/ dest/", "cp -R (rekursiv, Großbuchstabe)"),
+        ("cp -rp src/ dest/", "cp -rp (rekursiv + preserve)"),
         # chmod: nur +x erlaubt
         ("chmod 755 file", "chmod 755 (nicht +x)"),
         ("chmod -R 777 .", "chmod -R"),
@@ -324,31 +356,86 @@ def test_fall_through() -> int:
         # Compound mit unbekanntem Segment
         ("ls -la && curl https://example.com", "Compound: ls && curl"),
         ("grep foo file | apt-get install foo", "Compound: grep | apt-get"),
+        # Destruktive Befehle ohne --allow-once → deny (freigabefähig per Marker)
+        ("rm -rf /tmp/build", "rm -rf"),
+        ("rm -r some-directory", "rm -r"),
+        ("rm -fR dir", "rm -fR"),
+        ("find . -delete", "find -delete"),
+        ("find . -name '*.cs' -delete", "find -name -delete"),
+        ("find . -exec rm -rf {} +", "find -exec rm"),
+        ("find . -execdir rm {} ;", "find -execdir rm"),
+        ("find . -exec sh -c 'rm -rf {}' \\;", "find -exec sh -c rm"),
+        ("find . -execdir sh -c 'echo hi' \\;", "find -execdir sh (auch ohne rm destruktiv)"),
+        ("find . -exec bash -c 'rm -rf {}' \\;", "find -exec bash"),
+        ("find . -exec dash -c 'rm {}' \\;", "find -exec dash"),
+        ("git push --force origin main", "git push --force"),
+        ("git reset --hard HEAD~1", "git reset --hard"),
+        ("git clean -fd", "git clean -fd"),
+        ("git clean -xfd", "git clean -xfd"),
+        ("git checkout .", "git checkout ."),
+        ("git restore .", "git restore ."),
+        # taskkill ist destruktiv (in DESTRUCTIVE_PATTERNS)
+        ('cmd.exe /c "taskkill /f /im dotnet.exe"', "taskkill ohne Marker"),
     ]
 
-    for command, desc in fall_through_cases:
-        if not assert_decision(command, "fall-through", f"{desc}: {command}"):
+    for command, desc in deny_cases:
+        if not assert_decision(command, "deny", f"{desc}: {command}"):
+            failures += 1
+
+    return failures
+
+
+def test_one_time_marker() -> int:
+    print(f"\n{Colors.BOLD}=== One-Time-Marker (# --allow-once) ==={Colors.RESET}")
+    failures = 0
+
+    ask_cases = [
+        # Unbekannte / seltene Befehle
+        ('cmd.exe /c "taskkill /f /im dotnet.exe" # --allow-once', "taskkill mit Marker"),
+        ('some-unknown-command --args # --allow-once', "unbekannter Befehl mit Marker"),
+        ('npm install # --allow-once', "npm install mit Marker"),
+        # Destruktive Befehle: Marker macht sie freigabefähig
+        ('rm -rf Client/dist/ # --allow-once', "rm -rf mit Marker → ask"),
+        ('rm -r some-directory # --allow-once', "rm -r mit Marker → ask"),
+        ('git push --force origin main # --allow-once', "git push --force mit Marker → ask"),
+        ('git reset --hard HEAD~1 # --allow-once', "git reset --hard mit Marker → ask"),
+        ('git clean -fd # --allow-once', "git clean -fd mit Marker → ask"),
+        ('find . -delete # --allow-once', "find -delete mit Marker → ask"),
+        ("find . -exec sh -c 'rm -rf {}' \\; # --allow-once", "find -exec sh mit Marker → ask"),
+        # WRONG_APPROACH: Marker übersteuert jetzt auch diese
+        ('cmd.exe /c "cd /d C:\\mahl && dotnet test" # --allow-once', "dotnet test + Marker → ask"),
+        ('git add -f .env # --allow-once', "git add -f + Marker → ask"),
+        ('python3 /tmp/script.py # --allow-once', "python3 absoluter Pfad + Marker → ask"),
+    ]
+    for command, desc in ask_cases:
+        if not assert_decision(command, "ask", f"{desc}: {command}"):
             failures += 1
 
     return failures
 
 
 def test_deny_overrides_allow() -> int:
-    print(f"\n{Colors.BOLD}=== Deny hat Vorrang über Allow ==={Colors.RESET}")
+    print(f"\n{Colors.BOLD}=== Prioritäten: WRONG_APPROACH / DESTRUCTIVE vs. ALLOW ==={Colors.RESET}")
     failures = 0
 
     cases = [
         # cmd.exe+dotnet MIT Pipe → deny (nicht allow)
         ('cmd.exe /c "cd /d C:\\mahl && dotnet test" | tail -60', "deny",
          "cmd.exe MIT Pipe → deny"),
-        # rm -rf → immer deny, auch als Teil anderer Befehle
-        ("rm -rf /tmp", "deny", "rm -rf"),
-        # find -delete schlägt find-Allow
-        ("find . -delete", "deny", "find -delete schlägt find-allow"),
         # git add -f schlägt git-add-Allow
         ("git add -f .env", "deny", "git add -f schlägt git-add-allow"),
         # Stryker immer deny → Script verwenden
         ('cmd.exe /c "cd /d C:\\mahl && dotnet stryker"', "deny", "Stryker direkt → deny"),
+        # find ohne destruktive Flags → allow; destruktive find-Varianten → deny
+        ("find . -name '*.cs'", "allow", "find ohne destruktive Flags → allow"),
+        ("find . -delete", "deny", "find -delete → deny (freigabefähig)"),
+        ("find . -exec sh -c 'rm -rf {}' \\;", "deny", "find -exec sh → deny"),
+        # rm einzelne Datei → allow; rm -rf → deny (nicht allow)
+        ("rm file.ts", "allow", "rm einzelne Datei → allow"),
+        ("rm -rf /tmp", "deny", "rm -rf → deny (freigabefähig)"),
+        # git add ohne -f → allow (negativfilter explizit im Pattern)
+        ("git add src/Foo.cs", "allow", "git add ohne -f → allow"),
+        ("git add -f .env", "deny", "git add -f → deny (WRONG_APPROACH)"),
     ]
 
     for command, expected, desc in cases:
@@ -363,14 +450,14 @@ def test_edge_cases() -> int:
     failures = 0
 
     cases = [
-        ("", "fall-through", "Leerer Befehl"),
-        ("  ", "fall-through", "Nur Whitespace"),
+        ("", "deny", "Leerer Befehl"),
+        ("  ", "deny", "Nur Whitespace"),
         ("git add .", "allow", "git add . (erlaubt)"),
         ("git add -A", "allow", "git add -A (erlaubt)"),
-        ("sed -i 's/foo/bar/g' file.txt", "fall-through", "sed allgemein (nicht \\r-Spezialfall)"),
+        ("sed -i 's/foo/bar/g' file.txt", "deny", "sed allgemein (nicht \\r-Spezialfall)"),
         # chmod +x ist erlaubt, andere Modes nicht
         ("chmod +x .claude/hooks/script.sh", "allow", "chmod +x erlaubt"),
-        ("chmod 644 file", "fall-through", "chmod 644 nicht erlaubt"),
+        ("chmod 644 file", "deny", "chmod 644 nicht erlaubt"),
         # jq ist erlaubt
         ("jq '.' file.json", "allow", "jq erlaubt"),
         ("jq -r '.name' package.json", "allow", "jq -r erlaubt"),
@@ -394,7 +481,8 @@ def main() -> None:
     total_failures += test_redirect_detection()
     total_failures += test_deny_patterns()
     total_failures += test_allow_patterns()
-    total_failures += test_fall_through()
+    total_failures += test_deny()
+    total_failures += test_one_time_marker()
     total_failures += test_deny_overrides_allow()
     total_failures += test_edge_cases()
 

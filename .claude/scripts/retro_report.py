@@ -1,15 +1,18 @@
 """Kaizen-Retro-Bericht aus lessons_learned.md + Archiv.
 
 Aufruf:
-  python .claude/scripts/retro_report.py [--current <pfad>] [--archive <dir>] [--cm <pfad>]
+  python .claude/scripts/retro_report.py [--current <pfad>] [--archive <dir>] [--cm <pfad>] [--verbose]
 
-Abschnitte:
+Standard-Output (Agenten-Modus, retro-relevant):
   1. Aktuelle Periode – Aggregationstabelle
   2. Sonstiges-Einträge (Tag-Pflege)
+  6. Pattern-Kandidaten (aktuelle Periode + letzte 3 Archiv-Sessions)
+  9. Eskalierte Maßnahmen
+
+Nur mit --verbose (visuell / für Menschen):
   3. Zeitreihen – Gesamt-Chart (logarithmische Zeitachse, blau)
   4. Kategorie-Stack – farbiger gestapelter Chart (gleiche Zeitachse)
   5. Heatmap (Session × Kontext)
-  6. Pattern-Kandidaten (aktuelle Periode + letzte 3 Archiv-Sessions)
   7. Semantisches Clustering (sklearn optional, alle offenen Einträge)
   8. Trendanalyse per Kategorie
 """
@@ -20,6 +23,10 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
+
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kaizen_constants import SCHWERE_WEIGHTS
 
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -100,6 +107,7 @@ class Countermeasure:
     kategorie: str
     kontexte: list          # leer = Wildcard
     status: str             # OFFEN | AKTIV | BEWÄHRT | IN UMSETZUNG
+    seit_session: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -207,9 +215,13 @@ def load_cm(path: str) -> list[Countermeasure]:
             if status not in ('OFFEN', 'AKTIV', 'BEWÄHRT', 'IN UMSETZUNG'):
                 continue
             kontexte = [k.strip() for k in parts[4].split(',') if k.strip()]
+            try:
+                seit_session = int(parts[7])
+            except (IndexError, ValueError):
+                seit_session = 0
             cms.append(Countermeasure(
                 problem=parts[1], schwere=schwere, kategorie=parts[3],
-                kontexte=kontexte, status=status,
+                kontexte=kontexte, status=status, seit_session=seit_session,
             ))
     return cms
 
@@ -311,7 +323,7 @@ def render_gesamt_chart(
     bands: list[tuple[int, int]],
     title: str,
 ) -> list[str]:
-    totals = [float(len(s.findings)) for s in sessions]
+    totals = [float(sum(SCHWERE_WEIGHTS.get(f.schwere, 0) for f in s.findings)) for s in sessions]
     band_data = col_avgs(totals, bands)
     max_h = max(MIN_HEIGHT, int(max((v for cols in band_data for v in cols), default=0)) + 1)
     lines = [b(f"  {title}"), ""]
@@ -333,7 +345,7 @@ def render_stack_chart(
     title: str,
 ) -> list[str]:
     cat_counts = [
-        {c: sum(1 for f in s.findings if f.kategorie == c) for c in CATS}
+        {c: sum(SCHWERE_WEIGHTS.get(f.schwere, 0) for f in s.findings if f.kategorie == c) for c in CATS}
         for s in sessions
     ]
     band_data = col_cat_avgs(cat_counts, bands)
@@ -430,7 +442,7 @@ def render_zeitreihen(all_sessions: list[SessionData]) -> str:
         lines.append(f"  Zu wenig Sessions ({len(all_sessions)}). Minimum: 2.")
         return "\n".join(lines)
     bands = compute_bands(len(all_sessions))
-    lines += render_gesamt_chart(all_sessions, bands, "Findings/Session (Gesamt)")
+    lines += render_gesamt_chart(all_sessions, bands, "Schwere-Score/Session (Gesamt)")
     return "\n".join(lines)
 
 
@@ -440,7 +452,7 @@ def render_stack(all_sessions: list[SessionData]) -> str:
         lines.append(f"  Zu wenig Sessions ({len(all_sessions)}). Minimum: 2.")
         return "\n".join(lines)
     bands = compute_bands(len(all_sessions))
-    lines += render_stack_chart(all_sessions, bands, "Findings/Session (nach Kategorie)")
+    lines += render_stack_chart(all_sessions, bands, "Schwere-Score/Session (nach Kategorie)")
     return "\n".join(lines)
 
 
@@ -602,21 +614,50 @@ def render_trend(all_sessions: list[SessionData]) -> str:
     header = indent + "".join(lbl.rjust(TREND_VALUE_W) for lbl in band_labels) + "  Δ zuletzt"
     sep    = "  " + "─" * (LABEL_W + 2 + TREND_VALUE_W * len(bands) + 11)
 
-    lines.append("  Ø Findings/Session pro Band (logarithmisch).")
+    lines.append("  Ø Schwere-Score/Session pro Band (logarithmisch).")
+    lines.append("  Score = Summe der Gewichte (KRITISCH=25, HOCH=10, MITTEL=3, GERING=1).")
     lines.append("  Farbe: grün = weniger als Vorband (besser), rot = mehr (schlechter).")
     lines.append("  Δ zuletzt = Änderung letztes Band vs. vorletztes Band.\n")
     lines.append(header)
     lines.append(sep)
 
-    ys_total = [float(len(s.findings)) for s in all_sessions]
+    ys_total = [float(sum(SCHWERE_WEIGHTS.get(f.schwere, 0) for f in s.findings)) for s in all_sessions]
     lines.append(trend_line("GESAMT", ys_total))
     lines.append("")
 
     kategorien = sorted({f.kategorie for s in all_sessions for f in s.findings})
     for kat in kategorien:
-        ys = [float(sum(1 for f in s.findings if f.kategorie == kat)) for s in all_sessions]
+        ys = [float(sum(SCHWERE_WEIGHTS.get(f.schwere, 0) for f in s.findings if f.kategorie == kat)) for s in all_sessions]
         lines.append(trend_line(kat, ys, CAT_COLOR.get(kat, "")))
 
+    return "\n".join(lines)
+
+
+def render_escalated(cms: list[Countermeasure], archive_dir: str) -> str:
+    lines = [section("9. Eskalierte Maßnahmen (≥ 2 Retros OFFEN)")]
+    archive_starts: list[int] = []
+    if os.path.isdir(archive_dir):
+        for fname in sorted(os.listdir(archive_dir)):
+            m = re.match(r"session_(\d+)_to_\d+\.md$", fname)
+            if m:
+                archive_starts.append(int(m.group(1)))
+
+    offen = [cm for cm in cms if cm.status == 'OFFEN']
+    if not offen:
+        lines.append("  Keine offenen Maßnahmen.")
+        return "\n".join(lines)
+
+    escalated = [(cm, sum(1 for s in archive_starts if s > cm.seit_session)) for cm in offen]
+    escalated = [(cm, n) for cm, n in escalated if n >= 2]
+
+    if not escalated:
+        lines.append("  Keine Maßnahme seit ≥ 2 Retros OFFEN.")
+        return "\n".join(lines)
+
+    for cm, retros in escalated:
+        lines.append(f"  {clr('ESKALIERT', RED+BOLD)} [seit S{cm.seit_session}, {retros} Retro(s) ohne Umsetzung]")
+        lines.append(f"  Problem: {cm.problem}")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -628,6 +669,8 @@ def main() -> int:
     parser.add_argument("--current",  default=DEFAULT_CURRENT)
     parser.add_argument("--archive",  default=DEFAULT_ARCHIVE)
     parser.add_argument("--cm",       default=DEFAULT_CM)
+    parser.add_argument("--verbose",  action="store_true",
+                        help="Zeigt alle Abschnitte inkl. Charts (Standard: nur retro-relevante)")
     args = parser.parse_args()
 
     if not os.path.exists(args.current):
@@ -663,12 +706,15 @@ def main() -> int:
 
     print(render_aggregation(current_sessions))
     print(render_sonstiges(current_sessions))
-    print(render_zeitreihen(all_sessions))
-    print(render_stack(all_sessions))
-    print(render_heatmap(all_sessions))
+    if args.verbose:
+        print(render_zeitreihen(all_sessions))
+        print(render_stack(all_sessions))
+        print(render_heatmap(all_sessions))
     print(render_pattern(current_sessions, archive_periods, cms))
-    print(render_clustering(all_sessions, cms))
-    print(render_trend(all_sessions))
+    if args.verbose:
+        print(render_clustering(all_sessions, cms))
+        print(render_trend(all_sessions))
+    print(render_escalated(cms, args.archive))
     print()
 
     return 0

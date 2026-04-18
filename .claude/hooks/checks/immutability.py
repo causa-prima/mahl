@@ -1,4 +1,8 @@
-"""Immutability-Warn-Check (nicht-blockierend): Mutable Collections in Domain-Code."""
+"""Immutability-Check (blockierend): Mutable Collections in Domain-Code.
+
+Ergänzt Meziantou MA0016 (erzwingt Interface-Typen): dieser Check erzwingt zusätzlich
+die stärkere Anforderung von ImmutableList<T>/IImmutableSet<T> statt nur IList<T>.
+"""
 import re
 from .common import HookInput, IMMUTABILITY_EXCLUDED
 
@@ -20,15 +24,16 @@ def check(inp: HookInput) -> list[str]:
         line.strip() for line in inp.new_content.splitlines()
         if MUTABLE_COLLECTION.search(line) and not LOCAL_NEW.search(line)
     ]
-    if mutable_lines:
-        examples = "\n    ".join(mutable_lines[:3])
-        return [
-            "⚠ Immutability-Hinweis: Mutable Collection-Typ in Property/Parameter erkannt:\n"
-            f"    {examples}\n"
-            "  Verwende unveränderliche Strukturen:\n"
-            "    List<T>         → ImmutableList<T> oder IEnumerable<T>\n"
-            "    Dictionary<K,V> → ImmutableDictionary<K,V>\n"
-            "    HashSet<T>      → ImmutableHashSet<T>\n"
-            "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 1)."
-        ]
-    return []
+    if not mutable_lines:
+        return []
+
+    examples = "\n    ".join(mutable_lines[:3])
+    return [
+        "⛔ Immutability-Verletzung (blockierend): Mutable Collection-Typ in Property/Parameter erkannt:\n"
+        f"    {examples}\n"
+        "  Verwende unveränderliche Strukturen:\n"
+        "    List<T>         → ImmutableList<T> oder IEnumerable<T>\n"
+        "    Dictionary<K,V> → ImmutableDictionary<K,V>\n"
+        "    HashSet<T>      → ImmutableHashSet<T>\n"
+        "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 1)."
+    ]

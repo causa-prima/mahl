@@ -3,7 +3,7 @@
 > **Zweck:** Regelmäßig ausgeführte Befehle mit ihren Laufzeiten im Blick behalten.
 > Ziel: Am Phasen-Ende prüfen, ob es schnellere Alternativen gibt.
 >
-> **Pflege:** Keine Duplikate – bestehende Zeilen aktualisieren, nicht neu anlegen.
+> **Pflege:** Bestehende Zeilen aktualisieren – für jeden Befehl genau ein Eintrag.
 > Einmalige Befehle gehören nicht hier rein.
 
 | Befehl | Zweck | Dauer normal | Dauer max | Notizen / Alternativen |

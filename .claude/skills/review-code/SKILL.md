@@ -63,6 +63,8 @@ Kein Mutant darf stillschweigend ignoriert werden.
 ### 3. Review-Agenten spawnen
 → TaskUpdate "2. Stryker Mutation Testing": completed | TaskUpdate "3. Review-Agenten spawnen": in_progress
 
+⚠️ **Context-Freiheit:** Jeden Agenten ohne Iterations-Vorwissen spawnen – weder frühere Findings noch als false positive bekannte Punkte in den Prompt aufnehmen. Filtering geschieht im Anschluss durch den Hauptagenten. (Begründung: `docs/kaizen/principles.md` – Iterations-Vorwissen dämpft Kritikbereitschaft strukturell.)
+
 Scope bestimmt, welche Agenten nötig sind (siehe `docs/LLM_PROMPT_TEMPLATE.md`):
 
 | Was wurde geändert? | Agenten |
