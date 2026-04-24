@@ -1,33 +1,40 @@
 ---
 name: review-code
 description: >
-  Code-Review nach einer Implementierung: Autor-Selbstcheck via REVIEW_CHECKLIST.md,
-  dann Review-Agenten nach Scope (KLEIN/MITTEL/GROSS) spawnen und Findings iterativ fixen.
-  Verwende diesen Skill nach abgeschlossener Implementierung oder wenn der User explizit
-  eine Code-Review anfordert.
-user-invocable: false
+  Code-Review nach einer Implementierung: Selbstcheck via REVIEW_CHECKLIST.md,
+  dann spezialisierte Review-Agenten spawnen und Findings als strukturierte Liste
+  zurückgeben. Wird von implementing-scenario Schritt 5 direkt ausgeführt (kein
+  Subagent-Wrapper). Kann auch standalone auf beliebigem Code angewendet werden.
+user-invocable: true
 ---
 
 # Skill: review-code
 
-## Wann dieser Skill aktiv wird
+## Eingabe
 
-Wenn du nach einer Implementierung eine Code-Review durchführst, oder wenn der User explizit nach einer Review fragt.
+- Scope + Szenario-Tag (oder freier Scope bei standalone-Aufruf)
+- Geänderte Dateien (Pfade oder git-diff-Auszug)
+- **Stryker-Suppression-Report:** neue Suppressionen aus dem REFACTOR-Schritt
+  (Format: Datei:Zeile – Begründung), oder leer wenn keine neuen Suppressionen
+
+Fehlende Eingaben bei standalone-Aufruf: Scope → User nach Beschreibung der Änderung fragen.
+Geänderte Dateien → `git diff` (staged + unstaged) als Standard verwenden.
 
 ---
 
-## Review-Ablauf
+## Ablauf
 
-Lege zu Beginn folgende Task-Liste an:
+Lege zu Beginn eine Task-Liste an, sofern der Skill standalone aufgerufen wird. Bei Einbettung in einen anderen Skill (z.B. aus implementing-scenario heraus) keine neue Task-Liste anlegen und keine TaskUpdate-Aufrufe für interne Schritte – der Aufrufer verwaltet die Task-Liste. Stattdessen: kurze Status-Zeile pro Schritt ausgeben (z.B. „→ Schritt 1 (Selbstcheck): abgeschlossen").
+
 ```
-TaskCreate: "1. Autor-Selbstcheck"
-TaskCreate: "2. Stryker Mutation Testing"
+TaskCreate: "1. Selbstcheck (REVIEW_CHECKLIST.md)"
+TaskCreate: "2. Suppression-Report bewerten"
 TaskCreate: "3. Review-Agenten spawnen"
-TaskCreate: "4. Findings auswerten"
+TaskCreate: "4. Findings zusammenführen"
 ```
 
-### 1. Autor-Selbstcheck (REVIEW_CHECKLIST.md)
-→ TaskUpdate "1. Autor-Selbstcheck": in_progress
+### 1. Selbstcheck (REVIEW_CHECKLIST.md)
+→ TaskUpdate "1. Selbstcheck (REVIEW_CHECKLIST.md)": in_progress
 
 Gehe `docs/REVIEW_CHECKLIST.md` systematisch Punkt für Punkt durch:
 - Architecture Layer (internal-Typen, kein InternalsVisibleTo, Ports-only-Tests)
@@ -37,60 +44,74 @@ Gehe `docs/REVIEW_CHECKLIST.md` systematisch Punkt für Punkt durch:
 - Tests
 - Test-Audit (US-Tag im Testnamen, Traceability, kein Gold-Plating)
 
-**Wichtig: Alle ❌ Must-Fix-Findings sofort selbst beheben – BEVOR Agenten gespawnt werden.**
-Dazu `write-code`-Skill verwenden (TDD Red→Green→Refactor nach `docs/TDD_PROCESS.md` einhalten!).
-⚠️-Findings kommentieren, aber erst nach den Agenten entscheiden.
+Für jedes Finding: Schweregrad ❌/⚠️/✅ + Guideline-Referenz (Datei + Sektion) notieren.
+Findings werden gesammelt – nicht sofort selbst behoben.
 
-### 2. Stryker Mutation Testing (Pflicht)
-→ TaskUpdate "1. Autor-Selbstcheck": completed | TaskUpdate "2. Stryker Mutation Testing": in_progress
+### 2. Suppression-Report bewerten
+→ TaskUpdate "1. Selbstcheck (REVIEW_CHECKLIST.md)": completed | TaskUpdate "2. Suppression-Report bewerten": in_progress
 
-Befehle je nach Scope (Details: `docs/DEV_WORKFLOW.md` – Sektion "Mutation Testing"):
+Jeden Eintrag im übergebenen Stryker-Suppression-Report einzeln prüfen. Referenz:
+`docs/TDD_PROCESS.md` Sektion „Stryker-Survivor behandeln".
 
-| Scope | Befehl |
-|-------|--------|
-| Backend (C#) | `python3 .claude/scripts/dotnet-stryker.py` (Details: `docs/DEV_WORKFLOW.md`) |
-| Frontend (TS) | `cd Client && npx stryker run` |
-| Beides | beide Befehle sequenziell |
+Für jeden Eintrag: Beweist die Begründung echte Äquivalenz oder Nichttestbarkeit –
+oder klingt sie nur plausibel? (`docs/kaizen/principles.md`: semantische Korrektheit
+prüfen, nicht blind übernehmen.) Schwache oder fehlende Begründung → ❌ Finding.
 
-**Erwartung: 100 % Mutation Score** (alle Mutanten killed).
-
-Überlebende Mutanten haben genau zwei erlaubte Ursachen:
-1. **Fehlender Test** → mit `write-code`-Skill nachholen (TDD nach `docs/TDD_PROCESS.md`), dann erneut Stryker
-2. **Äquivalenter Mutant oder ausgenommener Pfad** (z.B. `> 0` ↔ `>= 1`, Logging, Infrastructure/Boilerplate) → in `stryker-config.json` exkludieren + Begründung in `docs/history/decisions.md`
-
-Kein Mutant darf stillschweigend ignoriert werden.
+Kein Suppression-Report übergeben oder leer → Schritt überspringen.
 
 ### 3. Review-Agenten spawnen
-→ TaskUpdate "2. Stryker Mutation Testing": completed | TaskUpdate "3. Review-Agenten spawnen": in_progress
+→ TaskUpdate "2. Suppression-Report bewerten": completed | TaskUpdate "3. Review-Agenten spawnen": in_progress
 
-⚠️ **Context-Freiheit:** Jeden Agenten ohne Iterations-Vorwissen spawnen – weder frühere Findings noch als false positive bekannte Punkte in den Prompt aufnehmen. Filtering geschieht im Anschluss durch den Hauptagenten. (Begründung: `docs/kaizen/principles.md` – Iterations-Vorwissen dämpft Kritikbereitschaft strukturell.)
+⚠️ **Context-Freiheit:** Jeden Agenten ohne Iterations-Vorwissen spawnen – weder frühere
+Findings noch als false positive bekannte Punkte im Prompt. Filtering geschieht im
+Anschluss. Begründung: Vorwissen dämpft die Kritikbereitschaft strukturell – der Reviewer
+denkt „wurde ja schon reviewt". Unabhängige Urteile, dann zentral filtern.
 
-Scope bestimmt, welche Agenten nötig sind (siehe `docs/LLM_PROMPT_TEMPLATE.md`):
+Scope bestimmt welche Agenten nötig sind:
 
 | Was wurde geändert? | Agenten |
 |--------------------|---------|
 | Änderung ohne Verhaltensänderung (z. B. Rename, Refactoring ohne Logik-Änderung) | `code-quality` |
-| Neue Funktionalität oder Verhaltensänderung (Domain/Application-Layer) | `code-quality` + `functional` + `test-quality` |
+| Neue Funktionalität / Verhaltensänderung | `code-quality` + `functional` + `test-quality` |
 | + API-Grenze, User-Input oder Auth berührt | + `security` |
 | + Frontend-Komponenten geändert | + `ux-ui` |
+| Nur Tests geändert (kein Produktionscode) | `test-quality` |
+| Nur Suppressionen hinzugefügt | Schritt 2 deckt das ab – kein Agent-Spawn nötig |
+| Nur Dokumentation / Kommentare geändert | `code-quality` |
 
-**Hinweis an Agenten:** Die Projekt-Guidelines (`docs/CODING_GUIDELINE_*.md`) haben Vorrang vor
-agenten-eigenen Checklisten. Abweichungen müssen explizit begründet werden.
+Alle zutreffenden Agenten parallel spawnen – sie reviewen denselben Diff und haben keine gegenseitigen Abhängigkeiten. Bei Unsicherheit über den Scope: `git diff` selbst auswerten; bei genuiner Ambiguität User fragen.
 
-### 4. Findings auswerten
-→ TaskUpdate "3. Review-Agenten spawnen": completed | TaskUpdate "4. Findings auswerten": in_progress
+Agent-Prompts enthalten (je Agent):
+- Geänderte Dateien / git diff
+- Anforderung: jedes Finding nennt Schweregrad (❌/⚠️), Guideline-Referenz
+  (konkrete Datei + Sektion) und Begründung (nicht nur Guideline zitieren)
+- Hinweis: Projekt-Guidelines (`docs/CODING_GUIDELINE_*.md`) haben Vorrang vor
+  agenten-eigenen Checklisten
 
-**Vor dem Fixen:** Prüfen ob das Finding semantisch korrekt ist — "Es ist implementierbar" ≠ "Es ist das richtige Verhalten." Insbesondere bei Performance-Tradeoff-Argumenten oder stillen Fallbacks kritisch hinterfragen.
+### 4. Findings zusammenführen
+→ TaskUpdate "3. Review-Agenten spawnen": completed | TaskUpdate "4. Findings zusammenführen": in_progress
 
-- ❌ Must Fix → mit `write-code`-Skill beheben, dann Review-Agent nochmals für den geänderten Teil
-- ⚠️ Improvement → abwägen, bei Business-Impact nachfragen
-- ✅ OK → weiter
+Alle Findings aus Selbstcheck + Suppression-Bewertung + Agenten zusammenführen. Für jedes Finding prüfen:
+ist die Begründung semantisch korrekt – „Es ist implementierbar" ≠ „Es ist das richtige
+Verhalten"? Insbesondere Performance-Tradeoff-Argumente und stille Fallbacks kritisch hinterfragen.
 
----
+Ein Finding gilt als false positive wenn die zitierte Guideline im konkreten Code-Kontext nicht
+greift (z.B. agenten-eigene Checkliste widerspricht Projektguideline) oder wenn die Begründung
+durch den Code-Kontext widerlegbar ist. False positives aus dem Report herausnehmen und kurz begründen.
 
-## Guideline-Referenzen
+**Ausgabe (strukturierte Liste für den Orchestrator):**
 
-- `docs/CODING_GUIDELINE_GENERAL.md` (KISS, Naming, Komplexität)
-- `docs/CODING_GUIDELINE_CSHARP.md` / `docs/CODING_GUIDELINE_TYPESCRIPT.md`
-- `docs/REVIEW_CHECKLIST.md`
-- `docs/LLM_PROMPT_TEMPLATE.md` (Agent-Prompts)
+```
+❌ Must Fix:
+- [Quelle: Selbstcheck|Agent] [Datei:Zeile] [Guideline: <Pfad>, <Sektion>] <Beschreibung>
+
+⚠️ Improvements:
+- [Quelle: Selbstcheck|Agent] [Datei:Zeile] [Guideline: <Pfad>, <Sektion>] <Beschreibung>
+
+Suppression-Bewertung:
+- [Datei:Zeile] → valide | ❌ Begründung unzureichend: <Warum>
+
+✅ Keine weiteren Findings
+```
+
+→ TaskUpdate "4. Findings zusammenführen": completed

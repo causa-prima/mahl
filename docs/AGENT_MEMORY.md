@@ -38,7 +38,6 @@ Infrastruktur (unverändert):
 
 ## Nächste Prioritäten (Reihenfolge bindend)
 
-- **Commit:** `"US-904: Zutaten-Liste ist leer (Szenario 1)"` – alle geänderten Dateien committen.
 - **US-904 Szenario 2:** `/implementing-scenario @US-904-happy-path "Zutat anlegen"` – inkl. Code-Migration `ingredientsApi.ts` → ResultAsync + useResultQuery + useResultMutation + **ETag-Support für `GET /api/ingredients` (Content-Hash) und `GET /api/ingredients/{id}` (xmin)**.
 - **gherkin-workshop US-904 V1:** Separater Schritt vor V1-Implementierung: Feature-Datei und Szenarien ergänzen, die erst in V1 umgesetzt werden (d.h. Funktionalität die über MVP hinausgeht: Update einer Zutat + Tags für Zutaten).
 - **Deep-Link-Anforderung klären:** Vor US-602 (Rezept-Detailansicht) – welche Entitäten, Hintergründe, Architektur-Implikationen.

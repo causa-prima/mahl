@@ -24,7 +24,7 @@ Beispiel: `/gherkin-workshop US-904`
 ## Pflicht-Lektüre
 
 Lies vor dem Start:
-- `docs/USER_STORIES.md` – Akzeptanzkriterien der Ziel-US
+- `docs/USER_STORIES.md` (Index) → `docs/stories/szenario_N_*.md` – Akzeptanzkriterien der Ziel-US (US-Präfix = Szenario-Nummer, oder `Grep "US-NNN" docs/stories/`)
 - `docs/GLOSSARY.md` – Ubiquitäre Sprache (nur Begriffe daraus in Szenarien)
 - `docs/E2E_TESTING.md` – Gherkin-Konventionen, Tag-Schema, Traceability-Regeln
 - `docs/history/decisions.md` – Explizite Entwurfsentscheidungen (Constraints für Szenarien)
@@ -57,7 +57,7 @@ Lies die Pflicht-Dateien. Lade bei konkretem Bedarf nach:
 - `docs/SKELETON_SPEC.md` / `docs/MVP_SPEC.md` – nur bei konkretem Bedarf; `decisions.md`
   hat Vorrang, weil diese Dateien Entscheidungen und unverifizierte Spec-Details vermischen
 
-**Voraussetzung:** Falls die US-ID in `docs/USER_STORIES.md` nicht gefunden wird oder
+**Voraussetzung:** Falls die US-ID in `docs/stories/` nicht gefunden wird oder
 `docs/GLOSSARY.md` keine relevanten Entitäten enthält: stopp und frage den User –
 alle folgenden Schritte bauen auf diesen Grundlagen auf.
 

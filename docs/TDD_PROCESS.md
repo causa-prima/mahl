@@ -132,6 +132,10 @@ Führe diese Checkliste explizit durch und dokumentiere das Ergebnis:
 > Der REFACTOR-Schritt gilt daher **immer für beides**: Produktionscode UND Tests.
 
 - [ ] **Minimalität (zuerst prüfen!):** Gibt es Code, der durch keinen bisher existierenden Test erzwungen wird? → Löschen. Frage: *"Welcher Test würde fehlschlagen, wenn ich diese Zeile entferne?"* Kein Test → Zeile löschen.
+- [ ] **Stryker + Branch Coverage (Pflicht, Teil der Minimalitätsprüfung):** Stryker und Branch-Coverage-Lauf für die betroffene Schicht ausführen. Ziel: **100 % Mutation Score + 100 % Branch Coverage**. Survivor-Behandlung, Suppressionen, Befehle: Sektion "Mutation Testing" + "Branch Coverage" in dieser Datei.
+
+  **PFLICHT-OUTPUT:** *"Stryker: [Score] | Branch Coverage: [Score] | Suppression-Report: [Neue Suppressionen mit Datei:Zeile und Begründung]"* oder *"Kein Survivor, keine Suppression"*. Beide Scores werden vom Orchestrator geprüft.
+
 - [ ] Gibt es Duplikate oder Copy-Paste zwischen diesem und bestehendem **Code oder Tests**?
 - [ ] **Test-Lesbarkeit:** Ist jeder neue Test auf das Wesentliche reduziert? Gibt es Duplikation im Test-Setup, die durch einen **Test-Data-Builder** (`ACreateXxxDto(...)`, `AnIngredient(...)` etc.) beseitigt werden sollte? Builder für Request-DTOs gehören ebenfalls in `EndpointsTestsBase`.
 - [ ] Sind alle neuen Namen klar und nach Ubiquitärer Sprache (GLOSSARY.md)?
@@ -300,12 +304,6 @@ Diese Regel gilt für POST (anlegen), PUT/PATCH (ändern), DELETE (löschen/soft
 - **Konfiguration:** `stryker-config.json` im Root (mit `coverage-analysis: "off"` für WebApplicationFactory)
 - **Ausnahmen** (äquivalente Mutanten, müssen dokumentiert werden): Generated Code (EF Migrations), Framework-Boilerplate (Program.cs)
 
-## Branch Coverage
-
-- **C# Backend:** Coverlet (collector) mit `coverlet.runsettings` – automatisch bei vollem Test-Lauf (`dotnet-test.py` ohne `--filter`). Threshold: 100% Branch + Line.
-- **TypeScript Frontend:** Vitest mit V8-Provider – `npm run test:coverage`. Threshold: 100% Branches, Functions, Lines, Statements.
-- **Suppressionen:** C# via `[ExcludeFromCodeCoverage]` + Begründung in `docs/history/decisions.md`; TS via `/* v8 ignore next */` + Begründung. Jede Suppression muss begründet sein.
-
 ### Stryker-Survivor behandeln
 
 **Ein Survivor bedeutet: Es fehlt eine Test-Assertion für echtes Verhalten.**
@@ -341,3 +339,9 @@ Die richtige Frage bei einem Survivor ist nie „Wie töte ich diesen Mutanten?"
 Syntax und vollständige Kategorienliste: `docs/CSharp-Stryker.md`.
 
 Stryker-Bezüge (Zeilennummern, Mutantentypen) gehören **nicht** in Test-Namen oder Kommentare.
+
+## Branch Coverage
+
+- **C# Backend:** Coverlet (collector) mit `coverlet.runsettings` – automatisch bei vollem Test-Lauf (`dotnet-test.py` ohne `--filter`). Threshold: 100% Branch + Line.
+- **TypeScript Frontend:** Vitest mit V8-Provider – `npm run test:coverage`. Threshold: 100% Branches, Functions, Lines, Statements.
+- **Suppressionen:** C# via `[ExcludeFromCodeCoverage]` + Begründung in `docs/history/decisions.md`; TS via `/* v8 ignore next */` + Begründung. Jede Suppression muss begründet sein.

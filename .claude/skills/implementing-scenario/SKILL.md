@@ -1,41 +1,47 @@
 ---
 name: implementing-scenario
 description: >
-  6-Schritt-Workflow zum Implementieren eines einzelnen Gherkin-Szenarios mit vollständigem
-  Double-Loop TDD-Zyklus (E2E → Unit/Integration → Autor-Review → Review-Agenten → Learnings).
-  Verwende diesen Skill immer wenn ein einzelnes @US-NNN-Szenario end-to-end implementiert
-  werden soll – von Architektur-Check über TDD bis Dokumentation. Voraussetzung: das Szenario
-  muss bereits via gherkin-workshop freigegeben sein. Typische Trigger: „implementiere Szenario X",
-  „fang mit dem ersten Szenario an", „nächstes Szenario", „happy-path implementieren",
-  oder direkter Aufruf via /implementing-scenario. Dieser Skill deckt genau EIN Szenario pro
-  Durchlauf ab – für das nächste Szenario neu aufrufen.
+  Implementiert ein einzelnes freigegebenes Gherkin-Szenario end-to-end: Architektur-Check,
+  Double-Loop TDD mit Subagenten pro Schicht, Orchestrator-Check, Review-Loop und Commit.
+  Voraussetzung: das Szenario muss bereits via /gherkin-workshop freigegeben sein – fehlt es
+  in features/, stoppt der Skill sofort. Verwende diesen Skill immer wenn ein @US-NNN-Szenario
+  implementiert werden soll. Typische Trigger: „implementiere Szenario X", „fang mit dem ersten
+  Szenario an", „nächstes Szenario", „happy-path implementieren", direkter Aufruf via /implementing-scenario.
 user-invocable: true
 ---
 
 # Szenario implementieren
 
-Implementiere Szenario $ARGUMENTS
-
-GRUNDSATZ: Die Regeln in dieser Dokumentation sind starke Guidelines, keine absoluten Gesetze.
-Gibt es sehr gute Gründe abzuweichen: sofort kommunizieren und auf Bestätigung warten.
+Implementiere Szenario $ARGUMENTS.
+Fehlen `$ARGUMENTS` → User nach Tag (`@US-NNN-tag`) und Szenario-Titel fragen, bevor weitergegangen wird.
 
 Aufruf: `/implementing-scenario @US-NNN-tag "Szenario-Titel"`
 Beispiel: `/implementing-scenario @US-904-happy-path "Neue Zutat anlegen"`
 
-Lege nach kurzer Analyse folgende Task-Liste an (Regeln: `docs/TASK_SYSTEM.md`):
+Der Ablauf ist bewusst outside-in strukturiert: Der E2E-Test definiert zuerst das gewünschte
+Verhalten von außen – erst danach entsteht Produktionscode, der dieses Verhalten erfüllt. So
+bleibt der Test die Spec, nicht der Code. Architekturentscheidungen kommen vor dem ersten Test,
+weil sie im Nachhinein teuer zu ändern sind. Die Implementierungsarbeit delegiert der Haupt-Thread
+an Subagenten, damit er selbst keine Coding-Guidelines laden muss und den Überblick behält.
+
+Zwei Ausführungsregeln gelten für den gesamten Ablauf:
+- Dateien > 100 Zeilen in der Regel nicht komplett lesen: TOC zuerst (Read mit `limit: 30`), dann gezielt per Grep oder `Read offset/limit`. Ausnahme: muss ein spezifischer, abgrenzbarer Abschnitt vollständig erfasst werden (z.B. ein einzelnes Gherkin-Szenario), darf dieser komplett gelesen werden.
+- Implementierungsarbeit (Schritte 1–3) und Reviews (Schritt 5) an Subagenten delegieren – der Haupt-Thread orchestriert.
+
+GRUNDSATZ: Die Regeln sind starke Guidelines, keine absoluten Gesetze. Gibt es sehr gute Gründe
+abzuweichen: sofort kommunizieren und auf Bestätigung warten. Ein guter Grund liegt vor, wenn
+das strikte Befolgen einer Regel nachweislich zu schlechterem Ergebnis führt – z.B. wenn ein
+Test ohne vorangehende Domain-Typen nicht schreibbar ist (zirkuläre Abhängigkeit). Kein guter
+Grund: Zeitdruck, Bequemlichkeit, "das klappt schon so".
+
+Lege folgende Task-Liste an (Regeln: `docs/TASK_SYSTEM.md`):
 ```
 TaskCreate: "Schritt 0: Architektur-Check"
 TaskCreate: "Schritt 1–3: TDD-Zyklus (Double-Loop)"
-TaskCreate: "Schritt 4: Autor-Review"
-TaskCreate: "Schritt 5: Review-Agenten"
-TaskCreate: "Schritt 6: Learnings & Dokumentation"
+TaskCreate: "Schritt 4: Orchestrator-Check"
+TaskCreate: "Schritt 5: Review-Loop"
+TaskCreate: "Schritt 6: Commit & Session-Abschluss"
 ```
-
-Lies vor dem Start:
-- Akzeptanzkriterien: `docs/USER_STORIES.md`
-- Patterns & Design-Philosophie: `docs/ARCHITECTURE.md` (inkl. Sektion 0)
-- Aktuelle Phasen-Spec: Entnehme `docs/AGENT_MEMORY.md` welche Phase aktiv ist,
-  dann lies `docs/SKELETON_SPEC.md` oder `docs/MVP_SPEC.md` (API + DB)
 
 ── SCHRITT 0: ARCHITEKTUR-CHECK ─────────────────────────────────────────────
 → TaskUpdate "Schritt 0: Architektur-Check": in_progress
@@ -44,14 +50,18 @@ Beantworte diese Fragen schriftlich, bevor der erste Test geschrieben wird.
 Der Schritt ist wichtig, weil nachträgliche Architekturentscheidungen teuer sind –
 einmal Code da, ist die Versuchung groß, die Entscheidung an den Code anzupassen statt umgekehrt.
 
-1. **Gherkin-Szenario (ATDD-Gate):** Ist das Szenario `$ARGUMENTS` in `features/` vorhanden?
-   - Öffne das zugehörige Feature-File und suche nach Tag + Titel.
-   - Nicht vorhanden? → STOP. Erst `gherkin-workshop` für die User Story ausführen,
-     dann zurückkommen. Ohne freigegebenes Gherkin-Szenario fehlt die objektive
-     Fertigstellungsbedingung – der Code kann nicht als "Done" gelten.
-   - Vorhanden: Notiere Given/When/Then vollständig – das ist die exakte Spec für diesen Durchlauf.
-   - Verweis auf Konventionen: `docs/E2E_TESTING.md`
+**Gezielt lesen, nicht full-read:**
+- Akzeptanzkriterien: `docs/stories/szenario_N_*.md` (N = US-Präfix, z.B. US-904 → szenario_9_datenpflege.md; Mapping-Tabelle: `docs/USER_STORIES.md`)
+- Architektur-Patterns: `docs/ARCHITECTURE.md` – TOC lesen, dann nur relevante Sektionen
+- Phasen-Spec: Phase aus `docs/AGENT_MEMORY.md` → `docs/SKELETON_SPEC.md` oder `docs/MVP_SPEC.md` (nur API+DB-Sektion der Story)
+- Feature-Datei: `features/<story>.feature` – nur das Szenario mit Tag `$ARGUMENTS` vollständig lesen
 
+Fragen:
+
+1. **ATDD-Gate:** Szenario `$ARGUMENTS` in `features/` vorhanden?
+  - Nicht vorhanden? → STOP. Erst `gherkin-workshop` für die User Story ausführen,
+     dann zurückkommen. Ohne freigegebenes Gherkin-Szenario fehlt die objektive
+     Fertigstellungsbedingung – der Code kann nicht als "Done" gelten. Vorhanden: Given/When/Then vollständig notieren – das ist die exakte Spec.
 2. **YAGNI/KISS-Scope:** Was ist das Minimal-Notwendige für genau dieses Szenario?
    Was wäre Gold-Plating (= kein Test dafür existiert, kein Akzeptanzkriterium fordert es)?
    Notiere explizit: *"Folgendes implementiere ich NICHT: ..."*
@@ -74,94 +84,152 @@ Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 → TaskUpdate "Schritt 0: Architektur-Check": completed | TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": in_progress
 
 Ziel: genau das Szenario aus $ARGUMENTS vollständig grün bekommen – nicht mehr, nicht weniger.
-Vollständige Double-Loop-Anleitung (äußerer/innerer Loop, RED→GREEN→REFACTOR je Schicht):
-`docs/TDD_PROCESS.md` (Sektion "Outside-In ATDD / Double-Loop TDD")
 
-### Äußerer Loop – E2E-Test (Playwright)
+**Äußerer Loop – E2E-Test (Haupt-Thread):**
 
-Schreibe zuerst den Playwright-Test für das Szenario (Given/When/Then 1:1 umgesetzt).
-Führe den Test aus und zeige die Fehlermeldung – das beweist, dass der Test echtes Verhalten
-misst und noch nicht durch bestehende Implementierung zufällig grün werden kann.
-Dieser Test bleibt rot, bis alle inneren Loops abgeschlossen sind – das ist gewollt.
+Schreibe selbst den Playwright-Test für das Szenario (Given/When/Then 1:1) – bevor der erste Subagent gespawnt wird. Führe ihn aus und zeige die Fehlermeldung. Das beweist, dass der Test echtes Verhalten misst und noch nicht durch bestehende Implementierung zufällig grün werden kann. Referenz: `docs/E2E_TESTING.md` (TOC zuerst).
 
-### Innerer Loop – Schicht für Schicht (outside-in)
+Dieser Test bleibt rot, bis alle inneren Loops abgeschlossen sind – das ist gewollt. Der Haupt-Thread ändert den E2E-Test während der inneren Loops nicht.
 
-Für jede Implementierungsschicht, die das Szenario berührt, einen vollständigen RED→GREEN→REFACTOR-Zyklus durchführen:
-1. Lies die relevante Coding-Guideline für diese Schicht – da ein Szenario mehrere Schichten
-   berühren kann, passiert das je Schicht neu:
-   `docs/CODING_GUIDELINE_GENERAL.md` gilt immer (sprachunabhängige Grundprinzipien)
-   C# → `docs/CODING_GUIDELINE_CSHARP.md` (Endpoint/Validierung: + `CSharp-ROP.md`; neuer Sum-Type: + `CSharp-SumTypes.md`)
-   TypeScript/React → `docs/CODING_GUIDELINE_TYPESCRIPT.md`
-   TypeScript/React-Komponenten (`src/components/`, `src/pages/`) → zusätzlich `docs/CODING_GUIDELINE_UX.md`
-2. Test schreiben (auf der passenden Ebene: Unit / Integration)
-3. Test ausführen, Fehlermeldung zeigen (beweist: roter Test fordert echtes Verhalten)
-4. Minimale Implementierung ("fake it till you make it" – hardcodierte Rückgabewerte sind erlaubt)
-5. Alle Tests ausführen, Ergebnis zeigen (alle grün, nichts kaputt)
-6. Refactor
-7. Weiter mit nächster Schicht
+**Innerer Loop – Subagent pro Schicht (Delegation ist Pflicht):**
+
+Für jede Schicht einen Subagenten spawnen. Haupt-Thread lädt KEINE Coding-Guidelines – der
+Subagent tut das selbst.
 
 **Schicht-Reihenfolge (outside-in):**
-- Backend-Szenarien: API-Endpoint → Domain-Typen/Validierung → Service/Repository
-- Frontend-Szenarien: React-Komponente → Service-Integration → API-Mock/Contract
-- Full-Stack-Szenarien: E2E → Frontend (oben) → Backend (oben)
+- Backend-Szenario: API-Endpoint → Domain-Typen/Validierung → Service/Repository
+- Frontend-Szenario: React-Komponente (mit Service-Mock, TDD) → Service-Client (TypeScript-API-Funktion, mit MSW-Mock, TDD)
+- Full-Stack-Szenario: E2E → Frontend (oben) → Backend (oben)
 
-### E2E-Loop schließen
+**Subagent-Prompt-Template** (`Agent` mit `subagent_type: "general-purpose"`, EINE Schicht pro Aufruf):
 
-Wenn alle inneren Loops abgeschlossen sind: Playwright E2E-Test erneut ausführen und Ergebnis zeigen.
-Wenn noch rot: fehlende Verbindung identifizieren (Routing? API-Integration? Komponente?)
-und den entsprechenden inneren Loop nochmal durchlaufen.
+Befülle das Template mit den konkreten Werten aus Schritt 0, bevor du den Subagent-Aufruf absetzt.
 
-Aktualisiere `docs/AGENT_MEMORY.md` (Phase-Zeile): aktuellen Szenario-Schritt eintragen (z.B. „Schritt 3/6 – REFACTOR abgeschlossen").
+```
+Implementiere Schicht <LAYER> für Gherkin-Szenario <TAG> "<TITEL>".
 
-── SCHRITT 4: AUTOR-REVIEW ──────────────────────────────────────────────────
-→ TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": completed | TaskUpdate "Schritt 4: Autor-Review": in_progress
+Lies diese Docs vor deinem ersten Test – in dieser Reihenfolge, TOC zuerst, dann gezielt.
+Du startest ohne Projektkontext und würdest sonst auf allgemeines Wissen zurückfallen, das
+hier an entscheidenden Stellen abweicht: das TDD-Format, Railway-Oriented Programming in C#,
+Branded Types und neverthrow in TypeScript. Die Reihenfolge folgt Abhängigkeiten: erst das
+Prozess-Framework (wie du vorgehst), dann allgemeine Prinzipien, dann das Layer-spezifische Handwerk.
+- docs/TDD_PROCESS.md  (Sektion "Outside-In ATDD / Double-Loop TDD" + Red-Green-Refactor)
+- docs/CODING_GUIDELINE_GENERAL.md  (komplett, ist klein)
+- Layer-spezifisch:
+  * C#-Endpoint/Validierung: docs/CODING_GUIDELINE_CSHARP.md + docs/CSharp-ROP.md
+  * C#-Sum-Types: + docs/CSharp-SumTypes.md
+  * TypeScript/React:        docs/CODING_GUIDELINE_TYPESCRIPT.md
+  * React-Komponente (pages/components): + docs/CODING_GUIDELINE_UX.md
 
-Gehe `docs/REVIEW_CHECKLIST.md` vollständig durch.
-Dokumentiere das Ergebnis mit ✅/⚠️/❌ pro Punkt – sichtbare Lücken jetzt sind billiger
-als dieselben Findings durch einen externen Reviewer später.
-Fixe alle Findings sofort. Erst dann weiter.
+Akzeptanzkriterien (inline):
+<Given/When/Then aus Schritt 0 einfügen>
 
-── SCHRITT 5: REVIEW-AGENTEN ────────────────────────────────────────────────
-→ TaskUpdate "Schritt 4: Autor-Review": completed | TaskUpdate "Schritt 5: Review-Agenten": in_progress
+Scope-Grenzen (NICHT implementieren):
+<YAGNI-Liste aus Schritt 0 einfügen>
 
-Führe den `review-code` Skill aus.
+Failing E2E-Test: <Pfad zur spec.ts>
 
-Schritt ist abgeschlossen wenn:
-- Alle ❌-Findings aus review-code sind behoben, oder
-- Verbleibende Findings wurden mit Begründung dokumentiert und dem User zur Entscheidung vorgelegt
+Vorgehen (strikt einhalten):
+1. RED: Genau einen Test schreiben (Unit/Integration passend zur Schicht). Ausführen, Fehlermeldung zeigen.
+2. GREEN: Minimale Implementierung. "Fake it till you make it" ist Pflicht. Alle Tests ausführen.
+3. REFACTOR: Checkliste aus docs/TDD_PROCESS.md Phase 3 vollständig abarbeiten – inklusive Stryker + Branch Coverage (Pflicht). Ziel: 100 % Mutation Score + 100 % Branch Coverage.
+TDD-Abweichung (z.B. Test NACH Code) ist ein Prozess-Fehler – dann STOP und berichten.
 
-Falls nach 3 vollständigen Runden noch ❌-Findings bestehen, die ohne Architektur-Entscheidung
-nicht lösbar sind: Finding + Kontext dokumentieren, User fragen wie weiter vorgegangen werden soll.
+Ausgabe:
+- Diff der Änderungen (Dateinamen + Hunks)
+- Output je Test-Run (RED, GREEN, REFACTOR-Grün)
+- Stryker-Score + Branch-Coverage-Score
+- Suppression-Report: neue Suppressionen mit Datei:Zeile + Begründung (oder "keine")
+- Kurzer Report: was implementiert, was bewusst weggelassen
+```
 
-── SCHRITT 6: LEARNINGS & DOKUMENTATION ─────────────────────────────────────
-→ TaskUpdate "Schritt 5: Review-Agenten": completed | TaskUpdate "Schritt 6: Learnings & Dokumentation": in_progress
+Spawn-Regeln:
+- EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin).
+- Haupt-Thread reviewt den Diff und den Test-Run-Output nach jedem Subagent-Return.
+- Weicht der Subagent von TDD ab → Finding direkt fixen (ggf. neuer Subagent-Call).
 
-Learnings, die hier nicht festgehalten werden, tauchen in der nächsten Session als vermeidbare
-Fehler wieder auf. Das Szenario gilt erst nach Abschluss dieses Schritts als Done.
+**E2E-Loop schließen (Haupt-Thread):**
 
-Eintrag in `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/PROCESS.md`).
-Pflichtfelder:
-  - Was war schwierig / hat nicht funktioniert – und warum?
-  - Learnings für die nächste Session
-  - Dokumentations-Änderungsvorschläge (jeden Punkt explizit beantworten)
-Gibt es wirklich keine Learnings, schreibe das explizit mit Begründung auf.
+Nach allen inneren Loops: Playwright-Test erneut ausführen. Noch rot? Fehlende Verbindung
+(Routing? API-Integration?) identifizieren → neuer Schicht-Subagent.
 
-Dokumentations-Check – prüfe explizit für jede Datei:
-  `docs/ARCHITECTURE.md`      Muss etwas ergänzt/korrigiert werden?
-  `docs/GLOSSARY.md`          Neues Konzept? Begriffsdefinition unscharf?
-  `docs/REVIEW_CHECKLIST.md`  Fehlender Prüfpunkt aufgefallen?
-  `docs/NFR.md`               Definition of Done unvollständig?
-  Phasen-Spec (SKELETON/MVP)  Schema oder API-Beschreibung veraltet?
+── SCHRITT 4: ORCHESTRATOR-CHECK ────────────────────────────────────────────
+→ TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": completed | TaskUpdate "Schritt 4: Orchestrator-Check": in_progress
 
-Falls ja, unterscheide nach Typ:
-  - Korrektur (Tippfehler, toter Link, veralteter Pfad): direkt korrigieren.
-  - Strukturelle Änderung (neues Pattern, geänderte Policy):
-    Vorschlag formulieren und User zur Genehmigung vorlegen. Nicht eigenständig anpassen.
+Der Haupt-Thread prüft, bevor externe Reviewer spawnen. Drei Punkte:
 
-Aktualisiere `docs/AGENT_MEMORY.md`:
-  - Phase-Zeile: Szenario als abgeschlossen markieren, nächstes Szenario benennen
-  - Technische Schuld und offene Fragen aktualisieren
+1. **Test-Qualität (Gold-Plating-Check):** `git diff` ausschließlich der Test-Dateien lesen.
+   Jede Assertion muss sich einem konkreten Given/When/Then des aktuellen Szenarios zuordnen
+   lassen. Assertions ohne passendes Akzeptanzkriterium → Schicht-Subagent spawnen mit Auftrag,
+   die überflüssige Assertion zu entfernen (und ggf. den damit verbundenen nicht-geforderten
+   Produktionscode).
 
-Erstelle einen neuen Commit (kein Amend): `"US-XXX: [Szenario-Titel]"`
+2. **Suppression-Check:** `git diff` nach `// Stryker disable` und `/* v8 ignore` durchsuchen.
+   Für jede neue Suppression: Begründung kritisch hinterfragen (nicht nur auf Vollständigkeit –
+   sondern gemäß `docs/kaizen/principles.md` auf inhaltliche Validität: beweist die Begründung
+   echte Äquivalenz / Nichttestbarkeit, oder klingt sie nur plausibel?). Schwache Begründung
+   → Schicht-Subagent spawnen mit Auftrag, entweder den Test zu ergänzen oder den
+   nicht-geforderten Produktionscode zu entfernen.
 
-Das Szenario ist Done. Nächstes Szenario = neuer `/implementing-scenario`-Aufruf.
+3. **Scores verifizieren:** Stryker-Score + Branch-Coverage-Score aus den Subagent-Ausgaben
+   lesen. Kein Score gemeldet oder Wert unklar → Stryker + Coverage selbst ausführen.
+   Score < 100 % bestätigt → als `lessons_learned` dokumentieren (Subagent hat
+   REFACTOR-Pflicht verletzt), Ursache per `docs/TDD_PROCESS.md` REFACTOR-Logik analysieren
+   (Gold-Plating / fehlender Test / äquivalenter Mutant), dann Schicht-Subagent für die
+   Korrektur spawnen.
+
+Triviale Findings (Tippfehler, eindeutig falsche Suppression-Begründung) darf der Haupt-Thread
+selbst fixen. Alles andere → Schicht-Subagent.
+
+── SCHRITT 5: REVIEW-LOOP ───────────────────────────────────────────────────
+→ TaskUpdate "Schritt 4: Orchestrator-Check": completed | TaskUpdate "Schritt 5: Review-Loop": in_progress
+
+Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
+
+**Pro Runde:**
+
+1. `.claude/skills/review-code/SKILL.md` laden und den darin beschriebenen Prozess ausführen.
+   Eingaben übergeben: Scope, geänderte Dateien, Stryker-Suppression-Report aus Schritt 1–3.
+   Keine neue Task-Liste anlegen – review-code läuft eingebettet in den implementing-scenario-Ablauf.
+   Die von review-code gespawnten spezialisierten Agenten erhalten **kein Iterations-Wissen** –
+   weder Findings aus früheren Runden noch Hinweise auf bereits abgelehnte false positives.
+
+2. Findings im **Haupt-Thread** auswerten:
+   - ❌ Must Fix → neuer Schicht-Subagent spawnen (mit Coding-Guidelines + TDD-Pflicht).
+     Den Schicht-Subagenten können dabei auch ⚠️-Improvements aus dieser Runde mitgegeben
+     werden, damit er sie optional mit adressiert. Nach Fixes → nächste Runde.
+   - ⚠️ Improvement → notieren; nach einer 0-❌-Runde Entscheidung dem User vorlegen.
+   - Suppression-Findings → direkt entscheiden: Begründung ausreichend oder Schicht-Subagent.
+
+3. **Terminierung:**
+   - a) 0 ❌ in einer Runde → Schritt 5 abgeschlossen.
+   - b) Nach 3 Runden ohne 0-❌-Runde → STOP, User fragen.
+
+Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
+
+── SCHRITT 6: COMMIT & SESSION-ABSCHLUSS ───────────────────────────────────
+→ TaskUpdate "Schritt 5: Review-Loop": completed | TaskUpdate "Schritt 6: Commit & Session-Abschluss": in_progress
+
+1. **Commit erstellen** (kein Amend):
+   ```
+   git commit -m "$(cat <<'EOF'
+   US-XXX: [Szenario-Titel]
+
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   EOF
+   )"
+   ```
+   Mapping aus `$ARGUMENTS`: Tag `@US-904-happy-path` → Präfix `US-904` (@ und Suffix ab zweitem Bindestrich entfernen); Titel in Anführungszeichen direkt übernehmen.
+   Beispiel: `$ARGUMENTS = @US-904-happy-path "Neue Zutat anlegen"` → `"US-904: Neue Zutat anlegen"`
+   Co-Authored-By: Modellname aus dem System-Kontext der aktuellen Session einsetzen.
+
+2. **Session-Abschluss anbieten** – frage den User:
+   > „Szenario abgeschlossen. Soll ich die Session jetzt schließen (`closing-session`)?"
+
+   Antwort abwarten:
+   - **Ja** → `closing-session`-Skill laden und ausführen.
+   - **Nein / später** → nur `docs/AGENT_MEMORY.md` aktualisieren (Phase-Zeile:
+     Szenario als abgeschlossen markieren, nächstes benennen; Technische Schuld + Offene
+     Fragen aktualisieren).
+
+→ TaskUpdate "Schritt 6: Commit & Session-Abschluss": completed
