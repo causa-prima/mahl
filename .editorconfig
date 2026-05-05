@@ -230,6 +230,16 @@ dotnet_naming_style.begins_with_i.required_suffix =
 dotnet_naming_style.begins_with_i.word_separator =
 dotnet_naming_style.begins_with_i.capitalization = pascal_case
 
+#### Code-Qualitäts-Metriken (SonarAnalyzer.CSharp) ####
+
+[*.cs]
+# Wirken als Build-Fehler via TreatWarningsAsErrors in Directory.Build.props.
+# Thresholds: S3776 Cognitive Complexity > 15 | S138 Methode > 80 Zeilen | S104 Datei > 1000 Zeilen
+# Lokale Suppressionen mit Begründung in den datei-spezifischen Sektionen weiter unten.
+dotnet_diagnostic.S3776.severity = warning
+dotnet_diagnostic.S138.severity = warning
+dotnet_diagnostic.S104.severity = warning
+
 #### Analyzer Suppressions ####
 # NOTE on glob patterns: In .NET's editorconfig implementation, `dir/**/*.cs` does NOT match
 # root-level files in `dir/` (only subdirectories). Use `{dir,dir/**}/*.cs` to match both.

@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
 import IngredientsPage from './IngredientsPage'
 
-function renderWithProviders(ui: React.ReactElement) {
+function renderWithProviders(ui: Readonly<React.ReactElement>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
 }

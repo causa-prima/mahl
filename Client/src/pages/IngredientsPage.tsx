@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- useResultQuery noch nicht implementiert; Migration in Szenario 2 (US-904-happy-path)
 import { useQuery } from '@tanstack/react-query'
 import { fetchIngredients } from '../services/ingredientsApi'
 

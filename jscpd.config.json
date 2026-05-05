@@ -1,0 +1,22 @@
+{
+  "minTokens": 70,
+  "languages": ["typescript", "csharp"],
+  "path": [
+    "Client/src",
+    "Server",
+    "Infrastructure"
+  ],
+  "ignore": [
+    "**/node_modules/**",
+    "**/bin/**",
+    "**/obj/**",
+    "**/dist/**",
+    "Client/src/**/*.test.ts",
+    "Client/src/**/*.test.tsx",
+    "Client/src/**/*.spec.ts",
+    "Client/src/**/*.spec.tsx",
+    "Client/e2e/**",
+    "Server/Migrations/**"
+  ],
+  "reporters": ["console"]
+}

@@ -284,6 +284,7 @@ def test_allow_patterns() -> int:
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run dev"', "npm run dev"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run build"', "npm run build"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint"', "npm run lint"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint:duplicates"', "npm run lint:duplicates"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test:coverage"', "npm run test:coverage (kein Wrapper)"),
         # Frontend-Wrapper-Scripts
         ("python3 .claude/scripts/vitest-run.py", "vitest-run.py"),

@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 66 | 2026-05-05 | SKELETON (Prozess/Tooling) | TDD-Prozess-Review: Single-Tier-Regel + REFACTOR PFLICHT-OUTPUT (ESLint/dotnet/jscpd). ESLint vollständig eingerichtet (fehlende Packages, react-hooks v5 API-Fix, Code-Qualitäts-Metriken). SonarAnalyzer-Thresholds (.editorconfig). jscpd (cross-language, minTokens 70). Hook-Freigabe + DEV_WORKFLOW.md für lint:duplicates. 4 ESLint-Fehler behoben. |
 | 65 | 2026-04-18 | SKELETON (US-904 Szenario 1) | gherkin-workshop UX-Update (Guideline 6+7+5+3): "Zutat anlegen", Empty-State-Text, Undo-Toast, Loading-State-Szenarien. Implementing-Scenario Szenario 1 abgeschlossen: Empty State grün, Stryker Findings dokumentiert, Review-Agenten (4), test.skip für Szenario 2. |
 | 64 | 2026-04-18 | SKELETON (Kaizen-Retro) | Retro S056–S063: 5 Noise-Einträge gelöscht, 3 neue CMs (Annahmen-als-Fakten, Noise-in-LL, Guideline-ohne-Skill-Update), CM1 BEWÄHRT. Filter-Test für lessons_learned, Preprocessing-Schritt im kaizen-Skill, mv/cp im Bash-Hook erlaubt, „Aktueller Stand / Letzter Stand"-Block aus AGENT_MEMORY entfernt. |
 | 63 | 2026-04-17 | SKELETON (US-904 Szenario 1) | CA-Analyzer-Fixes (Server.Tests), Stryker MTP-Runner für xUnit v3 (0%→100% Backend), gherkin-workshop-Skill um UX-Guidelines erweitert. Commit + Frontend-Stryker-Suppressionen + US-904-Workshop (UX) ausstehend. |

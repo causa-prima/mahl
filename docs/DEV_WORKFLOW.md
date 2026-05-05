@@ -52,6 +52,8 @@ kritische-regeln:
 | `dotnet stryker` (vollständig) | ~2–3 min | 360 000 ms |
 | `npm install` | 30–120 s | 180 000 ms |
 | `npm run build` | 10–30 s | 60 000 ms |
+| `npm run lint` | 5–15 s | 30 000 ms |
+| `npm run lint:duplicates` | 5–15 s | 30 000 ms |
 | `vitest-run.py` | 5–15 s | 30 000 ms |
 | `playwright-test.py` | 10–30 s | 60 000 ms |
 | `stryker-frontend.py` (eine Datei) | 1–3 min | 180 000 ms |

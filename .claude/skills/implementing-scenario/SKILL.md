@@ -127,6 +127,15 @@ Akzeptanzkriterien (inline):
 Scope-Grenzen (NICHT implementieren):
 <YAGNI-Liste aus Schritt 0 einfügen>
 
+Test-Einschränkung (strikt, keine Ausnahmen ohne expliziten Auftrag):
+Schreibe KEINE Unit Tests auf Value Types, Domain-Typen, Service-Klassen oder andere isolierte Logik.
+Erlaubt sind ausschließlich:
+- C# Backend: HTTP-Integrationstests via WebApplicationFactory
+- TypeScript Frontend: MSW-Komponenten-Tests (= öffentliche API der Komponente)
+Falls nach deiner Implementierung Stryker-Survivors auf isolierter Logik verbleiben die strukturell
+nicht via HTTP beobachtbar sind: im Suppression-Report melden – der Orchestrator entscheidet ob
+ein Unit Test nötig ist und schreibt ihn. Du implementierst nur.
+
 Failing E2E-Test: <Pfad zur spec.ts>
 
 Vorgehen (strikt einhalten):
@@ -153,6 +162,16 @@ Spawn-Regeln:
 Nach allen inneren Loops: Playwright-Test erneut ausführen. Noch rot? Fehlende Verbindung
 (Routing? API-Integration?) identifizieren → neuer Schicht-Subagent.
 
+**Stryker-Survivor-Check auf isolierter Logik (Haupt-Thread):**
+
+Enthält der Stryker-Report der Subagenten Survivors auf isolierter Domänenlogik (Value Types,
+Berechnungen, Multi-Condition-Rules)?
+- Survivor via HTTP beobachtbar (HTTP-Response ändert sich wenn Mutant überlebt)? → Integration-Test
+  fehlt → Schicht-Subagent ergänzt ihn.
+- Survivor **nicht** via HTTP beobachtbar (Mutant verändert interne Berechnung ohne sichtbaren
+  Effekt auf die Response)? → Haupt-Thread schreibt Unit Test (nur Spec + Survivor-Report, kein
+  Produktionscode) → Schicht-Subagent macht ihn grün.
+
 ── SCHRITT 4: ORCHESTRATOR-CHECK ────────────────────────────────────────────
 → TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": completed | TaskUpdate "Schritt 4: Orchestrator-Check": in_progress
 
@@ -177,6 +196,19 @@ Der Haupt-Thread prüft, bevor externe Reviewer spawnen. Drei Punkte:
    REFACTOR-Pflicht verletzt), Ursache per `docs/TDD_PROCESS.md` REFACTOR-Logik analysieren
    (Gold-Plating / fehlender Test / äquivalenter Mutant), dann Schicht-Subagent für die
    Korrektur spawnen.
+
+4. **Linter- und Duplikat-Gate verifizieren:** ESLint- + dotnet-build- + jscpd-Output aus den
+   Subagent-Ausgaben lesen (Format: `docs/TDD_PROCESS.md` Sektion "Linter- und Duplikat-Gate").
+   Fehlt der Output vollständig → Gate wurde nicht ausgeführt; selbst ausführen und Ergebnis
+   prüfen. ESLint Errors oder dotnet-build-Fehler → Schicht-Subagent spawnen. jscpd-Findings
+   ohne Adressierung oder Begründung → Schicht-Subagent spawnen.
+
+5. **Unit-Test-Check:** Enthält der Diff Unit Tests auf Value Types, Domain-Typen oder
+   Service-Klassen (keine HTTP-Integrationstests, keine MSW-Komponenten-Tests)?
+   - Wenn ja: Wurde dieser Test explizit vom Orchestrator beauftragt (Stryker-Survivor-Check
+     oben, Survivor nicht via HTTP beobachtbar)?
+   - Nein → ❌ Finding: Unit Test ohne Survivor-Begründung ist Gold-Plating. Schicht-Subagent
+     löscht den Test und prüft ob der zugehörige Produktionscode ebenfalls entfernt werden muss.
 
 Triviale Findings (Tippfehler, eindeutig falsche Suppression-Begründung) darf der Haupt-Thread
 selbst fixen. Alles andere → Schicht-Subagent.

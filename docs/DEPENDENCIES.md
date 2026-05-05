@@ -61,6 +61,7 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 | `@stryker-mutator/vitest-runner` | Testing |
 | `@stryker-mutator/typescript-checker` | Testing |
 | `msw` | Testing |
+| `jscpd` | Tooling |
 
 ### C# / NuGet
 

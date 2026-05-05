@@ -56,18 +56,27 @@ Es gibt drei Loop-Ebenen. Der äußere Loop treibt den mittleren, der mittlere t
 → äußere Schleife fortsetzen bis Gherkin grün
 ```
 
-**Schichten, die einen eigenen roten Unit-Test brauchen (Beispiele):**
-- C# Custom Value Types (z. B. `IngredientName`, `Unit`) – eigener Konstruktor-/Validierungstest (entsteht im Inner Loop, wenn der Outer Loop eine Validierungsregel fordert – kein proaktives Schreiben)
-- TypeScript Branded Types / Domain-Objekte (z. B. `IngredientId`, `ingredient.ts`) – eigener Unit-Test (analog: im Inner Loop, wenn durch Outer Loop gefordert)
-- Services / Use-Case-Klassen – Unit-Test vor der Implementierung
-- Repository-Logik (soweit nicht durch Integration-Test abgedeckt)
-- React-Komponenten – Vitest-Komponenten-Test vor der Implementierung
+**Test-Tier-Regel (Single-Tier als Standard):**
+
+Coding-Subagenten schreiben keine Unit Tests auf isolierte Domänenlogik.
+
+- **C# Backend:** ausschließlich HTTP-Integrationstests via WebApplicationFactory
+- **TypeScript Frontend:** MSW-Komponenten-Tests (= öffentliche API der Komponente, kein zweiter Tier)
+
+**Ausnahme – Stryker-getriggert, mit Quellen-Trennung:**
+
+Ein Unit Test auf isolierte Domänenlogik (Value Types, Berechnungen, Multi-Condition-Rules) ist nur zulässig wenn nach vollständiger Integration-Test-Implementierung Stryker-Survivors verbleiben, die **strukturell nicht via HTTP beobachtbar** sind – d.h. Mutanten die in der HTTP-Response keinen sichtbaren Unterschied erzeugen (z.B. interne Floating-Point-Konstanten, mehrstufige Berechnungen deren Ergebnis auf API-Ebene gerundet wird).
+
+Langsame Stryker-Läufe durch eine wachsende Integration-Test-Suite sind ein akzeptierter Trade-off des Single-Tier-Ansatzes. Sie rechtfertigen keine Unit-Test-Ausnahmen.
+
+**Pflicht:** Den Unit Test schreibt der **Haupt-Thread** (Orchestrator) oder ein separater Test-Agent, der ausschließlich Spec (Gherkin) + Stryker-Survivor-Report erhält – keinen Produktionscode. Der Coding-Subagent erhält den fertigen Test und macht ihn grün. **Jede Unit-Test-Ausnahme erfordert einen schriftlichen Survivor-Report als Begründung.**
 
 **Regeln:**
 - Backend- und E2E-Tests erst nach darüberliegendem Gherkin-Szenario anlegen
 - Produktionscode für eine Schicht erst nach einem fehlschlagenden Test auf dieser Schicht schreiben
 - Produktionscode erst nach fehlschlagendem Backend-Test schreiben
 - Das Gherkin-Szenario ist die Spec – nachträgliche Anpassungen zur Implementierungsbestätigung sind unzulässig
+- Coding-Subagenten schreiben keine Unit Tests (außer MSW-Komponenten-Tests für React). Jede Unit-Test-Ausnahme erfordert einen schriftlichen Stryker-Survivor-Report.
 
 **Vollständige BDD/Gherkin-Dokumentation:** `docs/E2E_TESTING.md`
 
@@ -135,6 +144,15 @@ Führe diese Checkliste explizit durch und dokumentiere das Ergebnis:
 - [ ] **Stryker + Branch Coverage (Pflicht, Teil der Minimalitätsprüfung):** Stryker und Branch-Coverage-Lauf für die betroffene Schicht ausführen. Ziel: **100 % Mutation Score + 100 % Branch Coverage**. Survivor-Behandlung, Suppressionen, Befehle: Sektion "Mutation Testing" + "Branch Coverage" in dieser Datei.
 
   **PFLICHT-OUTPUT:** *"Stryker: [Score] | Branch Coverage: [Score] | Suppression-Report: [Neue Suppressionen mit Datei:Zeile und Begründung]"* oder *"Kein Survivor, keine Suppression"*. Beide Scores werden vom Orchestrator geprüft.
+
+- [ ] **Linter- und Duplikat-Gate:**
+  - TypeScript: `npm run lint` (ESLint inkl. Complexity ≤ 10, Funktionslänge ≤ 20 Zeilen) – muss 0 Errors haben
+  - C#: `dotnet build` – SonarAnalyzer (S3776 Cognitive Complexity, S138 Methodenlänge) ist Teil des Builds; kein Fehler erlaubt
+  - Duplikate: `npm run lint:duplicates` (jscpd über TypeScript + C#) – Findings im Suppression-Report dokumentieren; kein hartes Gate, aber jeder Fund muss adressiert oder mit Begründung ignoriert werden
+
+  **PFLICHT-OUTPUT:** *"ESLint: [0 Errors / N Errors (Liste)] | dotnet build: [clean / N Fehler (Liste)] | jscpd: [Keine Duplikate / N Duplikate: Datei:Zeile – Adressierung oder Begründung]"*
+
+  Fehlt dieser Output im Subagenten-Report → Orchestrator behandelt das als fehlendes Gate (analog zu fehlendem Stryker-Score).
 
 - [ ] Gibt es Duplikate oder Copy-Paste zwischen diesem und bestehendem **Code oder Tests**?
 - [ ] **Test-Lesbarkeit:** Ist jeder neue Test auf das Wesentliche reduziert? Gibt es Duplikation im Test-Setup, die durch einen **Test-Data-Builder** (`ACreateXxxDto(...)`, `AnIngredient(...)` etc.) beseitigt werden sollte? Builder für Request-DTOs gehören ebenfalls in `EndpointsTestsBase`.

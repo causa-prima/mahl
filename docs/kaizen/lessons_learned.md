@@ -29,6 +29,23 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 > **Format-Referenz:** `docs/kaizen/PROCESS.md`
 > **Archiv:** `docs/kaizen/archive/`
 
+## Session 066 – 2026-05-05
+
+- **[MITTEL] [PROZESS] [Doku] AGENT_MEMORY.md mit Implementierungshistorie befüllt statt vorwärtsgerichteter Handlungsrelevanz**
+  Was: In AGENT_MEMORY.md wurde ein "Tooling (Session 066)"-Block ergänzt, der auflistet was in der Session umgesetzt wurde – statt nur was für künftige Sessions handlungsrelevant ist.
+  Warum: Session-Log und Working-Memory verwechselt; AGENT_MEMORY wirkt wie ein Statusbericht, verleitet daher zum Dokumentieren von Erledigtem.
+  Regel: AGENT_MEMORY.md enthält ausschließlich Informationen die eine *zukünftige* Session braucht um effektiv zu handeln – was implementiert wurde gehört in die Session-Datei, nicht in die Memory.
+
+- **[MITTEL] [QUALITÄT] [TS-Code] Breite ESLint-Suppression statt minimaler Fix in Betracht gezogen**
+  Was: Bei `functional/prefer-immutable-types` im Test-Helper war der erste Impuls, die Regel für alle Test-Dateien zu deaktivieren, statt den konkreten Parameter mit `Readonly<>` zu typisieren.
+  Warum: Der Fehler wurde als "Test-Code-spezifisch" eingestuft und eine globale Ausnahme als einfacher betrachtet.
+  Regel: Vor jeder ESLint-Suppression den minimalen Fix suchen und die Ursache verstehen – eine globale Suppress ist nur gerechtfertigt wenn das Muster strukturell im gesamten Scope nicht erfüllbar ist.
+
+- **[MITTEL] [PROZESS] [TDD] Unit-Test-Ausnahme mit Performance-Schwelle statt semantischem Kriterium begründet**
+  Was: Die erste Formulierung der Stryker-getriggerten Unit-Test-Ausnahme enthielt ">2 Minuten Laufzeit" als Kriterium – User hat das als unrealistisch und falsch zurückgewiesen.
+  Warum: Performance-Argument war das erste Suchbild; das eigentliche Kriterium (strukturell nicht via HTTP beobachtbar) ist semantisch, nicht metrisch.
+  Regel: Die Rechtfertigung für einen Unit Test ist immer semantisch (Verhalten nicht via HTTP beobachtbar), niemals eine Laufzeit-Schwelle.
+
 ## Session 065 – 2026-04-18
 
 - **[MITTEL] [TOOLING] [TS-Code] test.fail() läuft durch und timeoutet statt sofort zu überspringen**
