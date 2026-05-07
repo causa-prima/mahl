@@ -7,7 +7,7 @@
 - Szenario-Narrativ (Tag-Hierarchie, Einheiten, Vorrat, Tag-Sortierung, Backup)
 - US-901 (Tag-Hierarchie) [V2]
 - US-902 (Einheiten-Management) [MVP]
-- US-903 (Profil-Verwaltung) [V2]
+- US-903 (Profil-Verwaltung) [PARKING]
 - US-904 (Zutaten-Verwaltung) [SKELETON]
 - US-905 (Zutaten-Aliase) [V1]
 - US-906 (Vorrats-Management) [MVP]
@@ -34,13 +34,17 @@
     *   **Akzeptanzkriterien:**
         *   Eingabe von Faktor X Einheit A = Y Einheit B.
 
-*   **US-903 (Profil-Verwaltung) [V2]:** Als *Feierabend-Planer* möchte ich Esser-Profile (z.B. "Kind 1") anlegen, damit ich für diese Personen spezifische Bewertungen und Vorlieben hinterlegen kann.
+*   **US-903 (Profil-Verwaltung) [PARKING]:** Als *Feierabend-Planer* möchte ich Esser-Profile (z.B. "Kind 1") anlegen, damit ich für diese Personen spezifische Bewertungen und Vorlieben hinterlegen kann.
     *   **Akzeptanzkriterien:**
         *   CRUD für *Esser-Profile*.
 
 *   **US-904 (Zutaten-Verwaltung) [SKELETON]:** Als *Rezept-Sammler* möchte ich neue Zutaten manuell anlegen und bearbeiten (Tags, Basiseinheit), damit ich sie in Rezepten nutzen kann.
-    *   **Akzeptanzkriterien:**
+    *   **Akzeptanzkriterien (SKELETON-Version):**
         *   CRUD für Zutaten (Name, Einheit, Tags).
+    *   **Akzeptanzkriterien (MVP-Version – Modifier):**
+        *   Pro Zutat können Modifier angelegt und verwaltet werden (z.B. "stückig", "TK", "Dose").
+        *   Modifier sind optional – eine Zutat ohne Modifier bleibt gültig.
+        *   Gleiche Zutat mit unterschiedlichen Modifiern erzeugt getrennte Einträge auf der Einkaufsliste (konsistent mit US-301).
 
 *   **US-905 (Zutaten-Aliase) [V1]:** Als *Rezept-Sammler* möchte ich Aliase für Zutaten definieren (z.B. "Möhre" -> "Karotte"), um den Import und die Suche robuster zu machen.
     *   **Akzeptanzkriterien:**

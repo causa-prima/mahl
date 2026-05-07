@@ -6,7 +6,7 @@
 
 - Szenario-Narrativ (Harte/Weiche Regeln, Fallback)
 - US-701 (Harte Regeln / Ausschluss) [MVP]
-- US-702 (Sortier-Regeln / Präferenzen) [MVP]
+- US-702 (Sortier-Regeln / Präferenzen) [V1]
 - US-703 (Fallback-Strategien) [V2]
 
 ---
@@ -21,7 +21,7 @@
         *   Definition von Limits (Count, Frequency) für Tags.
         *   Rezepte, die das Limit verletzen, werden nicht vorgeschlagen.
 
-*   **US-702 (Sortier-Regeln / Präferenzen) [MVP]:** Als *Feierabend-Planer* möchte ich "Weiche Regeln" definieren (z.B. "Bevorzuge hohe Bewertung", "Lange nicht gekocht"), die die Reihenfolge der Vorschläge beeinflussen, ohne Kandidaten komplett zu entfernen.
+*   **US-702 (Sortier-Regeln / Präferenzen) [V1]:** Als *Feierabend-Planer* möchte ich "Weiche Regeln" definieren (z.B. "Bevorzuge hohe Bewertung", "Lange nicht gekocht"), die die Reihenfolge der Vorschläge beeinflussen, ohne Kandidaten komplett zu entfernen.
     *   **Akzeptanzkriterien:**
         *   Gewichtung von Faktoren (Historie, Bewertung, Dauer).
         *   Ergebnisliste wird basierend auf Score sortiert.

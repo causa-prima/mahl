@@ -6,12 +6,12 @@
 
 - Szenario-Narrativ (Planung am Abend, Wizard, Regeln)
 - US-101 (Planungs-Wizard) [V1]
-- US-102 (Muss-Zutaten) [V2]
-- US-103 (Muss-Rezepte) [MVP]
+- US-102 (Muss-Zutaten) [V1]
+- US-103 (Muss-Rezepte) [V1]
 - US-104 (Session-Regeln) [V2]
 - US-105 (Automatische Vorschläge & Regeln) [MVP]
-- US-106 (Besuchs-Planung) [MVP]
-- US-107 (Tagesregeln) [V2]
+- US-106 (Besuchs-Planung) [OBSOLET]
+- US-107 (Tagesregeln) [V1]
 - US-108 (Zeit-Budget) [V2]
 - US-109 (Konfliktlösung) [V2]
 - US-110 (Vorschlag ändern) [V2]
@@ -31,13 +31,13 @@
         *   Abbruch des Wizards verwirft den temporären *Planungs-Pool*.
         *   Abschluss ("Plan übernehmen") speichert die generierten Einträge in den *Wochen-Pool*.
 
-*   **US-102 (Muss-Zutaten) [V2]:** Als *Feierabend-Planer* möchte ich Zutaten angeben, die verbraucht werden müssen (Reste), damit der Algorithmus passende Rezepte priorisiert.
+*   **US-102 (Muss-Zutaten) [V1]:** Als *Feierabend-Planer* möchte ich Zutaten angeben, die verbraucht werden müssen (Reste), damit der Algorithmus passende Rezepte priorisiert.
     *   **Akzeptanzkriterien:**
         *   Eingabe von Zutaten über Suche/Autocomplete.
         *   Der Algorithmus priorisiert Rezepte, die diese Zutaten enthalten (höherer Score).
         *   Wenn keine Rezepte gefunden werden, wird der Nutzer informiert.
 
-*   **US-103 (Muss-Rezepte) [MVP]:** Als *Feierabend-Planer* möchte ich Rezepte vorab festlegen (z.B. für Geburtstag), um die der restliche Plan herumgebaut wird.
+*   **US-103 (Muss-Rezepte) [V1]:** Als *Feierabend-Planer* möchte ich Rezepte vorab festlegen (z.B. für Geburtstag), um die der restliche Plan herumgebaut wird.
     *   **Akzeptanzkriterien:**
         *   Nutzer kann spezifische Rezepte für bestimmte Tage pinnen.
         *   **Mengen-Anpassung:** Beim Auswählen kann direkt die *Planungs-Portion* angepasst werden (Default: *Basis-Portion* des Rezepts).
@@ -49,17 +49,17 @@
         *   Möglichkeit, Regeln für diesen Lauf zu deaktivieren oder temporäre Regeln hinzuzufügen.
 
 *   **US-105 (Automatische Vorschläge & Regeln) [MVP]:** Als *Feierabend-Planer* möchte ich, dass der Rest des Plans automatisch basierend auf Regeln (Abwechslung, Beliebtheit, Dienstag=Schnell, Sonntag=Pfannkuchen) aufgefüllt wird.
-    *   **Akzeptanzkriterien:**
+    *   **Akzeptanzkriterien (MVP-Version – Harte Regeln):**
         *   Leere Slots werden automatisch gefüllt.
-        *   Global definierte *Harte Regeln* (z.B. "Max 2x Fleisch") werden strikt eingehalten.
-        *   *Tagesregeln* (z.B. "Dienstag < 30min") werden eingehalten.
+        *   Global definierte *Harte Regeln* (US-701, z.B. "Max 2x Fleisch") werden strikt eingehalten.
+        *   Auswahl unter regelkonformen Rezepten erfolgt zufällig.
+    *   **Akzeptanzkriterien (V1-Erweiterung – Sortier- & Tagesregeln):**
+        *   *Sortier-Regeln* (US-702, z.B. Bevorzuge hohe Bewertung) beeinflussen die Auswahl (erfordert US-702).
+        *   *Tagesregeln* (z.B. "Dienstag < 30min") werden eingehalten (erfordert US-107).
 
-*   **US-106 (Besuchs-Planung) [MVP]:** Als *Feierabend-Planer* möchte ich für den kommenden Samstag die Portionsanzahl erhöhen (Besuch), damit die Einkaufsliste automatisch stimmt.
-    *   **Akzeptanzkriterien:**
-        *   Die *Planungs-Portion* kann pro *Plan-Eintrag* individuell gesetzt werden.
-        *   Default ist die *Basis-Portion* des Rezepts.
+*   **US-106 (Besuchs-Planung) [OBSOLET]:** Absorbiert in US-103 und US-803 (MVP) – Planungs-Portion pro Plan-Eintrag ist dort bereits als Akzeptanzkriterium enthalten.
 
-*   **US-107 (Tagesregeln) [V2]:** Als *Feierabend-Planer* möchte ich Regeln für spezifische Tage definieren können (z.B. "1. Sonntag im Monat = Pfannkuchen"), damit wiederkehrende Rituale automatisch eingeplant sind.
+*   **US-107 (Tagesregeln) [V1]:** Als *Feierabend-Planer* möchte ich Regeln für spezifische Tage definieren können (z.B. "1. Sonntag im Monat = Pfannkuchen"), damit wiederkehrende Rituale automatisch eingeplant sind.
     *   **Akzeptanzkriterien:**
         *   Regeln können an Wochentage oder Datums-Muster (z.B. "jeden 1. Sonntag") gebunden werden.
 

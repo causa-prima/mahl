@@ -6,7 +6,7 @@
 
 - Szenario-Narrativ (Pantry-Check, Mengen-Anpassung, Fix-Einträge)
 - US-201 (Pantry-Check) [SKELETON]
-- US-202 (Mengen-Anpassung) [MVP]
+- US-202 (Mengen-Anpassung) [V1]
 - US-203 (Fix-Eintrag) [V1]
 
 ---
@@ -20,8 +20,9 @@
     *   **Akzeptanzkriterien:**
         *   Liste zeigt alle Zutaten aus dem Plan (außer solche mit Flag "Immer vorrätig").
         *   Abhaken markiert das Item als "gekauft" (setzt BoughtAt-Timestamp). Item wird nicht gelöscht, sondern in Bereich "Zuletzt gekauft" verschoben (siehe US-303).
+    *   **Implementierungshinweis:** Teilt die Listenkomponente mit US-303. Beim Implementieren: Tests für den "zuhause vor dem Einkauf"-Kontext schreiben.
 
-*   **US-202 (Mengen-Anpassung) [MVP]:** Als *Feierabend-Planer* möchte ich die Menge von Artikeln auf der Liste reduzieren (z.B. "brauche nur noch die Hälfte"), um Reste zu berücksichtigen.
+*   **US-202 (Mengen-Anpassung) [V1]:** Als *Feierabend-Planer* möchte ich die Menge von Artikeln auf der Liste reduzieren (z.B. "brauche nur noch die Hälfte"), um Reste zu berücksichtigen.
     *   **Akzeptanzkriterien:**
         *   Menge jedes Eintrags ist editierbar.
         *   **Delta-Logik:** Änderungen werden als *Delta-Menge* gespeichert, ohne die Rezept-Zuordnung zu ändern.

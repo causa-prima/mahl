@@ -5,7 +5,7 @@
 ## Inhalt
 
 - Szenario-Narrativ (App-Start auf Handy/Tablet)
-- US-001 (Geräte-Kontext) [V1]
+- US-001 (Geräte-Kontext) [PARKING]
 
 ---
 
@@ -14,7 +14,8 @@
 
 **Abgeleitete User Stories:**
 
-*   **US-001 (Geräte-Kontext) [V1]:** Als *Nutzer* möchte ich eine Standardansicht definieren, damit ich sofort im richtigen Kontext bin (Handy -> Einkauf, Tablet -> Kochen).
+*   **US-001 (Geräte-Kontext) [PARKING]:** Als *Nutzer* möchte ich eine Standardansicht definieren, damit ich sofort im richtigen Kontext bin (Handy -> Einkauf, Tablet -> Kochen).
     *   **Akzeptanzkriterien:**
         *   Einstellung "Standard-Startseite" in den Nutzereinstellungen pro Gerät speicherbar.
         *   Beim App-Start wird die konfigurierte Ansicht geladen.
+    *   **Parking-Hinweis:** Als einfacherer erster Schritt kann der Default-Wert hardcodiert werden (Smartphone → Einkaufsliste, Tablet → Pool), bevor die konfigurierbare Variante implementiert wird.

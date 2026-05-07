@@ -29,6 +29,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 > **Format-Referenz:** `docs/kaizen/PROCESS.md`
 > **Archiv:** `docs/kaizen/archive/`
 
+## Session 067 – 2026-05-07
+
+- **[MITTEL] [PROZESS] [Doku] Migrations-Kontext nicht vor dem Schreiben eines decisions.md-Eintrags verifiziert**
+  Was: Für die DokuWiki-Migrationsstrategie wurde ein vollständiger decisions.md-Eintrag mit fünf Optionen formuliert und abgelehnt – der Kontext war falsch (Migration ist ein einmaliger Import bei MVP-Start mit DB-Reset, kein V1-Datenmigrations-Problem).
+  Warum: Annahme übernommen ohne den Timing-Kontext (wann, welche Datenbasis) zu klären.
+  Regel: Bei Migrationsstrategie-Einträgen zuerst klären: Wann passiert die Migration? Welcher Datenbankstand? Dann erst Optionen formulieren.
+
+- **[GERING] [TOOLING] [Tooling] Parallel laufende npm-Kommandos modifizieren node_modules gleichzeitig**
+  Was: `npm update` und `npm install @mui/...` liefen als parallele Background-Tasks und schrieben gleichzeitig in node_modules – kein Fehler aufgetreten, aber das Risiko war real.
+  Warum: Effizienz-Optimierung ohne Berücksichtigung dass beide Befehle dieselbe Directory-Struktur mutieren.
+  Regel: npm-Kommandos die node_modules modifizieren immer sequenziell ausführen, nie als parallele Background-Tasks.
+
 ## Session 066 – 2026-05-05
 
 - **[MITTEL] [PROZESS] [Doku] AGENT_MEMORY.md mit Implementierungshistorie befüllt statt vorwärtsgerichteter Handlungsrelevanz**

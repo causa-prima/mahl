@@ -6,22 +6,22 @@
 
 - Szenario-Narrativ (Auswahl, Kochmodus, Skalierung, Bewertung)
 - US-501 (Pool-Liste) [MVP]
-- US-502 (Smarte Sortierung) [MVP]
+- US-502 (Smarte Sortierung) [V1]
 - US-503 (Entscheidungs-Hilfe) [V2]
 - US-504 (Einkaufs-Warnung) [V2]
-- US-505 (Zutaten-Übersicht) [MVP]
-- US-506 (Koch-Start aus Pool) [MVP]
+- US-505 (Zutaten-Übersicht) [V1]
+- US-506 (Koch-Start aus Pool) [V1]
 - US-507 (Koch-Start aus Suche) [V1]
-- US-508 (Kochmodus) [MVP]
-- US-509 (Schritt-Zutaten) [MVP]
+- US-508 (Kochmodus) [V1]
+- US-509 (Schritt-Zutaten) [V1]
 - US-510 (Quellen-Zugriff) [MVP]
 - US-511 (Ad-Hoc Skalierung) [V1]
 - US-512 (Koch-Historie & Undo) [V2]
-- US-513 (Rezept-Bewertung) [V2]
+- US-513 (Rezept-Bewertung) [PARKING]
 - US-514 (Sub-Rezepte) [V2]
-- US-515 (Bewertungs-Historie & Erinnerung) [V2]
+- US-515 (Bewertungs-Historie & Erinnerung) [PARKING]
 - US-516 (Intelligenter Wach-Modus) [V1]
-- US-517 (Zeit-Tracking & Optimierung) [V2]
+- US-517 (Zeit-Tracking & Optimierung) [PARKING]
 
 ---
 
@@ -34,7 +34,7 @@
     *   **Akzeptanzkriterien:**
         *   Dashboard zeigt Rezepte des aktuellen Zeitraums.
 
-*   **US-502 (Smarte Sortierung) [MVP]:** Als *pragmatischer Koch* möchte ich, dass die Pool-Liste automatisch nach Eignung für heute sortiert ist.
+*   **US-502 (Smarte Sortierung) [V1]:** Als *pragmatischer Koch* möchte ich, dass die Pool-Liste automatisch nach Eignung für heute sortiert ist.
     *   **Akzeptanzkriterien:**
         *   Sortierung priorisiert Rezepte, die *Tagesregeln* erfüllen, VOR Rezepten, die nur *Globale Regeln* erfüllen.
 
@@ -47,12 +47,12 @@
         *   Visueller Indikator am Rezept im Pool, falls zugehörige Items auf der Einkaufsliste noch nicht "erledigt" sind.
         *   Warnung beim Starten des Kochmodus, falls Zutaten fehlen.
 
-*   **US-505 (Zutaten-Übersicht) [MVP]:** Als *pragmatischer Koch* möchte ich vor dem Kochen (im Rezept-View und als erste Seite im Kochmodus) eine Gesamtliste aller Zutaten sehen, um sicherzustellen, dass alles bereitsteht.
+*   **US-505 (Zutaten-Übersicht) [V1]:** Als *pragmatischer Koch* möchte ich vor dem Kochen (im Rezept-View und als erste Seite im Kochmodus) eine Gesamtliste aller Zutaten sehen, um sicherzustellen, dass alles bereitsteht.
     *   **Akzeptanzkriterien:**
         *   Anzeige der aggregierten Zutatenliste in der Rezept-Detailansicht.
         *   Erster Schritt im *Kochmodus* ist die Zutaten-Übersicht.
 
-*   **US-506 (Koch-Start aus Pool) [MVP]:** Als *pragmatischer Koch* möchte ich bei jedem Rezept im *Wochen-Pool* einen "Jetzt kochen"-Button haben, der den Kochmodus öffnet und das Gericht sofort als "gekocht" markiert.
+*   **US-506 (Koch-Start aus Pool) [V1]:** Als *pragmatischer Koch* möchte ich bei jedem Rezept im *Wochen-Pool* einen "Jetzt kochen"-Button haben, der den Kochmodus öffnet und das Gericht sofort als "gekocht" markiert.
     *   **Akzeptanzkriterien:**
         *   Button "Jetzt kochen" an Rezepten im *Wochen-Pool*.
         *   Startet Kochmodus.
@@ -65,13 +65,13 @@
         *   Startet Kochmodus.
         *   Ein neuer Eintrag in der globalen *Koch-Historie* wird angelegt (Datum + Rezept).
 
-*   **US-508 (Kochmodus) [MVP]:** Als *pragmatischer Koch* möchte ich eine Schritt-für-Schritt-Ansicht haben, die mir genau sagt, was ich jetzt tun muss ("Zwiebeln schneiden"), damit ich auch nach Unterbrechungen (Uno spielen) sofort weiß, wo ich war.
+*   **US-508 (Kochmodus) [V1]:** Als *pragmatischer Koch* möchte ich eine Schritt-für-Schritt-Ansicht haben, die mir genau sagt, was ich jetzt tun muss ("Zwiebeln schneiden"), damit ich auch nach Unterbrechungen (Uno spielen) sofort weiß, wo ich war.
     *   **Akzeptanzkriterien:**
         *   Vollbild-Modus.
         *   Navigation zwischen Schritten (Vor/Zurück).
         *   Aktueller Schritt ist hervorgehoben.
 
-*   **US-509 (Schritt-Zutaten) [MVP]:** Als *pragmatischer Koch* möchte ich bei jedem Schritt sehen, welche Zutaten *genau jetzt* benötigt werden, damit ich nicht in der langen Gesamtliste suchen muss.
+*   **US-509 (Schritt-Zutaten) [V1]:** Als *pragmatischer Koch* möchte ich bei jedem Schritt sehen, welche Zutaten *genau jetzt* benötigt werden, damit ich nicht in der langen Gesamtliste suchen muss.
     *   **Akzeptanzkriterien:**
         *   Pro Schritt werden nur die zugeordneten Zutaten angezeigt.
         *   Mengen sind auf die *Planungs-Portion* skaliert.
@@ -91,7 +91,7 @@
         *   Liste der gekochten Gerichte des aktuellen Tages einsehbar.
         *   Funktion "Nicht gekocht" fügt ein Rezept wieder dem *Wochen-Pool* hinzu.
 
-*   **US-513 (Rezept-Bewertung) [V2]:** Als *pragmatischer Koch* möchte ich nach dem Essen das Rezept für einzelne Profile bewerten (z.B. "Kind 1: 1 Stern"), damit die App beim nächsten Mal bessere Vorschläge macht.
+*   **US-513 (Rezept-Bewertung) [PARKING]:** Als *pragmatischer Koch* möchte ich nach dem Essen das Rezept für einzelne Profile bewerten (z.B. "Kind 1: 1 Stern"), damit die App beim nächsten Mal bessere Vorschläge macht.
     *   **Akzeptanzkriterien:**
         *   Bewertungs-Dialog über Button am Rezept aufrufbar.
         *   Sterne-Vergabe pro *Esser-Profil*.
@@ -102,7 +102,7 @@
     *   **Akzeptanzkriterien:**
         *   Schritte von als "Zutat" ausgewählten Rezepten können optional im Kochmodus als Teil des aktuellen Rezepts angezeigt werden.
 
-*   **US-515 (Bewertungs-Historie & Erinnerung) [V2]:** Als *pragmatischer Koch* möchte ich an die Bewertung erinnert werden und eine Historie der Bewertungen pro Profil sehen, um schwankende Vorlieben (z.B. bei Kindern) besser einschätzen zu können.
+*   **US-515 (Bewertungs-Historie & Erinnerung) [PARKING]:** Als *pragmatischer Koch* möchte ich an die Bewertung erinnert werden und eine Historie der Bewertungen pro Profil sehen, um schwankende Vorlieben (z.B. bei Kindern) besser einschätzen zu können.
     *   **Akzeptanzkriterien:**
         *   Speicherung einer Bewertungshistorie (Datum + Wertung) pro *Esser-Profil*.
         *   Push-Benachrichtigung zur ca. 30 Min. nach Beenden des Kochmodus (oder Display-Aus).
@@ -114,7 +114,7 @@
         *   Wake-Lock ist im Kochmodus aktiv.
         *   Dauer des Wake-Locks beschränkt auf `Vorbereitungszeit + Kochzeit` (oder `Gesamtzeit`), danach System-Timeout (Akku-Schutz).
 
-*   **US-517 (Zeit-Tracking & Optimierung) [V2]:** Als *pragmatischer Koch* möchte ich, dass die App misst, wie lange ich für Schritte brauche, um meine Zeitangaben im Rezept automatisch zu korrigieren.
+*   **US-517 (Zeit-Tracking & Optimierung) [PARKING]:** Als *pragmatischer Koch* möchte ich, dass die App misst, wie lange ich für Schritte brauche, um meine Zeitangaben im Rezept automatisch zu korrigieren.
     *   **Akzeptanzkriterien:**
         *   Kochmodus misst Verweildauer pro Schritt im Hintergrund.
         *   Nach Abschluss: Vorschlag zur Aktualisierung der Metadaten (Vorbereitungszeit/Kochzeit) basierend auf gemessenen Werten (nur für aktive Schritt-Typen).

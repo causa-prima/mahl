@@ -5,7 +5,7 @@
 > Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/decisions.md`
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, PROCESS)
 
-**Letzte Aktualisierung:** 2026-05-05 (Session 066 – TDD-Prozess-Review + Tooling)
+**Letzte Aktualisierung:** 2026-05-07 (Session 067 – Requirements-Sanitization + npm-Updates)
 **Phase:** SKELETON 🔄 – US-904 Szenario 1 vollständig abgeschlossen inkl. UX-Update (Guideline 6+7+5)
 
 ---
@@ -38,7 +38,6 @@ Infrastruktur (unverändert):
 
 ## Nächste Prioritäten (Reihenfolge bindend)
 
-- **npm Major-Updates prüfen:** Vor Szenario 2 – `npm outdated` ausführen, Major-Updates mit User besprechen und ggf. installieren.
 - **US-904 Szenario 2:** `/implementing-scenario @US-904-happy-path "Zutat anlegen"` – inkl. Code-Migration `ingredientsApi.ts` → ResultAsync + useResultQuery + useResultMutation + **ETag-Support für `GET /api/ingredients` (Content-Hash) und `GET /api/ingredients/{id}` (xmin)**.
 - **gherkin-workshop US-904 V1:** Separater Schritt vor V1-Implementierung: Feature-Datei und Szenarien ergänzen, die erst in V1 umgesetzt werden (d.h. Funktionalität die über MVP hinausgeht: Update einer Zutat + Tags für Zutaten).
 - **Deep-Link-Anforderung klären:** Vor US-602 (Rezept-Detailansicht) – welche Entitäten, Hintergründe, Architektur-Implikationen.
@@ -56,7 +55,6 @@ Infrastruktur (unverändert):
 | Frontend Stryker | `ingredientsApi.ts` URL-Survivor: real gap (React Query schluckt Fetch-Fehler, Fallback `= []`); nicht supprimiert | Mittel |
 | Frontend Stryker | `= []` Default in `IngredientsPage.tsx` supprimiert – Suppression entfällt wenn Loading-State-Szenario implementiert ist | Niedrig |
 | E2E-Test | `EmptyDb`-Test ohne DB-Reset – latent flaky wenn DB vorher befüllt | Niedrig |
-| npm audit | 1 moderate severity vulnerability – noch nicht behoben | Niedrig |
 
 ---
 

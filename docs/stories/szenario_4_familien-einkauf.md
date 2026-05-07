@@ -6,7 +6,7 @@
 
 - Szenario-Narrativ (Undo, Live-Sync)
 - US-401 (Undo-Funktion) [V1]
-- US-402 (Live-Sync) [V2]
+- US-402 (Live-Sync) [PARKING]
 
 ---
 
@@ -19,7 +19,7 @@
     *   **Akzeptanzkriterien:**
         *   Klick auf ein Item im Bereich "Zuletzt gekauft" stellt Item wieder auf "Offen".
 
-*   **US-402 (Live-Sync) [V2]:** Als *Familien-Einkäufer* möchte ich sehen, wenn mein Partner Artikel auf seinem Gerät abhakt ("Sahne schon geholt"), damit wir nichts doppelt kaufen oder suchen.
+*   **US-402 (Live-Sync) [PARKING]:** Als *Familien-Einkäufer* möchte ich sehen, wenn mein Partner Artikel auf seinem Gerät abhakt ("Sahne schon geholt"), damit wir nichts doppelt kaufen oder suchen.
     *   **Akzeptanzkriterien:**
         *   Änderungen werden bei Internetverbindung sofort synchronisiert.
         *   UI aktualisiert sich ohne manuellen Refresh.

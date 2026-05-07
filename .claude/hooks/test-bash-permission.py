@@ -194,6 +194,7 @@ def test_allow_patterns() -> int:
         # npm run / npm audit
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run build"', "npm run build"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm audit"', "npm audit"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm outdated"', "npm outdated"),
         # python3 -m pytest auf .claude/
         ("python3 -m pytest .claude/hooks/tests/ -p no:cacheprovider -s -q", "pytest .claude/hooks/"),
         ("python3 -m pytest .claude/ -q", "pytest .claude/ kurz"),
@@ -352,6 +353,7 @@ def test_deny() -> int:
         ("curl https://example.com", "curl"),
         ("wget https://example.com", "wget"),
         ("npm install", "npm install (nicht über cmd.exe)"),
+        ("npm outdated", "npm outdated (WSL direkt, ohne cmd.exe)"),
         ("apt-get install foo", "apt-get"),
         ("whoami", "whoami"),
         # Compound mit unbekanntem Segment

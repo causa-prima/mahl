@@ -10,9 +10,9 @@
 - US-603 (Sub-Rezepte) [V2]
 - US-604 (Zutaten-Mapping) [V2]
 - US-605 (Schritte anlegen) [MVP]
-- US-606 (Erweiterter Schritt-Editor) [V2]
+- US-606 (Erweiterter Schritt-Editor) [PARKING]
 - US-607 (Zutaten-Zuordnung) [MVP]
-- US-608 (Auto-Tagging) [V2]
+- US-608 (Auto-Tagging) [PARKING]
 - US-609 (Manuelles Tagging) [MVP]
 - US-610 (Gesamtzeit) [MVP]
 - US-611 (Detaillierte Zeit-Erfassung) [V2]
@@ -20,7 +20,7 @@
 - US-613 (Validierung) [V2]
 - US-614 (Rezept-Korrektur) [MVP]
 - US-615 (Änderungshistorie) [V2]
-- US-616 (Rezept-Löschen) [MVP]
+- US-616 (Rezept-Löschen) [V1]
 - US-617 (Schritt-Typisierung) [V2]
 
 ---
@@ -41,8 +41,9 @@
         *   Eingegebene URL wird als Rezept-Quelle gesetzt.
 
 *   **US-602 (Manuelle Erfassung & Anhänge) [SKELETON]:** Als *Rezept-Sammler* möchte ich Rezepte manuell anlegen und Fotos (z.B. aus Büchern) als Quelle anhängen können, um auch analoge Rezepte zu digitalisieren.
-    *   **Akzeptanzkriterien:**
-        *   Leeres Formular für neues Rezept.
+    *   **Akzeptanzkriterien (SKELETON):**
+        *   Leeres Formular für neues Rezept (Titel, Metadaten).
+    *   **Akzeptanzkriterien (MVP – Bild-Upload):**
         *   Upload/Kamera-Funktion für Bilder.
         *   Hochgeladenes Bild wird als Rezept-Quelle gesetzt.
 
@@ -63,18 +64,22 @@
     *   **Akzeptanzkriterien:**
         *   Erstellen, Bearbeiten und Löschen von einzelnen Schritten.
 
-*   **US-606 (Erweiterter Schritt-Editor) [V2]:** Als *Rezept-Sammler* möchte ich Schritte komfortabel verwalten (Sortieren, Splitten, Zusammenführen), um Texte schnell zu strukturieren (z. B. beim Import).
+*   **US-606 (Erweiterter Schritt-Editor) [PARKING]:** Als *Rezept-Sammler* möchte ich Schritte komfortabel verwalten (Sortieren, Splitten, Zusammenführen), um Texte schnell zu strukturieren (z. B. beim Import).
     *   **Akzeptanzkriterien:**
         *   Textfeld kann an Cursor-Position gesplittet werden.
         *   Schritte können zusammengeführt werden.
         *   Reihenfolge der Schritte änderbar.
 
-*   **US-607 (Zutaten-Zuordnung) [MVP]:** Als *Rezept-Sammler* möchte ich Zutaten den Schritten zuordnen, damit ich beim Kochen die richtige Info zur richtigen Zeit habe.
-    *   **Akzeptanzkriterien:**
-        *   Liste der *Rezept-Zutaten* ist neben den Schritten sichtbar.
-        *   Drag & Drop (oder Klick-Zuordnung) verknüpft Zutat mit Schritt.
+*   **US-607 (Zutaten-Zuordnung) [MVP]:** Als *Rezept-Sammler* möchte ich pro Schritt Zutaten (Menge + Einheit + Zutat) direkt eingeben, damit die Rezept-Zutatenliste automatisch als Aggregat aller Schritt-Zutaten entsteht.
+    *   **Akzeptanzkriterien (MVP – manuelle Erfassung):**
+        *   Pro Schritt können Zutaten (Menge, Einheit, Zutat) direkt hinzugefügt, bearbeitet und entfernt werden.
+        *   Die Zutatenliste in der Rezept-Detailansicht ist ein Aggregat aller Schritt-Zutaten.
+        *   Jede Zutat muss mindestens einem Schritt zugeordnet sein (Speichern ohne Schritt-Zutaten ist nicht möglich).
+    *   **Akzeptanzkriterien (V2 – Import-Workflow):**
+        *   Nach URL-Import (US-601) wird die extrahierte Zutatenliste neben den Schritten angezeigt.
+        *   Drag & Drop oder alternative mobilfreundliche Interaktion verknüpft importierte Zutat mit einem Schritt.
 
-*   **US-608 (Auto-Tagging) [V2]:** Als *Rezept-Sammler* möchte ich, dass Tags wie "Vegetarisch" automatisch anhand der Zutaten-Tags erkannt werden, um Pflegeaufwand zu sparen.
+*   **US-608 (Auto-Tagging) [PARKING]:** Als *Rezept-Sammler* möchte ich, dass Tags wie "Vegetarisch" automatisch anhand der Zutaten-Tags erkannt werden, um Pflegeaufwand zu sparen.
     *   **Akzeptanzkriterien:**
         *   System prüft Tags aller Zutaten.
         *   Wenn alle Zutaten Tag X haben (oder kein Ausschluss-Tag Y), wird Rezept-Tag gesetzt.
@@ -111,11 +116,13 @@
         *   Liste der Änderungen (Datum, Nutzer, Feld) einsehbar.
         *   (Optional) Wiederherstellen alter Versionen.
 
-*   **US-616 (Rezept-Löschen) [MVP]:** Als *Rezept-Sammler* möchte ich Rezepte archivieren können, wenn sie doppelt sind oder nicht geschmeckt haben, um meine Sammlung sauber zu halten.
+*   **US-616 (Rezept-Löschen) [V1]:** Als *Rezept-Sammler* möchte ich Rezepte archivieren können, wenn sie doppelt sind oder nicht geschmeckt haben, um meine Sammlung sauber zu halten.
     *   **Akzeptanzkriterien:**
         *   Archivieren-Funktion mit Sicherheitsabfrage.
-        *   Archivierte Rezepte können im Admin-Bereich aus dem Archiv wiederhergestellt werden.
-        *   Archivierte Rezepte werden in der Anwendung nur im Admin-Bereich angezeigt und werden ansonsten vom System ignoriert.
+        *   Archivierte Rezepte sind in der normalen Ansicht ausgeblendet.
+        *   Filter "Archivierte anzeigen" in der Rezept-Liste macht archivierte Rezepte sichtbar und ermöglicht Wiederherstellung.
+        *   Dedizierter Admin-Bereich listet alle archivierten Rezepte.
+        *   Wiederherstellung und endgültiges Löschen aus dem Admin-Bereich möglich.
 
 *   **US-617 (Schritt-Typisierung) [V2]:** Als *Rezept-Sammler* möchte ich Schritten eine Aktivitätsart (Vorbereitung, Kochen, Backen, Ruhen) zuweisen, um die Zeiten genauer zu kalkulieren und das Tracking (siehe US-517) zu ermöglichen.
     *   **Akzeptanzkriterien:**

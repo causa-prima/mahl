@@ -9,8 +9,6 @@ kritische-regeln:
   - Verhaltenserwartungen → Gherkin-Szenarien in features/
 -->
 
-> **Status:** 🔄 Neustart beschlossen (Session 042) – Backend wird mit BDD/Gherkin + Outside-In ATDD neu implementiert. Frontend noch nicht implementiert.
-
 ---
 
 ## Ziel

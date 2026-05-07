@@ -242,6 +242,7 @@ ALLOW_PATTERNS: list[re.Pattern[str]] = [
     # npm run / npm audit über cmd.exe (npm install bleibt deny – führt externen Code aus)
     re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl\\Client[^"]*&&\s*npm\s+run\s'),
     re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl\\Client[^"]*&&\s*npm\s+audit\b'),
+    re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl\\Client[^"]*&&\s*npm\s+outdated\b'),
     # python3 -m pytest auf .claude/ (Hook-Tests)
     re.compile(r'^python3\s+-m\s+pytest\s+\.claude/'),
     # Lese- und Analyse-Befehle
@@ -302,6 +303,13 @@ _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r'\bnpm\s+install\b'),
         "npm install: DEPENDENCIES.md-Prozess durchführen, dann User bitten den Befehl auszuführen.",
+    ),
+    (
+        re.compile(r'\bnpm\b'),
+        "npm immer via cmd.exe aufrufen (npm läuft nur auf Windows, nicht in WSL):\n"
+        "  cmd.exe /c \"cd /d C:\\\\Users\\\\kieritz\\\\source\\\\repos\\\\mahl\\\\Client && npm <subcommand>\"\n"
+        "  Erlaubt (Allow-Liste): npm run <script>, npm audit\n"
+        "  Einmalige Ausnahme (z.B. npm outdated): # --allow-once anhängen",
     ),
     (
         re.compile(r'\bdotnet\s+run\b'),

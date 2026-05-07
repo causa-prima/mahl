@@ -463,6 +463,14 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 ---
 
+### Einkaufsliste UX-Referenz: Bring!
+
+**Entscheidung:** Die Einkaufsliste orientiert sich am UX-Muster von Bring! – Kachel-Layout mit Icon (Strichzeichnung) und zweizeiligem Text (Name inkl. Modifizierer + Menge). Dieses Designprinzip gilt ab SKELETON, nicht erst ab V1.
+
+**Begründung:** Bring! ist im Familienshopping-Kontext etabliert und auf Touch-Geräten gut bedienbar. US-304 (Visuelle Darstellung & Varianten) wurde aufgelöst, weil das Layout kein Feature-Increment ist, sondern ein Designprinzip – die Kachel-Entscheidung fällt einmalig und ist kein eigenständiges Implementierungsticket.
+
+---
+
 ### Bildformat: WEBP (nicht JPG), Format-Erkennung via Magic Bytes
 
 **Entscheidung:** Server konvertiert hochgeladene Bilder serverseitig zu WEBP. Pfadkonvention: `/uploads/recipe-sources/{recipeId}/original.webp` (deterministisch aus Recipe-ID ableitbar). Format-Erkennung via Magic Bytes – kein expliziter `Content-Type` oder Typ-Parameter im Request nötig.
@@ -616,3 +624,26 @@ Kein einzelner DB-Wert bildet den Collection-Zustand korrekt ab. `MAX(xmin)` ist
 **Entscheidung:** ETag-Support wird pro Endpoint beim Szenario-Schritt eingebaut, der den Endpoint erstmalig mit echten DB-Daten belegt. Nicht in Skeleton-Stubs (hardcoded Antworten haben keinen sinnvollen ETag).
 
 `GET /api/ingredients` erhält ETag-Support in US-904 Szenario 2 (erster GET mit echten DB-Rows).
+
+---
+
+## Offline-Sync-Strategie (US-306)
+
+**Entscheidung:** Service Worker via Workbox, IndexedDB für lokale Datenhaltung, Last-Write-Wins mit Nutzer-Transparenz als Konfliktlösung.
+
+**Cache-Strategie:**
+- Cache-First für Lesezugriffe
+- Network-First mit Fallback für Schreiboperationen
+- Background-Sync: Änderungen bei Reconnect synchronisieren
+
+**Konfliktlösung:**
+1. Jede Änderung bekommt einen Client-Timestamp
+2. Bei Konflikt: Jüngerer Timestamp gewinnt + Toast "Deine Änderung wurde überschrieben. [Undo]"
+3. Abhaken: kein Konflikt (deterministisch)
+4. Additive Änderungen gewinnen über Delete/Reduce
+
+**Polling:** Einkaufsliste prüft alle 3–5 Sekunden auf Server-Updates (nur wenn App im Vordergrund).
+
+**Verworfen:** Merge-basierte Konfliktlösung – zu komplex für den MVP-Scope.
+
+**Hinweis:** Service Worker funktioniert nur mit HTTPS (oder localhost in Dev).

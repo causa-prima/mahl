@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 67 | 2026-05-07 | SKELETON (Requirements) | Requirements-Sanitization abgeschlossen: alle Story-Dateien mit SKELETON/MVP/V1/V2/PARKING-Tiers, US-301 neu formuliert, US-304 OBSOLET aufgelöst, decisions.md Bring!-UX-Referenz. npm-Updates: MUI v7→v9, ESLint v9→v10. Hook: npm outdated erlaubt + hint für WSL-Direktaufruf. |
 | 66 | 2026-05-05 | SKELETON (Prozess/Tooling) | TDD-Prozess-Review: Single-Tier-Regel + REFACTOR PFLICHT-OUTPUT (ESLint/dotnet/jscpd). ESLint vollständig eingerichtet (fehlende Packages, react-hooks v5 API-Fix, Code-Qualitäts-Metriken). SonarAnalyzer-Thresholds (.editorconfig). jscpd (cross-language, minTokens 70). Hook-Freigabe + DEV_WORKFLOW.md für lint:duplicates. 4 ESLint-Fehler behoben. |
 | 65 | 2026-04-18 | SKELETON (US-904 Szenario 1) | gherkin-workshop UX-Update (Guideline 6+7+5+3): "Zutat anlegen", Empty-State-Text, Undo-Toast, Loading-State-Szenarien. Implementing-Scenario Szenario 1 abgeschlossen: Empty State grün, Stryker Findings dokumentiert, Review-Agenten (4), test.skip für Szenario 2. |
 | 64 | 2026-04-18 | SKELETON (Kaizen-Retro) | Retro S056–S063: 5 Noise-Einträge gelöscht, 3 neue CMs (Annahmen-als-Fakten, Noise-in-LL, Guideline-ohne-Skill-Update), CM1 BEWÄHRT. Filter-Test für lessons_learned, Preprocessing-Schritt im kaizen-Skill, mv/cp im Bash-Hook erlaubt, „Aktueller Stand / Letzter Stand"-Block aus AGENT_MEMORY entfernt. |

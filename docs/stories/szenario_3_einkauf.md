@@ -8,8 +8,8 @@
 - US-301 (Intelligente Artikelerfassung) [MVP]
 - US-302 (Laufweg-Sortierung) [V1]
 - US-303 (Artikel abhaken) [SKELETON]
-- US-304 (Visuelle Darstellung & Varianten) [V1]
-- US-305 (Ersatz-Vorschläge) [V2]
+- US-304 (Visuelle Darstellung & Varianten) [OBSOLET]
+- US-305 (Ersatz-Vorschläge) [PARKING]
 - US-306 (Offline-Verfügbarkeit) [MVP]
 - US-307 (Nicht-Zutaten) [MVP]
 
@@ -22,10 +22,12 @@
 
 *   **US-301 (Intelligente Artikelerfassung) [MVP]:** Als *eiliger Einkäufer* möchte ich Artikel über ein smartes Suchfeld hinzufügen, das mir bereits beim Tippen passende Vorschläge macht, um Dopplungen zu vermeiden und schnell zu sein.
     *   **Akzeptanzkriterien:**
-        *   **Live-Suche:** Suche in Stammdaten und aktueller Liste während des Tippens.
-        *   **Status-Anzeige:** Bereits auf der Liste befindliche Artikel werden optisch hervorgehoben.
-        *   **Interaktion:** Tippen fügt hinzu (oder erhöht Menge), langes Drücken öffnet Details.
-        *   **Erstellung:** Letzter Eintrag der Vorschlagsliste ist immer ein Eintrag zum Neu erstellen der aktuellen Eingabe als Titel (mit Parsing von Menge/Einheit).
+        *   **Eingabe & Vorschläge:** Während der Texteingabe werden passende Vorschläge aus den Stammdaten und der aktuellen Liste als Kacheln angezeigt. Die Kachelfarbe spiegelt den Listenstatus wider, konsistent zur Listenansicht selbst: offene Artikel in der Listen-Farbe, bereits abgehakte und neue Artikel in der Abgehakt-Farbe.
+        *   **Modifizierer-Trennschärfe:** Gleiche Zutat mit unterschiedlichen Modifizierern (z.B. Dose vs. Frisch) sind getrennte Einträge – werden nicht zusammengeführt.
+        *   **Antippen fügt hinzu:** Antippen einer Kachel fügt den Artikel zur Einkaufsliste hinzu, setzt das Eingabefeld zurück und setzt den Fokus darauf, damit direkt der nächste Artikel eingegeben werden kann.
+        *   **Mengen-Parsing:** Enthält die Eingabe eine Menge und Einheit (z.B. "300g Tomaten"), wird die Menge beim Hinzufügen automatisch übernommen.
+        *   **Neuen Artikel anlegen:** Die letzte Kachel in der Vorschlagsliste ist immer "Neu anlegen: [Eingabe]" – für Artikel die noch nicht in den Stammdaten existieren.
+        *   **Menge anpassen (langer Druck):** Langer Druck auf einen Listeneintrag öffnet eine Detail-Ansicht mit editierbarer Menge und der Liste der zugehörigen Rezepte mit Teilmengen (Kontext für Substitutionsentscheidungen).
 
 *   **US-302 (Laufweg-Sortierung) [V1]:** Als *eiliger Einkäufer* möchte ich, dass die Liste nach Tags sortiert ist, die meinem Weg durch den Laden entsprechen (Gemüse -> Milch -> TK), damit ich nicht zurücklaufen muss.
     *   **Akzeptanzkriterien:**
@@ -38,14 +40,14 @@
         *   Klick auf Artikel markiert ihn als "gekauft".
         *   Gekaufte Artikel werden ans Ende der Liste in einen eigenen Bereich "Zuletzt gekauft" verschoben.
         *   Gekaufte Artikel lassen sich einfach von noch nicht gekauften Artikeln unterscheiden
+    *   **Implementierungshinweis:** Teilt die Listenkomponente mit US-201. Beim Implementieren: Tests für den "im Laden"-Kontext schreiben.
 
-*   **US-304 (Visuelle Darstellung & Varianten) [V1]:** Als *eiliger Einkäufer* möchte ich Artikel als Kacheln mit Icon und Text sehen, wobei unterschiedliche Zustände (z.B. "Tomaten" vs. "Tomaten, stückig") als separate Einträge behandelt werden.
-    *   **Akzeptanzkriterien:**
-        *   **Layout:** Kachel-Design mit Icon (Strichzeichnung) und zweizeiligem Text (Name (inkl. Modifizierer) + Menge).
-        *   **Trennschärfe:** Gleiche Zutat mit unterschiedlichen Modifizierern (z.B. Dose vs. Frisch) sind getrennte Einträge.
-        *   **Kontext:** Langer Klick auf Item zeigt Liste der zugehörigen Rezepte mit Teilmengen.
+*   **US-304 (Visuelle Darstellung & Varianten) [OBSOLET]:** Aufgelöst – drei Bedenken wurden getrennt behandelt:
+    *   **Kachel-Design (Layout):** Designprinzip ab SKELETON – in `docs/history/decisions.md` (Abschnitt "Einkaufsliste UX-Referenz: Bring!") dokumentiert.
+    *   **Modifizierer-Trennschärfe:** Als AK in US-301 aufgenommen.
+    *   **Langklick-Kontext:** Als AK in US-301 aufgenommen.
 
-*   **US-305 (Ersatz-Vorschläge) [V2]:** Als *eiliger Einkäufer* möchte ich bei fehlenden Artikeln (kein Schmelzkäse) sehen, welche Alternativen möglich wären, damit ich das Rezept retten kann.
+*   **US-305 (Ersatz-Vorschläge) [PARKING]:** Als *eiliger Einkäufer* möchte ich bei fehlenden Artikeln (kein Schmelzkäse) sehen, welche Alternativen möglich wären, damit ich das Rezept retten kann.
     *   **Akzeptanzkriterien:**
         *   Anzeige von Zutaten mit expliziten Alternativen oder ähnlichen Tags.
 

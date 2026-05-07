@@ -13,10 +13,11 @@ Einzelne User-Story-Beschreibungen und Akzeptanzkriterien stehen in der jeweilig
 
 ## Priorisierung (Tags)
 
-*   **[SKELETON]:** "Walking Skeleton". Die absolute Mindestanforderung, um einen technischen Durchstich (End-to-End) zu ermöglichen. Ohne dies ist die App nicht nutzbar.
-*   **[MVP]:** "Minimum Viable Product". Der Funktionsumfang, der nötig ist, um dem Nutzer echten Mehrwert zu bieten und die Mission zu erfüllen.
-*   **[V1]:** "Version 1.0" (MMP). Der erste vollständige Release, der sich "rund" anfühlt. Enthält Komfortfunktionen, Fehlerbehandlung und Features, die für eine dauerhafte Nutzung wichtig sind.
-*   **[V2]:** "Version 2.0". Echte Erweiterungen, neue Module und Optimierungen für die Zukunft.
+*   **[SKELETON]:** Technischer Durchstich – Architektur End-to-End beweisbar, noch kein echter Nutzer-Nutzen. Legt die Grundlage für alle weiteren Phasen.
+*   **[MVP]:** App ist für den primären Use Case nutzbar: Wochenplan generieren, Einkaufsliste erstellen, Einkaufen gehen. Ohne MVP-Features kann Mahl nicht ernsthaft genutzt werden.
+*   **[V1]:** App ist komfortabel nutzbar. Ohne V1-Features ist Mahl mühsam aber nicht kaputt. Enthält u.a. Planungs-Wizard, Kochmodus, Rezept-Suche und Tagesregeln.
+*   **[V2]:** App ist poliert und vollständig. Seltene aber wertvolle Szenarien sind abgedeckt – kein Alltags-Blocker, aber echter Mehrwert.
+*   **[PARKING]:** Gute Idee, kein Commitment. Kohärent mit der Vision, aber ohne definierten Implementierungszeitpunkt. Wird aufgenommen wenn der konkrete Bedarf entsteht.
 
 ---
 
