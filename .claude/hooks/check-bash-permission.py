@@ -138,6 +138,18 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         'Stryker (Frontend) immer via Script aufrufen:\n'
         '  python3 .claude/scripts/stryker-frontend.py [--mutate src/pages/Foo.tsx] [--detail]',
     ),
+    # npx eslint / npm run lint: immer via eslint-run.py
+    (
+        re.compile(r'\bnpx\s+eslint\b|\bnpm\s+run\s+lint\b'),
+        'ESLint immer via Script aufrufen:\n'
+        '  python3 .claude/scripts/eslint-run.py [--verbose]',
+    ),
+    # npx jscpd / npm run lint:duplicates: immer via jscpd-run.py
+    (
+        re.compile(r'\bnpx\s+jscpd\b|\bnpm\s+run\s+lint:duplicates\b'),
+        'jscpd immer via Script aufrufen:\n'
+        '  python3 .claude/scripts/jscpd-run.py [--verbose]',
+    ),
     # WSL: Pipe direkt nach cmd.exe funktioniert nicht
     (
         re.compile(r'\bcmd\.exe\b.*\|'),

@@ -29,6 +29,75 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 > **Format-Referenz:** `docs/kaizen/PROCESS.md`
 > **Archiv:** `docs/kaizen/archive/`
 
+## Session 069 – 2026-06-01
+
+- **[KRITISCH] [PROZESS] [TDD] Subagent hat Validierungscode beyond Szenario-Scope implementiert**
+  Was: Backend-Subagent implementierte `NonEmptyTrimmedString`, Fehler-Pfad (`UnprocessableEntity`, `validationError`-Guard) und Stryker-Suppressionen mit Vorwärts-Referenz auf nicht-existierende Szenarien – obwohl das Gherkin-Szenario nur den Happy Path ohne Validierung forderte.
+  Warum: Der Orchestrator-Check (Schritt 4) prüft per SKILL nur Test-Dateien auf Gold-Plating, nicht Produktionscode. Stryker-Suppressionen mit Vorwärts-Referenz wurden als valide akzeptiert statt als Gold-Plating-Signal gewertet.
+  Regel: Jede Stryker-Suppression mit Begründung "tested by future scenario" ist automatisch ein Gold-Plating-❌; Orchestrator-Check muss auch Produktionscode-Diff gegen Given/When/Then des Szenarios abgleichen.
+
+- **[HOCH] [AGENT] [TDD] Subagent meldete Stryker 100% auf Basis eines Scoped-Runs, nicht eines vollständigen Runs**
+  Was: Der Subagent führte Stryker nur auf die neu erstellten Dateien ein (`--mutate`) und meldete 100% – der Orchestrator übernahm das und stellte erst beim vollständigen Lauf in Schritt 4 fest, dass der Score 83% war (Survivors in `Ingredient.cs`).
+  Warum: Der Subagent-Prompt spezifizierte nicht explizit, dass der Schritt-3-Stryker ein vollständiger Lauf ohne `--mutate`-Einschränkung sein muss, und der Orchestrator hat den Report-Pfad nicht als Verifikationsbeweis verlangt.
+  Regel: Subagent-Prompt muss explizit fordern: vollständiger Stryker-Lauf ohne `--mutate` + Pfad zur HTML-Report-Datei als Nachweis; Orchestrator prüft den Report-Pfad selbst, bevor er den Score als verifiziert markiert.
+
+- **[HOCH] [TOOLING] [Tooling] Backend-Prozess hält DLL-Lock – Stryker und Build schlagen fehl**
+  Was: Das im Hintergrund laufende Backend (dotnet run) hält `mahl.Infrastructure.dll` gesperrt; dotnet build und dotnet stryker schlagen mit MSB3027/MSB3021 fehl.
+  Warum: Kein Mechanismus verhindert, dass Stryker/Build gestartet wird solange der Backend-Prozess läuft; kein Hint weist auf diesen Fall hin.
+  Regel: Vor jedem dotnet-stryker- oder dotnet-build-Aufruf prüfen ob ein dotnet-run-Prozess aktiv ist; bei Bedarf mit `taskkill /f /im dotnet.exe # --allow-once` beenden, danach neu starten.
+
+- **[HOCH] [TOOLING] [Tooling] allow-once wird für freigegebene Kommandos verwendet**
+  Was: Nach einem abgelehnten Bash-Aufruf wurde `# --allow-once` an Folgebefehle angehängt, die eigentlich auf der Allow-Liste stehen – u.a. `docker-compose up -d` mit `-f`-Flag (nicht im erlaubten Pattern).
+  Warum: Nach einem Deny weiß der Agent nicht welche Befehle erlaubt sind und welche nur wegen einer Kleinigkeit (z.B. falschem Pfad-Argument) nicht matchen. Kein Mechanismus erklärt die Allow-Liste bei Session-Start.
+  Regel: `# --allow-once` ausschließlich für echte Einzel-Ausnahmen (destruktiv, nicht regelmäßig benötigt). Bei Deny zuerst `check-bash-permission.py` lesen um das korrekte Pattern zu verstehen, bevor `# --allow-once` erwogen wird.
+
+- **[MITTEL] [PROZESS] [Agent-Prompt] Subagenten ohne Fortsetzungsmechanismus – Fragen führen zu Abbruch**
+  Was: Subagenten haben ihre Arbeit abgebrochen wenn sie eine Entscheidung nicht selbst treffen konnten, weil kein Kommunikationskanal zurück zum Orchestrator bestand.
+  Warum: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` war nicht aktiviert; Subagenten konnten nicht fortgesetzt werden.
+  Regel: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in globalen settings.json aktivieren; Subagenten-Prompts explizit anweisen, Fragen gesammelt am Ende zu stellen statt mid-task abzubrechen.
+
+- **[MITTEL] [PROZESS] [Agent-Prompt] Subagenten-Zwischenarbeit für Orchestrator nicht sichtbar**
+  Was: Der Orchestrator sieht nur die finale Return-Message von Subagenten – keine Zwischenschritte, keine Tool-Calls, keine Probleme die unterwegs aufgetreten sind.
+  Warum: Strukturelle Grenze des Agent-Tools; es gibt keine Möglichkeit, Subagenten-Protokolle aus dem Haupt-Thread zu lesen.
+  Regel: Subagenten-Prompts müssen am Ende einen strukturierten Prozessverbesserungs-Abschnitt fordern: „Was hat nicht funktioniert, was hätte besser tooling-seitig unterstützt werden sollen?" – der Orchestrator wertet diesen Abschnitt aus und trägt Findings in lessons_learned ein.
+
+- **[MITTEL] [QUALITÄT] [Doku] #pragma-Kommentar referenziert nicht-existierende Entscheidung in decisions.md**
+  Was: `IngredientsEndpoints.cs` enthält `#pragma warning disable CA1308 // lowercase hex is required per ETag spec decision (docs/history/decisions.md)` – die referenzierte Entscheidung existiert nicht in decisions.md.
+  Warum: Subagent hat die Querverweispflicht nicht geprüft; Orchestrator-Check hat den Kommentar nicht verifiziert.
+  Regel: Jede `#pragma`/`// Stryker disable`-Begründung die auf `decisions.md` verweist muss vom Orchestrator verifiziert werden – grep auf das verlinkte Stichwort, nicht nur auf Vollständigkeit prüfen.
+
+- **[GERING] [TOOLING] [Tooling] sed-Aufruf ohne Hint für Alternativen**
+  Was: Ein `sed`-Aufruf wurde vom Hook geblockt ohne Hinweis auf Alternativen (Read-Tool mit offset/limit, oder head + tail).
+  Warum: `WRONG_APPROACH_PATTERNS` für sed hat keinen Hint-Text.
+  Regel: Im `check-bash-permission.py` einen Hint für sed eintragen: „Zum Lesen von Zeilenbereichen: Read-Tool mit offset/limit-Parametern verwenden."
+
+## Session 068 – 2026-05-29
+
+- **[HOCH] [PROZESS] [Agent-Prompt] Orchestrator hat Coding-Guidelines im Haupt-Thread gelesen**
+  Was: Im Schritt 0 (Architektur-Check) und zur Vorbereitung des Subagenten-Prompts wurden CODING_GUIDELINE_TYPESCRIPT.md und verwandte HOW-Dokumente im Haupt-Thread gelesen.
+  Warum: Der Impuls war, den Subagenten-Prompt präziser zu machen – aber der Workflow sieht vor, dass der Subagent diese Docs selbst liest.
+  Regel: Haupt-Thread liest ausschließlich WHAT-Dokumente (Feature-File, ARCHITECTURE.md, SKELETON_SPEC.md, decisions.md). HOW-Dokumente (Coding-Guidelines, TDD_PROCESS.md) liest ausschließlich der Subagent.
+
+- **[HOCH] [PROZESS] [Skill-Nutzung] Orchestrator hat Code direkt geschrieben statt Subagenten zu beauftragen**
+  Was: `aria-labelledby`-Fix, Test-Refactoring und Stryker-Suppressionen wurden im Haupt-Thread implementiert.
+  Warum: Die Fixes erschienen "klein genug" – der Effizienz-Impuls überwog die Workflow-Disziplin.
+  Regel: Implementierungsarbeit (auch einzelne Bugfixes) gehört in Subagenten. Ausnahme nur bei trivialen Tippfehler-Korrekturen in Dokumenten.
+
+- **[HOCH] [PROZESS] [Agent-Prompt] User-Interaktion kann Subagenten vorzeitig beenden**
+  Was: Subagenten wurden durch Ablehnen von Tool-Calls (Edit/Write) unterbrochen und hinterließen unvollständige Arbeit; ein neuer Subagent kann den Kontext des alten nicht übernehmen.
+  Warum: Annahme, dass der User mitten in der Subagenten-Ausführung steuern kann.
+  Regel: Vor dem Spawnen eines Subagenten kommunizieren: "Bitte alle Tool-Calls ohne Kommentar freigeben." Erst steuernde Fragen nach Abschluss des Subagenten stellen.
+
+- **[MITTEL] [QUALITÄT] [TDD] Viele Stryker-Suppressionen als Gold-Plating-Signal**
+  Was: Hooks (`useResultMutation`, `useResultQuery`) und `match.ts` zeigten viele NoCoverage/Survived-Mutanten die nur per Suppression zu bereinigen waren.
+  Warum: Infrastruktur-Code wurde mit allen vier States implementiert, obwohl das Happy-Path-Szenario nur pending+success benötigt.
+  Regel: Wenn Stryker viele Suppressionen erzwingt → erst klären ob der Code überhaupt gebraucht wird, bevor supprimiert wird.
+
+- **[MITTEL] [TOOLING] [Tooling] `# --allow-once` nicht an Standard-Lesebefehle anhängen**
+  Was: `# --allow-once` wurde an `find`- und `grep`-Befehle angehängt obwohl diese keine Ausnahme benötigen.
+  Warum: Falsches Verständnis – `--allow-once` ist für destruktive Einzelfall-Ausnahmen (`git restore`, `rm -rf`), nicht für normale Lesebefehle.
+  Regel: `# --allow-once` nur bei destruktiven oder ungewöhnlichen Befehlen verwenden. Standard-Lesebefehle (find, grep, ls) brauchen es nie.
+
 ## Session 067 – 2026-05-07
 
 - **[MITTEL] [PROZESS] [Doku] Migrations-Kontext nicht vor dem Schreiben eines decisions.md-Eintrags verifiziert**

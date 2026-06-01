@@ -321,6 +321,13 @@ dotnet_diagnostic.MA0051.severity = none
 dotnet_diagnostic.MA0048.severity = none
 dotnet_diagnostic.CA1861.severity = none
 
+# --- Generated migrations: root-level files directly in Infrastructure/Migrations/ ---
+[{Infrastructure/Migrations,Infrastructure/Migrations/**}/*.cs]
+dotnet_diagnostic.MA0051.severity = none
+dotnet_diagnostic.MA0048.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none
+
 # --- Test project ---
 # {Server.Tests,Server.Tests/**}/*.cs matches both root-level and subdirectory .cs files.
 # [Server.Tests/**/*.cs] alone would miss root-level files (e.g. EndpointsTestsBase.cs).

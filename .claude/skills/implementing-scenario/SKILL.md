@@ -154,6 +154,9 @@ Ausgabe:
 
 Spawn-Regeln:
 - EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin).
+- **KEIN `run_in_background: true`** – Subagenten müssen im Vordergrund laufen. Edit- und Write-Aufrufe
+  erzeugen Permission-Prompts die der User interaktiv bestätigen muss. Im Hintergrund laufende
+  Subagenten erhalten diese Prompts nicht und scheitern sofort mit "Permission denied".
 - Haupt-Thread reviewt den Diff und den Test-Run-Output nach jedem Subagent-Return.
 - Weicht der Subagent von TDD ab → Finding direkt fixen (ggf. neuer Subagent-Call).
 

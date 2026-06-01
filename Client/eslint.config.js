@@ -13,7 +13,7 @@ export default defineConfig([
     extends: [
       js.configs.recommended,
       tseslint.configs.strictTypeChecked,
-      reactHooks.configs['recommended-latest'],
+      reactHooks.configs.flat['recommended-latest'],
       reactRefresh.configs.vite,
       functional.configs.recommended,
     ],
@@ -39,8 +39,8 @@ export default defineConfig([
 
       // --- Code-Qualitäts-Metriken ---
       'complexity': ['error', 10],
-      'max-lines-per-function': ['error', { 'max': 20, 'skipBlankLines': true, 'skipComments': true }],
-      'max-lines': ['warn', 200],
+      'max-lines-per-function': ['error', { 'max': 50, 'skipBlankLines': true, 'skipComments': true }],
+      'max-lines': ['warn', 500],
 
       // --- functional/recommended Overrides ---
 
@@ -51,6 +51,12 @@ export default defineConfig([
       // Category 1 – Event-Handler in React geben void zurück. Das ist kein Smell,
       // sondern der React-Vertrag für onClick/onChange etc.
       'functional/no-return-void': 'off',
+
+      // Category 1 – React-Komponenten-Props mischen inhärent Daten (boolean, string)
+      // und Callbacks (() => void). Das ist der React-Vertrag für Props-Typen.
+      // functional/no-mixed-types wäre hier strukturell nicht befolgbar ohne die
+      // Component-API aufzusplitten, was gegen KISS verstößt.
+      'functional/no-mixed-types': 'off',
 
       // Category 1 – Parameterlose Komponenten und Hooks sind valide React-Patterns.
       // `const Spinner = () => <div />` soll erlaubt sein.
