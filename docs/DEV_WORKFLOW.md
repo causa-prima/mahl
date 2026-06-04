@@ -150,8 +150,16 @@ cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet <command>"
 
 # Beispiele:
 cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet build"
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet run --project Server"
 cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ef migrations add InitialCreate"
+```
+
+`dotnet run` **immer mit vollständigem Projektpfad** (kein `cd /d`):
+```bash
+# Pflicht: vollständiger Pfad damit laufende Prozesse im DLL-Lock-Check identifizierbar sind
+cmd.exe /c "dotnet run --project C:\Users\kieritz\source\repos\mahl\Server"
+
+# Mit Umgebungsvariable:
+cmd.exe /c "set ASPNETCORE_URLS=http://localhost:5059 && dotnet run --project C:\Users\kieritz\source\repos\mahl\Server"
 ```
 
 ---

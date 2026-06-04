@@ -85,6 +85,15 @@ Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 
 Ziel: genau das Szenario aus $ARGUMENTS vollständig grün bekommen – nicht mehr, nicht weniger.
 
+**Vorabanalyse: Spec-Ambiguitäten klären (Haupt-Thread):**
+
+Bevor der E2E-Test geschrieben wird, das Szenario auf offene Entscheidungen scannen – schichtübergreifend:
+- **Verhaltensentscheidungen:** Was passiert nach einer Aktion? Dialog-Verhalten nach Erfolg/Fehler, Feldinitialisierung, Reihenfolge von Elementen, exakter Fehlermeldungstext.
+- **Backend-Entscheidungen:** HTTP-Statuscodes, Header-Format (z.B. `Location`), DB-Schema-Details (Constraints, Datentypen, Default-Werte).
+
+Gefundene Ambiguitäten mit dem User klären, bevor der E2E-Test entsteht.
+Reine Design-Entscheidungen (CSS, Fonts, Abstände) sind kein Klärungsbedarf – diese liegen in den UX-Guidelines und brauchen keine Spec-Anpassung.
+
 **Äußerer Loop – E2E-Test (Haupt-Thread):**
 
 Schreibe selbst den Playwright-Test für das Szenario (Given/When/Then 1:1) – bevor der erste Subagent gespawnt wird. Führe ihn aus und zeige die Fehlermeldung. Das beweist, dass der Test echtes Verhalten misst und noch nicht durch bestehende Implementierung zufällig grün werden kann. Referenz: `docs/E2E_TESTING.md` (TOC zuerst).
@@ -139,26 +148,52 @@ ein Unit Test nötig ist und schreibt ihn. Du implementierst nur.
 Failing E2E-Test: <Pfad zur spec.ts>
 
 Vorgehen (strikt einhalten):
+0. PLANUNG: Bevor du den ersten Test schreibst – liste auf, welche Details das Szenario in dieser Schicht noch offenlässt (Fehlermeldungstext, HTTP-Statuscodes, Feld-Initialisierung, etc.). Stelle Fragen direkt an den Orchestrator – nicht am Ende sammeln.
 1. RED: Genau einen Test schreiben (Unit/Integration passend zur Schicht). Ausführen, Fehlermeldung zeigen.
+   Bitte danach den Orchestrator um Test-Review und warte auf Freigabe, bevor du mit GREEN beginnst.
+   Nach Freigabe: Ab jetzt sind Assertion-Änderungen ohne Orchestrator-Zustimmung verboten. Setup-Änderungen (Mock-Handler, Testdaten – keine Assertions) sind erlaubt, müssen aber beim Return explizit begründet werden.
 2. GREEN: Minimale Implementierung. "Fake it till you make it" ist Pflicht. Alle Tests ausführen.
 3. REFACTOR: Checkliste aus docs/TDD_PROCESS.md Phase 3 vollständig abarbeiten – inklusive Stryker + Branch Coverage (Pflicht). Ziel: 100 % Mutation Score + 100 % Branch Coverage.
+   Stryker-Läufe: Während der Entwicklung sind eingeschränkte Läufe (--mutate auf neue Dateien) für schnelles Feedback explizit erlaubt.
+   Für die Übergabe an den Orchestrator ist ein vollständiger Lauf ohne --mutate-Einschränkung mit 100%-Score Pflicht.
 TDD-Abweichung (z.B. Test NACH Code) ist ein Prozess-Fehler – dann STOP und berichten.
 
 Ausgabe:
 - Diff der Änderungen (Dateinamen + Hunks)
 - Output je Test-Run (RED, GREEN, REFACTOR-Grün)
-- Stryker-Score + Branch-Coverage-Score
+- Stryker-Score + Branch-Coverage-Score (aus vollständigem Lauf ohne --mutate-Einschränkung)
+- Vollständiger Pfad zur generierten Stryker-Report-Datei
 - Suppression-Report: neue Suppressionen mit Datei:Zeile + Begründung (oder "keine")
 - Kurzer Report: was implementiert, was bewusst weggelassen
+
+## Prozessverbesserung (Pflicht)
+Berichte am Ende strukturiert:
+- Was hat nicht wie erwartet funktioniert (Tooling-Fehler, schlechte Fehlermeldungen)?
+- Welche Schritte haben unnötig Zeit gekostet und hätten durch besseres Tooling
+  oder klarere Anweisungen vermieden werden können?
+Falls nichts aufgefallen ist: explizit "Keine Auffälligkeiten" schreiben.
 ```
 
 Spawn-Regeln:
 - EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin).
-- **KEIN `run_in_background: true`** – Subagenten müssen im Vordergrund laufen. Edit- und Write-Aufrufe
-  erzeugen Permission-Prompts die der User interaktiv bestätigen muss. Im Hintergrund laufende
-  Subagenten erhalten diese Prompts nicht und scheitern sofort mit "Permission denied".
+- **KEIN `run_in_background: true`** – Subagenten müssen im Vordergrund laufen. Edit- und Write-Aufrufe erzeugen Permission-Prompts die der User interaktiv bestätigen muss. Im Hintergrund laufende Subagenten erhalten diese Prompts nicht und scheitern sofort mit "Permission denied".
 - Haupt-Thread reviewt den Diff und den Test-Run-Output nach jedem Subagent-Return.
-- Weicht der Subagent von TDD ab → Finding direkt fixen (ggf. neuer Subagent-Call).
+- Weicht der Subagent von TDD ab → Subagenten fixen lassen (max. 2 Iterationen, danach Abbruch + Meldung an User).
+
+**Test-Review nach RED im Inneren Loop (Haupt-Thread):**
+
+Wenn ein Subagent nach RED um Test-Review bittet, prüft der Haupt-Thread die Tests anhand dieser Kriterien und antwortet via `SendMessage` mit Freigabe und stagen der Test-Dateien (`git add <test-files>`) oder konkreter Korrektur-Anforderung:
+
+- **Per-Assertion-Pflicht (inkl. Given/When):** Für jede neue oder geänderte Assertion und signifikante Given/When-Schritte: Welches Gherkin-Kriterium erzwingt sie? Falls keines vorhanden – drei Diagnosen, der Haupt-Thread entscheidet:
+  - a) **Gold-Plating** → Subagent löscht Assertion und ggf. zugehörigen Produktionscode.
+  - b) **User-facing Verhalten ohne Szenario** → User-Freigabe für neues Szenario einholen, erst dann implementieren.
+  - c) **Technische API/Architektur-Entscheidung** → Test braucht `// DEC-XXX`-Kommentar der auf den Eintrag in `docs/history/decisions.md` verweist; Haupt-Thread verifiziert per `grep`.
+
+- **Anpassungen an bestehenden Tests:** Was würde ohne diese Anpassung kaputtgehen, das nicht ohnehin durch andere Assertions auffiele? Keine Antwort → redundant (Diagnose a).
+
+- **Full-State-Assertions:** Bei `BeEquivalentTo` / `toEqual` (C#) bzw. `toEqual` / `toMatchObject` (TypeScript): Sind alle Properties durch ein Gherkin-Kriterium gedeckt? Gibt es `Excluding(...)` oder Partial-Matches? → müssen mit Kommentar begründet sein; unchecked oder excluded Properties sind Gold-Plating-Signal für den Produktionscode.
+
+- **Given/When-Struktur:** Neue Tests sollen durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Fehlen diese → Finding melden (nicht blockierend).
 
 **E2E-Loop schließen (Haupt-Thread):**
 
@@ -169,8 +204,7 @@ Nach allen inneren Loops: Playwright-Test erneut ausführen. Noch rot? Fehlende 
 
 Enthält der Stryker-Report der Subagenten Survivors auf isolierter Domänenlogik (Value Types,
 Berechnungen, Multi-Condition-Rules)?
-- Survivor via HTTP beobachtbar (HTTP-Response ändert sich wenn Mutant überlebt)? → Integration-Test
-  fehlt → Schicht-Subagent ergänzt ihn.
+- Survivor via HTTP beobachtbar (HTTP-Response ändert sich wenn Mutant überlebt)? → Integration-Test fehlt → Schicht-Subagent ergänzen lassen.
 - Survivor **nicht** via HTTP beobachtbar (Mutant verändert interne Berechnung ohne sichtbaren
   Effekt auf die Response)? → Haupt-Thread schreibt Unit Test (nur Spec + Survivor-Report, kein
   Produktionscode) → Schicht-Subagent macht ihn grün.
@@ -178,13 +212,11 @@ Berechnungen, Multi-Condition-Rules)?
 ── SCHRITT 4: ORCHESTRATOR-CHECK ────────────────────────────────────────────
 → TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": completed | TaskUpdate "Schritt 4: Orchestrator-Check": in_progress
 
-Der Haupt-Thread prüft, bevor externe Reviewer spawnen. Drei Punkte:
+Der Haupt-Thread prüft, bevor externe Reviewer spawnen. Fünf Punkte:
 
-1. **Test-Qualität (Gold-Plating-Check):** `git diff` ausschließlich der Test-Dateien lesen.
-   Jede Assertion muss sich einem konkreten Given/When/Then des aktuellen Szenarios zuordnen
-   lassen. Assertions ohne passendes Akzeptanzkriterium → Schicht-Subagent spawnen mit Auftrag,
-   die überflüssige Assertion zu entfernen (und ggf. den damit verbundenen nicht-geforderten
-   Produktionscode).
+1. **Staged-Test-Check:** `git status` prüfen: Enthält die staged area Modifikationen an Test-Dateien, die nach der Freigabe im Inneren Loop gemacht wurden?
+   Falls ja → Finding: Assertions dürfen nach Freigabe nicht geändert werden ohne Orchestrator-Zustimmung. Schicht-Subagent spawnen um die unautorisierten Änderungen zu revertieren und – falls ein echter Bedarf dahintersteht – das korrekte Klärungsverfahren (Diagnose a/b/c aus dem Test-Review) zu durchlaufen.
+   (Der inhaltliche Test-Review findet bereits im Inneren Loop statt.)
 
 2. **Suppression-Check:** `git diff` nach `// Stryker disable` und `/* v8 ignore` durchsuchen.
    Für jede neue Suppression: Begründung kritisch hinterfragen (nicht nur auf Vollständigkeit –

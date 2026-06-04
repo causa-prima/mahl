@@ -157,6 +157,26 @@ Der Dialog ist abgeschlossen, wenn:
   gilt – „keine Antwort" ist kein Abschluss
 - Draft-Saving: explizit entschieden ob Formulare dieser Story nicht-trivialen
   Eingabeaufwand haben; bei Ja: Szenario eingeplant
+- UI-Verhaltens-Checkliste (siehe unten) vollständig abgearbeitet
+
+### UI-Verhaltens-Checkliste (Pflichtprüfung vor Abschluss von Schritt 1)
+
+Diese Aspekte werden sonst als Implementierungsdetails entschieden — ohne Gherkin-Deckung.
+Prüfe jeden Punkt für jede Operation aus Schritt 0.A, die ein Formular oder einen Dialog hat.
+Für jeden relevanten Aspekt ohne vorhandenes Szenario: jetzt ein Szenario formulieren,
+nicht später als Implementierungsdetail überlassen.
+
+| Aspekt | Prüffrage | Wenn relevant und kein Szenario vorhanden |
+|--------|-----------|-------------------------------------------|
+| **Nach erfolgreicher Aktion** | Schließt sich der Dialog/das Formular nach dem Absenden? Werden Felder zurückgesetzt? Erscheint eine Bestätigung? | Szenario formulieren, das den sichtbaren Zustand nach Erfolg beschreibt |
+| **Abbrechen** | Gibt es einen Abbrechen-Pfad (Button, Escape, Klick außerhalb)? Wohin führt er? Gehen Eingaben verloren? | Szenario formulieren, das die Abbrechen-Navigation und den Endzustand beschreibt |
+| **Feld-Initialisierung** | Welche Werte haben Felder beim ersten Öffnen des Dialogs/Formulars? (Leer, Defaults, vorausgefüllt?) | Szenario formulieren, das den initialen Zustand beim Öffnen beschreibt |
+| **Async-Zustände** | Gibt es sichtbare Loading-States oder Disabled-States während laufender Operationen? | Szenario formulieren, das beschreibt was der Nutzer während der Operation sieht |
+
+Notiere das Ergebnis der Checkliste schriftlich — für jeden Aspekt entweder:
+- „Relevant – Szenario formuliert: [Titel]"
+- „Relevant – bereits durch Szenario [Titel] abgedeckt"
+- „Nicht relevant – [ein Satz Begründung]"
 
 **Achtung:** Offenbart der Dialog eine Architekturentscheidung, die nicht in decisions.md
 steht (z.B. eine neue Verhaltenssemantik oder ein neues Zustandsmodell)? → Stopp.

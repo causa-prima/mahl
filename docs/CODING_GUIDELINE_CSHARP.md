@@ -20,6 +20,7 @@ kritische-regeln:
 | 4. Pure Functions & Extension Methods | Extension Methods für Geschäftslogik, OneOf als Rückgabe | Beim Kapseln von Logik ohne Seiteneffekte |
 | 5. Domain-Typen (Architektur) | Systemgrenz-Architektur (Write/Read-Pfad), Dependency Rule, Typ-Deklarationen sind `internal`, Typ-Struktur, Datei-Orte, kanonisches Beispiel | Beim Anlegen neuer Entities oder Umstrukturierung des Domain-Layers |
 | 6. Endpoints: ETag-Pflicht | ETag für alle Endpoints: xmin (Single Resource), Content-Hash (Collection), 304/412/428-Muster | Bei jedem neuen Endpoint |
+| 7. Test-Code | Given/When/Then-Struktur (Pflicht), Full-State-Assertions (`BeEquivalentTo`) | Beim Schreiben von Backend-Tests |
 
 **Ergänzende Richtlinien (separate Dateien):**
 
@@ -261,3 +262,49 @@ Entscheidung + Begründung: `docs/history/decisions.md` → Sektion "HTTP-Cachin
 | PUT/PATCH/DELETE | `If-Match` stimmt | EF Core prüft `xmin` beim `SaveChanges` nochmals | – |
 
 `UseXminAsConcurrencyToken()` in `OnModelCreating` konfigurieren, bevor der erste GET-Endpoint für eine Entity gebaut wird.
+
+## 7. Test-Code – Struktur und Assertions
+
+### Given/When/Then-Struktur in Tests (Pflicht)
+
+Jeder neue Test muss durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Die Kommentare helfen beim Review, jede Assertion dem passenden Akzeptanzkriterium des Gherkin-Szenarios zuzuordnen.
+
+```csharp
+[Fact]
+public async Task GetIngredients_ReturnsList()
+{
+    // Given
+    var ingredient = new IngredientDbType { Id = Guid.NewGuid(), Name = "Tomaten", DefaultUnit = "kg" };
+    DbContext.Ingredients.Add(ingredient);
+    await DbContext.SaveChangesAsync();
+
+    // When
+    var response = await Client.GetAsync("/api/ingredients");
+
+    // Then
+    response.StatusCode.Should().Be(HttpStatusCode.OK);
+    var body = await response.Content.ReadFromJsonAsync<List<IngredientDto>>();
+    body.Should().ContainSingle(i => i.Name == "Tomaten");
+}
+```
+
+### Full-State-Assertions
+
+Bei `BeEquivalentTo`-Aufrufen müssen alle verglichenen Properties durch ein Akzeptanzkriterium des Szenarios gedeckt sein.
+
+- `Excluding(...)` ist erlaubt, muss aber mit einem Kommentar begründet werden.
+- Unchecked oder excluded Properties ohne Begründung sind ein Gold-Plating-Signal: Sie deuten auf Produktionscode hin, der nicht durch ein Szenario gefordert ist.
+
+```csharp
+// ✓ Korrekt – alle Properties durch AKs gedeckt
+result.Should().BeEquivalentTo(new { Name = "Tomaten", DefaultUnit = "kg" });
+
+// ✓ Erlaubt mit Begründung
+result.Should().BeEquivalentTo(expected, options => options
+    .Excluding(x => x.Id));
+// Id wird in separater Assertion geprüft
+
+// ✗ Ohne Begründung – Gold-Plating-Signal
+result.Should().BeEquivalentTo(expected, options => options
+    .Excluding(x => x.DeletedAt));
+```

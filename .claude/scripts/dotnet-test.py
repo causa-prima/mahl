@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
-from _util import run_dotnet, REPO_ROOT_WIN
+from _util import run_dotnet, REPO_ROOT_WIN, check_dotnet_dll_lock
 
 _RELEVANT = re.compile(
     r"(^\s*Failed|^\s*Passed|^\s*Skipped|^\s*Total"
@@ -146,6 +146,7 @@ def _report_coverage(totals: dict[str, float], gaps: list[FileGap]) -> bool:
 
 
 def main() -> None:
+    check_dotnet_dll_lock()
     parser = argparse.ArgumentParser(description="dotnet test via cmd.exe (WSL)")
     parser.add_argument("--filter", dest="filter_name", help="Test-Filter (FullyQualifiedName~...)")
     parser.add_argument("--verbose", action="store_true", help="Vollständigen Output anzeigen")

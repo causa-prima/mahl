@@ -33,6 +33,7 @@ HIGH (muss vor Output behoben werden):
 
 MEDIUM (beheben wenn möglich, sonst dokumentieren):
 - Mutierende Operation mit Server-Wartezeit ohne Ladezustand-Szenario (Guideline 3): kein Szenario das beschreibt was der Nutzer während des Wartens sieht – nur wenn die Operation typischerweise spürbar lange dauert
+- UI-Verhaltensaspekte ohne Szenario: Wenn die Story ein Formular oder Dialog hat und keines der vorhandenen Szenarien beschreibt (a) was nach Erfolg mit dem Dialog passiert, (b) einen Abbrechen-Pfad, (c) den initialen Feld-Zustand beim Öffnen, oder (d) Loading/Disabled-States — und diese Aspekte wurden in Schritt 1 als relevant markiert: als MEDIUM flaggen mit konkretem Hinweis welcher Aspekt fehlt
 - Fehlende Input-Partition (z.B. kein Whitespace-Test bei Pflichtfeld)
 - Parametrisierbare Szenarien nicht als solche erkennbar – nur als MEDIUM wenn gleicher
   Prozessfluss und gleiche Fehlermeldung aus US-Text oder Constraints klar ablesbar sind;

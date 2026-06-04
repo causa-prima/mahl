@@ -385,3 +385,63 @@ const validName = makeIngredientName('Tomaten')._unsafeUnwrap();
 // _unsafeUnwrap() ist in Tests OK, weil der Wert bekannt gültig ist
 ```
 
+### Given/When/Then-Struktur in Tests (Pflicht)
+
+Jeder neue Test muss durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Die Kommentare helfen beim Review, jede Assertion dem passenden Akzeptanzkriterium des Gherkin-Szenarios zuzuordnen.
+
+```typescript
+it('zeigt Zutaten-Liste an', async () => {
+  // Given
+  server.use(http.get('/api/ingredients', () => HttpResponse.json([
+    { id: '1', name: 'Tomaten', defaultUnit: 'kg' },
+  ])));
+
+  // When
+  render(<IngredientsPage />);
+
+  // Then
+  expect(await screen.findByText('Tomaten')).toBeInTheDocument();
+});
+```
+
+### Full-State-Assertions
+
+Bei `toEqual`- und `toMatchObject`-Aufrufen müssen alle verglichenen Properties durch ein Akzeptanzkriterium des Szenarios gedeckt sein.
+
+- `toMatchObject` (Teilabgleich) ist erlaubt, muss aber mit einem Kommentar begründet werden, warum Properties weggelassen wurden.
+- Unchecked Properties ohne Begründung sind ein Gold-Plating-Signal: Sie deuten auf Produktionscode hin, der nicht durch ein Szenario gefordert ist.
+
+```typescript
+// ✓ Korrekt – alle Properties durch AKs gedeckt
+expect(result).toEqual({ id: '1', name: 'Tomaten', defaultUnit: 'kg' });
+
+// ✓ Erlaubt mit Begründung
+expect(result).toMatchObject({ name: 'Tomaten' });
+// id und defaultUnit werden in separaten Assertions geprüft
+
+// ✗ Ohne Begründung – Gold-Plating-Signal
+expect(result).toMatchObject({ name: 'Tomaten' });
+```
+
+### Stryker-Survivor: `= []` Default-Wert in useQuery
+
+Ein `?? []`-Default (z.B. `data ?? []`) erzeugt einen Stryker-Survivor, weil MSW in Tests immer Daten liefert und der Default nie aktiv ist. Dieser Survivor darf mit einem erklärenden Kommentar supprimiert werden:
+
+```typescript
+// Stryker disable next line ArrayDeclaration -- Default [] nie aktiv:
+//   data ist während Tests nie undefined (MSW liefert immer).
+//   Entfällt wenn Loading-State-Szenario implementiert ist.
+const items = data ?? [];
+```
+
+### Stryker-Survivor: CSS-className-Strings
+
+String-Literale in `className`-Props erzeugen Stryker-StringLiteral-Mutanten, die kein Test killt, weil Tests nicht auf CSS-Klassen assertieren. Diese dürfen supprimiert werden:
+
+```typescript
+// Stryker disable next line StringLiteral -- CSS-only, kein Verhalten
+<div className="flex gap-4">
+```
+
+**Ausnahme:** Bedingte Klassen (`condition ? 'a' : 'b'`) müssen durch einen Test gedeckt sein – die Bedingung hat Verhalten und ist kein reines CSS-Detail.
+

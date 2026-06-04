@@ -179,6 +179,14 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         '  python3 .claude/scripts/dotnet-stryker.py\n'
         '  python3 .claude/hooks/...',
     ),
+    # dotnet run via cd /d: Prozess nicht per Projektpfad identifizierbar → --project <vollpfad> verwenden
+    (
+        re.compile(r'cd\s+/d\s+[^"]*mahl[^"]*&&\s*(?:set\s+\S+\s+&&\s+)?dotnet\s+run\b'),
+        'dotnet run immer mit vollständigem Projektpfad aufrufen:\n'
+        '  cmd.exe /c "dotnet run --project C:\\\\Users\\\\kieritz\\\\source\\\\repos\\\\mahl\\\\Server"\n'
+        '  (mit Env-Var: cmd.exe /c "set KEY=VALUE && dotnet run --project C:\\\\...\\\\mahl\\\\Server")\n'
+        'cd /d macht laufende Prozesse im DLL-Lock-Check nicht identifizierbar.',
+    ),
     # git add -f: ignorierte Dateien könnten Secrets enthalten – User muss manuell handeln
     (
         re.compile(r'\bgit\s+add\b.*\s(?:-f\b|--force\b)'),
@@ -192,111 +200,180 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
 # ---------------------------------------------------------------------------
 # Destructive-Patterns (destruktiv aber legitim – per '# --allow-once' freigabefähig)
-# Struktur: (pattern, hint_text)
+# Struktur: (pattern, hint_text, short_label)
+#   hint_text:   Deny-Nachricht für den Agenten (mehrzeilig, mit Beispiel)
+#   short_label: Kurze Bezeichnung für --list (leer → kein Eintrag)
 # ---------------------------------------------------------------------------
-DESTRUCTIVE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+DESTRUCTIVE_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
     (
         re.compile(r'\bfind\b.*\s-delete\b'),
         "Destruktiver Befehl.",
+        'find ... -delete',
     ),
     (
         re.compile(r'\bfind\b.*\s-exec(?:dir)?\s+(?:rm|bash|sh|dash|ksh)\b'),
         "Destruktiver Befehl.",
+        'find ... -exec rm|bash|sh|dash|ksh',
     ),
     (
         re.compile(r'\brm\s+-[a-zA-Z]*[rR]'),
         "Destruktiver Befehl.\n"
         "  Beispiel: rm -rf Client/dist/ # --allow-once",
+        'rm -r/-rf',
     ),
     (
         re.compile(r'\bgit\s+push\s+--force\b'),
         "Destruktiver Befehl.",
+        'git push --force',
     ),
     (
         re.compile(r'\bgit\s+reset\s+--hard\b'),
         "Destruktiver Befehl.",
+        'git reset --hard',
     ),
     (
         re.compile(r'\bgit\s+clean\s+-[a-zA-Z]*f'),
         "Destruktiver Befehl.",
+        'git clean -f',
     ),
     (
         re.compile(r'\bgit\s+checkout\s+\.'),
         "Destruktiver Befehl.",
+        'git checkout .',
     ),
     (
         re.compile(r'\bgit\s+restore\s+\.'),
         "Destruktiver Befehl.",
+        'git restore .',
     ),
     (
         re.compile(r'\btaskkill\b'),
         "Prozess-Kill ist ein destruktiver Eingriff.\n"
         "  Beispiel: cmd.exe /c \"taskkill /f /im dotnet.exe\" # --allow-once",
+        'cmd.exe /c "taskkill /f /im <prozess.exe>"',
     ),
 ]
 
 
 # ---------------------------------------------------------------------------
 # Allow-Patterns
+# Struktur: (pattern, group, description)
+#   group:       Gruppenname (str) → _print_allow_list aggregiert Einträge derselben Gruppe
+#                None → Standalone-Eintrag
+#   description: Konkreter Beispiel-Befehl für --list
+#                Leer ('') → kein Eintrag in --list (nur Pattern-Matching-Variante)
 # ---------------------------------------------------------------------------
-ALLOW_PATTERNS: list[re.Pattern[str]] = [
+ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     # dotnet build über cmd.exe (direkt oder via Variable capturen)
-    re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+build\b'),
-    re.compile(r'^output=\$\(cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+build\b'),
-    # dotnet run via cmd.exe (mit optionaler Env-Var-Präfix)
-    re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*(set\s+\S+\s+&&\s+)?dotnet\s+run\b'),
+    (
+        re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+build\b'),
+        None,
+        r'cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet build"',
+    ),
+    (
+        re.compile(r'^output=\$\(cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+build\b'),
+        None,
+        '',  # Variante: output=$(cmd.exe /c "... && dotnet build")
+    ),
+    # dotnet run mit vollständigem Projektpfad (Pflicht für DLL-Lock-Identifikation)
+    (
+        re.compile(r'^cmd\.exe\s+/c\s+"(?:set\s+\S+\s+&&\s+)?dotnet\s+run\s+--project\s+[^"]*[Mm]ahl'),
+        None,
+        r'cmd.exe /c "dotnet run --project C:\Users\kieritz\source\repos\mahl\Server"',
+    ),
+    # taskkill für einen einzelnen dotnet-Prozess per PID (gezielter Kill)
+    (
+        re.compile(r'^cmd\.exe\s+/c\s+"taskkill\s+/f\s+/pid\s+\d+"$'),
+        None,
+        'cmd.exe /c "taskkill /f /pid <PID>"',
+    ),
     # dotnet ef (sichere Subcommands; database drop bleibt deny)
-    re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+ef\s+(migrations\s+(add|remove|list)|database\s+update)\b'),
+    (
+        re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+ef\s+(migrations\s+(add|remove|list)|database\s+update)\b'),
+        None,
+        r'cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ef migrations add|remove|list"  (auch: database update)',
+    ),
     # docker-compose: WSL-direkt und via cmd.exe
-    re.compile(r'^docker-compose\s+(up|down)\b'),
-    re.compile(r'^docker\s+compose\s+(up|down)\b'),
-    re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*docker-compose\s+(up|down)\b'),
-    # npm run / npm audit über cmd.exe (npm install bleibt deny – führt externen Code aus)
-    re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl\\Client[^"]*&&\s*npm\s+run\s'),
-    re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl\\Client[^"]*&&\s*npm\s+audit\b'),
-    re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl\\Client[^"]*&&\s*npm\s+outdated\b'),
+    (
+        re.compile(r'^docker-compose\s+(up|down)\b'),
+        None,
+        'docker-compose up|down',
+    ),
+    (
+        re.compile(r'^docker\s+compose\s+(up|down)\b'),
+        None,
+        'docker compose up|down',
+    ),
+    (
+        re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*docker-compose\s+(up|down)\b'),
+        None,
+        r'cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && docker-compose up|down"',
+    ),
+    # npm run / npm audit / npm outdated über cmd.exe (npm install bleibt deny)
+    (
+        re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl\\Client[^"]*&&\s*npm\s+(?:run\s|audit\b|outdated\b)'),
+        None,
+        r'cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run <script> | audit | outdated"',
+    ),
     # python3 -m pytest auf .claude/ (Hook-Tests)
-    re.compile(r'^python3\s+-m\s+pytest\s+\.claude/'),
-    # Lese- und Analyse-Befehle
-    re.compile(r'^ls\b'),
-    re.compile(r'^cat\b'),
-    re.compile(r'^tail\b'),
-    re.compile(r'^head\b'),
-    re.compile(r'^wc\b'),
-    re.compile(r'^grep\b'),
+    (
+        re.compile(r'^python3\s+-m\s+pytest\s+\.claude/'),
+        None,
+        'python3 -m pytest .claude/<test_script>.py',
+    ),
+    # Lesen: Datei- und Verzeichnisinhalte lesen/inspizieren
+    (re.compile(r'^ls\b'), 'Lesen', 'ls'),
+    (re.compile(r'^cat\b'), 'Lesen', 'cat'),
+    (re.compile(r'^tail\b'), 'Lesen', 'tail'),
+    (re.compile(r'^head\b'), 'Lesen', 'head'),
+    (re.compile(r'^wc\b'), 'Lesen', 'wc'),
+    (re.compile(r'^grep\b'), 'Lesen', 'grep'),
     # find: -delete und -exec (alle Varianten) → DESTRUCTIVE_PATTERNS
-    re.compile(r'^find\b(?!.*\s(?:-delete|-exec))'),
-    re.compile(r'^echo\b'),
-    re.compile(r'^pwd$'),
-    re.compile(r'^date$'),
-    re.compile(r'^which\b'),
-    re.compile(r'^file\b'),
-    re.compile(r'^stat\b'),
-    re.compile(r'^diff\b'),
-    re.compile(r'^sort\b'),
-    re.compile(r'^uniq\b'),
-    re.compile(r'^tr\b'),
-    re.compile(r'^cut\b'),
-    re.compile(r'^dirname\b'),
-    re.compile(r'^basename\b'),
-    re.compile(r'^realpath\b'),
-    re.compile(r'^jq\b'),
+    (re.compile(r'^find\b(?!.*\s(?:-delete|-exec))'), 'Lesen', 'find (ohne -delete/-exec)'),
+    (re.compile(r'^stat\b'), 'Lesen', 'stat'),
+    (re.compile(r'^file\b'), 'Lesen', 'file'),
+    (re.compile(r'^diff\b'), 'Lesen', 'diff'),
+    # Shell: allgemeine Hilfsbefehle, Textverarbeitung, Pfad-Tools
+    (re.compile(r'^echo\b'), 'Shell', 'echo'),
+    (re.compile(r'^pwd$'), 'Shell', 'pwd'),
+    (re.compile(r'^date$'), 'Shell', 'date'),
+    (re.compile(r'^which\b'), 'Shell', 'which'),
+    (re.compile(r'^sort\b'), 'Shell', 'sort'),
+    (re.compile(r'^uniq\b'), 'Shell', 'uniq'),
+    (re.compile(r'^tr\b'), 'Shell', 'tr'),
+    (re.compile(r'^cut\b'), 'Shell', 'cut'),
+    (re.compile(r'^dirname\b'), 'Shell', 'dirname'),
+    (re.compile(r'^basename\b'), 'Shell', 'basename'),
+    (re.compile(r'^realpath\b'), 'Shell', 'realpath'),
+    (re.compile(r'^jq\b'), 'Shell', 'jq'),
     # Datei-/Verzeichnis-Verwaltung
-    re.compile(r'^mkdir\b'),
-    re.compile(r'^touch\b'),
-    re.compile(r'^chmod\s+\+x\b'),  # nur +x, nicht 755/-R/andere
-    re.compile(r'^rm\b(?!\s+-[a-zA-Z]*[rR])'),  # einzelne Dateien; rm -r/-rf → DESTRUCTIVE_PATTERNS
-    re.compile(r'^mv\b'),                         # mv ist nicht-rekursiv (kein -r)
-    re.compile(r'^cp\b(?!\s+-[a-zA-Z]*[rR])'),   # cp ohne -r/-R; rekursiv → deny
+    (re.compile(r'^mkdir\b'), 'Dateiverwaltung', 'mkdir'),
+    (re.compile(r'^touch\b'), 'Dateiverwaltung', 'touch'),
+    (re.compile(r'^chmod\s+\+x\b'), 'Dateiverwaltung', 'chmod +x'),  # nur +x, nicht 755/-R/andere
+    (re.compile(r'^rm\b(?!\s+-[a-zA-Z]*[rR])'), 'Dateiverwaltung', 'rm (ohne -r/-R)'),  # rm -r/-rf → DESTRUCTIVE_PATTERNS
+    (re.compile(r'^mv\b'), 'Dateiverwaltung', 'mv'),                   # mv ist nicht-rekursiv (kein -r)
+    (re.compile(r'^cp\b(?!\s+-[a-zA-Z]*[rR])'), 'Dateiverwaltung', 'cp (ohne -r/-R)'),  # rekursiv → deny
     # Python: nur .claude/-Verzeichnis (Projekt-Werkzeuge und Hooks)
-    re.compile(r'^python3\s+(?!-)\.claude/'),
+    (
+        re.compile(r'^python3\s+(?!-)\.claude/'),
+        None,
+        'python3 .claude/scripts/<script>.py  /  python3 .claude/hooks/<hook>.py',
+    ),
     # sed für \r-Bereinigung (\\r oder \\\\r, einfache oder doppelte Anführungszeichen)
-    re.compile(r"^sed\s+-i\s+['\"]s/\\\\?r//['\"]"),
+    (
+        re.compile(r"^sed\s+-i\s+['\"]s/\\\\?r//['\"]"),
+        None,
+        "sed -i 's/\\r//' <datei>",
+    ),
     # git read-only
-    re.compile(r'^git\s+(status|log|diff|branch|show|stash\s+list|remote|tag|rev-parse|ls-files|shortlog)\b'),
+    (
+        re.compile(r'^git\s+(status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog)\b'),
+        None,
+        'git status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog',
+    ),
     # git safe write (explizit kein -f/--force – das ist in WRONG_APPROACH_PATTERNS)
-    re.compile(r'^git\s+add\b(?!.*\s(?:-f\b|--force\b))'),
-    re.compile(r'^git\s+stash\s+(push|save|pop|apply|drop)\b'),
+    (re.compile(r'^git\s+add\b(?!.*\s(?:-f\b|--force\b))'), None, 'git add <datei>  (ohne -f/--force)'),
+    (re.compile(r'^git\s+stash\s+(list|push|save|pop|apply|drop)\b'), None, 'git stash list|push|save|pop|apply|drop'),
 ]
 
 
@@ -304,6 +381,12 @@ ALLOW_PATTERNS: list[re.Pattern[str]] = [
 # Smart-Deny-Hints (für UNKNOWN-Fälle ohne passendes Pattern)
 # ---------------------------------------------------------------------------
 _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(r'\bsed\b'),
+        "Für Datei-Edits: Edit-Tool verwenden.\n"
+        "Für Lesen von Zeilenbereichen: Read-Tool mit offset/limit-Parametern verwenden.\n"
+        "(Erlaubt: sed -i 's/\\r//' zur \\r-Bereinigung)",
+    ),
     (
         re.compile(r'\bgit\s+push\b'),
         "git push: Befehl dem User mitteilen – Pushes sind User-Aktionen.",
@@ -320,12 +403,12 @@ _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
         re.compile(r'\bnpm\b'),
         "npm immer via cmd.exe aufrufen (npm läuft nur auf Windows, nicht in WSL):\n"
         "  cmd.exe /c \"cd /d C:\\\\Users\\\\kieritz\\\\source\\\\repos\\\\mahl\\\\Client && npm <subcommand>\"\n"
-        "  Erlaubt (Allow-Liste): npm run <script>, npm audit\n"
-        "  Einmalige Ausnahme (z.B. npm outdated): # --allow-once anhängen",
+        "  Erlaubt (Allow-Liste): npm run <script>, npm audit, npm outdated",
     ),
     (
         re.compile(r'\bdotnet\s+run\b'),
-        "dotnet run: cmd.exe /c \"cd /d C:\\\\...\\\\mahl && dotnet run --project Server\"\n"
+        "dotnet run immer mit vollständigem Projektpfad (für DLL-Lock-Identifikation):\n"
+        "  cmd.exe /c \"dotnet run --project C:\\\\Users\\\\kieritz\\\\source\\\\repos\\\\mahl\\\\Server\"\n"
         "  (.NET läuft nur auf Windows, nicht direkt in WSL)",
     ),
 ]
@@ -345,7 +428,9 @@ def _get_smart_hint(command: str) -> str:
 _ALLOW_ONCE_WITH_HINT_FOOTER = (
     "\n\n"
     "Einmalige Ausnahme: '# --allow-once' anhängen → User wird gefragt.\n"
-    "Dabei begründen warum der Hint nicht befolgt werden kann.\n"
+    "⚠️  Nur für echte Einzelfälle ohne reguläre Alternative – nie für Befehle die auf der Allow-Liste stehen.\n"
+    "   Dabei begründen warum der Hint oben nicht befolgt werden kann.\n"
+    "   Alle erlaubten Patterns: python3 .claude/hooks/check-bash-permission.py --list\n"
     "Nicht kreativ umgehen – jedes Deny hat einen Grund."
 )
 
@@ -360,6 +445,8 @@ _NO_HINT_MESSAGE = (
     "  (4) Wenn regelmäßig + Output-Verarbeitung: Wrapper-Script sinnvoller?\n"
     "\n"
     "Einmalige Ausnahme: '# --allow-once' anhängen → User wird gefragt.\n"
+    "⚠️  Nur für echte Einzelfälle ohne reguläre Alternative.\n"
+    "   Alle erlaubten Patterns: python3 .claude/hooks/check-bash-permission.py --list\n"
     "Nicht kreativ umgehen – jedes Deny hat einen Grund."
 )
 
@@ -519,13 +606,13 @@ def check_simple_command(command: str) -> tuple[str, str, str]:
 
     Gibt (decision, reason, log_type) zurück. decision: 'allow' | 'deny'.
     """
-    for pattern in ALLOW_PATTERNS:
+    for pattern, _, _ in ALLOW_PATTERNS:
         if pattern.search(command):
             if has_unsafe_output_redirect(command):
                 return ("deny", _UNSAFE_REDIRECT_DENY_REASON, "UNSAFE_REDIRECT")
             return ("allow", _ALLOW_REASON, "ALLOW")
 
-    for pattern, reason in DESTRUCTIVE_PATTERNS:
+    for pattern, reason, _ in DESTRUCTIVE_PATTERNS:
         if pattern.search(command):
             return ("deny", reason, "DESTRUCTIVE")
 
@@ -573,7 +660,49 @@ def _build_deny_message(reason: str) -> str:
     return _NO_HINT_MESSAGE
 
 
+def _print_allow_list() -> None:
+    """Gibt eine lesbare Übersicht der erlaubten Befehle aus (--list-Flag)."""
+    print("Erlaubte Befehle (Allow-Liste):")
+
+    # Erst alle Einträge sammeln, dann alphabetisch sortiert ausgeben
+    groups: dict[str, list[str]] = {}
+    standalone: list[str] = []
+
+    for _pattern, group, desc in ALLOW_PATTERNS:
+        if group is not None:
+            groups.setdefault(group, [])
+            if desc:
+                groups[group].append(desc)
+        elif desc:
+            standalone.append(desc)
+
+    for _, line in sorted((desc.lower(), f"  {desc}") for desc in standalone):
+        print(line)
+
+    if groups:
+        print()
+        for grp in sorted(groups, key=str.lower):
+            items = sorted(groups[grp], key=str.lower)
+            print(f"  [{grp}]")
+            print(f"    {', '.join(items)}")
+
+    print()
+    print("Verknüpfung mit |, ||, &&, ; ist erlaubt – jedes Segment wird einzeln geprüft.")
+    print("Ausnahme: cmd.exe ... | ... ist verboten (WSL-Pipe-Limitation, WRONG_APPROACH).")
+    print()
+    print("Destruktive Befehle (nur mit # --allow-once, User-Freigabe nötig):")
+    for _pattern, _hint, label in sorted(
+        ((p, h, lb) for p, h, lb in DESTRUCTIVE_PATTERNS if lb),
+        key=lambda x: x[2].lower(),
+    ):
+        print(f"  {label}")
+
+
 def main() -> None:
+    if "--list" in sys.argv:
+        _print_allow_list()
+        sys.exit(0)
+
     try:
         inp = json.load(sys.stdin)
     except (json.JSONDecodeError, EOFError):

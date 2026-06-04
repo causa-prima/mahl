@@ -5,64 +5,14 @@
 > Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/decisions.md`
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, PROCESS)
 
-**Letzte Aktualisierung:** 2026-06-01 (Session 069 – US-904 Szenario 2 abgebrochen, Prozessverbesserung priorisiert)
-**Phase:** SKELETON 🔄 – US-904 Szenario 1 vollständig abgeschlossen; Szenario 2 Working-Tree-Stand vorhanden aber REVERT ausstehend
-
----
-
-## Was ist implementiert
-
-Anwendungscode (US-904 Szenario 1 vollständig, committed):
-- `Infrastructure/DatabaseTypes/IngredientDbType.cs` (nur `Id Guid`)
-- `Infrastructure/MahlDbContext.cs`
-- `Server/Endpoints/IngredientsEndpoints.cs` (GET /api/ingredients → hardcoded `[]`)
-- `Server/Program.cs` + `Server/appsettings.json`
-- `Server.Tests/Helpers/TestWebApplicationFactory.cs` + `EndpointsTestsBase.cs`
-- `Server.Tests/IngredientsEndpointsTests.cs` (1 Test grün)
-- `Client/src/pages/IngredientsPage.tsx` (Empty State: Hinweis + "Zutat anlegen"-Button)
-- `Client/src/pages/IngredientsPage.test.tsx` (1 Test grün, via MSW)
-- `Client/src/services/ingredientsApi.ts` (plain Promise, GET /api/ingredients)
-- `Client/src/mocks/server.ts` + `Client/src/test/setup.ts` (MSW-Infrastruktur)
-- `Client/src/App.tsx` (BrowserRouter + Route /ingredients)
-- `Client/src/main.tsx` (QueryClientProvider)
-- `Client/vite.config.ts` (test: happy-dom, setupFiles, include)
-- `Client/stryker.config.json` (main.tsx, src/test/**, src/mocks/** ausgeschlossen)
-- `Client/e2e/ingredients.spec.ts` (Szenario 1 grün, Szenario 2 skip – korrekt)
-- `features/ingredients.feature` (UX-Update: "Zutat anlegen", Empty-State-Text, Undo-Toast, Loading-State-Szenarien)
-
-Working Tree (NICHT committed, REVERT ausstehend):
-- `Infrastructure/DatabaseTypes/IngredientDbType.cs` (Name, DefaultUnit, DeletedAt hinzugefügt)
-- `Infrastructure/Migrations/` (neu – InitialCreate, aber Gold-Plating-Code im Server)
-- `Server/Endpoints/IngredientsEndpoints.cs` (GET+POST mit Gold-Plating-Validierung)
-- `Server/Dtos/`, `Server/Types/NonEmptyTrimmedString.cs` (Gold-Plating)
-- `Server.Tests/` (angepasst)
-- `Client/src/pages/IngredientsPage.tsx`, `CreateIngredientDialog.tsx` (neu)
-- `Client/src/hooks/useResultQuery.ts`, `Client/src/types/mutationState.ts` (neu)
-- `.editorconfig` (Infrastructure/Migrations Sektion – BEHALTEN, korrekt)
-- `.claude/scripts/stryker-parse-survivors.py` (neu, nützlich – BEHALTEN)
-
-Infrastruktur (unverändert):
-- `mahl.sln` + 3 `.csproj`-Projekte, `Client/` mit allen Paketen inkl. Stryker + MSW
-- `features/resilience.feature` (5 Szenarien, @NFR-resilience, Scope MVP)
+**Letzte Aktualisierung:** 2026-06-04 (Session 070 – Kaizen-Retro + Revert Gold-Plating Working Tree abgeschlossen)
+**Phase:** SKELETON 🔄 – US-904 Szenario 1 vollständig abgeschlossen; Szenario 2 bereit zur Neuimplementierung
 
 ---
 
 ## Nächste Prioritäten (Reihenfolge bindend; keine Nummerierung verwenden, sondern nur Anstriche)
 
-- **Kaizen-Retro** (Jenga-Score -57, RETRO FÄLLIG) – zu Beginn der nächsten Session.
-
-- **Prozessverbesserungen** (alle vor Szenario-2-Neuimplementierung umsetzen):
-   - **SKILL `implementing-scenario`**: Orchestrator-Check auf Produktionscode ausweiten (Diff gegen Given/When/Then); Stryker-Suppressionen mit Vorwärts-Referenz automatisch als ❌ behandeln
-   - **Subagenten-Prompt-Template**: Stryker-Übergabe = vollständiger Lauf ohne `--mutate` + Pfad zur HTML-Report-Datei; am Ende einen Prozessverbesserungs-Abschnitt fordern ("Was hat nicht funktioniert, was braucht besseres Tooling?")
-   - **Bash-Permission-Hook**: Hint für `sed`-Aufrufe ergänzen (→ Read-Tool mit offset/limit-Parametern)
-   - **allow-once-Mechanismus**: Lösung für das Problem, dass nach einem Deny unklar ist welche Befehle freigegeben sind (z.B. Hook der bei Session-Start oder erstem Bash-Deny eine Liste erlaubter Befehle ausgibt)
-   - **DLL-Lock / Backend-Start**: Tooling verbessern damit vor Stryker/Build automatisch geprüft wird ob ein dotnet-run-Prozess läuft
-
-- **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`** in globale `settings.json` eintragen (vor nächster Session).
-
-- **REVERT Working Tree** (nach Prozessverbesserung, vor Neuimplementierung):
-   - `git restore` für alle modifizierten Server/Infrastructure/Client-Dateien außer `.editorconfig` und `.claude/scripts/stryker-parse-survivors.py`
-   - `git clean -f Server/Dtos/ Server/Types/ Server/Domain/ Infrastructure/Migrations/ Client/src/hooks/ Client/src/pages/CreateIngredientDialog.tsx Client/src/types/mutationState.ts`
+- **decisions.md verbessern**: eindeutige IDs (DEC-XXX), Discoverability und Durchsuchbarkeit für Subagenten-Referenzierung prüfen – Voraussetzung für A1c (`#pragma DEC-XXX`-Enforcement in `implementing-scenario` Skill + Subagenten-Prompts)
 
 - **US-904 Szenario 2 neu implementieren** (mit verbessertem Prozess) – nur was das Szenario fordert: POST /api/ingredients (happy path, kein Validierungsfehler-Code), GET mit ETag (Content-Hash SHA-256). ETag für `GET /api/ingredients/{id}` (xmin): wird beim entsprechenden Endpoint-Szenario umgesetzt, NICHT hier.
 

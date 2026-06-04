@@ -275,17 +275,18 @@ def test_allow_patterns() -> int:
             'output=$(cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build Server.Tests 2>&1")\necho "$output" | grep -E "(error|warning CS|Build succeeded)" | head -30',
             "Variable-Capture dotnet build + grep | head",
         ),
-        # dotnet run via cmd.exe
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet run --project Server"', "dotnet run --project Server"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet run --project Server" &', "dotnet run im Hintergrund"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && set ASPNETCORE_URLS=http://localhost:5059 && dotnet run --project Server"', "dotnet run mit Env-Var"),
+        # dotnet run mit vollständigem Projektpfad (neues Format)
+        ('cmd.exe /c "dotnet run --project C:\\Users\\kieritz\\source\\repos\\mahl\\Server"', "dotnet run --project Vollpfad"),
+        ('cmd.exe /c "dotnet run --project C:\\Users\\kieritz\\source\\repos\\mahl\\Server" &', "dotnet run --project Vollpfad im Hintergrund"),
+        ('cmd.exe /c "set ASPNETCORE_URLS=http://localhost:5059 && dotnet run --project C:\\Users\\kieritz\\source\\repos\\mahl\\Server"', "dotnet run --project Vollpfad mit Env-Var"),
+        # taskkill per PID (gezielte Prozess-Beendigung aus DLL-Lock-Check)
+        ('cmd.exe /c "taskkill /f /pid 1234"', "taskkill /f /pid"),
+        ('cmd.exe /c "taskkill /f /pid 99999"', "taskkill /f /pid großer Wert"),
         # docker-compose via cmd.exe
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && docker-compose up -d"', "docker-compose up via cmd.exe"),
-        # npm run build/dev/lint/preview via cmd.exe (kein Wrapper nötig)
+        # npm run build/dev/test:coverage via cmd.exe (kein Wrapper nötig)
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run dev"', "npm run dev"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run build"', "npm run build"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint"', "npm run lint"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint:duplicates"', "npm run lint:duplicates"),
         ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test:coverage"', "npm run test:coverage (kein Wrapper)"),
         # Frontend-Wrapper-Scripts
         ("python3 .claude/scripts/vitest-run.py", "vitest-run.py"),
@@ -429,6 +430,16 @@ def test_deny_overrides_allow() -> int:
         ("git add -f .env", "deny", "git add -f schlägt git-add-allow"),
         # Stryker immer deny → Script verwenden
         ('cmd.exe /c "cd /d C:\\mahl && dotnet stryker"', "deny", "Stryker direkt → deny"),
+        # dotnet run via cd /d → WRONG_APPROACH (Prozess nicht identifizierbar)
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet run --project Server"', "deny",
+         "dotnet run via cd /d → deny (kein Vollpfad)"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && set ASPNETCORE_URLS=http://localhost:5059 && dotnet run --project Server"', "deny",
+         "dotnet run via cd /d mit Env-Var → deny"),
+        # npm run lint / lint:duplicates → immer Wrapper-Script (WRONG_APPROACH)
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint"', "deny",
+         "npm run lint → deny (eslint-run.py verwenden)"),
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint:duplicates"', "deny",
+         "npm run lint:duplicates → deny (jscpd-run.py verwenden)"),
         # find ohne destruktive Flags → allow; destruktive find-Varianten → deny
         ("find . -name '*.cs'", "allow", "find ohne destruktive Flags → allow"),
         ("find . -delete", "deny", "find -delete → deny (freigabefähig)"),

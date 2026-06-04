@@ -14,13 +14,14 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
-from _util import REPO_ROOT_WIN, _win_path
+from _util import REPO_ROOT_WIN, _win_path, check_dotnet_dll_lock
 
 _SCRIPTS_DIR = Path(__file__).parent
 _TMP_FILE = _SCRIPTS_DIR.parent / "tmp" / "stryker_out.txt"
 _TMP_FILE_WIN = _win_path(str(_TMP_FILE))
 
 def main() -> None:
+    check_dotnet_dll_lock()
     parser = argparse.ArgumentParser(description="dotnet stryker via cmd.exe (WSL)")
     parser.add_argument("--mutate", help="Datei mutieren (z.B. Domain/Foo.cs)")
     parser.add_argument("--detail", action="store_true", help="Alle nicht-getöteten Mutanten")
