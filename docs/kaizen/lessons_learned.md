@@ -29,6 +29,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 > **Format-Referenz:** `docs/kaizen/PROCESS.md`
 > **Archiv:** `docs/kaizen/archive/`
 
+## Session 071 – 2026-06-04
+
+- **[HOCH] [AGENT] [Doku] Dateiinhalt ohne Verifikation zitiert**
+  Was: Die Zeichenfolge "Bei Löschen, Archivieren, Überschreiben" wurde zweimal als konkretes Zitat aus einer Datei präsentiert (erst CODING_GUIDELINE_UX.md, dann CLAUDE.md) — sie existiert in keiner der beiden.
+  Warum: Schlussfolgerung aus dem Kontext als Zitat präsentiert, ohne Read-Tool-Verifikation.
+  Regel: Vor dem Zitieren einer konkreten Zeichenfolge aus einer Datei immer mit Read-Tool verifizieren — Paraphrasen und Schlussfolgerungen sind kein Zitat.
+
+- **[MITTEL] [PROZESS] [Gherkin] Szenarien-Reihenfolge im Workshop nicht korrekt angewandt**
+  Was: Neue Szenarien ohne Backend-Interaktion (Feld-Init, Abbrechen) wurden nach dem bestehenden "Zutat anlegen"-Szenario eingefügt statt davor.
+  Warum: Die Sortierregel "trivialster zuerst" wurde nicht auf Backend-Unabhängigkeit als Komplexitätskriterium angewandt.
+  Regel: Szenarien ohne Backend-Interaktion kommen vor Szenarien mit mutierenden Server-Anfragen — gilt auch beim Einfügen in bestehende Feature-Files.
+
 ## Session 070 – 2026-06-04
 
 - **[MITTEL] [TOOLING] [Agent-Prompt] Hintergrund-Subagenten scheitern an Edit/Write-Permissions**

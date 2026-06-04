@@ -5,7 +5,7 @@
 > Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/decisions.md`
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, PROCESS)
 
-**Letzte Aktualisierung:** 2026-06-04 (Session 070 – Kaizen-Retro + Revert Gold-Plating Working Tree abgeschlossen)
+**Letzte Aktualisierung:** 2026-06-04 (Session 071 – gherkin-workshop US-904 Dialog-Verhalten abgeschlossen)
 **Phase:** SKELETON 🔄 – US-904 Szenario 1 vollständig abgeschlossen; Szenario 2 bereit zur Neuimplementierung
 
 ---

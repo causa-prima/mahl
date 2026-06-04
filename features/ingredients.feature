@@ -19,12 +19,36 @@ Feature: Zutaten verwalten
     And sehe ich den Button "Zutat anlegen"
 
   @US-904-happy-path
+  Scenario: Felder sind beim Öffnen des Dialogs leer
+    When ich auf "Zutat anlegen" klicke
+    Then ist das Name-Feld leer
+    And ist das Einheit-Feld leer
+
+  @US-904-happy-path
+  Scenario: Felder sind nach Abbrechen beim erneuten Öffnen wieder leer
+    When ich auf "Zutat anlegen" klicke
+    And ich "Knoblauch" als Name eingebe
+    And ich auf "Abbrechen" klicke
+    And ich auf "Zutat anlegen" klicke
+    Then ist das Name-Feld leer
+    And ist das Einheit-Feld leer
+
+  @US-904-happy-path
+  Scenario: Abbrechen schließt Dialog und verwirft Eingaben
+    When ich auf "Zutat anlegen" klicke
+    And ich "Oregano" als Name eingebe
+    And ich auf "Abbrechen" klicke
+    Then ist der "Zutat anlegen"-Dialog geschlossen
+    And ist "Oregano" nicht in der Zutaten-Liste
+
+  @US-904-happy-path
   Scenario: Zutat anlegen
     When ich auf "Zutat anlegen" klicke
     And ich "Tomaten" als Name eingebe
     And ich "Stück" als Einheit eingebe
     And ich auf "Speichern" klicke
     Then sehe ich "Tomaten" in der Zutaten-Liste mit Einheit "Stück"
+    And ist der "Zutat anlegen"-Dialog geschlossen
 
   @US-904-happy-path
   Scenario: Mehrere Zutaten erscheinen alphabetisch sortiert

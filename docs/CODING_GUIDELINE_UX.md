@@ -108,6 +108,18 @@ Stufe 1 hat immer Vorrang vor Stufe 2.
 ✅ Zutat löschen → wird als gelöscht markiert → im UI wiederherstellbar → kein Datenverlust.
 ❌ Zutat löschen → sofort unwiederbringlich weg → Nutzer muss neu anlegen.
 
+**Sonderfall: Formular-Abbrechen**
+
+Abbrechen eines Formulars trifft keine persistierten Daten — die Eingaben existieren nur im Browser-Zustand. Die Stufentabelle oben gilt nicht direkt. Vor der Implementierung klären: Wie komplex sind die Eingaben, und soll es Draft-Saving geben? Das Abbrechen-Verhalten folgt daraus:
+
+| Eingabeaufwand | Draft-Saving als Feature? | Abbrechen-Verhalten |
+|---|---|---|
+| Trivial (wenige Felder, schnell wiederherstellbar) | Nein — Standard | Keine Rückfrage — kommentarlos schließen. |
+| Nicht-trivial (z.B. neues Rezept) | Ja | Abbrechen bietet "Als Entwurf speichern" an (konsistent mit dediziertem Button). |
+| Nicht-trivial | Nein | Explizite Entscheidung: (a) Keine Rückfrage oder (b) Bestätigungsdialog ("Eingaben verwerfen?"). |
+
+Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
+
 ---
 
 ## 6. Konsistente Terminologie

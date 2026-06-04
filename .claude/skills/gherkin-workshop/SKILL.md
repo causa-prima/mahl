@@ -128,7 +128,7 @@ Typische Frage-Kategorien:
 | Fehlermeldungen | „Spezifische oder generische Meldung für [Fehlerfall]?" |
 | Latente Regeln | „Gibt es Regeln, die sich nicht aus den Akzeptanzkriterien ergeben, aber wichtig sind?" |
 | Technische Fehler | „Gibt es für diese Operation Fehlerverhalten jenseits der allgemeinen Behandlung (→ decisions.md: Querschnittliche Fehlerbehandlung)?" |
-| Draft-Saving | „Hat diese Story Formulare mit nicht-trivialem Eingabeaufwand? → Falls ja: Draft-Saving-Szenario einplanen." |
+| Draft-Saving & Abbrechen | „Wie komplex sind die Eingaben dieses Formulars? Trivial → kein Draft-Saving, Abbrechen ohne Rückfrage (Standard). Nicht-trivial → (1) Soll es einen 'Als Entwurf speichern'-Button geben? Falls ja: Abbrechen bietet Entwurf-Option an. Falls nein: (a) Abbrechen ohne Rückfrage oder (b) Bestätigungsdialog? (→ UX-Guideline Prinzip 5)" |
 
 ### grill-me für tiefere Exploration
 
@@ -155,8 +155,7 @@ Der Dialog ist abgeschlossen, wenn:
 - Technische Fehler: entweder story-spezifisches Verhalten dokumentiert, oder explizit
   bestätigt dass die allgemeine Behandlung (decisions.md: Querschnittliche Fehlerbehandlung)
   gilt – „keine Antwort" ist kein Abschluss
-- Draft-Saving: explizit entschieden ob Formulare dieser Story nicht-trivialen
-  Eingabeaufwand haben; bei Ja: Szenario eingeplant
+- Draft-Saving & Abbrechen: für jedes Formular dieser Story explizit entschieden — trivial (→ kein Draft-Saving, Abbrechen ohne Rückfrage) oder nicht-trivial (→ Draft-Saving ja/nein, Abbrechen-Verhalten per UX-Guideline Prinzip 5 geklärt); bei Draft-Saving oder Bestätigungsdialog: Szenarien eingeplant
 - UI-Verhaltens-Checkliste (siehe unten) vollständig abgearbeitet
 
 ### UI-Verhaltens-Checkliste (Pflichtprüfung vor Abschluss von Schritt 1)
@@ -258,6 +257,8 @@ Führe die Outputs von A, B, C zusammen:
    - Kategorienreihenfolge: happy-path → error → edge-case
    - Innerhalb happy-path: trivialster Anwendungsfall zuerst, dann zunehmend komplexer
      (z.B. erst „Leere Liste anzeigen", dann „anlegen", dann „mehrere sortiert anzeigen")
+     Konkret: Szenarien ohne Backend-Interaktion (reine UI-Zustandsprüfungen wie Feld-Init,
+     Abbrechen) kommen vor Szenarien mit mutierenden Server-Anfragen.
    - Innerhalb error: häufigster Fehler im Produktivbetrieb zuerst
    - Innerhalb edge-case: schwerwiegendste Konsequenz bei fehlendem Test zuerst
 
