@@ -1,6 +1,6 @@
 ---
 name: review-docs
-description: Vollständige Qualitätsprüfung der Projektdokumentation: Guidelines, Skills, Agenten, CLAUDE.md und globale ~/.claude-Dateien. Analysiert Konsistenz, Progressive Disclosure, Verständlichkeit, Vollständigkeit und Minimalität mithilfe paralleler Sub-Agenten. Liefert priorisierte Verbesserungsvorschläge und arbeitet Findings interaktiv ab. Nur manuell aufrufen via /review-docs oder expliziter Erwähnung – nicht auto-triggern.
+description: Vollständige Qualitätsprüfung der Projektdokumentation: Guidelines, Skills, Agenten, CLAUDE.md und globale ~/.claude-Dateien. Analysiert Konsistenz, Progressive Disclosure, Verständlichkeit, Vollständigkeit und Minimalität mithilfe paralleler Sub-Agenten. Liefert priorisierte Verbesserungsvorschläge und arbeitet Findings interaktiv ab. Prüft die Qualität der Doku-TEXTE, nicht das Prozess-/Workflow-Design (das macht review-workflow). Nur manuell aufrufen via /review-docs oder expliziter Erwähnung – nicht auto-triggern.
 ---
 
 # Dokumentations-Review
@@ -22,7 +22,7 @@ Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentati
 - `CLAUDE.md` (Projekt-Root)
 - `docs/AGENT_MEMORY.md`
 - `docs/` – alle Markdown-Dateien, **außer** `docs/history/sessions/` (Session-Logs, keine Richtlinien)
-- `docs/history/decisions.md`, `docs/kaizen/lessons_learned.md`, `docs/kaizen/principles.md`, `docs/kaizen/countermeasures.md` (explizit einschließen)
+- `docs/history/adr.md`, `docs/kaizen/lessons_learned.md`, `docs/kaizen/principles.md`, `docs/kaizen/countermeasures.md` (explizit einschließen)
 - `.claude/skills/` – alle Skill-Definitionen
 - `.claude/agents/` – alle Agenten-Definitionen (falls vorhanden)
 - `.claude/settings.json`
@@ -102,7 +102,7 @@ Bewerte auch: Werden Skills/Agenten klar genug beschrieben, sodass der Hauptagen
 **Frage:** Widersprechen sich Dokumente? Fehlen Informationen, die Agenten für ihre Aufgabe brauchen?
 
 Lies alle Projekt- und globalen Docs. Suche nach:
-- Widersprüchen: gleicher Sachverhalt, unterschiedliche Anweisungen in verschiedenen Docs (z.B. TDD_PROCESS.md vs. CODING_GUIDELINE vs. Skill-Beschreibungen)
+- Widersprüchen: gleicher Sachverhalt, unterschiedliche Anweisungen in verschiedenen Docs (z.B. docs/process/tdd-process.md vs. CODING_GUIDELINE vs. Skill-Beschreibungen)
 - Duplikaten: gleiche Regel an mehreren Stellen – Wartungsrisiko bei Änderungen
 - Terminologie-Inkonsistenzen: gleicher Begriff, verschiedene Bedeutungen; oder verschiedene Begriffe für dasselbe Konzept
 - Fehlenden Verlinkungen: Doc A setzt Wissen aus Doc B voraus, verweist aber nicht auf B

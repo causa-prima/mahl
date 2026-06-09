@@ -4,10 +4,10 @@
 Blockiert Edit/Write auf:
 - Client/package.json
 - **/*.csproj
-- docs/DEPENDENCIES.md
+- docs/reference/dependencies.md
 
 Grund: Externe Abhängigkeiten erfordern explizite Freigabe durch den User.
-Prozess: docs/DEPENDENCIES.md (Sektion "Prozess: Neues Paket hinzufügen")
+Prozess: docs/reference/dependencies.md (Sektion "Prozess: Neues Paket hinzufügen")
 """
 import json
 import os
@@ -18,16 +18,16 @@ import sys
 PROTECTED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r'(^|[/\\])package\.json$'), 'package.json'),
     (re.compile(r'\.csproj$'), '.csproj'),
-    (re.compile(r'(^|[/\\])DEPENDENCIES\.md$'), 'DEPENDENCIES.md'),
+    (re.compile(r'(^|[/\\])dependencies\.md$'), 'dependencies.md'),
 ]
 
 DENY_MESSAGE = """\
 Dependency-Datei ({filename}) darf nicht direkt vom Agenten bearbeitet werden.
 
-Prozess (docs/DEPENDENCIES.md):
+Prozess (docs/reference/dependencies.md):
 1. Agent bereitet 5-Punkte-Anfrage vor
 2. User gibt explizit frei
-3. User trägt das Paket manuell in DEPENDENCIES.md ein
+3. User trägt das Paket manuell in docs/reference/dependencies.md ein
 4. User installiert das Paket und aktualisiert {filename} selbst"""
 
 

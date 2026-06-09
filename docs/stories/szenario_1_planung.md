@@ -1,6 +1,6 @@
 # Szenario 1 – Die Planung am Donnerstagabend
 
-> Teil von [USER_STORIES.md](../USER_STORIES.md).
+> Teil von [docs/stories/user-stories.md](../docs/stories/user-stories.md).
 
 ## Inhalt
 

@@ -20,15 +20,15 @@ Immer wenn du C#- oder TypeScript/React-Code schreibst – egal ob im Rahmen von
 ### 1. Richtigen Guidelines lesen
 
 **Immer lesen (sprachunabhängige Grundprinzipien):**
-→ `docs/CODING_GUIDELINE_GENERAL.md`
+→ `docs/guidelines/coding-guideline-general.md`
 
 **Zusätzlich je nach Sprache:**
-- C# (Backend, Tests) → `docs/CODING_GUIDELINE_CSHARP.md`
-  - Endpoint oder Validierungskette → zusätzlich `docs/CSharp-ROP.md`
-  - Neuer Domain-Typ mit Zustandsvarianten → zusätzlich `docs/CSharp-SumTypes.md`
-  - Stryker-Survivors behandeln (Phase 3) → zusätzlich `docs/CSharp-Stryker.md`
-- TypeScript/React (Frontend) → `docs/CODING_GUIDELINE_TYPESCRIPT.md`
-  - React-Komponenten (`src/components/`, `src/pages/`) → zusätzlich `docs/CODING_GUIDELINE_UX.md`
+- C# (Backend, Tests) → `docs/guidelines/coding-guideline-csharp.md`
+  - Endpoint oder Validierungskette → zusätzlich `docs/guidelines/csharp-rop.md`
+  - Neuer Domain-Typ mit Zustandsvarianten → zusätzlich `docs/guidelines/csharp-sumtypes.md`
+  - Stryker-Survivors behandeln (Phase 3) → zusätzlich `docs/guidelines/csharp-stryker.md`
+- TypeScript/React (Frontend) → `docs/guidelines/coding-guideline-typescript.md`
+  - React-Komponenten (`src/components/`, `src/pages/`) → zusätzlich `docs/guidelines/coding-guideline-ux.md`
 
 **PFLICHT-OUTPUT nach dem Lesen** – beantworte aufgabenspezifisch:
 - **YAGNI:** Was implementiere ich explizit NICHT? (Nennung konkreter Nicht-Ziele)
@@ -39,11 +39,11 @@ Immer wenn du C#- oder TypeScript/React-Code schreibst – egal ob im Rahmen von
 
 ### 2. Implementieren via TDD
 
-→ `docs/TDD_PROCESS.md` (RED → GREEN → REFACTOR)
+→ `docs/process/tdd-process.md` (RED → GREEN → REFACTOR)
 
 ### 3. Selbst-Review vor Review-Agenten
 
-→ `docs/REVIEW_CHECKLIST.md` Punkt für Punkt durchgehen und Findings sofort fixen.
+→ `docs/process/review-checklist.md` Punkt für Punkt durchgehen und Findings sofort fixen.
 
 ---
 

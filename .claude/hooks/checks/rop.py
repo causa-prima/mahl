@@ -21,5 +21,5 @@ def check(inp: HookInput) -> list[str]:
         f"⛔ ROP-Verletzung (C#, blockierend): {found} erkannt.\n"
         "Verwende stattdessen `.Match(ok => ..., err => ...)` oder `.MatchAsync(...)`.\n"
         "Gilt global für allen Produktionscode – nicht nur in Endpoints.\n"
-        "Siehe CODING_GUIDELINE_CSHARP.md (ROP-Abschnitt)."
+        "Siehe docs/guidelines/coding-guideline-csharp.md (ROP-Abschnitt)."
     ]

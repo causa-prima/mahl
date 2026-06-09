@@ -1,7 +1,7 @@
 ---
 name: review-code
 description: >
-  Code-Review nach einer Implementierung: Selbstcheck via REVIEW_CHECKLIST.md,
+  Code-Review nach einer Implementierung: Selbstcheck via docs/process/review-checklist.md,
   dann spezialisierte Review-Agenten spawnen und Findings als strukturierte Liste
   zurückgeben. Wird von implementing-scenario Schritt 5 direkt ausgeführt (kein
   Subagent-Wrapper). Kann auch standalone auf beliebigem Code angewendet werden.
@@ -27,16 +27,16 @@ Geänderte Dateien → `git diff` (staged + unstaged) als Standard verwenden.
 Lege zu Beginn eine Task-Liste an, sofern der Skill standalone aufgerufen wird. Bei Einbettung in einen anderen Skill (z.B. aus implementing-scenario heraus) keine neue Task-Liste anlegen und keine TaskUpdate-Aufrufe für interne Schritte – der Aufrufer verwaltet die Task-Liste. Stattdessen: kurze Status-Zeile pro Schritt ausgeben (z.B. „→ Schritt 1 (Selbstcheck): abgeschlossen").
 
 ```
-TaskCreate: "1. Selbstcheck (REVIEW_CHECKLIST.md)"
+TaskCreate: "1. Selbstcheck (docs/process/review-checklist.md)"
 TaskCreate: "2. Suppression-Report bewerten"
 TaskCreate: "3. Review-Agenten spawnen"
 TaskCreate: "4. Findings zusammenführen"
 ```
 
-### 1. Selbstcheck (REVIEW_CHECKLIST.md)
-→ TaskUpdate "1. Selbstcheck (REVIEW_CHECKLIST.md)": in_progress
+### 1. Selbstcheck (docs/process/review-checklist.md)
+→ TaskUpdate "1. Selbstcheck (docs/process/review-checklist.md)": in_progress
 
-Gehe `docs/REVIEW_CHECKLIST.md` systematisch Punkt für Punkt durch:
+Gehe `docs/process/review-checklist.md` systematisch Punkt für Punkt durch:
 - Architecture Layer (internal-Typen, kein InternalsVisibleTo, Ports-only-Tests)
 - Allgemeine Prinzipien (KISS, Naming)
 - Domain Modeling
@@ -48,10 +48,10 @@ Für jedes Finding: Schweregrad ❌/⚠️/✅ + Guideline-Referenz (Datei + Sek
 Findings werden gesammelt – nicht sofort selbst behoben.
 
 ### 2. Suppression-Report bewerten
-→ TaskUpdate "1. Selbstcheck (REVIEW_CHECKLIST.md)": completed | TaskUpdate "2. Suppression-Report bewerten": in_progress
+→ TaskUpdate "1. Selbstcheck (docs/process/review-checklist.md)": completed | TaskUpdate "2. Suppression-Report bewerten": in_progress
 
 Jeden Eintrag im übergebenen Stryker-Suppression-Report einzeln prüfen. Referenz:
-`docs/TDD_PROCESS.md` Sektion „Stryker-Survivor behandeln".
+`docs/process/tdd-process.md` Sektion „Stryker-Survivor behandeln".
 
 Für jeden Eintrag: Beweist die Begründung echte Äquivalenz oder Nichttestbarkeit –
 oder klingt sie nur plausibel? (`docs/kaizen/principles.md`: semantische Korrektheit
@@ -71,13 +71,15 @@ Scope bestimmt welche Agenten nötig sind:
 
 | Was wurde geändert? | Agenten |
 |--------------------|---------|
-| Änderung ohne Verhaltensänderung (z. B. Rename, Refactoring ohne Logik-Änderung) | `code-quality` |
-| Neue Funktionalität / Verhaltensänderung | `code-quality` + `functional` + `test-quality` |
-| + API-Grenze, User-Input oder Auth berührt | + `security` |
-| + Frontend-Komponenten geändert | + `ux-ui` |
-| Nur Tests geändert (kein Produktionscode) | `test-quality` |
+| Änderung ohne Verhaltensänderung (z. B. Rename, Refactoring ohne Logik-Änderung) | `code-quality-auditor` |
+| Neue Funktionalität / Verhaltensänderung | `code-quality-auditor` + `functional-correctness-auditor` + `test-quality-auditor` |
+| + API-Grenze, User-Input oder Auth berührt | + `security-auditor` |
+| + Frontend-Komponenten geändert | + `ux-ui-auditor` |
+| Nur Tests geändert (kein Produktionscode) | `test-quality-auditor` |
 | Nur Suppressionen hinzugefügt | Schritt 2 deckt das ab – kein Agent-Spawn nötig |
-| Nur Dokumentation / Kommentare geändert | `code-quality` |
+| Nur Dokumentation / Kommentare geändert | `code-quality-auditor` |
+
+Jeden Agenten via Agent-Tool mit `subagent_type: "<name>"` spawnen (z.B. `subagent_type: "code-quality-auditor"`) – die Namen entsprechen der Tabelle (es sind registrierte Agenten in `.claude/agents/`, read-only).
 
 Alle zutreffenden Agenten parallel spawnen – sie reviewen denselben Diff und haben keine gegenseitigen Abhängigkeiten. Bei Unsicherheit über den Scope: `git diff` selbst auswerten; bei genuiner Ambiguität User fragen.
 
@@ -85,7 +87,7 @@ Agent-Prompts enthalten (je Agent):
 - Geänderte Dateien / git diff
 - Anforderung: jedes Finding nennt Schweregrad (❌/⚠️), Guideline-Referenz
   (konkrete Datei + Sektion) und Begründung (nicht nur Guideline zitieren)
-- Hinweis: Projekt-Guidelines (`docs/CODING_GUIDELINE_*.md`) haben Vorrang vor
+- Hinweis: Projekt-Guidelines (`docs/guidelines/coding-guideline-*.md`) haben Vorrang vor
   agenten-eigenen Checklisten
 
 ### 4. Findings zusammenführen

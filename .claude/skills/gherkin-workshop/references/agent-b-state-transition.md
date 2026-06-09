@@ -41,7 +41,7 @@ Ausgabe:
 |---|---|---|---|---|
 | happy-path | ... | ... | ... | ... |
 
-Gherkin-Konventionen: Fachliche Sprache gemäß GLOSSARY.md – keine HTTP-Codes, kein SQL.
+Gherkin-Konventionen: Fachliche Sprache gemäß docs/reference/glossary.md – keine HTTP-Codes, kein SQL.
 Technische Kürzel koppeln das Szenario an die Implementierungsschicht und brechen bei
 Refactorings, auch wenn das fachliche Verhalten unverändert bleibt.
 ```

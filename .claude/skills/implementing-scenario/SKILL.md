@@ -31,10 +31,9 @@ Zwei Ausführungsregeln gelten für den gesamten Ablauf:
 GRUNDSATZ: Die Regeln sind starke Guidelines, keine absoluten Gesetze. Gibt es sehr gute Gründe
 abzuweichen: sofort kommunizieren und auf Bestätigung warten. Ein guter Grund liegt vor, wenn
 das strikte Befolgen einer Regel nachweislich zu schlechterem Ergebnis führt – z.B. wenn ein
-Test ohne vorangehende Domain-Typen nicht schreibbar ist (zirkuläre Abhängigkeit). Kein guter
-Grund: Zeitdruck, Bequemlichkeit, "das klappt schon so".
+Test ohne vorangehende Domain-Typen nicht schreibbar ist (zirkuläre Abhängigkeit).
 
-Lege folgende Task-Liste an (Regeln: `docs/TASK_SYSTEM.md`):
+Lege folgende Task-Liste an (Regeln: `docs/process/task-system.md`):
 ```
 TaskCreate: "Schritt 0: Architektur-Check"
 TaskCreate: "Schritt 1–3: TDD-Zyklus (Double-Loop)"
@@ -51,30 +50,52 @@ Der Schritt ist wichtig, weil nachträgliche Architekturentscheidungen teuer sin
 einmal Code da, ist die Versuchung groß, die Entscheidung an den Code anzupassen statt umgekehrt.
 
 **Gezielt lesen, nicht full-read:**
-- Akzeptanzkriterien: `docs/stories/szenario_N_*.md` (N = US-Präfix, z.B. US-904 → szenario_9_datenpflege.md; Mapping-Tabelle: `docs/USER_STORIES.md`)
-- Architektur-Patterns: `docs/ARCHITECTURE.md` – TOC lesen, dann nur relevante Sektionen
-- Phasen-Spec: Phase aus `docs/AGENT_MEMORY.md` → `docs/SKELETON_SPEC.md` oder `docs/MVP_SPEC.md` (nur API+DB-Sektion der Story)
+- Akzeptanzkriterien: `docs/stories/szenario_N_*.md` (N = US-Präfix, z.B. US-904 → szenario_9_datenpflege.md; Mapping-Tabelle: `docs/stories/user-stories.md`)
+- Architektur-Patterns: `docs/reference/architecture.md` – TOC lesen, dann nur relevante Sektionen
+- Phasen-Spec: Phase aus `docs/AGENT_MEMORY.md` → `docs/reference/skeleton-spec.md` oder `docs/reference/mvp-spec.md` (nur API+DB-Sektion der Story)
 - Feature-Datei: `features/<story>.feature` – nur das Szenario mit Tag `$ARGUMENTS` vollständig lesen
 
 Fragen:
 
 1. **ATDD-Gate:** Szenario `$ARGUMENTS` in `features/` vorhanden?
-  - Nicht vorhanden? → STOP. Erst `gherkin-workshop` für die User Story ausführen,
+   ```
+   python3 .claude/scripts/check-atdd-gate.py <TAG> "<TITEL>"
+   ```
+   - Exit 1? → STOP. Erst `gherkin-workshop` für die User Story ausführen,
      dann zurückkommen. Ohne freigegebenes Gherkin-Szenario fehlt die objektive
-     Fertigstellungsbedingung – der Code kann nicht als "Done" gelten. Vorhanden: Given/When/Then vollständig notieren – das ist die exakte Spec.
+     Fertigstellungsbedingung – der Code kann nicht als "Done" gelten.
+   - Exit 0: Der Script-Output enthält Background + Given/When/Then – das ist die exakte Spec.
 2. **YAGNI/KISS-Scope:** Was ist das Minimal-Notwendige für genau dieses Szenario?
    Was wäre Gold-Plating (= kein Test dafür existiert, kein Akzeptanzkriterium fordert es)?
    Notiere explizit: *"Folgendes implementiere ich NICHT: ..."*
 
-3. **Domain-Typen & Architektur:** Brauche ich neue Domain-Typen?
-   - Struktur: `readonly record struct` für Value Objects, `abstract record` für Sum-Types?
-   - Error-States: Wie typisiert? (`OneOf<T, Error<string>>`, kein `T?` in Domain-Properties)
-   - Alle neuen Typ-Deklarationen in `Server/` sind `internal` (kein `public` ohne Begründung)
-   - Neuer Infrastruktur-Code (DbContext, DbTypes) gehört in `Infrastructure/`, nicht in `Server/`
+3. **Domain-Typen & Architektur:** Brauche ich neue Domain-Typen? Falls ja: grob skizzieren (welche Konzepte, welche Schicht). Konkrete Typ-Entscheidungen (Struktur, Fehler-Modellierung, Sichtbarkeit) fallen im TDD-Zyklus – der Layer-Implementer liest dafür die Coding-Guidelines.
 
-4. **Entscheide:** Berührt das Szenario eine bestehende Entscheidung in `docs/history/decisions.md`?
-   Falls ja, gilt sie noch? Falls neue Architekturentscheidung nötig: User fragen, bevor Code
-   geschrieben wird. Selbst entschiedenes in `docs/history/decisions.md` dokumentieren.
+4. **ADR-Check:** Berührt das Szenario eine bestehende Entscheidung?
+
+   `decisions.py`-Kurzreferenz:
+   - `list --tag X` → Header-Zeile + Tags aller passenden ADRs (kompakt, zum Scannen)
+   - `list --tag X --full` → vollständiger Text jeder ADR inkl. Beschreibung + verworfene Alternativen
+   - `get ID1 ID2 ...` → vollständiger Text für konkrete IDs
+   - `tags` → Übersicht aller Tag-Kategorien
+   - `refs` → listet alle `// ADR-SXXX-N`-Kommentare im Code und prüft ob die referenzierten ADRs existieren
+
+   Mechanische Suche (Ergebnisse vollständig in die Subagenten-Message):
+   ```
+   python3 .claude/scripts/decisions.py list --tag scope:cross-cutting --full
+   python3 .claude/scripts/decisions.py list --tag story:us-NNN --full    # NNN aus $ARGUMENTS, z.B. story:us-904
+   ```
+
+   Eigene Bewertung – intern festhalten, Subagent macht diese unabhängig:
+   ```
+   python3 .claude/scripts/decisions.py tags                              # Überblick Tag-Kategorien
+   python3 .claude/scripts/decisions.py list --tag resource:<X>           # relevante Kategorien listen
+   python3 .claude/scripts/decisions.py get ADR-SXXX-N ADR-SYYY-M ...    # potentiell relevante vollständig lesen
+   # Entscheiden welche davon relevant sind
+   ```
+
+   Falls neue Architekturentscheidung nötig: User fragen. Selbst Entschiedenes in `docs/history/adr.md` dokumentieren.
+   Mechanische-Suche-Ergebnisse (`--full`) inklusive der verwendeten Befehle in die Subagenten-Message aufnehmen.
 
 Schriftliche Antwort auf alle vier Punkte.
 Dieser Schritt ist reine Analyse – noch kein Produktionscode schreiben. Domain-Typen und
@@ -96,98 +117,67 @@ Reine Design-Entscheidungen (CSS, Fonts, Abstände) sind kein Klärungsbedarf �
 
 **Äußerer Loop – E2E-Test (Haupt-Thread):**
 
-Schreibe selbst den Playwright-Test für das Szenario (Given/When/Then 1:1) – bevor der erste Subagent gespawnt wird. Führe ihn aus und zeige die Fehlermeldung. Das beweist, dass der Test echtes Verhalten misst und noch nicht durch bestehende Implementierung zufällig grün werden kann. Referenz: `docs/E2E_TESTING.md` (TOC zuerst).
+Schreibe selbst den Playwright-Test für das Szenario (Given/When/Then 1:1) – bevor der erste Subagent gespawnt wird. Führe ihn aus und zeige die Fehlermeldung. Das beweist, dass der Test echtes Verhalten misst und noch nicht durch bestehende Implementierung zufällig grün werden kann. Referenz: `docs/process/e2e-testing.md` (TOC zuerst).
 
 Dieser Test bleibt rot, bis alle inneren Loops abgeschlossen sind – das ist gewollt. Der Haupt-Thread ändert den E2E-Test während der inneren Loops nicht.
 
 **Innerer Loop – Subagent pro Schicht (Delegation ist Pflicht):**
 
+> **Voraussetzung:** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` muss in den globalen Settings aktiv sein. Ohne dieses Feature schlägt `SendMessage` still fehl – der Prozess hängt ohne Fehlermeldung.
+
 Für jede Schicht einen Subagenten spawnen. Haupt-Thread lädt KEINE Coding-Guidelines – der
 Subagent tut das selbst.
 
 **Schicht-Reihenfolge (outside-in):**
-- Backend-Szenario: API-Endpoint → Domain-Typen/Validierung → Service/Repository
-- Frontend-Szenario: React-Komponente (mit Service-Mock, TDD) → Service-Client (TypeScript-API-Funktion, mit MSW-Mock, TDD)
-- Full-Stack-Szenario: E2E → Frontend (oben) → Backend (oben)
+- Frontend-Szenario: ein Frontend-Subagent implementiert beide Frontend-Schichten sequenziell (Komponente mit Service-Mock zuerst, dann Service-Client mit MSW)
+- Full-Stack-Szenario: E2E → Frontend-Subagent (oben) → Backend-Subagent *(Frontend zuerst: implementiert gegen MSW-Mocks; Backend ersetzt diese Mocks danach)*
+- Frontend-only (z.B. Dialog-Verhalten ohne HTTP-Calls): Frontend-Subagent ohne Service-Client-Schicht, kein Backend-Subagent. Backend-only-Szenarien sind aktuell nicht vorgesehen.
 
-**Subagent-Prompt-Template** (`Agent` mit `subagent_type: "general-purpose"`, EINE Schicht pro Aufruf):
+**Schicht-Subagenten (EINE Schicht pro Aufruf):**
 
-Befülle das Template mit den konkreten Werten aus Schritt 0, bevor du den Subagent-Aufruf absetzt.
+- Backend-Schicht: `subagent_type: "backend-layer-implementer"`
+- Frontend-Schicht: `subagent_type: "frontend-layer-implementer"`
+
+Befülle die Message mit den konkreten Werten aus Schritt 0:
 
 ```
-Implementiere Schicht <LAYER> für Gherkin-Szenario <TAG> "<TITEL>".
+Szenario: <TAG> "<TITEL>"
 
-Lies diese Docs vor deinem ersten Test – in dieser Reihenfolge, TOC zuerst, dann gezielt.
-Du startest ohne Projektkontext und würdest sonst auf allgemeines Wissen zurückfallen, das
-hier an entscheidenden Stellen abweicht: das TDD-Format, Railway-Oriented Programming in C#,
-Branded Types und neverthrow in TypeScript. Die Reihenfolge folgt Abhängigkeiten: erst das
-Prozess-Framework (wie du vorgehst), dann allgemeine Prinzipien, dann das Layer-spezifische Handwerk.
-- docs/TDD_PROCESS.md  (Sektion "Outside-In ATDD / Double-Loop TDD" + Red-Green-Refactor)
-- docs/CODING_GUIDELINE_GENERAL.md  (komplett, ist klein)
-- Layer-spezifisch:
-  * C#-Endpoint/Validierung: docs/CODING_GUIDELINE_CSHARP.md + docs/CSharp-ROP.md
-  * C#-Sum-Types: + docs/CSharp-SumTypes.md
-  * TypeScript/React:        docs/CODING_GUIDELINE_TYPESCRIPT.md
-  * React-Komponente (pages/components): + docs/CODING_GUIDELINE_UX.md
+Akzeptanzkriterien:
+<Given/When/Then aus Schritt 0>
 
-Akzeptanzkriterien (inline):
-<Given/When/Then aus Schritt 0 einfügen>
-
-Scope-Grenzen (NICHT implementieren):
-<YAGNI-Liste aus Schritt 0 einfügen>
-
-Test-Einschränkung (strikt, keine Ausnahmen ohne expliziten Auftrag):
-Schreibe KEINE Unit Tests auf Value Types, Domain-Typen, Service-Klassen oder andere isolierte Logik.
-Erlaubt sind ausschließlich:
-- C# Backend: HTTP-Integrationstests via WebApplicationFactory
-- TypeScript Frontend: MSW-Komponenten-Tests (= öffentliche API der Komponente)
-Falls nach deiner Implementierung Stryker-Survivors auf isolierter Logik verbleiben die strukturell
-nicht via HTTP beobachtbar sind: im Suppression-Report melden – der Orchestrator entscheidet ob
-ein Unit Test nötig ist und schreibt ihn. Du implementierst nur.
+Scope-Grenzen (nicht implementieren):
+<YAGNI-Liste aus Schritt 0>
 
 Failing E2E-Test: <Pfad zur spec.ts>
 
-Vorgehen (strikt einhalten):
-0. PLANUNG: Bevor du den ersten Test schreibst – liste auf, welche Details das Szenario in dieser Schicht noch offenlässt (Fehlermeldungstext, HTTP-Statuscodes, Feld-Initialisierung, etc.). Stelle Fragen direkt an den Orchestrator – nicht am Ende sammeln.
-1. RED: Genau einen Test schreiben (Unit/Integration passend zur Schicht). Ausführen, Fehlermeldung zeigen.
-   Bitte danach den Orchestrator um Test-Review und warte auf Freigabe, bevor du mit GREEN beginnst.
-   Nach Freigabe: Ab jetzt sind Assertion-Änderungen ohne Orchestrator-Zustimmung verboten. Setup-Änderungen (Mock-Handler, Testdaten – keine Assertions) sind erlaubt, müssen aber beim Return explizit begründet werden.
-2. GREEN: Minimale Implementierung. "Fake it till you make it" ist Pflicht. Alle Tests ausführen.
-3. REFACTOR: Checkliste aus docs/TDD_PROCESS.md Phase 3 vollständig abarbeiten – inklusive Stryker + Branch Coverage (Pflicht). Ziel: 100 % Mutation Score + 100 % Branch Coverage.
-   Stryker-Läufe: Während der Entwicklung sind eingeschränkte Läufe (--mutate auf neue Dateien) für schnelles Feedback explizit erlaubt.
-   Für die Übergabe an den Orchestrator ist ein vollständiger Lauf ohne --mutate-Einschränkung mit 100%-Score Pflicht.
-TDD-Abweichung (z.B. Test NACH Code) ist ein Prozess-Fehler – dann STOP und berichten.
-
-Ausgabe:
-- Diff der Änderungen (Dateinamen + Hunks)
-- Output je Test-Run (RED, GREEN, REFACTOR-Grün)
-- Stryker-Score + Branch-Coverage-Score (aus vollständigem Lauf ohne --mutate-Einschränkung)
-- Vollständiger Pfad zur generierten Stryker-Report-Datei
-- Suppression-Report: neue Suppressionen mit Datei:Zeile + Begründung (oder "keine")
-- Kurzer Report: was implementiert, was bewusst weggelassen
-
-## Prozessverbesserung (Pflicht)
-Berichte am Ende strukturiert:
-- Was hat nicht wie erwartet funktioniert (Tooling-Fehler, schlechte Fehlermeldungen)?
-- Welche Schritte haben unnötig Zeit gekostet und hätten durch besseres Tooling
-  oder klarere Anweisungen vermieden werden können?
-Falls nichts aufgefallen ist: explizit "Keine Auffälligkeiten" schreiben.
+Relevante ADRs:
+Bereits ausgeführt (nicht nochmal ausführen):
+  python3 .claude/scripts/decisions.py list --tag scope:cross-cutting --full
+  python3 .claude/scripts/decisions.py list --tag story:us-NNN --full
+<Vollständige Ausgabe beider Befehle – oder: "keine Treffer in [Befehl]">
 ```
 
 Spawn-Regeln:
-- EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin).
-- **KEIN `run_in_background: true`** – Subagenten müssen im Vordergrund laufen. Edit- und Write-Aufrufe erzeugen Permission-Prompts die der User interaktiv bestätigen muss. Im Hintergrund laufende Subagenten erhalten diese Prompts nicht und scheitern sofort mit "Permission denied".
-- Haupt-Thread reviewt den Diff und den Test-Run-Output nach jedem Subagent-Return.
-- Weicht der Subagent von TDD ab → Subagenten fixen lassen (max. 2 Iterationen, danach Abbruch + Meldung an User).
+- EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin). Ausnahme: der Frontend-Subagent implementiert Komponente und Service-Client sequenziell in einem Aufruf (siehe Schicht-Reihenfolge oben).
+- **Subagent benennen:** `name: "backend-<schicht>"` bzw. `"frontend-<schicht>"` – nötig damit der Haupt-Thread via `SendMessage` für das Test-Review antworten kann.
+- **KEIN `run_in_background: true`** – andernfalls werden Berechtigungsanfragen des Subagenten automatisch abgelehnt; er kann keine Dateien schreiben oder Befehle ausführen.
+- **Subagent-Lebenszyklus:** Subagenten terminieren nach ihrer Ausgabe nicht – sie schlafen und bleiben via `SendMessage` erreichbar. Das ist das Kernverhalten von `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`. `permissionMode: acceptEdits` in den Subagenten-Definitionen stellt sicher, dass Datei-Edits nicht geblockt werden.
+- **PLANUNG-Phase beachten:** Der Subagent beginnt mit einem PLANUNG-Schritt, stellt Rückfragen und berichtet seine eigenständig gefundenen ADRs. Auf diese Ausgabe antworten:
+  - **Rückfragen:** Alle Rückfragen in einer Antwort beantworten. Für jede Frage prüfen, ob sie bereits in Schritt 0 geklärt wurde – bekannte Antworten direkt einschließen (kurz vermerken: „aus Schritt 0 bekannt: [Antwort]"), offene Fragen gebündelt an den User weitergeben. Max. 2 Runden; danach dem Nutzer die Situation erklären (offene Fragen auflisten) und fragen wie weiter verfahren werden soll.
+  - **ADR-Abgleich:** Findet der Subagent ADRs, die du nicht als relevant eingestuft hast (oder umgekehrt), kritisch prüfen ob sie tatsächlich anwendbar sind. Im Zweifelsfall mit dem Subagenten klären – dessen Begründungen aber ebenfalls kritisch hinterfragen, nicht blind übernehmen. Kein Konflikt: kein weiterer Austausch nötig.
+  Erst nach dieser Antwort beginnt der Batch-RED-Zyklus.
+- Haupt-Thread reviewt Diff und Test-Run-Output nach jedem Subagent-Return.
+- Weicht der Subagent von TDD ab → an denselben Subagenten korrigieren (er wartet noch auf Test-Review). Max. 2 Iterationen; nach jeder Korrektur fordert der Subagent erneut Review an, bevor er zu GREEN übergeht. Nach 2 Iterationen ohne Verbesserung: Abbruch + Meldung an User.
 
-**Test-Review nach RED im Inneren Loop (Haupt-Thread):**
+**Batch-Test-Review nach RED im Inneren Loop (Haupt-Thread):**
 
-Wenn ein Subagent nach RED um Test-Review bittet, prüft der Haupt-Thread die Tests anhand dieser Kriterien und antwortet via `SendMessage` mit Freigabe und stagen der Test-Dateien (`git add <test-files>`) oder konkreter Korrektur-Anforderung:
+Der Subagent schreibt den **gesamten Test-Batch der Schicht** (alle Tests, die das Szenario auf dieser Schicht fordert), bestätigt den **kollektiven** Fehlschlag und sendet **einmal** das Signal `TEST-REVIEW: <Testname1, Testname2, ...>` mit allen Tests des Batches. Der Haupt-Thread liest den Test-Code via `git diff`, prüft den **ganzen Batch** anhand der folgenden Kriterien, stagt danach die Test-Dateien (`git add <test-files>`) und antwortet mit Freigabe oder konkreter Korrektur-Anforderung. Setup-Änderungen (Mock-Handler, Testdaten), die der Subagent nach der Freigabe noch vornimmt, sind im abschließenden Return beschrieben – diese danach ebenfalls stagen.
 
 - **Per-Assertion-Pflicht (inkl. Given/When):** Für jede neue oder geänderte Assertion und signifikante Given/When-Schritte: Welches Gherkin-Kriterium erzwingt sie? Falls keines vorhanden – drei Diagnosen, der Haupt-Thread entscheidet:
   - a) **Gold-Plating** → Subagent löscht Assertion und ggf. zugehörigen Produktionscode.
   - b) **User-facing Verhalten ohne Szenario** → User-Freigabe für neues Szenario einholen, erst dann implementieren.
-  - c) **Technische API/Architektur-Entscheidung** → Test braucht `// DEC-XXX`-Kommentar der auf den Eintrag in `docs/history/decisions.md` verweist; Haupt-Thread verifiziert per `grep`.
+  - c) **Technische API/Architektur-Entscheidung** → Test braucht `// ADR-SXXX-N`-Kommentar der auf den Eintrag in `docs/history/adr.md` verweist; Haupt-Thread verifiziert via `python3 .claude/scripts/decisions.py refs`.
 
 - **Anpassungen an bestehenden Tests:** Was würde ohne diese Anpassung kaputtgehen, das nicht ohnehin durch andere Assertions auffiele? Keine Antwort → redundant (Diagnose a).
 
@@ -195,58 +185,58 @@ Wenn ein Subagent nach RED um Test-Review bittet, prüft der Haupt-Thread die Te
 
 - **Given/When-Struktur:** Neue Tests sollen durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Fehlen diese → Finding melden (nicht blockierend).
 
-**E2E-Loop schließen (Haupt-Thread):**
-
-Nach allen inneren Loops: Playwright-Test erneut ausführen. Noch rot? Fehlende Verbindung
-(Routing? API-Integration?) identifizieren → neuer Schicht-Subagent.
-
-**Stryker-Survivor-Check auf isolierter Logik (Haupt-Thread):**
-
-Enthält der Stryker-Report der Subagenten Survivors auf isolierter Domänenlogik (Value Types,
-Berechnungen, Multi-Condition-Rules)?
-- Survivor via HTTP beobachtbar (HTTP-Response ändert sich wenn Mutant überlebt)? → Integration-Test fehlt → Schicht-Subagent ergänzen lassen.
-- Survivor **nicht** via HTTP beobachtbar (Mutant verändert interne Berechnung ohne sichtbaren
-  Effekt auf die Response)? → Haupt-Thread schreibt Unit Test (nur Spec + Survivor-Report, kein
-  Produktionscode) → Schicht-Subagent macht ihn grün.
-
 ── SCHRITT 4: ORCHESTRATOR-CHECK ────────────────────────────────────────────
 → TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": completed | TaskUpdate "Schritt 4: Orchestrator-Check": in_progress
 
-Der Haupt-Thread prüft, bevor externe Reviewer spawnen. Fünf Punkte:
+**E2E-Loop schließen:**
 
-1. **Staged-Test-Check:** `git status` prüfen: Enthält die staged area Modifikationen an Test-Dateien, die nach der Freigabe im Inneren Loop gemacht wurden?
-   Falls ja → Finding: Assertions dürfen nach Freigabe nicht geändert werden ohne Orchestrator-Zustimmung. Schicht-Subagent spawnen um die unautorisierten Änderungen zu revertieren und – falls ein echter Bedarf dahintersteht – das korrekte Klärungsverfahren (Diagnose a/b/c aus dem Test-Review) zu durchlaufen.
-   (Der inhaltliche Test-Review findet bereits im Inneren Loop statt.)
+Playwright-Test erneut ausführen. Noch rot? Ursache identifizieren (Routing? API-Integration? Fehlende Verbindung zwischen Schichten):
+- Ursache in bereits implementierter Schicht → an bestehenden Schicht-Subagenten übergeben.
+- Ursache in noch nicht implementierter Schicht → neuer Schicht-Subagent.
 
-2. **Suppression-Check:** `git diff` nach `// Stryker disable` und `/* v8 ignore` durchsuchen.
-   Für jede neue Suppression: Begründung kritisch hinterfragen (nicht nur auf Vollständigkeit –
-   sondern gemäß `docs/kaizen/principles.md` auf inhaltliche Validität: beweist die Begründung
-   echte Äquivalenz / Nichttestbarkeit, oder klingt sie nur plausibel?). Schwache Begründung
-   → Schicht-Subagent spawnen mit Auftrag, entweder den Test zu ergänzen oder den
-   nicht-geforderten Produktionscode zu entfernen.
+**Mechanische Verifikation (Script):**
 
-3. **Scores verifizieren:** Stryker-Score + Branch-Coverage-Score aus den Subagent-Ausgaben
-   lesen. Kein Score gemeldet oder Wert unklar → Stryker + Coverage selbst ausführen.
-   Score < 100 % bestätigt → als `lessons_learned` dokumentieren (Subagent hat
-   REFACTOR-Pflicht verletzt), Ursache per `docs/TDD_PROCESS.md` REFACTOR-Logik analysieren
-   (Gold-Plating / fehlender Test / äquivalenter Mutant), dann Schicht-Subagent für die
-   Korrektur spawnen.
+Für jede verwendete Schicht ausführen (`--skip-stryker`: kein neuer Stryker-Lauf – analysiert den Report des letzten Subagenten-Laufs):
+```
+python3 .claude/scripts/qa-check.py --layer backend --skip-stryker
+python3 .claude/scripts/qa-check.py --layer frontend --skip-stryker
+```
 
-4. **Linter- und Duplikat-Gate verifizieren:** ESLint- + dotnet-build- + jscpd-Output aus den
-   Subagent-Ausgaben lesen (Format: `docs/TDD_PROCESS.md` Sektion "Linter- und Duplikat-Gate").
-   Fehlt der Output vollständig → Gate wurde nicht ausgeführt; selbst ausführen und Ergebnis
-   prüfen. ESLint Errors oder dotnet-build-Fehler → Schicht-Subagent spawnen. jscpd-Findings
-   ohne Adressierung oder Begründung → Schicht-Subagent spawnen.
+Hash aus dem `=== VERIFIKATIONS-HASH ===`-Block des Subagenten-Returns mit dem eigenen Script-Output vergleichen.
+- Stimmen überein → mechanische Findings sind vertrauenswürdig.
+- Abweichung → Subagent auffordern, `qa-check.py` erneut auszuführen und neuen Hash zu liefern. Bleibt die Abweichung nach einem Retry bestehen → STOP, User fragen.
 
-5. **Unit-Test-Check:** Enthält der Diff Unit Tests auf Value Types, Domain-Typen oder
-   Service-Klassen (keine HTTP-Integrationstests, keine MSW-Komponenten-Tests)?
-   - Wenn ja: Wurde dieser Test explizit vom Orchestrator beauftragt (Stryker-Survivor-Check
-     oben, Survivor nicht via HTTP beobachtbar)?
-   - Nein → ❌ Finding: Unit Test ohne Survivor-Begründung ist Gold-Plating. Schicht-Subagent
-     löscht den Test und prüft ob der zugehörige Produktionscode ebenfalls entfernt werden muss.
+Der Script-Output enthält: staged Test-Dateien (Check 1), neue Suppressionen (Check 2),
+Unit-Test-Muster (Check 3), ESLint-Status (Check 4, Frontend),
+Test-Struktur/Given-When-Then (Check 5), Stryker-Score.
 
-Triviale Findings (Tippfehler, eindeutig falsche Suppression-Begründung) darf der Haupt-Thread
-selbst fixen. Alles andere → Schicht-Subagent.
+**Inhaltliche Bewertung (Haupt-Thread):**
+
+1. **Staged-Test-Check:** Enthält Check 1 Test-Dateien? Falls ja → Assertions dürfen nach
+   Freigabe im Inneren Loop nicht geändert worden sein.
+
+2. **Suppression-Validität:** Für jede Suppression aus Check 2: Beweist die Begründung
+   echte Äquivalenz / Nichttestbarkeit, oder klingt sie nur plausibel? (Maßstab:
+   `docs/kaizen/principles.md`).
+
+3. **Stryker-Score & Survivor-Fix:** Score aus Script-Output lesen. Score < 100 % → je Survivor:
+   - Äquivalenter Mutant → als Suppression anlegen (Begründung Pflicht).
+   - Gold-Plating (kein Gherkin-Kriterium erzwingt die Logik) → Produktionscode löschen.
+   - Fehlender Test (Survivor beobachtbar – Backend: via HTTP, Frontend: via Komponenten-API) → an bestehenden Schicht-Subagenten.
+   - Survivor **nicht** beobachtbar (Backend: nicht via HTTP, Frontend: nicht via Komponenten-API) – typisch für technisch erzwungene Zweige die nie ausgelöst werden können (z.B. exhaustiver `default`-Case über ein geschlossenes Sum-Type) → an bestehenden Schicht-Subagenten: Suppression anlegen lassen (Begründung Pflicht). Der Subagent hätte das bereits vor der Übergabe beheben müssen; 100 %-Score ist Voraussetzung für den Return.
+   Score nach Fix immer noch < 100 % → als `lessons_learned` dokumentieren.
+
+4. **Unit-Test-Autorisierung:** Für jeden Treffer aus Check 3: Wurde dieser Test explizit
+   vom Orchestrator beauftragt (Stryker-Survivor-Check, Survivor nicht via Schicht-Grenze beobachtbar)?
+   Nein → ❌ Gold-Plating.
+
+**Findings übergeben:** Alle Findings werden **gesammelt** an den jeweiligen Schicht-Subagenten
+übergeben – mit der Bitte um Korrektur oder, falls der Subagent gute Gegenargumente hat, um
+Begründung. Der Subagent hat den vollständigen Implementierungskontext und kann echte
+Gegenpositionen einbringen. Der Haupt-Thread entscheidet nach der Antwort ob die Begründung
+trägt – Subagenten-Argumente dabei kritisch hinterfragen, nicht blind übernehmen. Nach
+umgesetzten Korrekturen führt der Subagent `qa-check.py` erneut aus und liefert einen
+aktualisierten `=== VERIFIKATIONS-HASH ===`-Block.
 
 ── SCHRITT 5: REVIEW-LOOP ───────────────────────────────────────────────────
 → TaskUpdate "Schritt 4: Orchestrator-Check": completed | TaskUpdate "Schritt 5: Review-Loop": in_progress
@@ -256,15 +246,15 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
 **Pro Runde:**
 
 1. `.claude/skills/review-code/SKILL.md` laden und den darin beschriebenen Prozess ausführen.
-   Eingaben übergeben: Scope, geänderte Dateien, Stryker-Suppression-Report aus Schritt 1–3.
+   Eingaben übergeben: Szenario-Tag + Given/When/Then (aus Schritt 0), YAGNI-Liste (aus Schritt 0), geänderte Dateien (git diff), Check-2-Output (Suppressionen) aus dem Schritt-4-qa-check, gemeinsam ermittelte ADRs (Schritt 0 + Subagenten-PLANUNG).
    Keine neue Task-Liste anlegen – review-code läuft eingebettet in den implementing-scenario-Ablauf.
    Die von review-code gespawnten spezialisierten Agenten erhalten **kein Iterations-Wissen** –
    weder Findings aus früheren Runden noch Hinweise auf bereits abgelehnte false positives.
 
 2. Findings im **Haupt-Thread** auswerten:
-   - ❌ Must Fix → neuer Schicht-Subagent spawnen (mit Coding-Guidelines + TDD-Pflicht).
-     Den Schicht-Subagenten können dabei auch ⚠️-Improvements aus dieser Runde mitgegeben
-     werden, damit er sie optional mit adressiert. Nach Fixes → nächste Runde.
+   - ❌ Must Fix → neuen Schicht-Subagenten spawnen (mit Coding-Guidelines + TDD-Pflicht).
+     Diesem können auch ⚠️-Improvements aus dieser Runde mitgegeben werden, damit er sie
+     optional mit adressiert. Nach Fixes → nächste Runde.
    - ⚠️ Improvement → notieren; nach einer 0-❌-Runde Entscheidung dem User vorlegen.
    - Suppression-Findings → direkt entscheiden: Begründung ausreichend oder Schicht-Subagent.
 
@@ -278,17 +268,18 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
 → TaskUpdate "Schritt 5: Review-Loop": completed | TaskUpdate "Schritt 6: Commit & Session-Abschluss": in_progress
 
 1. **Commit erstellen** (kein Amend):
+   `git status` prüfen – alle noch unstaged Änderungen stagen (`git add <dateien>`).
    ```
    git commit -m "$(cat <<'EOF'
    US-XXX: [Szenario-Titel]
 
-   Co-Authored-By: Claude <noreply@anthropic.com>
+   Co-Authored-By: <MODELLNAME> <noreply@anthropic.com>
    EOF
    )"
    ```
-   Mapping aus `$ARGUMENTS`: Tag `@US-904-happy-path` → Präfix `US-904` (@ und Suffix ab zweitem Bindestrich entfernen); Titel in Anführungszeichen direkt übernehmen.
+   Mapping: `@US-904-happy-path` → `US-904` (@ entfernen, alles nach dem zweiten Bindestrich abschneiden). Titel direkt übernehmen.
    Beispiel: `$ARGUMENTS = @US-904-happy-path "Neue Zutat anlegen"` → `"US-904: Neue Zutat anlegen"`
-   Co-Authored-By: Modellname aus dem System-Kontext der aktuellen Session einsetzen.
+   Co-Authored-By: Modellname aus dem System-Kontext einsetzen.
 
 2. **Session-Abschluss anbieten** – frage den User:
    > „Szenario abgeschlossen. Soll ich die Session jetzt schließen (`closing-session`)?"

@@ -10,9 +10,9 @@ user-invocable: true
 
 # Kaizen-Retro
 
-Definitionen für Schwere, Kategorien, Kontext-Tags, BEWÄHRT- und Obsolet-Kriterien: `docs/kaizen/PROCESS.md`
+Definitionen für Schwere, Kategorien, Kontext-Tags, BEWÄHRT- und Obsolet-Kriterien: `docs/kaizen/process.md`
 
-→ Task-System: `docs/TASK_SYSTEM.md`
+→ Task-System: `docs/process/task-system.md`
 
 Lege zu Beginn folgende Task-Liste an:
 
@@ -30,7 +30,7 @@ Lege zu Beginn folgende Task-Liste an:
 
 → TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": in_progress
 
-Lies `docs/kaizen/lessons_learned.md` und alle `*.md`-Dateien in `docs/kaizen/archive/`. Wende auf jeden Eintrag den Filter-Test aus `docs/kaizen/PROCESS.md` an:
+Lies `docs/kaizen/lessons_learned.md` und alle `*.md`-Dateien in `docs/kaizen/archive/`. Wende auf jeden Eintrag den Filter-Test aus `docs/kaizen/process.md` an:
 
 **Test:** „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?"
 
@@ -79,9 +79,9 @@ Ergebnis intern festhalten für Schritt 3.
 
 Lies `docs/kaizen/countermeasures.md`. Für jeden AKTIV/OFFEN-Eintrag:
 
-**Anwendbarkeit prüfen:** Lies zunächst `docs/history/sessions/INDEX.md` und identifiziere anhand der Kurzfassungen welche Sessions ab "Neue Sessions ab: NNN" (laut Script-Output) die relevante Arbeit enthielten. Lies dann die vollständigen Session-Dateien dieser gefilterten Sessions um zu beurteilen ob das Problem aufgetreten ist (Nachweis für BEWÄHRT / Rückfall). Falls eine Session-Datei fehlt: Fehler melden – nicht als "nicht beobachtbar" werten (fehlende Datei = Datenverlust oder Prozessbruch, keine valide Aussage möglich).
+**Anwendbarkeit prüfen:** Lies zunächst `docs/history/sessions/index.md` und identifiziere anhand der Kurzfassungen welche Sessions ab "Neue Sessions ab: NNN" (laut Script-Output) die relevante Arbeit enthielten. Lies dann die vollständigen Session-Dateien dieser gefilterten Sessions um zu beurteilen ob das Problem aufgetreten ist (Nachweis für BEWÄHRT / Rückfall). Falls eine Session-Datei fehlt: Fehler melden – nicht als "nicht beobachtbar" werten (fehlende Datei = Datenverlust oder Prozessbruch, keine valide Aussage möglich).
 
-Faustregel je Kontext-Tag (für Filterung via INDEX.md):
+Faustregel je Kontext-Tag (für Filterung via index.md):
 - `TDD` / `C#-Code` / `TS-Code`: beobachtbar wenn neuer Produktions- oder Testcode geschrieben wurde
 - `Agent-Prompt` / `Review`: beobachtbar wenn ein Sub-Agent beauftragt wurde
 - `Skill-Nutzung`: beobachtbar wenn ein Skill aufgerufen wurde
@@ -150,10 +150,10 @@ Abschnitte die leer sind weglassen.
 
 Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: countermeasures.md verweist auf Ziele die bereits existieren müssen):
 1. `docs/kaizen/principles.md` aktualisieren
-2. Guidelines / Skills anpassen – Entscheidungshilfe: `docs/kaizen/PROCESS.md`, Abschnitt "Wann gehört etwas wohin?"
+2. Guidelines / Skills anpassen – Entscheidungshilfe: `docs/kaizen/process.md`, Abschnitt "Wann gehört etwas wohin?"
    Bei echter Überschneidung: mit User absprechen
 3. `docs/kaizen/countermeasures.md` aktualisieren (Verweise auf principles.md oder Guideline-Änderungen aus Schritt 1+2 ergänzen)
-4. `docs/kaizen/PROCESS.md` aktualisieren falls neue Kontext-Tags vereinbart
+4. `docs/kaizen/process.md` aktualisieren falls neue Kontext-Tags vereinbart
 5. `docs/AGENT_MEMORY.md` unter „Nächste Prioritäten": Für jeden neuen OFFEN-Eintrag einen Punkt ergänzen (Kurzbeschreibung, Verweis auf countermeasures.md). Falls zutreffend auch als Technische Schuld oder Offene Frage eintragen.
 
 ---

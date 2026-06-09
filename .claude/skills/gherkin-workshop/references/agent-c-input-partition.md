@@ -38,7 +38,7 @@ Then-Spalte bei Fehlerfällen muss konkreten Fehlermeldungstext enthalten.
 Format: „sehe ich die Fehlermeldung ‚[Was ist falsch].'" oder „‚[Was ist falsch] ([Constraint]).'"
 Platzierung nahe am betroffenen Eingabefeld – kein generisches „Fehler aufgetreten".
 
-Gherkin-Konventionen: Fachliche Sprache gemäß GLOSSARY.md – keine HTTP-Codes, kein SQL.
+Gherkin-Konventionen: Fachliche Sprache gemäß docs/reference/glossary.md – keine HTTP-Codes, kein SQL.
 Technische Kürzel koppeln das Szenario an die Implementierungsschicht und brechen bei
 Refactorings, auch wenn das fachliche Verhalten unverändert bleibt.
 ```

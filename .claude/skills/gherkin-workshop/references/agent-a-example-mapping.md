@@ -35,7 +35,7 @@ Ausgabe – eine Markdown-Tabelle pro Tag-Kategorie (happy-path, error, edge-cas
 |---|---|---|---|---|
 | happy-path | ... | ... | ... | ... |
 
-Gherkin-Konventionen: Fachliche Sprache gemäß GLOSSARY.md – keine HTTP-Codes, kein SQL.
+Gherkin-Konventionen: Fachliche Sprache gemäß docs/reference/glossary.md – keine HTTP-Codes, kein SQL.
 Technische Kürzel koppeln das Szenario an die Implementierungsschicht und brechen bei
 Refactorings, auch wenn das fachliche Verhalten unverändert bleibt.
 ```

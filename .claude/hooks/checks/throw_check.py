@@ -28,5 +28,5 @@ def check(inp: HookInput) -> list[str]:
         "  ✅ Erlaubt: `throw new InvalidOperationException` in Value-Object-Guards\n"
         "  ❌ Domänen-/Validierungsfehler → `OneOf<T, Error<string>>` zurückgeben\n"
         "Jedes `throw` muss mit einem Kommentar begründet werden.\n"
-        "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 4 – ROP)."
+        "Siehe docs/guidelines/coding-guideline-csharp.md (Abschnitt 4 – ROP)."
     ]

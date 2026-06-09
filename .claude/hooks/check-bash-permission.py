@@ -397,7 +397,7 @@ _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
     ),
     (
         re.compile(r'\bnpm\s+install\b'),
-        "npm install: DEPENDENCIES.md-Prozess durchführen, dann User bitten den Befehl auszuführen.",
+        "npm install: docs/reference/dependencies.md-Prozess durchführen, dann User bitten den Befehl auszuführen.",
     ),
     (
         re.compile(r'\bnpm\b'),

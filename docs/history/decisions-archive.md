@@ -120,7 +120,7 @@ Breakpoint: 768px (MUI Standard). Mobile-First Ansatz.
 ## Tooling & Infrastruktur (redundant / trivial)
 
 ### dotnet in WSL: Windows-Pfad erforderlich (2026-02-19)
-`which dotnet` gibt nichts zurück in WSL. Wrapper: `cmd.exe /c "cd /d C:\...\mahl && dotnet <command>"`. Aktuell dokumentiert in `docs/DEV_WORKFLOW.md`.
+`which dotnet` gibt nichts zurück in WSL. Wrapper: `cmd.exe /c "cd /d C:\...\mahl && dotnet <command>"`. Aktuell dokumentiert in `docs/process/dev-workflow.md`.
 
 ### Entwicklungs-Workflow: Drop + Recreate vor Production (2026-02-18)
 Schnellere Iteration. Ab Production: Normale Migrations.

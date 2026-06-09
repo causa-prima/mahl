@@ -39,7 +39,7 @@ def check(inp: HookInput) -> list[str]:
             f"Test-Pattern-Hinweis: {found} erkannt.\n"
             "Pruefe ob `.Should().BeEquivalentTo(expected)` die vollstaendigere Assertion waere\n"
             "(Full-State-Assertion statt partieller Zaehlung).\n"
-            "Siehe ARCHITECTURE.md (Test-Patterns)."
+            "Siehe docs/reference/architecture.md (Test-Patterns)."
         )
 
     if _is_new(CONTAIN_PATTERN, inp):

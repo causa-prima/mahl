@@ -17,6 +17,6 @@
     "!src/test/**",
     "!src/mocks/**"
   ],
-  "reporters": ["html", "clear-text", "progress"],
+  "reporters": ["html", "json", "clear-text", "progress"],
   "coverageAnalysis": "perTest"
 }

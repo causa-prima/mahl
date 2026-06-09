@@ -24,11 +24,11 @@ Beispiel: `/gherkin-workshop US-904`
 ## Pflicht-Lektüre
 
 Lies vor dem Start:
-- `docs/USER_STORIES.md` (Index) → `docs/stories/szenario_N_*.md` – Akzeptanzkriterien der Ziel-US (US-Präfix = Szenario-Nummer, oder `Grep "US-NNN" docs/stories/`)
-- `docs/GLOSSARY.md` – Ubiquitäre Sprache (nur Begriffe daraus in Szenarien)
-- `docs/E2E_TESTING.md` – Gherkin-Konventionen, Tag-Schema, Traceability-Regeln
-- `docs/history/decisions.md` – Explizite Entwurfsentscheidungen (Constraints für Szenarien)
-- `docs/CODING_GUIDELINE_UX.md` – Interaction-Design-Prinzipien (Leer-Zustand, Feedback, Fehlermeldungen)
+- `docs/stories/user-stories.md` (Index) → `docs/stories/szenario_N_*.md` – Akzeptanzkriterien der Ziel-US (US-Präfix = Szenario-Nummer, oder `Grep "US-NNN" docs/stories/`)
+- `docs/reference/glossary.md` – Ubiquitäre Sprache (nur Begriffe daraus in Szenarien)
+- `docs/process/e2e-testing.md` – Gherkin-Konventionen, Tag-Schema, Traceability-Regeln
+- `docs/history/adr.md` – Explizite Entwurfsentscheidungen (Constraints für Szenarien)
+- `docs/guidelines/coding-guideline-ux.md` – Interaction-Design-Prinzipien (Leer-Zustand, Feedback, Fehlermeldungen)
 - `features/` – Bestehende Feature-Files (Pattern-Konsistenz)
 
 ---
@@ -53,22 +53,22 @@ Implementierung zu bestätigen. Was hier unvollständig oder ungenau ist, zieht 
 alle folgenden Phasen.
 
 Lies die Pflicht-Dateien. Lade bei konkretem Bedarf nach:
-- `docs/ARCHITECTURE.md` (bei architektonischen Fragen in Schritt 0.A oder Schritt 1)
-- `docs/SKELETON_SPEC.md` / `docs/MVP_SPEC.md` – nur bei konkretem Bedarf; `decisions.md`
+- `docs/reference/architecture.md` (bei architektonischen Fragen in Schritt 0.A oder Schritt 1)
+- `docs/reference/skeleton-spec.md` / `docs/reference/mvp-spec.md` – nur bei konkretem Bedarf; `adr.md`
   hat Vorrang, weil diese Dateien Entscheidungen und unverifizierte Spec-Details vermischen
 
 **Voraussetzung:** Falls die US-ID in `docs/stories/` nicht gefunden wird oder
-`docs/GLOSSARY.md` keine relevanten Entitäten enthält: stopp und frage den User –
+`docs/reference/glossary.md` keine relevanten Entitäten enthält: stopp und frage den User –
 alle folgenden Schritte bauen auf diesen Grundlagen auf.
 
 Notiere schriftlich:
 
 **A) Story-Kern:**
 - Was ist das Geschäftsziel?
-- Welche Entitäten sind betroffen? (Name aus GLOSSARY.md)
+- Welche Entitäten sind betroffen? (Name aus docs/reference/glossary.md)
 - Welche Zustände kann jede Entität haben? (z.B. Ingredient: Aktiv / Soft-Deleted)
 - Welche Operationen definiert die US? (Create / Read-Einzeln / Read-Liste / Update / Delete / Restore / Filter / Sort / andere)
-- Welche expliziten Validierungsregeln nennt die US oder decisions.md?
+- Welche expliziten Validierungsregeln nennt die US oder adr.md?
 
 **B) Bestandsanalyse:**
 Existiert bereits eine Feature-Datei für diese US?
@@ -77,7 +77,7 @@ Existiert bereits eine Feature-Datei für diese US?
   - Offensichtliche Lücken
 - **NEIN:** Notiere „neu anlegen". Schritt 2 startet mit leerem Pool.
 
-**C) Constraints aus decisions.md:**
+**C) Constraints aus adr.md:**
 Welche Entscheidungen betreffen diese US?
 (z.B. „Soft-Delete-Pattern", „IDs sind UUIDs", „Sortierung alphabetisch nach Name")
 
@@ -127,7 +127,7 @@ Typische Frage-Kategorien:
 | Grenzfälle | „Was passiert wenn [Szenario X] und [Zustand Y] gleichzeitig gelten?" |
 | Fehlermeldungen | „Spezifische oder generische Meldung für [Fehlerfall]?" |
 | Latente Regeln | „Gibt es Regeln, die sich nicht aus den Akzeptanzkriterien ergeben, aber wichtig sind?" |
-| Technische Fehler | „Gibt es für diese Operation Fehlerverhalten jenseits der allgemeinen Behandlung (→ decisions.md: Querschnittliche Fehlerbehandlung)?" |
+| Technische Fehler | „Gibt es für diese Operation Fehlerverhalten jenseits der allgemeinen Behandlung (→ adr.md: Querschnittliche Fehlerbehandlung)?" |
 | Draft-Saving & Abbrechen | „Wie komplex sind die Eingaben dieses Formulars? Trivial → kein Draft-Saving, Abbrechen ohne Rückfrage (Standard). Nicht-trivial → (1) Soll es einen 'Als Entwurf speichern'-Button geben? Falls ja: Abbrechen bietet Entwurf-Option an. Falls nein: (a) Abbrechen ohne Rückfrage oder (b) Bestätigungsdialog? (→ UX-Guideline Prinzip 5)" |
 
 ### grill-me für tiefere Exploration
@@ -148,12 +148,12 @@ Der Dialog ist abgeschlossen, wenn:
   oder (b) der User hat explizit bestätigt, dass keine gilt – notiere dies als Befund.
   Ohne explizite Bestätigung ist die Abwesenheit einer Antwort kein Abschluss.
 - Alle Zustände aus Schritt 0.A haben definiertes Verhalten bei allen Operationen aus 0.A –
-  außer einer Operation wurde durch decisions.md oder explizite User-Aussage als „nicht
+  außer einer Operation wurde durch adr.md oder explizite User-Aussage als „nicht
   applicable" markiert
 - Keine offenen Widersprüche bestehen – prüfe: Widerspricht Antwort X der Antwort Y
   zu derselben Entität / Operation / Zustand?
 - Technische Fehler: entweder story-spezifisches Verhalten dokumentiert, oder explizit
-  bestätigt dass die allgemeine Behandlung (decisions.md: Querschnittliche Fehlerbehandlung)
+  bestätigt dass die allgemeine Behandlung (adr.md: Querschnittliche Fehlerbehandlung)
   gilt – „keine Antwort" ist kein Abschluss
 - Draft-Saving & Abbrechen: für jedes Formular dieser Story explizit entschieden — trivial (→ kein Draft-Saving, Abbrechen ohne Rückfrage) oder nicht-trivial (→ Draft-Saving ja/nein, Abbrechen-Verhalten per UX-Guideline Prinzip 5 geklärt); bei Draft-Saving oder Bestätigungsdialog: Szenarien eingeplant
 - UI-Verhaltens-Checkliste (siehe unten) vollständig abgearbeitet
@@ -177,10 +177,10 @@ Notiere das Ergebnis der Checkliste schriftlich — für jeden Aspekt entweder:
 - „Relevant – bereits durch Szenario [Titel] abgedeckt"
 - „Nicht relevant – [ein Satz Begründung]"
 
-**Achtung:** Offenbart der Dialog eine Architekturentscheidung, die nicht in decisions.md
+**Achtung:** Offenbart der Dialog eine Architekturentscheidung, die nicht in adr.md
 steht (z.B. eine neue Verhaltenssemantik oder ein neues Zustandsmodell)? → Stopp.
 Per CLAUDE.md-Regel: Business-Logik-Entscheidungen beim User nachfragen und erst dann
-in decisions.md dokumentieren, bevor Szenarien geschrieben werden.
+in adr.md dokumentieren, bevor Szenarien geschrieben werden.
 
 → TaskUpdate „1. Regelentdeckung (Dialog)": completed
 
@@ -197,7 +197,7 @@ Jeder Agent bekommt:
 - Eingabefelder mit Typen und Constraints (Schritt 0.D)
 - User-Antworten aus dem Dialog (Schritt 1) – **verbatim, nicht paraphrasiert**
   (Paraphrasen können implizite Regeln verlieren, die der User beiläufig formuliert hat)
-- Constraints aus decisions.md (Schritt 0.C; nur US-bezogene + allgemeine Architekturregeln)
+- Constraints aus adr.md (Schritt 0.C; nur US-bezogene + allgemeine Architekturregeln)
 - Bestehende Szenarien (Schritt 0.B; „keine" wenn neu)
 - UX-Kontext (Schritt 0.E) – welche UX-Prinzipien gelten, mit Relevanzbewertung
 
@@ -232,7 +232,7 @@ Führe die Outputs von A, B, C zusammen:
    Formulierung. Verliere keine Information – nur echte Duplikate entfernen.
 
 2. **Widersprüche auflösen:** Wenn Agents verschiedene Outcomes für denselben Fall beschreiben,
-   prüfe gegen decisions.md und US-Akzeptanzkriterien. Nicht auflösbar?
+   prüfe gegen adr.md und US-Akzeptanzkriterien. Nicht auflösbar?
    → Als offene Frage markieren und User fragen (kein Weitermachen mit Widerspruch).
 
    Wie Widersprüche erkennen:
@@ -240,9 +240,9 @@ Führe die Outputs von A, B, C zusammen:
    - Komplementäre Fälle (ein Agent: „Zutat existiert", anderer: „Zutat existiert nicht")
      sind **kein** Widerspruch – beide in den Pool aufnehmen
 
-3. **Vollständige Gherkin-Szenarien formulieren** (Formatregeln: `docs/E2E_TESTING.md`):
-   - Background: übernehmen wenn vorhanden und die Given-Steps noch mit GLOSSARY.md-Entitäten
-     und decisions.md-Zustandsmodell übereinstimmen; bei Zweifel verwerfen und neu definieren –
+3. **Vollständige Gherkin-Szenarien formulieren** (Formatregeln: `docs/process/e2e-testing.md`):
+   - Background: übernehmen wenn vorhanden und die Given-Steps noch mit docs/reference/glossary.md-Entitäten
+     und adr.md-Zustandsmodell übereinstimmen; bei Zweifel verwerfen und neu definieren –
      ein unpassender Background korrumpiert still alle darunterliegenden Szenarien, während
      Redundanz nur kosmetisch ist. Neu definieren wenn Voraussetzungen für alle Szenarien
      identisch sind.
@@ -276,7 +276,7 @@ Lies `references/agent-review.md` – der Inhalt ist der Prompt für den Review-
 Füge ihn zusammen mit diesen Inputs in den Agent-Aufruf ein:
 - Feature-Entwurf aus Schritt 3 (vollständig, verbatim)
 - User Story + Akzeptanzkriterien (verbatim aus Schritt 0, nicht paraphrasiert)
-- Constraints aus decisions.md (aus Schritt 0)
+- Constraints aus adr.md (aus Schritt 0)
 
 **Nach dem Review – Loop (max. 3 Iterationen):**
 
@@ -310,7 +310,7 @@ Findings + Kontext dem User präsentieren, fragen wie weiter.
 
 **A) Feature-File schreiben:**
 Pfad: `features/<entity-plural-english>.feature`
-Konvention: englischer Plural des Domain-Entitätsnamens aus GLOSSARY.md
+Konvention: englischer Plural des Domain-Entitätsnamens aus docs/reference/glossary.md
 (z.B. `features/ingredients.feature` für Zutat, `features/recipes.feature` für Rezept).
 Wenn eine US mehrere Entitäten betrifft, benenne die Datei nach der primären Entität
 (der, die in der US-Überschrift dominant ist); falls unklar: User fragen.
@@ -318,8 +318,8 @@ Datei vollständig ersetzen (oder neu anlegen) mit dem finalen Entwurf.
 
 **B) Entscheidungen dokumentieren:**
 Wurden im Workshop explizite Entscheidungen getroffen (z.B. Fehlermeldungstext,
-Grenzfall-Verhalten), die noch nicht in decisions.md stehen?
-Falls ja: Einträge in `docs/history/decisions.md` ergänzen.
+Grenzfall-Verhalten), die noch nicht in adr.md stehen?
+Falls ja: Einträge in `docs/history/adr.md` ergänzen.
 
 **C) Freigabe vom User einholen:**
 Präsentiere:
@@ -332,7 +332,7 @@ implementing-scenario starten?"
 
 Warte auf explizite Freigabe. Bei Anpassungsbedarf: überarbeiten und erneut vorlegen.
 
-Falls User-Feedback ein Szenario fordert, das einer Regel in decisions.md oder dem GLOSSARY.md
+Falls User-Feedback ein Szenario fordert, das einer Regel in adr.md oder dem docs/reference/glossary.md
 widerspricht: Konflikt explizit benennen, Regel zitieren, fragen ob das Szenario angepasst
 oder die Regel aktualisiert werden soll. Business-Logic-Entscheidungen gehören dem User
 (CLAUDE.md-Regel: Business-Impact → nachfragen).

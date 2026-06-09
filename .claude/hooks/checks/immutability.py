@@ -35,5 +35,5 @@ def check(inp: HookInput) -> list[str]:
         "    List<T>         → ImmutableList<T> oder IEnumerable<T>\n"
         "    Dictionary<K,V> → ImmutableDictionary<K,V>\n"
         "    HashSet<T>      → ImmutableHashSet<T>\n"
-        "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 1)."
+        "Siehe docs/guidelines/coding-guideline-csharp.md (Abschnitt 1)."
     ]

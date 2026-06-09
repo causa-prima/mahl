@@ -4,13 +4,13 @@
 Du reviewst einen Gherkin-Feature-Entwurf auf Vollständigkeit und Qualität.
 
 Lies zuerst (Read-Tool verwenden):
-- `docs/E2E_TESTING.md` – verbindliche Tag-Konventionen, Namenskonventionen, Traceability-Regeln
-- `docs/CODING_GUIDELINE_UX.md` – Interaction-Design-Prinzipien (Prinzip 3, 4, 7 sind für Gherkin relevant)
+- `docs/process/e2e-testing.md` – verbindliche Tag-Konventionen, Namenskonventionen, Traceability-Regeln
+- `docs/guidelines/coding-guideline-ux.md` – Interaction-Design-Prinzipien (Prinzip 3, 4, 7 sind für Gherkin relevant)
 
 Feature-Entwurf: [vollständiger Entwurf aus Schritt 3, verbatim]
 User Story + Akzeptanzkriterien: [aus Schritt 0, verbatim – nicht paraphrasiert; Paraphrasen
   können implizite Anforderungen verlieren]
-Constraints aus decisions.md: [aus Schritt 0]
+Constraints aus adr.md: [aus Schritt 0]
 Resilience-Entscheidung aus Schritt 1: [entweder „story-spezifisches Verhalten: <Beschreibung>"
   oder „allgemeine Behandlung gilt, kein story-spezifisches Szenario nötig"]
 Draft-Saving-Entscheidung aus Schritt 1: [entweder „nicht-trivialer Eingabeaufwand: Szenario
@@ -26,7 +26,7 @@ CRITICAL (blockiert Output):
 HIGH (muss vor Output behoben werden):
 - Filterverhalten fehlt (z.B. gelöschte Entitäten ohne Szenario)
 - Listenverhalten fehlt (leere Liste, Sortierung, mehrere Elemente) wenn für US relevant
-- Leerer Zustand ohne Erklärungstext und nächste Aktion (Guideline 7 – CODING_GUIDELINE_UX.md): Then beschreibt nur "leere Liste" statt was der Nutzer konkret sieht
+- Leerer Zustand ohne Erklärungstext und nächste Aktion (Guideline 7 – docs/guidelines/coding-guideline-ux.md): Then beschreibt nur "leere Liste" statt was der Nutzer konkret sieht
 - Mutierende Szenarien ohne vollständigen Then-Zustand
 - Fehlermeldungstext fehlt im Szenario obwohl explizit in der US genannt
 - Then-Assertion trivial wahr: Given kann keinen Gegenfall produzieren (z.B. Sortierungsbehauptung mit nur einem Listeneintrag – immer true)
@@ -41,8 +41,8 @@ MEDIUM (beheben wenn möglich, sonst dokumentieren):
 - Technische Details in Given/When/Then (HTTP-Codes, SQL, DB-Begriffe)
 
 LOW (Hinweis):
-- Tag-Inkonsistenz (abweichend von E2E_TESTING.md-Schema)
-- Begriff nicht aus GLOSSARY.md
+- Tag-Inkonsistenz (abweichend von docs/process/e2e-testing.md-Schema)
+- Begriff nicht aus docs/reference/glossary.md
 - Sortierreihenfolge nicht eingehalten (happy-path → error → edge-case)
 
 Ausgabe pro Finding: [SEVERITY] [Szenario-Titel oder "Global"] – [Problem] – [Vorschlag]

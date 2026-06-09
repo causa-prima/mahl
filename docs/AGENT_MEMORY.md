@@ -2,25 +2,23 @@
 
 > **Working Memory:** Immer aktuell. **Limit: ≤ 4 KB** (Hard-Grenzwert).
 > Bei Überschuss: Mit User klären was wohin ausgelagert werden soll – sollte aber nie vorkommen.
-> Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/decisions.md`
-> Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, PROCESS)
+> Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`)
+> Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process)
 
-**Letzte Aktualisierung:** 2026-06-04 (Session 071 – gherkin-workshop US-904 Dialog-Verhalten abgeschlossen)
-**Phase:** SKELETON 🔄 – US-904 Szenario 1 vollständig abgeschlossen; Szenario 2 bereit zur Neuimplementierung
+**Letzte Aktualisierung:** 2026-06-10 (Session 076 – Doc-/Prozess-Tuning: TDD Batch-RED, Review-Auditoren, docs/-Reorg; committed + gepusht)
+**Phase:** SKELETON 🔄 – US-904 Szenario 1 abgeschlossen; Szenario 2 bereit zur Neuimplementierung (jetzt mit Batch-RED-Prozess + `*-auditor`-Agenten)
 
 ---
 
 ## Nächste Prioritäten (Reihenfolge bindend; keine Nummerierung verwenden, sondern nur Anstriche)
 
-- **decisions.md verbessern**: eindeutige IDs (DEC-XXX), Discoverability und Durchsuchbarkeit für Subagenten-Referenzierung prüfen – Voraussetzung für A1c (`#pragma DEC-XXX`-Enforcement in `implementing-scenario` Skill + Subagenten-Prompts)
-
-- **US-904 Szenario 2 neu implementieren** (mit verbessertem Prozess) – nur was das Szenario fordert: POST /api/ingredients (happy path, kein Validierungsfehler-Code), GET mit ETag (Content-Hash SHA-256). ETag für `GET /api/ingredients/{id}` (xmin): wird beim entsprechenden Endpoint-Szenario umgesetzt, NICHT hier.
+- **US-904 weiter implementieren** (Batch-RED-Prozess) – erstes `@US-904-happy-path` („Zutaten-Liste ist leer") abgeschlossen; nächste Szenarien in Reihenfolge aus `features/ingredients.feature`, via `implementing-scenario`.
 
 - **gherkin-workshop US-904 V1:** Separater Schritt vor V1-Implementierung: Feature-Datei und Szenarien ergänzen, die erst in V1 umgesetzt werden (Funktionalität die über MVP hinausgeht: Update einer Zutat + Tags für Zutaten).
 
 - **Deep-Link-Anforderung klären:** Vor US-602 (Rezept-Detailansicht) – welche Entitäten, Hintergründe, Architektur-Implikationen.
 
-- **Visuelle Konsistenz-Guideline:** `docs/CODING_GUIDELINE_UX.md` um Spacing/Hierarchie/Farbe erweitern, sobald >3 Komponenten dieselben visuellen Entscheidungen treffen.
+- **Visuelle Konsistenz-Guideline:** `docs/guidelines/coding-guideline-ux.md` um Spacing/Hierarchie/Farbe erweitern, sobald >3 Komponenten dieselben visuellen Entscheidungen treffen.
 
 ---
 
@@ -39,4 +37,4 @@
 
 ## Offene Fragen
 
-- **Soll YAGNI für useResultQuery/MutationState gelten?** → Nur `pending|success` implementieren oder vollständige Union? TypeScript-Exhaustiveness-Check erzwingt alle Zweige. Klären vor Szenario-2-Implementierung.
+- **Soll YAGNI für useResultQuery/MutationState gelten?** → Nur `pending|success` implementieren oder vollständige Union? TypeScript-Exhaustiveness-Check erzwingt alle Zweige. Klären vor dem ersten Szenario mit async HTTP-State (Mutation/Loading) – die nächsten reinen Dialog-Szenarien brauchen es nicht.

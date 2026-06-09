@@ -396,3 +396,4 @@ playwright-report/
 
 # Stryker mutation reports
 Client/reports/
+StrykerOutput/

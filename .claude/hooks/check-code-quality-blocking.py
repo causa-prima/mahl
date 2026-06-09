@@ -5,7 +5,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from checks.common import parse_input, BLOCKING_DISCUSSION_NOTE
-from checks import rop, throw_check, immutability_strict, immutability, constructors, tdd_one_test
+from checks import rop, throw_check, immutability_strict, immutability, constructors
 from checks.primitives import check_blocking as primitives_blocking
 
 CHECKS = [
@@ -14,7 +14,6 @@ CHECKS = [
     immutability_strict.check,
     immutability.check,
     constructors.check,
-    tdd_one_test.check,
     primitives_blocking,
 ]
 

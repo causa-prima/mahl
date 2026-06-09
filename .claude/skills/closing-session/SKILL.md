@@ -15,7 +15,7 @@ TaskCreate: "1. Intern reflektieren"
 TaskCreate: "2. Dokumentations-Änderungsbedarf prüfen"
 TaskCreate: "3. Session-Datei anlegen"
 TaskCreate: "4. lessons_learned.md aktualisieren"
-TaskCreate: "5. INDEX.md aktualisieren"
+TaskCreate: "5. index.md aktualisieren"
 TaskCreate: "6. Jenga-Score berechnen"
 TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
 ```
@@ -47,7 +47,7 @@ TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
 5. `docs/kaizen/lessons_learned.md` – Einträge schreiben:
 → TaskUpdate "3. Session-Datei anlegen": completed | TaskUpdate "4. lessons_learned.md aktualisieren": in_progress
 
-   Format und Schwere/Kategorie-Definitionen: `docs/kaizen/PROCESS.md`
+   Format und Schwere/Kategorie-Definitionen: `docs/kaizen/process.md`
 
    **Andon-Cord:** KRITISCH-Findings wurden bereits behandelt – trotzdem dokumentieren.
 
@@ -57,11 +57,11 @@ TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
 
    "Keine Learnings" nur mit expliziter Begründung akzeptabel.
 
-6. `docs/history/sessions/INDEX.md` – neue Zeile ergänzen (1-Satz-Zusammenfassung)
-→ TaskUpdate "4. lessons_learned.md aktualisieren": completed | TaskUpdate "5. INDEX.md aktualisieren": in_progress
+6. `docs/history/sessions/index.md` – neue Zeile ergänzen (1-Satz-Zusammenfassung)
+→ TaskUpdate "4. lessons_learned.md aktualisieren": completed | TaskUpdate "5. index.md aktualisieren": in_progress
 
 7. Jenga-Score berechnen:
-→ TaskUpdate "5. INDEX.md aktualisieren": completed | TaskUpdate "6. Jenga-Score berechnen": in_progress
+→ TaskUpdate "5. index.md aktualisieren": completed | TaskUpdate "6. Jenga-Score berechnen": in_progress
    - Script ausführen: `python3 .claude/scripts/jenga_score.py`
    - Jenga-Score intern festhalten für Schritt 8.
 

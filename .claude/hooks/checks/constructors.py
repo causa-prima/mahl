@@ -56,6 +56,6 @@ def check(inp: HookInput) -> list[str]:
             "Ausnahmen:\n"
             "  - DTOs, EF-Entities (`DatabaseTypes/`), Tests\n"
             "  - `public TypeName() => throw new InvalidOperationException(...)` für readonly record struct\n"
-            "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 3)."
+            "Siehe docs/guidelines/coding-guideline-csharp.md (Abschnitt 3)."
         ]
     return []

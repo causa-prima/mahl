@@ -1,6 +1,6 @@
 # Szenario 3 – Der schnelle Einkauf (Mittagspause)
 
-> Teil von [USER_STORIES.md](../USER_STORIES.md).
+> Teil von [docs/stories/user-stories.md](../docs/stories/user-stories.md).
 
 ## Inhalt
 
@@ -43,7 +43,7 @@
     *   **Implementierungshinweis:** Teilt die Listenkomponente mit US-201. Beim Implementieren: Tests für den "im Laden"-Kontext schreiben.
 
 *   **US-304 (Visuelle Darstellung & Varianten) [OBSOLET]:** Aufgelöst – drei Bedenken wurden getrennt behandelt:
-    *   **Kachel-Design (Layout):** Designprinzip ab SKELETON – in `docs/history/decisions.md` (Abschnitt "Einkaufsliste UX-Referenz: Bring!") dokumentiert.
+    *   **Kachel-Design (Layout):** Designprinzip ab SKELETON – in `docs/history/adr.md` (Abschnitt "Einkaufsliste UX-Referenz: Bring!") dokumentiert.
     *   **Modifizierer-Trennschärfe:** Als AK in US-301 aufgenommen.
     *   **Langklick-Kontext:** Als AK in US-301 aufgenommen.
 

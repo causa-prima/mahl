@@ -46,7 +46,7 @@ def check_blocking(inp: HookInput) -> list[str]:
         "⛔ Primitive-Obsession-Verletzung (blockierend): Nackte Built-in-Typen als Property in Domain-Code erkannt.\n"
         "Kapsle sie in Value Objects (z.B. `RecipeName`, `IngredientId`).\n"
         "Ausnahmen: DTOs (`Shared/Dtos/`), EF-Entities (`DatabaseTypes/`), Tests.\n"
-        "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 2)."
+        "Siehe docs/guidelines/coding-guideline-csharp.md (Abschnitt 2)."
     ]
 
 
@@ -66,5 +66,5 @@ def check_nonblocking(inp: HookInput) -> list[str]:
         "Prüfe ob Value Objects (z.B. `RecipeName`, `IngredientId`) passender wären.\n"
         "Ausnahme: Factory-Methods und Value Objects nehmen bewusst Primitives als Input.\n"
         "Ausnahmen: DTOs (`Shared/Dtos/`), EF-Entities (`DatabaseTypes/`), Tests.\n"
-        "Siehe CODING_GUIDELINE_CSHARP.md (Abschnitt 2)."
+        "Siehe docs/guidelines/coding-guideline-csharp.md (Abschnitt 2)."
     ]

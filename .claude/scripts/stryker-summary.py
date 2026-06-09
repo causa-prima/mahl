@@ -19,10 +19,10 @@ from pathlib import Path
 MAX_REPORT_AGE_MINUTES = 5
 
 
-def find_latest_report() -> Path:
-    output_dir = Path(__file__).parent.parent.parent / "StrykerOutput"
+def find_latest_report(base_dir: str = "StrykerOutput/Backend") -> Path:
+    output_dir = Path(__file__).parent.parent.parent / base_dir
     if not output_dir.exists():
-        print("Kein StrykerOutput-Verzeichnis gefunden.", file=sys.stderr)
+        print(f"Kein {base_dir}-Verzeichnis gefunden.", file=sys.stderr)
         sys.exit(1)
     reports = sorted(output_dir.glob("*/reports/mutation-report.json"), reverse=True)
     if not reports:
@@ -42,7 +42,7 @@ def find_latest_report() -> Path:
 
 def short_path(full_path: str) -> str:
     normalized = full_path.replace("\\", "/")
-    for anchor in ("Server/", "Server.Tests/"):
+    for anchor in ("Server/", "Server.Tests/", "src/"):
         if anchor in normalized:
             return normalized[normalized.index(anchor):]
     return normalized.split("/")[-1]

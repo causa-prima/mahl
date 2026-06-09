@@ -25,10 +25,10 @@ def test_csproj_tests_blocked():
     assert get_denial_reason("Server.Tests/mahl.Server.Tests.csproj") is not None
 
 def test_dependencies_md_blocked():
-    assert get_denial_reason("docs/DEPENDENCIES.md") is not None
+    assert get_denial_reason("docs/reference/dependencies.md") is not None
 
 def test_dependencies_md_absolute_blocked():
-    assert get_denial_reason("/repo/docs/DEPENDENCIES.md") is not None
+    assert get_denial_reason("/repo/docs/reference/dependencies.md") is not None
 
 
 # --- erlaubt ---
@@ -37,7 +37,7 @@ def test_other_json_not_blocked():
     assert get_denial_reason("appsettings.json") is None
 
 def test_other_md_not_blocked():
-    assert get_denial_reason("docs/ARCHITECTURE.md") is None
+    assert get_denial_reason("docs/reference/architecture.md") is None
 
 def test_cs_file_not_blocked():
     assert get_denial_reason("Server/Domain/Ingredient.cs") is None
