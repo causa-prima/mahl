@@ -335,6 +335,20 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     (re.compile(r'^diff\b'), 'Lesen', 'diff'),
     # Shell: allgemeine Hilfsbefehle, Textverarbeitung, Pfad-Tools
     (re.compile(r'^echo\b'), 'Shell', 'echo'),
+    # cd: reine Navigation. Gefährliche Kombis (cd + dotnet run / npx) sind unabhängig
+    # via WRONG_APPROACH (Gesamtbefehl, vor Split) gedeckt; jedes Folge-Segment wird
+    # ohnehin einzeln geprüft.
+    (re.compile(r'^cd\b'), 'Shell', 'cd'),
+    # sed read-only (kein -i / --in-place): druckt nur nach stdout, verändert keine Datei.
+    # In-Place-Edits bleiben deny → Edit-Tool (Ausnahme: \r-Bereinigung, eigenes Pattern oben).
+    (re.compile(r'^sed\b(?!.*\s(?:-i|--in-place))'), 'Shell', "sed (read-only, ohne -i)"),
+    # xargs nur mit read-only Child-Command (xargs führt sein Argument als Befehl aus –
+    # darum eng auf Lese-Werkzeuge begrenzt; xargs rm/mv/bash etc. bleibt deny).
+    (
+        re.compile(r'^xargs\s+(?:-\S+\s+(?:\{\}\s+)?)*(?:grep|cat|wc|head|tail|file|stat|sort|uniq|cut|ls)\b'),
+        'Shell',
+        'xargs grep|cat|wc|head|tail|file|stat|sort|uniq|cut|ls',
+    ),
     (re.compile(r'^pwd$'), 'Shell', 'pwd'),
     (re.compile(r'^date$'), 'Shell', 'date'),
     (re.compile(r'^which\b'), 'Shell', 'which'),
@@ -365,11 +379,11 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         None,
         "sed -i 's/\\r//' <datei>",
     ),
-    # git read-only
+    # git read-only (optional mit -C <pfad>, um in anderem Repo/Worktree zu lesen)
     (
-        re.compile(r'^git\s+(status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog)\b'),
+        re.compile(r'^git\s+(?:-C\s+\S+\s+)?(status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog)\b'),
         None,
-        'git status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog',
+        'git [-C <pfad>] status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog',
     ),
     # git safe write (explizit kein -f/--force – das ist in WRONG_APPROACH_PATTERNS)
     (re.compile(r'^git\s+add\b(?!.*\s(?:-f\b|--force\b))'), None, 'git add <datei>  (ohne -f/--force)'),
@@ -411,6 +425,19 @@ _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
         "  cmd.exe /c \"dotnet run --project C:\\\\Users\\\\kieritz\\\\source\\\\repos\\\\mahl\\\\Server\"\n"
         "  (.NET läuft nur auf Windows, nicht direkt in WSL)",
     ),
+    (
+        re.compile(r'^python3\s+-c\b'),
+        "python3 -c führt beliebigen Code aus (nicht erlaubt).\n"
+        "Für Ad-hoc-Analyse: Script nach .claude/tmp/foo.py schreiben (Write-Tool), dann\n"
+        "  python3 .claude/tmp/foo.py   (anschließend löschen).\n"
+        "Für Datei-Inspektion: Read/Grep/Glob-Tools statt Python.",
+    ),
+    (
+        re.compile(r'^(?:for|while)\b'),
+        "Shell-Schleifen sind nicht erlaubt.\n"
+        "Über mehrere Dateien iterieren: Glob/Grep-Tools nutzen, oder ein\n"
+        "Analyse-Script nach .claude/tmp/ schreiben und mit python3 .claude/tmp/<name>.py ausführen.",
+    ),
 ]
 
 
@@ -435,18 +462,18 @@ _ALLOW_ONCE_WITH_HINT_FOOTER = (
 )
 
 _NO_HINT_MESSAGE = (
-    "Kein Hint verfügbar. Zuerst CLAUDE.md Navigationstabelle prüfen\n"
-    "ob eine definierte Alternative existiert.\n"
+    "Befehl nicht auf der Allow-Liste. Erlaubte Befehle + Alternativen ansehen:\n"
+    "  python3 .claude/hooks/check-bash-permission.py --list\n"
     "\n"
-    "Falls keine Alternative bekannt – dem User erklären:\n"
+    "Für Ad-hoc-Logik: Script nach .claude/tmp/foo.py schreiben, dann python3 .claude/tmp/foo.py.\n"
+    "\n"
+    "Falls --list nichts Passendes zeigt – dem User erklären:\n"
     "  (1) Was der Befehl tun soll\n"
-    "  (2) Warum keine bekannte Alternative ausreicht\n"
-    "  (3) Ob regelmäßig benötigt → ggf. zur Allow-Liste hinzufügen\n"
-    "  (4) Wenn regelmäßig + Output-Verarbeitung: Wrapper-Script sinnvoller?\n"
+    "  (2) Warum keine erlaubte Alternative ausreicht\n"
+    "  (3) Ob regelmäßig benötigt → ggf. auf die Allow-Liste / als Wrapper-Script\n"
     "\n"
     "Einmalige Ausnahme: '# --allow-once' anhängen → User wird gefragt.\n"
     "⚠️  Nur für echte Einzelfälle ohne reguläre Alternative.\n"
-    "   Alle erlaubten Patterns: python3 .claude/hooks/check-bash-permission.py --list\n"
     "Nicht kreativ umgehen – jedes Deny hat einen Grund."
 )
 
@@ -660,8 +687,37 @@ def _build_deny_message(reason: str) -> str:
     return _NO_HINT_MESSAGE
 
 
+# Projekt-Tasks, die NIE direkt laufen (Tests/Lint/Mutation) → immer via Wrapper-Script.
+# Die direkten Befehle (dotnet test, npm run test, npx …) sind WRONG_APPROACH → deny.
+# Hier nur für --list, damit der korrekte Weg PROAKTIV sichtbar ist (sonst lernt der Agent
+# ihn erst nach einem unnötigen Deny). Bei Script-Umbenennung hier + WRONG_APPROACH_PATTERNS syncen.
+_PROJECT_TASK_SCRIPTS: list[str] = [
+    "Backend-Tests:       python3 .claude/scripts/dotnet-test.py [--filter X] [--verbose]",
+    "Backend-Mutation:    python3 .claude/scripts/dotnet-stryker.py [--mutate Domain/Foo.cs] [--detail]",
+    "Frontend-Unit-Tests: python3 .claude/scripts/vitest-run.py [--filter X] [--verbose]",
+    "Frontend-E2E:        python3 .claude/scripts/playwright-test.py [--filter X] [--verbose]",
+    "Frontend-Mutation:   python3 .claude/scripts/stryker-frontend.py [--mutate src/..] [--detail]",
+    "ESLint:              python3 .claude/scripts/eslint-run.py [--verbose]",
+    "Duplikate (jscpd):   python3 .claude/scripts/jscpd-run.py [--verbose]",
+]
+
+
 def _print_allow_list() -> None:
     """Gibt eine lesbare Übersicht der erlaubten Befehle aus (--list-Flag)."""
+    print(
+        "Diese Liste regelt das Bash-Tool. Befehle die hier nicht passen, werden vom\n"
+        "PreToolUse-Hook automatisch geblockt (deny) – nicht nur \"unerwünscht\", sondern\n"
+        "hart blockiert. '# --allow-once' anhängen erzwingt eine einmalige User-Freigabe\n"
+        "(nur für echte Einzelfälle ohne regulären Weg).\n"
+        "Tool-Vorrang: für Datei-Lesen/-Ändern/-Suchen sind Read/Edit/Grep/Glob meist\n"
+        "besser als cat/sed/grep – Bash nur wenn kein Tool passt.\n"
+    )
+
+    print("Häufige Projekt-Tasks – immer via Wrapper-Script (Direktaufruf wird geblockt):")
+    for line in _PROJECT_TASK_SCRIPTS:
+        print(f"  {line}")
+    print()
+
     print("Erlaubte Befehle (Allow-Liste):")
 
     # Erst alle Einträge sammeln, dann alphabetisch sortiert ausgeben

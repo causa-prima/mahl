@@ -32,6 +32,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 079 – 2026-06-10
+
+- **[MITTEL] [PROZESS] [Hook/Script] Agenten-Guidance/UX nicht am frischen Subagenten verifiziert**
+  Was: Hook-Allow-Liste + Framing überarbeitet und für ausreichend gehalten; erst der Subagent-Eval (frischer Agent löst Task-Liste nur anhand `--list`) deckte auf, dass die Wrapper-Scripts unsichtbar waren → `dotnet test`/`npm test` wären weiter in unnötige Denies gelaufen.
+  Warum: „Verständlich für mich, der ich den Hook kenne" ≠ „verständlich für einen kalt startenden Agenten" – das eigene Vorwissen maskiert die Lücke.
+  Regel: Änderungen an agenten-gerichteter Guidance/Hint-/List-UX an einem frischen Subagenten mit konkreter Aufgabenliste empirisch testen, bevor sie als fertig gelten – nicht am eigenen Verständnis.
+
+- **[MITTEL] [PROZESS] [Hook/Script] Korrekter Weg nur reaktiv (per Deny-Hint) statt proaktiv auffindbar**
+  Was: Die Wrapper-Scripts (Tests/Lint/Mutation) standen nur in den WRONG_APPROACH-Hints – der Agent erfuhr den richtigen Befehl erst *nach* einem Deny; proaktiv griff er zum naheliegenden Direktbefehl.
+  Warum: Reaktive Hints heilen, verhindern aber den unnötigen Deny nicht; der korrekte Pfad fehlte in der immer geladenen Liste.
+  Regel: Für wiederkehrende Tätigkeits-Klassen den korrekten Befehl proaktiv in der ständig sichtbaren Quelle (`--list`, SessionStart) anbieten – nicht darauf bauen, dass der Agent ihn über ein Deny lernt.
+
 ## Session 078 – 2026-06-10
 
 - **[MITTEL] [PROZESS] [Hook/Script] Matching-Heuristik nur theoretisch begründet, nicht am Datensatz geprüft**

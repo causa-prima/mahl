@@ -304,6 +304,22 @@ def test_allow_patterns() -> int:
         ("cat file.txt | tail -20", "Compound: cat | tail"),
         ("git status && git diff", "Compound: git status && git diff"),
         ("ls -la | grep .cs | wc -l", "Compound: ls | grep | wc (3 Segmente)"),
+        # cd-Navigation (harmlos – gefährliche Kombis bleiben via WRONG_APPROACH/DESTRUCTIVE gedeckt)
+        ("cd Client", "cd solo"),
+        ("cd .claude/hooks && ls -la", "cd && ls"),
+        ("cd /mnt/c/Users/kieritz/source/repos/mahl && git status", "cd && git status"),
+        ("cd docs/kaizen/archive && wc -l *.md", "cd && wc"),
+        # sed read-only (kein -i) → erlaubt
+        ("sed -n '1,40p' docs/process/e2e-testing.md", "sed -n Zeilenbereich"),
+        ("sed -n '154,162p' .claude/hooks/test-bash-permission.py", "sed -n zweiter Bereich"),
+        ("cat foo | sed 's/x/y/'", "sed im Pipe (read-only, kein -i)"),
+        # find | xargs <safe-readonly> → erlaubt
+        ("find . -name '*.feature' | xargs grep -l Zutat", "find | xargs grep"),
+        ("find . -name '*.md' | xargs wc -l", "find | xargs wc"),
+        ("find . -type f | xargs -I {} grep foo {}", "find | xargs -I grep"),
+        # git -C <pfad> read-only → erlaubt
+        ("git -C /mnt/c/Users/kieritz/source/repos/mahl diff --stat HEAD", "git -C diff"),
+        ("git -C Client log --oneline -3", "git -C log"),
     ]
 
     for command, desc in allow_cases:
@@ -380,6 +396,17 @@ def test_deny() -> int:
         ("git restore .", "git restore ."),
         # taskkill ist destruktiv (in DESTRUCTIVE_PATTERNS)
         ('cmd.exe /c "taskkill /f /im dotnet.exe"', "taskkill ohne Marker"),
+        # cd erlaubt – aber gefährliche Folge-Segmente bleiben deny
+        ("cd Client && rm -rf dist", "cd && rm -rf → deny (DESTRUCTIVE-Segment)"),
+        ("cd Client && npx vitest run", "cd && npx → deny (WRONG_APPROACH)"),
+        ("cd Server && dotnet publish", "cd && dotnet publish → deny (unbekanntes Segment)"),
+        # sed mit -i (nicht \r-Spezialfall) bleibt deny – Edit-Tool verwenden
+        ("sed -i 's/foo/bar/' file.txt", "sed -i Edit → deny"),
+        ("cat x | sed -i 's/a/b/' y.txt", "sed -i im Pipe → deny"),
+        # xargs mit nicht-read-only Child bleibt deny
+        ("find . -name '*.tmp' | xargs rm", "find | xargs rm → deny"),
+        ("find . | xargs -I {} mv {} /tmp", "find | xargs mv → deny"),
+        ("echo x | xargs bash -c 'rm -rf /'", "xargs bash → deny"),
     ]
 
     for command, desc in deny_cases:

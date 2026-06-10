@@ -41,6 +41,8 @@ kritische-regeln:
 - **Auto-deny**: Alle anderen Befehle werden automatisch abgelehnt.
 - **`# --allow-once`**: Marker an den Befehl hängen → Hook fragt den User. Wird geloggt in `.claude/tmp/denied-commands.log`.
 
+**Vollständige Liste:** `python3 .claude/hooks/check-bash-permission.py --list` zeigt alle erlaubten Befehle, die Projekt-Task-Wrapper (Tests/Lint/Mutation) und die Deny-Mechanik. Wird am Session-Start automatisch in den Kontext geladen.
+
 **Timeouts:** Vor jedem lang laufenden Prozess überlegen: *Wann sollte ich abbrechen?* Das Bash-Tool akzeptiert einen `timeout`-Parameter (Millisekunden). Richtwerte:
 
 | Befehl | Erwartete Dauer | Empfohlener Timeout |

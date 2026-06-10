@@ -5,7 +5,7 @@
 > Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`)
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process)
 
-**Letzte Aktualisierung:** 2026-06-10 (Session 078 – Kaizen-Retro S070–077 + Revision der Kontext-Taxonomie; Details: session_078)
+**Letzte Aktualisierung:** 2026-06-10 (Session 079 – Bash-Permission-Friktion ausgewertet+behoben (Hook+Guidance+SessionStart, 2 Subagent-Evals); Details: session_079)
 **Phase:** SKELETON 🔄 – US-904: „Liste leer" + „Felder leer beim Öffnen" abgeschlossen; nächstes Szenario aus `features/ingredients.feature` via `implementing-scenario`
 
 ---
@@ -20,7 +20,7 @@
 
 - **Visuelle Konsistenz-Guideline:** `docs/guidelines/coding-guideline-ux.md` um Spacing/Hierarchie/Farbe erweitern, sobald >3 Komponenten dieselben visuellen Entscheidungen treffen.
 
-- **Zwei offene Maßnahmen** (Details + Status in `docs/kaizen/countermeasures.md`, OFFEN): (a) bash-permission-Friktion auswerten & Hook/Guidance verbessern (67 Befehls-Denies → Zeit/Token-Kosten, Datenlage reicht); (b) HOCH→CM-Härtung prüfen (closing-session-Prüfung ist weich).
+- **Eine offene Maßnahme** (Details + Status in `docs/kaizen/countermeasures.md`, OFFEN): HOCH→CM-Härtung prüfen (closing-session-Prüfung ist weich).
 
 ---
 
