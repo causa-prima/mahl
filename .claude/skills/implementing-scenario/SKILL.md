@@ -196,15 +196,18 @@ Playwright-Test erneut ausführen. Noch rot? Ursache identifizieren (Routing? AP
 
 **Mechanische Verifikation (Script):**
 
-Für jede verwendete Schicht ausführen (`--skip-stryker`: kein neuer Stryker-Lauf – analysiert den Report des letzten Subagenten-Laufs):
+Der Subagent hat in seinem Return einen `=== VERIFIKATIONS-HASH ===`-Block aus einem **frischen** `qa-check.py`-Lauf geliefert. Verifiziere ihn mechanisch – das Script führt **keinen** neuen Stryker-Lauf aus und meldet pass/fail:
 ```
-python3 .claude/scripts/qa-check.py --layer backend --skip-stryker
-python3 .claude/scripts/qa-check.py --layer frontend --skip-stryker
+python3 .claude/scripts/qa-check.py --layer backend  --verify <hash-aus-subagent-return>
+python3 .claude/scripts/qa-check.py --layer frontend --verify <hash-aus-subagent-return>
 ```
 
-Hash aus dem `=== VERIFIKATIONS-HASH ===`-Block des Subagenten-Returns mit dem eigenen Script-Output vergleichen.
-- Stimmen überein → mechanische Findings sind vertrauenswürdig.
-- Abweichung → Subagent auffordern, `qa-check.py` erneut auszuführen und neuen Hash zu liefern. Bleibt die Abweichung nach einem Retry bestehen → STOP, User fragen.
+- `✅` (Exit 0) → Hash stimmt überein UND Score == 100 % → frischer, gültiger Übergabe-Lauf, mechanische Findings vertrauenswürdig.
+- `❌` (Exit 1) → entweder Hash-Mismatch (kein frischer Lauf / Zustand geändert) oder Score < 100 %. In beiden Fällen Subagent auffordern, das Problem zu beheben und `qa-check.py` erneut auszuführen. Bleibt es nach einem Retry rot → STOP, User fragen.
+
+> **Wichtig:** Der Subagent muss `qa-check.py` zur Übergabe **ohne** `--skip-stryker` laufen lassen – nur ein frischer Lauf erzeugt einen gültigen Übergabe-Hash (mit `--skip-stryker` wird kein Hash ausgegeben). `--skip-stryker` ist reiner Diagnose-Modus für den Orchestrator, nie die Übergabe. Den Subagenten NICHT anweisen, `--skip-stryker` zu nutzen.
+
+`--verify`/`--skip-stryker` geben zusätzlich den vollständigen Check-Block aus (auch bei zu niedrigem Score – qa-check bricht nicht mehr früh ab, sondern zeigt alle Checks und gated am Ende per Exit-Code).
 
 Der Script-Output enthält: staged Test-Dateien (Check 1), neue Suppressionen (Check 2),
 Unit-Test-Muster (Check 3), ESLint-Status (Check 4, Frontend),
@@ -267,7 +270,19 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
 ── SCHRITT 6: COMMIT & SESSION-ABSCHLUSS ───────────────────────────────────
 → TaskUpdate "Schritt 5: Review-Loop": completed | TaskUpdate "Schritt 6: Commit & Session-Abschluss": in_progress
 
-1. **Commit erstellen** (kein Amend):
+1. **Offene Punkte mit dem User triagieren (bevor committed wird):** Sammle aus dem gesamten Ablauf alles, was nicht in den Szenario-Code eingeflossen ist – nichts darf nur in der Konversation hängen bleiben oder ungefragt irgendwo eingetragen werden:
+   - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende oft einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return darauf durchsehen.
+   - **Zurückgestellte ⚠️-Findings** aus dem Review-Loop (Schritt 5).
+   - **Während des Ablaufs entdeckte technische Schuld / Tooling-Reibung.**
+
+   Lege dem User **jeden** Punkt vor – mit genug **Kontext** zum Entscheiden und einer **begründeten Empfehlung**. Der User entscheidet pro Punkt:
+   1. **Direkt umsetzen** → jetzt erledigen (ggf. eigener TDD-Zyklus / Schicht-Subagent).
+   2. **Vermerken** → in das passende Dokument bzw. die passenden Dokumente eintragen. Welches Dokument wofür zuständig ist, steht in der `CLAUDE.md`-Navigationstabelle (single source of truth – hier bewusst NICHT dupliziert, damit nichts driftet).
+   3. **Ignorieren** → bewusst verwerfen.
+
+   Erst eintragen/umsetzen, NACHDEM der User entschieden hat. Kein stilles Eintragen, kein stilles Vergessen.
+
+2. **Commit erstellen** (kein Amend):
    `git status` prüfen – alle noch unstaged Änderungen stagen (`git add <dateien>`).
    ```
    git commit -m "$(cat <<'EOF'

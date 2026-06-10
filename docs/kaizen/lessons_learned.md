@@ -29,6 +29,38 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 > **Format-Referenz:** `docs/kaizen/process.md`
 > **Archiv:** `docs/kaizen/archive/`
 
+## Session 077 – 2026-06-10
+
+- **[HOCH] [TOOLING] [Tooling] Mutation-Gate war dekorativ – nirgends mechanisch erzwungen**
+  Was: Trotz „100 % Mutation Score Pflicht" brach kein Skript bei Survivor/NoCoverage ab: Stryker-Config ohne `thresholds.break` (Default `null`), `stryker-summary.py` exit 0 trotz Survivors, `qa-check.py` prüfte nur den Stryker-Prozess-Exit. Der NoCoverage-`map`-Survivor des Vorszenarios rutschte so durch.
+  Warum: Das Gate verließ sich vollständig auf manuelle/LLM-Sichtprüfung der gedruckten Survivor-Liste; kein Exit-Code erzwang den Schwellwert.
+  Regel: Bei jedem „X % Pflicht"-Gate verifizieren, dass ein konkreter Exit-Code/Mechanismus den Schwellwert erzwingt – „das Skript zeigt es an" ≠ „das Skript blockiert".
+
+- **[MITTEL] [TOOLING] [Tooling] Eigene Metrik statt der Tool-eigenen nachgerechnet**
+  Was: `stryker-summary.py`/`qa-check.py` rechneten den „covered code"-Score (`Killed/(Killed+Survived+Timeout)`, NoCoverage raus) statt des Standard-Mutation-Scores (`detected/(detected+undetected)`, NoCoverage drin), den Stryker selbst im HTML zeigt. Folge: NoCoverage senkte den Score nicht.
+  Warum: Der JSON-Report enthält kein Score-Feld; bei der Nachberechnung wurde die falsche der zwei Stryker-Score-Varianten gewählt.
+  Regel: Wenn ein Tool eine Metrik selbst definiert (hier: HTML-Mutation-Score), exakt diese replizieren – keine abweichende Eigenvariante erfinden.
+
+- **[MITTEL] [PROZESS] [Skill-Nutzung] Orchestrator überschrieb Handoff-Befehl der Agent-Definition**
+  Was: Der Orchestrator wies den Subagenten an, `qa-check.py` mit `--skip-stryker` zur Übergabe zu nutzen – entgegen der Agent-Definition (Übergabe = frischer Lauf). Das schwächte die Frische-Garantie des Verifikations-Hashes.
+  Warum: `--skip-stryker` aus dem Orchestrator-Schritt (Verifikation) wurde fälschlich auf die Subagenten-Übergabe übertragen.
+  Regel: Handoff-Befehle stehen in der Agent-Definition; nicht im Orchestrator-Prompt überschreiben. Gegenmaßnahme umgesetzt: `--skip-stryker` erzeugt keinen Hash mehr; Orchestrator verifiziert via `--verify`.
+
+- **[GERING] [TOOLING] [Tooling] StrykerJS ignoriert JSX-`{/* … */}`-Disable-Kommentare**
+  Was: `{/* Stryker disable next-line ArrowFunction */}` vor einem `{ingredients.map(...)}` wurde nicht erkannt – der Mutant blieb NoCoverage.
+  Warum: StrykerJS liest Disable-Direktiven nicht aus JSX-Block-Kommentaren (JSXExpressionContainer).
+  Regel: Stryker-Disable in JSX als `//`-Zeilenkommentar *innerhalb* der `{ }`-Expression setzen (eigene Zeile vor dem Ausdruck), nicht als `{/* */}`.
+
+- **[MITTEL] [PROZESS] [Skill-Nutzung] Subagent-Vorschläge + zurückgestellte ⚠️-Findings fielen durch**
+  Was: Der Frontend-Subagent lieferte 3 Prozessverbesserungs-Vorschläge; 2 (jest-dom, git-stash) wurden nicht behandelt, einer nur zufällig (ein Auditor meldete dasselbe). Auch als „später vermerken" zugesagte ⚠️-Findings landeten zunächst nicht in AGENT_MEMORY.
+  Warum: `implementing-scenario` hatte keinen Schritt, der Subagenten-Returns auf Vorschläge prüft / offene Punkte triagiert – sie hingen allein an der Orchestrator-Disziplin.
+  Regel: Offene Punkte (Subagent-Vorschläge, zurückgestellte Findings) am Szenario-Ende explizit dem User vorlegen (umsetzen/vermerken/ignorieren) – nicht der Erinnerung überlassen. Gegenmaßnahme umgesetzt: Triage-Schritt in implementing-scenario Schritt 6.
+
+- **[MITTEL] [PROZESS] [Session-Struktur] Abschluss-Artefakte von Hand statt via closing-session**
+  Was: 077-Lessons-Header + AGENT_MEMORY-Zeile + Retro-Trigger wurden mitten im Flow von Hand geschrieben, ohne `closing-session` zu durchlaufen → Jenga-Score nicht neu berechnet, kein Session-Log, Retro-Trigger fehlte bis zum User-Hinweis.
+  Warum: Der Abschluss wurde stückweise vorweggenommen statt als ein Schritt am Ende ausgeführt.
+  Regel: Session-Abschluss-Artefakte (Lessons, AGENT_MEMORY-Stand, Jenga, Retro-Trigger, Log, Index) nur gebündelt via `closing-session` erzeugen – nie einzeln von Hand vorwegnehmen.
+
 ## Session 076 – 2026-06-10
 
 - **[HOCH] [PROZESS] [Tooling] Datei-Rename brach einen funktionalen Pfad-Matcher, nicht nur Links**

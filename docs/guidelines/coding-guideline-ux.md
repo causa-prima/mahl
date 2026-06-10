@@ -47,7 +47,7 @@ sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müsse
 - Nein → gut.
 - Ja → Label oder Struktur überarbeiten, bis der Tooltip überflüssig ist.
 
-✅ Button "Zutat hinzufügen" braucht keine Erklärung.
+✅ Button "Zutat anlegen" braucht keine Erklärung.
 ❌ Button "+" braucht einen Tooltip "Neue Zutat anlegen" → Label direkt ändern.
 
 **Ausnahme:** Tooltips für sekundäre Informationen, die das Layout sprengen würden (z.B. Erklärung eines Fachbegriffs), sind erlaubt — nie als Ersatz für ein klares primäres Label.
@@ -143,7 +143,7 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 1. Warum sie leer ist ("Noch keine Zutaten angelegt.")
 2. Was der Nutzer als nächstes tun kann (primäre Aktion oder Hinweis).
 
-✅ "Noch keine Zutaten angelegt." + Button "Zutat hinzufügen"
+✅ "Noch keine Zutaten angelegt." + Button "Zutat anlegen"
 ❌ Leere Liste ohne Text.
 ❌ "Keine Daten vorhanden." (erklärt nicht warum und was zu tun ist)
 

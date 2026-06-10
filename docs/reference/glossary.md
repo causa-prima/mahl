@@ -42,6 +42,7 @@ Ein alternativer Suchbegriff, der auf genau eine *Zutat* verweist.
 ### Basiseinheit (Base Unit)
 Die kanonische Einheit, in der eine *Zutat* systemintern gespeichert und auf der *Einkaufsliste* aggregiert wird.
 *   **Regel:** Alle *Rezept-Zutaten* müssen in diese Einheit umrechenbar sein.
+*   **UI-Label:** Im Nutzer-Interface heißt das Feld „Einheit“ (nicht „Basiseinheit“). Solange es im UI keine Einheiten-Umrechnung gibt (SKELETON/MVP), hat „Basis-“ keinen Kontrast und verwirrt eher; „Einheit“ ist für Rezept-Sammler der erwartbare Alltagsbegriff. Bei Einführung der Umrechnung (V1, *Umrechnungsfaktor*) erneut prüfen, ob „Basiseinheit“ zur Abgrenzung nötig wird.
 
 ### Umrechnungsfaktor (Conversion Factor)
 Definiert das Verhältnis einer beliebigen *Einheit* zur *Basiseinheit*.

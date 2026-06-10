@@ -5,14 +5,16 @@
 > Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`)
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process)
 
-**Letzte Aktualisierung:** 2026-06-10 (Session 076 – Doc-/Prozess-Tuning: TDD Batch-RED, Review-Auditoren, docs/-Reorg; committed + gepusht)
-**Phase:** SKELETON 🔄 – US-904 Szenario 1 abgeschlossen; Szenario 2 bereit zur Neuimplementierung (jetzt mit Batch-RED-Prozess + `*-auditor`-Agenten)
+**Letzte Aktualisierung:** 2026-06-10 (Session 077 – US-904 „Felder leer beim Öffnen Dialog" implementiert; Mutation-Gate scharf geschaltet: Standard-Score inkl. NoCoverage, Config `thresholds.break:100`, summary/qa-check gaten Score<100, `--verify`-Hash-Flow)
+**Phase:** SKELETON 🔄 – US-904: „Liste leer" + „Felder leer beim Öffnen" abgeschlossen; nächstes Szenario aus `features/ingredients.feature` via `implementing-scenario`
 
 ---
 
 ## Nächste Prioritäten (Reihenfolge bindend; keine Nummerierung verwenden, sondern nur Anstriche)
 
-- **US-904 weiter implementieren** (Batch-RED-Prozess) – erstes `@US-904-happy-path` („Zutaten-Liste ist leer") abgeschlossen; nächste Szenarien in Reihenfolge aus `features/ingredients.feature`, via `implementing-scenario`.
+- **Retro fällig (Jenga-Score ≤ 0):** Nächste Session mit Skill `kaizen` beginnen.
+
+- **US-904 weiter implementieren** (Batch-RED-Prozess) – „Zutaten-Liste leer" + „Felder leer beim Öffnen Dialog" abgeschlossen; nächste Szenarien in Reihenfolge aus `features/ingredients.feature`, via `implementing-scenario`. **Hinweis:** das nächste Szenario, das eine *befüllte* Liste rendert („Zutat anlegen" / „Mehrere Zutaten alphabetisch"), killt die 3 zeitlich begrenzten Stryker-Suppressions (s. tech debt) echt – dann entfernen.
 
 - **gherkin-workshop US-904 V1:** Separater Schritt vor V1-Implementierung: Feature-Datei und Szenarien ergänzen, die erst in V1 umgesetzt werden (Funktionalität die über MVP hinausgeht: Update einer Zutat + Tags für Zutaten).
 
@@ -28,9 +30,11 @@
 |---------|---------|-----------|
 | STJ/Deserialisierung | 400 vs. 500 bei ungültigem URI; STJ via OriginalString unverifiziert | Hoch – erst ab US-602 relevant |
 | Frontend Service | `fetchIngredients` als plain Promise – Migration auf ResultAsync ausstehend | Mittel |
-| Frontend Stryker | `ConditionalExpression` (`if (true)`) + `ArrowFunction` NoCoverage in `IngredientsPage.tsx` – bewusst belassen, Szenario 2 killt sie | Mittel |
-| Frontend Stryker | `ingredientsApi.ts` URL-Survivor: real gap (React Query schluckt Fetch-Fehler, Fallback `= []`); nicht supprimiert | Mittel |
+| Frontend Stryker | 3 **zeitlich begrenzte** Suppressions auf dem Non-Empty-Listen-Pfad: `IngredientsPage.tsx` `if`-ConditionalExpression + `map`-ArrowFunction, `ingredientsApi.ts` URL-StringLiteral. Wurzel: kein Szenario rendert eine befüllte Liste. Beim Szenario „Zutat anlegen" / „Mehrere Zutaten" alle 3 entfernen (werden dann echt gekillt). | Mittel |
 | Frontend Stryker | `= []` Default in `IngredientsPage.tsx` supprimiert – Suppression entfällt wenn Loading-State-Szenario implementiert ist | Niedrig |
+| Frontend Test-Infra | `@testing-library/jest-dom` + `user-event` nicht installiert → `.value`-Cast statt `toHaveValue`, schwächere Fehlermeldungen. Installieren + ggf. Guideline-Abschnitt „verfügbares Test-Toolkit" ergänzen. | Mittel |
+| Frontend Komponente | Dialog liegt nur im Empty-State-Branch von `IngredientsPage.tsx` – wird beim „Zutat anlegen"-Szenario zur Falle (Anlegen-Funktion verschwindet sobald die erste Zutat existiert); dann herausziehen. | Mittel |
+| Frontend Komponente | `isDialogOpen` als `boolean` – bei Speichern/Validierung auf Discriminated Union (`status`) umstellen statt weitere Flags anzuhängen. | Niedrig |
 | E2E-Test | `EmptyDb`-Test ohne DB-Reset – latent flaky wenn DB vorher befüllt | Niedrig |
 
 ---
