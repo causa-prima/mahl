@@ -71,23 +71,25 @@ def main() -> None:
         print("\n".join(lines[-30:]))
         _TMP_FILE.unlink()
 
-    if result.returncode != 0:
-        print(f"\nStryker fehlgeschlagen (Exit-Code {result.returncode}).", file=sys.stderr)
-        sys.exit(result.returncode)
-
-    if not _STRYKER_SRC.exists():
-        print(f"\nKein Report-Verzeichnis gefunden: {_STRYKER_SRC}", file=sys.stderr)
-        sys.exit(1)
+    # StrykerJS schreibt den Report VOR dem Threshold-Check, daher existiert er auch bei
+    # Below-Threshold-Exit (Score < break). Nur wenn gar kein Report da ist, ist es ein echter
+    # Lauf-Fehler (z.B. Compile-Fehler) – dann hart abbrechen.
+    report_present = _STRYKER_SRC.exists() and any(_STRYKER_SRC.iterdir())
+    if not report_present:
+        print(f"\nStryker hat keinen Report erzeugt (Exit {result.returncode}) – Lauf-Fehler.", file=sys.stderr)
+        sys.exit(result.returncode or 1)
 
     timestamp = datetime.now().strftime("%Y-%m-%d.%H-%M-%S")
     report_json = _copy_reports(timestamp)
     print(f"\nReport kopiert → {report_json.parent.parent}")
 
+    # stryker-summary.py ist das maßgebliche Gate (Score < 100 % → exit 1) und deckt sich mit
+    # Strykers eigenem break-Threshold. Bei Abweichung gewinnt das Fail.
     summary_args = [sys.executable, str(_SCRIPTS_DIR / "stryker-summary.py"), str(report_json)]
     if args.detail:
         summary_args.append("--detail")
     summary_result = subprocess.run(summary_args)
-    sys.exit(summary_result.returncode)
+    sys.exit(summary_result.returncode or (1 if result.returncode != 0 else 0))
 
 
 if __name__ == "__main__":

@@ -77,14 +77,17 @@ def _parse_report(report_path: Path) -> tuple[str, str]:
             file_data["mutants"] = sorted(file_data["mutants"], key=lambda m: str(m.get("id", "")))
     normalized = json.dumps(data, sort_keys=True, ensure_ascii=False)
     content_hash = hashlib.sha256(normalized.encode()).hexdigest()[:16]
-    total_tested = total_killed = 0
+    # Standard-Mutation-Score (mutation-testing-elements, identisch zum HTML-Report):
+    #   detected = Killed + Timeout ; undetected = Survived + NoCoverage.
+    # NoCoverage senkt den Score; Ignored/CompileError/RuntimeError zählen nicht in den Nenner.
+    counts: dict[str, int] = {}
     for file_data in data.get("files", {}).values():
         for m in file_data.get("mutants", []):
-            if m.get("status") in ("Killed", "Survived", "Timeout"):
-                total_tested += 1
-            if m.get("status") == "Killed":
-                total_killed += 1
-    score = (total_killed / total_tested * 100) if total_tested > 0 else 0.0
+            s = m.get("status")
+            counts[s] = counts.get(s, 0) + 1
+    detected = counts.get("Killed", 0) + counts.get("Timeout", 0)
+    total_valid = detected + counts.get("Survived", 0) + counts.get("NoCoverage", 0)
+    score = (detected / total_valid * 100) if total_valid > 0 else 100.0
     return f"{score:.1f}%", content_hash
 
 
@@ -222,6 +225,34 @@ def check_eslint() -> tuple[str, int]:
     return f"FEHLER – {lines[-1] if lines else '(kein Output)'}", r.returncode
 
 
+# ── Hash ─────────────────────────────────────────────────────────────────────
+
+def compute_hash(*, layer: str, tree: str, report_hash: str, test_files, suppressions,
+                 unit_tests, lint_code, test_structure, adr_code) -> str:
+    """Kanonischer Übergabe-Hash. Bindet Report-Inhalt, gestagten Code-Zustand und alle Checks.
+
+    Es gibt nur DIESE eine Hash-Form. --skip-stryker gibt bewusst keinen Hash aus, daher ist
+    jeder existierende Übergabe-Hash per Konstruktion ein Frisch-Lauf-Hash.
+    """
+    hashable = "|".join([
+        f"LAYER:{layer}",
+        f"TREE:{tree}",
+        f"C3_HASH:{report_hash}",
+        f"C1:{sorted(test_files)}",
+        f"C2:{sorted(str(x) for x in suppressions)}",
+        f"C3_PATTERNS:{sorted(str(x) for x in unit_tests)}",
+        f"C4:{lint_code}",
+        f"C5:{sorted(str(x) for x in test_structure)}",
+        f"C6:{adr_code}",
+    ])
+    return hashlib.sha256(hashable.encode()).hexdigest()[:16]
+
+
+def verify_hash(expected: str, **kwargs) -> bool:
+    """True wenn der übergebene Hash dem kanonischen Hash des aktuellen Zustands entspricht."""
+    return compute_hash(**kwargs) == expected
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -229,17 +260,27 @@ def main() -> None:
     parser.add_argument("--layer", choices=["backend", "frontend"], required=True,
                         help="Welche Schicht wird geprüft")
     parser.add_argument("--skip-stryker", action="store_true",
-                        help="Stryker nicht ausführen (Orchestrator-Verifikationsmodus: "
-                             "liest den bestehenden Report der Subagenten-Ausführung)")
+                        help="Stryker nicht ausführen (Diagnose-Modus: liest den bestehenden "
+                             "Report; gibt KEINEN Übergabe-Hash aus)")
+    parser.add_argument("--verify", metavar="HASH",
+                        help="Übergabe-Hash gegen den aktuellen Zustand prüfen (kein Stryker-Lauf). "
+                             "Schlägt fehl, wenn der Hash kein frischer Lauf war oder Code/Report sich änderte.")
     args = parser.parse_args()
 
+    # verify impliziert keinen frischen Stryker-Lauf (reine Verifikation des bestehenden Reports)
+    run_stryker_now = not (args.skip_stryker or args.verify)
+
     # ── Stryker ──────────────────────────────────────────────────────────────
-    if not args.skip_stryker:
+    stryker_gate_failed = False
+    if run_stryker_now:
         print(f"[qa-check] Starte Stryker ({args.layer}) …")
         rc = _run_stryker(args.layer)
         if rc != 0:
-            print(f"[qa-check] Stryker fehlgeschlagen (Exit {rc}). Abbruch.", file=sys.stderr)
-            sys.exit(rc)
+            # NICHT sofort abbrechen: restliche Checks + Hash trotzdem ausgeben, damit ein zu
+            # niedriger Score keine Probleme in anderen Checks verdeckt. Gate-Exit kommt am Ende.
+            stryker_gate_failed = True
+            print(f"[qa-check] ⚠️  Stryker-Gate fehlgeschlagen (Score < 100 % oder Lauf-Fehler, "
+                  f"Exit {rc}) – führe restliche Checks dennoch aus.", file=sys.stderr)
 
     report_path = _find_report(args.layer)
     if report_path is None:
@@ -294,23 +335,43 @@ def main() -> None:
     print(adr_status)
 
     # ── Hash ─────────────────────────────────────────────────────────────────
-    # Bindet Findings an: Report-Inhalt (C3_HASH), gestagten Code-Zustand (TREE),
-    # und alle git-basierten Checks. Score-String wird nicht direkt gehasht –
-    # stattdessen der Report-Inhalt (fälschungssicher).
-    hashable = "|".join([
-        f"LAYER:{args.layer}",
-        f"TREE:{tree}",
-        f"C3_HASH:{report_hash}",
-        f"C1:{sorted(test_files)}",
-        f"C2:{sorted(str(x) for x in suppressions)}",
-        f"C3_PATTERNS:{sorted(str(x) for x in unit_tests)}",
-        f"C4:{lint_code}",
-        f"C5:{sorted(str(x) for x in test_structure)}",
-        f"C6:{adr_code}",
-    ])
-    h = hashlib.sha256(hashable.encode()).hexdigest()[:16]
-    print(f"\n=== VERIFIKATIONS-HASH ===")
-    print(h)
+    # Bindet Findings an: Report-Inhalt (C3_HASH), gestagten Code-Zustand (TREE)
+    # und alle git-basierten Checks (fälschungssicher via SHA-256).
+    hash_kwargs = dict(
+        layer=args.layer, tree=tree, report_hash=report_hash,
+        test_files=test_files, suppressions=suppressions, unit_tests=unit_tests,
+        lint_code=lint_code, test_structure=test_structure, adr_code=adr_code,
+    )
+
+    if args.verify:
+        ok = verify_hash(args.verify, **hash_kwargs)
+        print(f"\n=== VERIFY ===")
+        if not ok:
+            print("❌ Hash stimmt NICHT überein – der aktuelle Zustand weicht von dem ab, für den der "
+                  "Hash erzeugt wurde (Code/Report seit der Übergabe geändert, falsche Schicht, oder "
+                  "ungültiger Hash).", file=sys.stderr)
+            sys.exit(1)
+        print("✅ Hash verifiziert – frischer Lauf, Code/Report-Zustand stimmt überein.")
+        # KEIN early exit: der Score-Gate unten gilt auch hier – ein verifizierter Hash mit
+        # Score < 100 % ist trotzdem keine gültige Übergabe.
+    else:
+        print(f"\n=== VERIFIKATIONS-HASH ===")
+        if args.skip_stryker:
+            print("(übersprungen – --skip-stryker erzeugt KEINEN Übergabe-Hash. Nur Läufe ohne "
+                  "--skip-stryker sind zur Übergabe gültig; Verifikation durch den Orchestrator via --verify <hash>.)")
+        else:
+            print(compute_hash(**hash_kwargs))
+
+    # ── Gate ─────────────────────────────────────────────────────────────────
+    # Score-Gate als Exit-Code – aber erst NACH vollständiger Ausgabe aller Checks + Hash,
+    # damit ein zu niedriger Score keine anderen Check-Probleme verdeckt. Der Hash bleibt
+    # verifizierbar; der nicht-null Exit-Code signalisiert: keine gültige Übergabe.
+    score_value = float(score.rstrip("%"))
+    if stryker_gate_failed or score_value < 100.0:
+        sys.stdout.flush()  # Checks zuerst, damit die Warnung danach erscheint (stderr ist ungepuffert)
+        print(f"\n⚠️  ACHTUNG: Mutation-Score {score} < 100 % – dieser Lauf ist KEINE gültige "
+              f"Übergabe. Survivors/NoCoverage oben klären, bevor übergeben wird.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

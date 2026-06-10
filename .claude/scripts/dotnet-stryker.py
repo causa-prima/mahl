@@ -75,20 +75,21 @@ def main() -> None:
         print("\n".join(lines[-30:]))
         _TMP_FILE.unlink()
 
-    if result.returncode != 0:
-        print(f"\nStryker fehlgeschlagen (Exit-Code {result.returncode}).", file=sys.stderr)
-        sys.exit(result.returncode)
-
+    # Stryker.NET schreibt den Report vor dem Threshold-Check, daher existiert er auch bei
+    # Below-Threshold-Exit. Nur wenn kein neuer Report angelegt wurde, ist es ein echter Lauf-Fehler.
     run_dir = _move_new_run(before)
-    if run_dir:
-        print(f"\nReport verschoben → {run_dir}")
+    if run_dir is None:
+        print(f"\nStryker hat keinen neuen Report erzeugt (Exit {result.returncode}) – Lauf-Fehler.", file=sys.stderr)
+        sys.exit(result.returncode or 1)
+    print(f"\nReport verschoben → {run_dir}")
 
-    # Auswertung via stryker-summary.py
+    # stryker-summary.py ist das maßgebliche Gate (Score < 100 % → exit 1) und deckt sich mit
+    # Strykers eigenem break-Threshold. Bei Abweichung gewinnt das Fail.
     summary_args = [sys.executable, str(_SCRIPTS_DIR / "stryker-summary.py")]
     if args.detail:
         summary_args.append("--detail")
     summary_result = subprocess.run(summary_args)
-    sys.exit(summary_result.returncode)
+    sys.exit(summary_result.returncode or (1 if result.returncode != 0 else 0))
 
 
 if __name__ == "__main__":

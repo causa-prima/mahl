@@ -6,6 +6,7 @@
     "coverage-analysis": "off",
     "additional-timeout": 15000,
     "reporters": ["html", "cleartext", "json"],
+    "thresholds": { "high": 100, "low": 100, "break": 100 },
     "mutate": [
       "**/*.cs",
       "!**/Migrations/**",

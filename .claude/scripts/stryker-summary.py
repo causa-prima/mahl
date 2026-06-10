@@ -13,6 +13,7 @@ import json
 import os
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 
@@ -48,6 +49,39 @@ def short_path(full_path: str) -> str:
     return normalized.split("/")[-1]
 
 
+def compute_metrics(files: dict) -> dict:
+    """Standard-Mutation-Score (mutation-testing-elements, identisch zum HTML-Report).
+
+      detected   = Killed + Timeout
+      undetected = Survived + NoCoverage
+      score      = detected / (detected + undetected)
+
+    Ignored / CompileError / RuntimeError zählen NICHT in den Nenner (eigene Buckets).
+    NoCoverage ist undetected: nicht ausgeführter Code senkt den Score – ein NoCoverage-Mutant
+    ist strenger genommen schlimmer als ein Survivor (nicht mal ausgeführt).
+    """
+    counts: Counter = Counter()
+    for file_data in files.values():
+        for m in file_data.get("mutants", []):
+            counts[m.get("status")] += 1
+    detected = counts["Killed"] + counts["Timeout"]
+    undetected = counts["Survived"] + counts["NoCoverage"]
+    total_valid = detected + undetected
+    score = (detected / total_valid * 100) if total_valid > 0 else 100.0
+    return {
+        "counts": counts,
+        "detected": detected,
+        "undetected": undetected,
+        "total_valid": total_valid,
+        "score": score,
+    }
+
+
+def gate_code(metrics: dict) -> int:
+    """0 wenn 100 % (keine undetected Mutanten), sonst 1 – das mechanische Mutation-Gate."""
+    return 0 if metrics["undetected"] == 0 else 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Stryker JSON-Report aufbereiten.")
     parser.add_argument("report", nargs="?", help="Pfad zur mutation-report.json (optional)")
@@ -60,48 +94,36 @@ def main() -> None:
         data = json.load(f)
 
     files = data.get("files", {})
+    metrics = compute_metrics(files)
+    counts = metrics["counts"]
 
-    # Aggregieren
-    total_tested = 0
-    total_killed = 0
-    total_survived = 0
-    total_timeout = 0
+    # Survivors + NoCoverage nach Datei sammeln (für Ausgabe)
     survivors_by_file: dict[str, list[dict]] = {}
+    nocoverage_by_file: dict[str, list[dict]] = {}
     detail_by_file: dict[str, list[dict]] = {}
-
     for path, file_data in files.items():
         for m in file_data.get("mutants", []):
             status = m.get("status")
-            if status in ("Killed", "Survived", "Timeout"):
-                total_tested += 1
-            if status == "Killed":
-                total_killed += 1
-            elif status == "Survived":
-                total_survived += 1
-                key = short_path(path)
-                survivors_by_file.setdefault(key, []).append(m)
-            elif status == "Timeout":
-                total_timeout += 1
+            if status == "Survived":
+                survivors_by_file.setdefault(short_path(path), []).append(m)
+            elif status == "NoCoverage":
+                nocoverage_by_file.setdefault(short_path(path), []).append(m)
             if args.detail and status != "Killed":
-                key = short_path(path)
-                detail_by_file.setdefault(key, []).append(m)
-
-    score = (total_killed / total_tested * 100) if total_tested > 0 else 0
+                detail_by_file.setdefault(short_path(path), []).append(m)
 
     print(f"Stryker-Report: {report_path.parent.parent.name}")
-    print(f"Score: {score:.1f}%  |  Tested: {total_tested}  |  Killed: {total_killed}  |  Survived: {total_survived}  |  Timeout: {total_timeout}")
+    print(f"Score: {metrics['score']:.1f}%  |  Valid: {metrics['total_valid']}  |  "
+          f"Killed: {counts['Killed']}  |  Survived: {counts['Survived']}  |  "
+          f"Timeout: {counts['Timeout']}  |  NoCoverage: {counts['NoCoverage']}")
 
-    if total_timeout > 0:
+    if counts["Timeout"] > 0:
         print(
-            f"\n⏱️  {total_timeout} Timeout(s) – können Timing-Artefakte bei Partial-Runs sein.\n"
-            f"   Bitte mit `--detail` prüfen ob die Mutanten wirklich getötet sein sollten."
+            f"\n⏱️  {counts['Timeout']} Timeout(s) zählen als detected (Standard), können aber\n"
+            f"   Timing-Artefakte bei Partial-Runs sein – mit `--detail` prüfen."
         )
 
-    if not survivors_by_file:
-        print("\n✅ Keine Survivors.")
-    else:
-        print(f"\n⚠️  {total_survived} Survivor(s):\n")
-        for file, mutants in sorted(survivors_by_file.items()):
+    def _print_group(by_file: dict[str, list[dict]]) -> None:
+        for file, mutants in sorted(by_file.items()):
             print(f"  {file} ({len(mutants)})")
             for m in sorted(mutants, key=lambda x: x["location"]["start"]["line"]):
                 line = m["location"]["start"]["line"]
@@ -110,6 +132,16 @@ def main() -> None:
                 print(f"    Zeile {line:>4}  {mutator}")
                 print(f"           → {replacement}")
             print()
+
+    if not survivors_by_file and not nocoverage_by_file:
+        print("\n✅ Keine Survivors / NoCoverage.")
+    else:
+        if survivors_by_file:
+            print(f"\n⚠️  {counts['Survived']} Survivor(s):\n")
+            _print_group(survivors_by_file)
+        if nocoverage_by_file:
+            print(f"\n⚠️  {counts['NoCoverage']} NoCoverage (von keinem Test ausgeführt):\n")
+            _print_group(nocoverage_by_file)
 
     if args.detail and detail_by_file:
         total_detail = sum(len(v) for v in detail_by_file.values())
@@ -128,6 +160,9 @@ def main() -> None:
                     print(f"           StatusReason: {status_reason}")
                 print(f"           → {replacement}")
             print()
+
+    # Mechanisches Gate: Score < 100 % (Survivor oder NoCoverage) → exit 1.
+    sys.exit(gate_code(metrics))
 
 
 if __name__ == "__main__":
