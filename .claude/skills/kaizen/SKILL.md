@@ -30,13 +30,17 @@ Lege zu Beginn folgende Task-Liste an:
 
 → TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": in_progress
 
-Lies `docs/kaizen/lessons_learned.md` und alle `*.md`-Dateien in `docs/kaizen/archive/`. Wende auf jeden Eintrag den Filter-Test aus `docs/kaizen/process.md` an:
+Lies `docs/kaizen/lessons_learned.md` und alle `*.md`-Dateien in `docs/kaizen/archive/`. **`.legacy`-Dateien (altes Format) sind bewusst out-of-scope – nicht lesen.** Wende auf jeden Eintrag den Filter-Test aus `docs/kaizen/process.md` an:
 
-**Test:** „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?"
+**Test (alle drei Fragen müssen mit Ja beantwortet werden, damit der Eintrag bleibt):**
+1. „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?"
+2. „Kann die auslösende Situation grundsätzlich wiederkehren – bzw. liegt eine wiederkehrende Tätigkeits-Klasse darunter?"
+3. „Beschreibt die *Regel* ein Agenten-Verhalten/-Urteil, das schiefgehen kann – oder eine **statische Tatsache**, die man einmal nachschlägt?" (statische Tatsache → Noise, gehört in Doku/Code-Kommentar). Begründung dieser Frage: `docs/kaizen/process.md`.
 
 Noise-Kandidaten sind Einträge die:
 - Ein Infrastruktur- oder Setup-Problem beschreiben das durch eine Konfigurationsänderung dauerhaft behoben ist
 - Reine Fakten über Tool-Verhalten dokumentieren ohne Konsequenz für künftiges Agenten-Verhalten
+- Eine **einmalige Situation** beschreiben, die grundsätzlich nicht wiederkehren kann und unter der **keine wiederkehrende Tätigkeits-Klasse** liegt (liegt eine Klasse darunter → kein Noise, der Eintrag bleibt)
 
 Präsentiere Kandidaten als Tabelle:
 
@@ -67,7 +71,16 @@ Falls `docs/kaizen/archive/` leer ist:
 - Wenn `docs/kaizen/countermeasures.md` AKTIV/OFFEN-Einträge enthält: User bestätigen lassen dass das Archiv tatsächlich leer ist (Archiv-Dateien könnten verschoben oder versehentlich gelöscht worden sein). Erst nach Bestätigung mit Schritt 2 weitermachen.
 - Wenn `countermeasures.md` ebenfalls keine AKTIV/OFFEN-Einträge enthält: User bestätigen lassen dass dies tatsächlich die erste Retro ist (auch CMs könnten versehentlich fehlen). Nach Bestätigung: Erster Lauf – kein historischer Vergleich möglich, Script liefert nur aktuelle Statistik. In Schritt 3 darauf hinweisen.
 
-Das Script gibt einen beschrifteten Abschnitt "Pattern-Kandidaten" aus – diese sind bereits gefiltert (≥2× im Fenster (= Sessions seit der letzten Retro, ab "Neue Sessions ab: NNN"), nicht durch eine bestehende Countermeasure (egal ob OFFEN, AKTIV, IN UMSETZUNG oder BEWÄHRT) abgedeckt). Der Anker "Neue Sessions ab: NNN" (ebenfalls im Script-Output) gibt die erste Session an, die seit der letzten Retro hinzugekommen ist. Leite aus diesen Pattern-Kandidaten konkrete Maßnahmenvorschläge ab. Diese Vorschläge sind der Input für Abschnitt A in Schritt 3.
+Das Script gibt einen beschrifteten Abschnitt "Pattern-Kandidaten" aus – Tag-Tripel (Schwere/Kategorie/Kontext), die ≥2× im **Pattern-Fenster** auftreten und nicht durch eine bestehende Countermeasure (OFFEN/AKTIV/IN UMSETZUNG/BEWÄHRT) abgedeckt sind. Das **Pattern-Fenster** = aktuelle Periode + die letzten 3 Archiv-Perioden. Perioden sind die Spannen zwischen Retros, durch den Jenga-Score begrenzt – also **unterschiedlich lang** (die „Sessions gesamt"-Zahl im Header ist nur der aktuelle Wert, keine feste Fenstergröße).
+
+**Drei Dinge beim Lesen der Kandidaten:**
+- **Grobe Erstfilterung:** Das Tripel ist nur ein grober Proxy für „dasselbe Problem", und der CM-Abgleich ist severity-exakt. Jeden NEU-Kandidaten **manuell gegen `countermeasures.md` UND `principles.md`** gegenprüfen – ein anders getaggtes oder schwereres CM kann denselben Sachverhalt meinen (Prinzipien sind als CM-Schatten getrackt, s. `process.md`).
+- **Priorisierung:** Der Anker „Neue Sessions ab: NNN" markiert die erste Session der aktuellen Periode. Muster mit mindestens einem Mitglied aus der aktuellen Periode priorisieren – reine Alt-Archiv-Muster lagen bereits früheren Retros vor.
+- **Einzel-Einträge lesen:** Cluster sind Tag-Kombinationen, keine semantischen Gruppen – vor jedem Vorschlag die konkreten Einträge prüfen.
+
+Leite aus den verbleibenden Kandidaten konkrete Maßnahmenvorschläge ab (CM-Eingangs-Gate beachten, s.u.). Diese Vorschläge sind der Input für Abschnitt A in Schritt 3.
+
+**CM-Eingangs-Gate:** Bevor ein Pattern-Kandidat zu einem Maßnahmenvorschlag wird, das CM-Eingangs-Gate aus `docs/kaizen/process.md` (Abschnitt „Wann gehört etwas wohin?") anwenden: liegt eine wiederkehrende Tätigkeits-Klasse darunter, oder war es eine einmalige Umstellung? Einmal-Situation ohne verallgemeinerbare Klasse → keine CM. Klasse vorhanden → Vorschlag auf Klassen-Ebene formulieren.
 
 Ergebnis intern festhalten für Schritt 3.
 
@@ -85,10 +98,12 @@ Faustregel je Kontext-Tag (für Filterung via index.md):
 - `TDD` / `C#-Code` / `TS-Code`: beobachtbar wenn neuer Produktions- oder Testcode geschrieben wurde
 - `Agent-Prompt` / `Review`: beobachtbar wenn ein Sub-Agent beauftragt wurde
 - `Skill-Nutzung`: beobachtbar wenn ein Skill aufgerufen wurde
-- `Session-Struktur`: beobachtbar wenn eine Session mit Planung/Abschluss stattfand
+- `Bash/Permission` / `Mutation-Testing` / `Hook/Script`: beobachtbar wenn Befehle/Permission-Hook, Mutation-Testing oder .claude-Hooks/Scripts berührt wurden
 - Sonstige: Zweifel → Session-Datei trotzdem lesen
 
 Falls keine Session die relevante Arbeit enthielt: Maßnahme hat keine neue Evidenz gesammelt – Status unverändert.
+
+**Harte Daten statt Selbstbericht:** Adressiert die Maßnahme ein Verhalten, das ein Agent **nicht** selbst als Problem loggt (z.B. Bash-Permission-Verstöße), ist „keine neuen lessons_learned dazu" ein Trugschluss – werte die primäre Datenquelle aus (z.B. `.claude/tmp/denied-commands.log`). Fehlt sie: User fragen statt raten. Details: `docs/kaizen/process.md` (BEWÄHRT-Kriterium).
 
 **BEWÄHRT?** Kriterium: Die relevante Situation ist nach Einführung mind. 3× aufgetreten ohne Rückfall.
 

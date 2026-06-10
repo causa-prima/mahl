@@ -5,14 +5,12 @@
 > Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`)
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process)
 
-**Letzte Aktualisierung:** 2026-06-10 (Session 077 – US-904 „Felder leer beim Öffnen Dialog" implementiert; Mutation-Gate scharf geschaltet: Standard-Score inkl. NoCoverage, Config `thresholds.break:100`, summary/qa-check gaten Score<100, `--verify`-Hash-Flow)
+**Letzte Aktualisierung:** 2026-06-10 (Session 078 – Kaizen-Retro S070–077 + Revision der Kontext-Taxonomie; Details: session_078)
 **Phase:** SKELETON 🔄 – US-904: „Liste leer" + „Felder leer beim Öffnen" abgeschlossen; nächstes Szenario aus `features/ingredients.feature` via `implementing-scenario`
 
 ---
 
 ## Nächste Prioritäten (Reihenfolge bindend; keine Nummerierung verwenden, sondern nur Anstriche)
-
-- **Retro fällig (Jenga-Score ≤ 0):** Nächste Session mit Skill `kaizen` beginnen.
 
 - **US-904 weiter implementieren** (Batch-RED-Prozess) – „Zutaten-Liste leer" + „Felder leer beim Öffnen Dialog" abgeschlossen; nächste Szenarien in Reihenfolge aus `features/ingredients.feature`, via `implementing-scenario`. **Hinweis:** das nächste Szenario, das eine *befüllte* Liste rendert („Zutat anlegen" / „Mehrere Zutaten alphabetisch"), killt die 3 zeitlich begrenzten Stryker-Suppressions (s. tech debt) echt – dann entfernen.
 
@@ -21,6 +19,8 @@
 - **Deep-Link-Anforderung klären:** Vor US-602 (Rezept-Detailansicht) – welche Entitäten, Hintergründe, Architektur-Implikationen.
 
 - **Visuelle Konsistenz-Guideline:** `docs/guidelines/coding-guideline-ux.md` um Spacing/Hierarchie/Farbe erweitern, sobald >3 Komponenten dieselben visuellen Entscheidungen treffen.
+
+- **Zwei offene Maßnahmen** (Details + Status in `docs/kaizen/countermeasures.md`, OFFEN): (a) bash-permission-Friktion auswerten & Hook/Guidance verbessern (67 Befehls-Denies → Zeit/Token-Kosten, Datenlage reicht); (b) HOCH→CM-Härtung prüfen (closing-session-Prüfung ist weich).
 
 ---
 

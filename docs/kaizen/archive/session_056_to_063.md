@@ -15,8 +15,9 @@ Eintrag-Format:
 
 Schwere:    KRITISCH | HOCH | MITTEL | GERING
 Kategorien: PROZESS | AGENT | QUALITÄT | TOOLING
-Kontext:    TDD | C#-Code | TS-Code | Review | Agent-Prompt | Skill-Nutzung |
-            Session-Struktur | Tooling | Gherkin | Doku | Sonstiges
+Kontext:    TDD | C#-Code | TS-Code | Bash/Permission | Mutation-Testing |
+            Hook/Script | Review | Agent-Prompt | Skill-Nutzung | Gherkin |
+            Doku | Kommunikation | Sonstiges
 
 Alle drei Tags sind Pflicht. Definitionen und Reaktionsregeln: docs/kaizen/PROCESS.md
 
@@ -33,7 +34,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ## Session 063 – 2026-04-17
 
-- **[HOCH] [AGENT] [Tooling] Hypothesen nicht als "bekannte Probleme" framen**
+- **[HOCH] [AGENT] [Kommunikation] Hypothesen nicht als "bekannte Probleme" framen**
   Was: Stryker-0%-Score wurde ohne Quelle als "bekanntes Stryker.NET / WebApplicationFactory Kompatibilitätsproblem" bezeichnet – der User musste korrigieren, dass die alte Version (NUnit) funktioniert hatte.
   Warum: Plausible Erklärung wurde mit verifizierten Fakten gleichgesetzt; "klingt bekannt" ≠ "ist dokumentiert".
   Regel: Hypothesen explizit als Hypothesen benennen ("meine Vermutung: …"), empirisch verifizieren (manuelle Route-Test, Stryker-Versionsprüfung), erst dann als Ursache kommunizieren.
@@ -47,7 +48,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ## Session 061 – 2026-04-17
 
-- **[HOCH] [AGENT] [Tooling] Annahmen über externes Systemverhalten nicht als Fakten präsentieren**
+- **[HOCH] [AGENT] [Kommunikation] Annahmen über externes Systemverhalten nicht als Fakten präsentieren**
   Was: Zweimal wurden falsche Behauptungen über Claude Codes Permission-System als gesichertes Wissen präsentiert – erst musste der User aktiv nachfragen, bevor recherchiert wurde.
   Warum: Training-Wissen über Tool-Verhalten wird mit dokumentiertem Verhalten verwechselt; fehlende Unterscheidung zwischen "ich glaube" und "ich habe verifiziert".
   Regel: Behauptungen über das Verhalten externer Tools (Claude Code, APIs, Frameworks) immer mit "ich glaube" qualifizieren und sofort Verifizierung anbieten – nicht auf Nachfrage warten.
@@ -56,7 +57,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ## Session 062 – 2026-04-17
 
-- **[GERING] [QUALITÄT] [Tooling] replace_all trifft Konstantendefinition selbst**
+- **[GERING] [QUALITÄT] [Sonstiges] replace_all trifft Konstantendefinition selbst**
   Was: Bei `_ALLOW_REASON`-Extraktion wurde `replace_all=True` versucht – hätte die frisch eingefügte Definition `_ALLOW_REASON = "..."` zu `_ALLOW_REASON = _ALLOW_REASON` umgeschrieben.
   Warum: `replace_all` ersetzt alle Vorkommen des Strings, einschließlich der Neudefinition die denselben Literal-String enthält.
   Regel: Vor `replace_all` prüfen ob der zu ersetzende String auch in der Konstantendefinition vorkommt. Falls ja: einzelne, gezielte Ersetzungen verwenden.
@@ -70,7 +71,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ## Session 060 – 2026-04-16
 
-- **[MITTEL] [PROZESS] [Tooling] Hook-Tests nach Hook-Änderungen sofort prüfen**
+- **[MITTEL] [PROZESS] [Hook/Script] Hook-Tests nach Hook-Änderungen sofort prüfen**
   Was: Nach Änderungen an WRONG_APPROACH/ALLOW-Patterns in check-bash-permission.py waren bestehende Tests in test-bash-permission.py veraltet (npx via cmd.exe als allow statt deny erwartet).
   Warum: Tests spiegeln den alten Zustand wider — beim Umbau von ALLOW → WRONG_APPROACH werden sie nicht automatisch angepasst.
   Regel: Nach jeder Änderung an WRONG_APPROACH_PATTERNS oder ALLOW_PATTERNS sofort test-bash-permission.py öffnen und betroffene Testfälle aktualisieren.
@@ -126,7 +127,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Komplexe Architektur-Trade-offs (React Query, TypeScript structural typing, Poka-yoke) wurden schrittweise durch User-Fragen aufgedeckt, nicht von Anfang an vollständig durchdacht.
   Regel: Bei Framework-Integrationsentscheidungen zuerst die semantische Korrektheit prüfen (ist ein Fehler ein Wert oder eine Ausnahme?), dann die technische Umsetzung ableiten – nicht umgekehrt.
 
-- **[GERING] [TOOLING] [Tooling] CM-Status nach Umsetzung nicht sofort aktualisiert**
+- **[GERING] [TOOLING] [Skill-Nutzung] CM-Status nach Umsetzung nicht sofort aktualisiert**
   Was: Die Bash-Permission-CM wurde in der Retro auf OFFEN gesetzt und in derselben Session umgesetzt, aber der Status in countermeasures.md blieb bis zum Session-Abschluss auf OFFEN.
   Warum: AGENT_MEMORY wurde noch nicht aktualisiert; CM-Status-Update fehlte im Implementierungsflow.
   Regel: Beim Abschließen einer CM-Umsetzung sofort countermeasures.md auf AKTIV setzen, nicht auf den Session-Abschluss warten.

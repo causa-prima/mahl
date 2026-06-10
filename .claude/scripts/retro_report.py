@@ -117,7 +117,7 @@ SESSION_RE = re.compile(r"^##\s+Session\s+(\d+)\s+[–\-]\s+(\d{4}-\d{2}-\d{2})"
 FINDING_RE = re.compile(
     r"^\s*-\s+\*\*\[(?P<schwere>KRITISCH|HOCH|MITTEL|GERING)\]\s*"
     r"\[(?P<kategorie>[\w-]+)\]\s*"
-    r"\[(?P<kontext>[\w-]+)\]\s*(?P<titel>[^\*]+?)\*\*\s*$"
+    r"\[(?P<kontext>[\w/-]+)\]\s*(?P<titel>.+?)\*\*\s*$"
 )
 WAS_RE   = re.compile(r"^\s+Was:\s+(.+)")
 WARUM_RE = re.compile(r"^\s+Warum:\s+(.+)")

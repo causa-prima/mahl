@@ -15,8 +15,9 @@ Eintrag-Format:
 
 Schwere:    KRITISCH | HOCH | MITTEL | GERING
 Kategorien: PROZESS | AGENT | QUALITÄT | TOOLING
-Kontext:    TDD | C#-Code | TS-Code | Review | Agent-Prompt | Skill-Nutzung |
-            Session-Struktur | Tooling | Gherkin | Doku | Sonstiges
+Kontext:    TDD | C#-Code | TS-Code | Bash/Permission | Mutation-Testing |
+            Hook/Script | Review | Agent-Prompt | Skill-Nutzung | Gherkin |
+            Doku | Kommunikation | Sonstiges
 
 Alle drei Tags sind Pflicht. Definitionen und Reaktionsregeln: docs/kaizen/PROCESS.md
 
@@ -66,11 +67,6 @@ klären.
   Regel: Leere Listen brauchen `minHeight` oder eine Wrapper-Lösung; E2E-Tests mit `toBeVisible()` auf Container-Elemente immer mit sichtbaren Dimensionen
   absichern.
 
-- **[MITTEL] [TOOLING] [Tooling] Backend Stryker schlägt fehl wenn VS-MSBuild und dotnet-SDK-Version auseinanderlaufen**
-  Was: Stryker.NET nutzt VS2022-MSBuild, nicht die dotnet CLI – bei .NET 10 Target schlägt der Build fehl wenn VS noch kein .NET 10 Workload hat.
-  Warum: Stryker baut die Solution über `MSBuild.exe`, nicht über `dotnet build`.
-  Regel: Nach jedem .NET-Major-Update prüfen ob VS2022 auf demselben Stand ist wie das dotnet CLI-SDK.
-
 - **[GERING] [PROZESS] [TDD] "Fake it till you make it" bedeutet auch: keine Typen anlegen, die kein Test erzwingt**
   Was: Diskussion ob `Ingredient`-Typ und `IngredientId` für die leere-Liste-Implementierung nötig sind.
   Warum: Unbewusste Tendenz, bereits "fertige" Typen vorauszugreifen.
@@ -85,12 +81,12 @@ klären.
   Warum: Ich habe die bekannte finale Struktur vorweggenommen statt "Fake it till you make it" konsequent anzuwenden.
   Regel: Bei jedem neuen Property und jeder neuen Methode fragen: "Welcher aktuelle rote Test fordert genau das?" Kein Test → nicht schreiben.
 
-- **[MITTEL] [TOOLING] [Tooling] DEV_WORKFLOW.md-Befehle verwenden, nicht ad-hoc**
+- **[MITTEL] [TOOLING] [Bash/Permission] DEV_WORKFLOW.md-Befehle verwenden, nicht ad-hoc**
   Was: `npx playwright test` direkt verwendet statt `npm run test:e2e` aus DEV_WORKFLOW.md – Hook hat geblockt.
   Warum: Bekannten Befehl durch eigene Variante ersetzt ohne DEV_WORKFLOW.md zu konsultieren.
   Regel: Vor jedem Ausführungsbefehl DEV_WORKFLOW.md prüfen – nicht ad-hoc variieren.
 
-- **[MITTEL] [TOOLING] [Tooling] Regex-Bug in check-bash-permission.py: Backslash-Zählung**
+- **[MITTEL] [TOOLING] [Bash/Permission] Regex-Bug in check-bash-permission.py: Backslash-Zählung**
   Was: `mahl\\\\Client` (4 Backslashes im Raw-String = 2 im Regex = matcht 2 Backslashes) statt `mahl\\Client` (2 = 1 Backslash = matcht Windows-Pfad).
   Warum: In Python-Raw-Strings bedeutet `\\` ein literales Backslash im Regex – bei Windows-Pfaden mit einem Backslash also `\\`, nicht `\\\\`.
   Regel: Windows-Pfade in Python-Regex-Raw-Strings brauchen genau 2 Backslashes (`\\`) pro Pfad-Trennzeichen.
@@ -171,7 +167,7 @@ klären.
 
 ## Session 048 – 2026-04-07
 
-- **[MITTEL] [PROZESS] [Tooling] Edit-Tool ohne vorheriges Read aufgerufen**
+- **[MITTEL] [PROZESS] [Sonstiges] Edit-Tool ohne vorheriges Read aufgerufen**
   Was: Mehrere Edit-Aufrufe schlugen fehl, weil die Dateien in dieser Konversation nicht vorher gelesen wurden.
   Warum: Parallele Edits vorbereitet ohne Read-Schritt einzuplanen.
   Regel: Vor jedem Edit sicherstellen, dass die Datei in dieser Konversation bereits gelesen wurde.

@@ -15,8 +15,9 @@ Eintrag-Format:
 
 Schwere:    KRITISCH | HOCH | MITTEL | GERING
 Kategorien: PROZESS | AGENT | QUALITÄT | TOOLING
-Kontext:    TDD | C#-Code | TS-Code | Review | Agent-Prompt | Skill-Nutzung |
-            Session-Struktur | Tooling | Gherkin | Doku | Sonstiges
+Kontext:    TDD | C#-Code | TS-Code | Bash/Permission | Mutation-Testing |
+            Hook/Script | Review | Agent-Prompt | Skill-Nutzung | Gherkin |
+            Doku | Kommunikation | Sonstiges
 
 Alle drei Tags sind Pflicht. Definitionen und Reaktionsregeln: docs/kaizen/PROCESS.md
 
@@ -41,12 +42,12 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Der Subagent-Prompt spezifizierte nicht explizit, dass der Schritt-3-Stryker ein vollständiger Lauf ohne `--mutate`-Einschränkung sein muss, und der Orchestrator hat den Report-Pfad nicht als Verifikationsbeweis verlangt.
   Regel: Subagent-Prompt muss explizit fordern: vollständiger Stryker-Lauf ohne `--mutate` + Pfad zur HTML-Report-Datei als Nachweis; Orchestrator prüft den Report-Pfad selbst, bevor er den Score als verifiziert markiert.
 
-- **[HOCH] [TOOLING] [Tooling] Backend-Prozess hält DLL-Lock – Stryker und Build schlagen fehl**
+- **[HOCH] [TOOLING] [Mutation-Testing] Backend-Prozess hält DLL-Lock – Stryker und Build schlagen fehl**
   Was: Das im Hintergrund laufende Backend (dotnet run) hält `mahl.Infrastructure.dll` gesperrt; dotnet build und dotnet stryker schlagen mit MSB3027/MSB3021 fehl.
   Warum: Kein Mechanismus verhindert, dass Stryker/Build gestartet wird solange der Backend-Prozess läuft; kein Hint weist auf diesen Fall hin.
   Regel: Vor jedem dotnet-stryker- oder dotnet-build-Aufruf prüfen ob ein dotnet-run-Prozess aktiv ist; bei Bedarf mit `taskkill /f /im dotnet.exe # --allow-once` beenden, danach neu starten.
 
-- **[HOCH] [TOOLING] [Tooling] allow-once wird für freigegebene Kommandos verwendet**
+- **[HOCH] [TOOLING] [Bash/Permission] allow-once wird für freigegebene Kommandos verwendet**
   Was: Nach einem abgelehnten Bash-Aufruf wurde `# --allow-once` an Folgebefehle angehängt, die eigentlich auf der Allow-Liste stehen – u.a. `docker-compose up -d` mit `-f`-Flag (nicht im erlaubten Pattern).
   Warum: Nach einem Deny weiß der Agent nicht welche Befehle erlaubt sind und welche nur wegen einer Kleinigkeit (z.B. falschem Pfad-Argument) nicht matchen. Kein Mechanismus erklärt die Allow-Liste bei Session-Start.
   Regel: `# --allow-once` ausschließlich für echte Einzel-Ausnahmen (destruktiv, nicht regelmäßig benötigt). Bei Deny zuerst `check-bash-permission.py` lesen um das korrekte Pattern zu verstehen, bevor `# --allow-once` erwogen wird.
@@ -66,7 +67,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Subagent hat die Querverweispflicht nicht geprüft; Orchestrator-Check hat den Kommentar nicht verifiziert.
   Regel: Jede `#pragma`/`// Stryker disable`-Begründung die auf `decisions.md` verweist muss vom Orchestrator verifiziert werden – grep auf das verlinkte Stichwort, nicht nur auf Vollständigkeit prüfen.
 
-- **[GERING] [TOOLING] [Tooling] sed-Aufruf ohne Hint für Alternativen**
+- **[GERING] [TOOLING] [Bash/Permission] sed-Aufruf ohne Hint für Alternativen**
   Was: Ein `sed`-Aufruf wurde vom Hook geblockt ohne Hinweis auf Alternativen (Read-Tool mit offset/limit, oder head + tail).
   Warum: `WRONG_APPROACH_PATTERNS` für sed hat keinen Hint-Text.
   Regel: Im `check-bash-permission.py` einen Hint für sed eintragen: „Zum Lesen von Zeilenbereichen: Read-Tool mit offset/limit-Parametern verwenden."
@@ -93,7 +94,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Infrastruktur-Code wurde mit allen vier States implementiert, obwohl das Happy-Path-Szenario nur pending+success benötigt.
   Regel: Wenn Stryker viele Suppressionen erzwingt → erst klären ob der Code überhaupt gebraucht wird, bevor supprimiert wird.
 
-- **[MITTEL] [TOOLING] [Tooling] `# --allow-once` nicht an Standard-Lesebefehle anhängen**
+- **[MITTEL] [TOOLING] [Bash/Permission] `# --allow-once` nicht an Standard-Lesebefehle anhängen**
   Was: `# --allow-once` wurde an `find`- und `grep`-Befehle angehängt obwohl diese keine Ausnahme benötigen.
   Warum: Falsches Verständnis – `--allow-once` ist für destruktive Einzelfall-Ausnahmen (`git restore`, `rm -rf`), nicht für normale Lesebefehle.
   Regel: `# --allow-once` nur bei destruktiven oder ungewöhnlichen Befehlen verwenden. Standard-Lesebefehle (find, grep, ls) brauchen es nie.
@@ -105,7 +106,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Annahme übernommen ohne den Timing-Kontext (wann, welche Datenbasis) zu klären.
   Regel: Bei Migrationsstrategie-Einträgen zuerst klären: Wann passiert die Migration? Welcher Datenbankstand? Dann erst Optionen formulieren.
 
-- **[GERING] [TOOLING] [Tooling] Parallel laufende npm-Kommandos modifizieren node_modules gleichzeitig**
+- **[GERING] [TOOLING] [Sonstiges] Parallel laufende npm-Kommandos modifizieren node_modules gleichzeitig**
   Was: `npm update` und `npm install @mui/...` liefen als parallele Background-Tasks und schrieben gleichzeitig in node_modules – kein Fehler aufgetreten, aber das Risiko war real.
   Warum: Effizienz-Optimierung ohne Berücksichtigung dass beide Befehle dieselbe Directory-Struktur mutieren.
   Regel: npm-Kommandos die node_modules modifizieren immer sequenziell ausführen, nie als parallele Background-Tasks.
@@ -146,7 +147,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ## Session 064 – 2026-04-18
 
-- **[MITTEL] [AGENT] [Tooling] retro_report.py-Cluster vor CM-Vorschlag nicht einzeln geprüft**
+- **[MITTEL] [AGENT] [Skill-Nutzung] retro_report.py-Cluster vor CM-Vorschlag nicht einzeln geprüft**
   Was: `[MITTEL][PROZESS][Tooling] 2×` als Cluster gemeldet → CM "Hook-Tests nach Änderungen" vorgeschlagen, ohne zu prüfen dass die beiden Einträge (S048: Edit-ohne-Read; S060: Hook-Tests) semantisch verschieden sind.
   Warum: Cluster-Label als inhaltliche Aussage übernommen statt die Einzel-Einträge zu lesen.
   Regel: Retro-Script-Cluster sind Tag-Kombinationen, keine semantischen Gruppen – immer die Einzel-Einträge lesen bevor ein Maßnahmenvorschlag formuliert wird.

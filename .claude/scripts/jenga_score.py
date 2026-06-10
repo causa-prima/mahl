@@ -29,7 +29,7 @@ START_SCORE = 100
 FINDING_RE = re.compile(
     r"^\s*-\s+\*\*\[(?P<schwere>KRITISCH|HOCH|MITTEL|GERING)\]\s*"
     r"\[(?P<kategorie>\w+(?:-\w+)*)\]\s*"
-    r"\[(?P<kontext>\w+(?:-\w+)*)\]"
+    r"\[(?P<kontext>[\w/-]+)\]"
 )
 SESSION_RE = re.compile(r"^##\s+Session\s+\d+")
 

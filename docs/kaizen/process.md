@@ -13,9 +13,17 @@ Ein Eintrag ist sinnvoll wenn er ein **Agenten-Verhalten** beschreibt das wieder
 - Infrastruktur- oder Setup-Fehler die durch eine Konfigurationsänderung dauerhaft behoben sind
   → Dieses Wissen gehört in `docs/process/dev-workflow.md`, eine Config-Datei oder einen Code-Kommentar
 - Reine Fakten über Tool-Verhalten ohne Konsequenz für künftiges Agenten-Verhalten
+- Fehler aus einer **einmaligen Situation, die grundsätzlich nicht wiederkehren kann** und unter der **keine wiederkehrende Tätigkeits-Klasse** liegt (z.B. ein Fehler, der nur an eine einmalige Repo-Umstellung gebunden war)
+  → Achtung Abstraktionsebene: Liegt unter der einmaligen konkreten Auslösung eine wiederkehrende Klasse (z.B. „programmatische String-Transforms", „Datei-Renames"), ist der Eintrag sinnvoll – aber auf der **Klassen-Ebene** formuliert, nicht auf der Einmal-Situation.
 
-**Test vor jedem Eintrag:** „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?"
-Nein → kein Eintrag. Ja → dokumentieren.
+**Test vor jedem Eintrag (alle drei Fragen müssen mit Ja beantwortet werden, sonst kein Eintrag):**
+1. „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?" (Nein → Infra-/Config-Noise)
+2. „Kann die auslösende Situation grundsätzlich wiederkehren – bzw. liegt eine wiederkehrende Tätigkeits-Klasse darunter?" (Nein → einmalige Situation, kein Eintrag)
+3. „Beschreibt die *Regel* ein **Agenten-Verhalten oder -Urteil**, das schiefgehen kann – oder ist sie eine **statische Tatsache**, die man einmal nachschlägt und danach kennt?" (statische Tatsache → Noise, gehört nach `docs/process/dev-workflow.md` oder in einen Code-Kommentar)
+
+> Warum Frage 3 nötig ist: Frage 1 allein trennt Tool-Fakten nicht sauber ab – ein Agent „könnte" fast jeden Tool-Fakt wiederholen, weil er Tool-Verhalten nicht auswendig kennt, womit Frage 1 fast nie Nein ergibt. Erst Frage 3 zieht die Linie: wiederkehrendes Verhaltensmuster bleibt, nachschlagbare Tatsache ist Noise.
+
+Alle drei Ja → dokumentieren (Frage 2: auf Klassen-Ebene formulieren, nicht auf der einmaligen Auslösung).
 
 ---
 
@@ -71,14 +79,16 @@ Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
 | `TDD` | Test-first-Disziplin, Red-Green-Refactor-Loop |
 | `C#-Code` | C#-Implementierung, .NET-Guidelines |
 | `TS-Code` | TypeScript/React-Implementierung, Frontend-Guidelines |
+| `Bash/Permission` | Befehlsausführung & Permission-Hook (Allow-Liste, `--allow-once`, ad-hoc-Befehle) |
+| `Mutation-Testing` | Stryker / QA-Gate (Score, Hashes, Coverage-Gate, Build-Lock für Mutation-Läufe) |
+| `Hook/Script` | Selbstgebaute Projekt-Automatisierung (.claude-Hooks & -Scripts, Pfad-Matcher, Migrations-Scripts) |
 | `Review` | Code- oder Dokument-Review-Prozess |
-| `Agent-Prompt` | Formulierung von Sub-Agenten-Instruktionen |
-| `Skill-Nutzung` | Anwendung oder Aufrufen von Skills |
-| `Session-Struktur` | Session-Planung, Kontext-Management, Scope |
-| `Tooling` | Build, IDE, WSL, Infrastruktur |
+| `Agent-Prompt` | Formulierung & Mechanik von Sub-Agenten-Instruktionen |
+| `Skill-Nutzung` | Anwendung oder Aufrufen von Skills (inkl. Kaizen-Prozess-Bookkeeping) |
 | `Gherkin` | Feature-Files, Szenario-Formulierung |
 | `Doku` | Guidelines, Docs, Entscheidungen pflegen |
-| `Sonstiges` | Passt in keinen anderen Tag |
+| `Kommunikation` | Aussagen ggü. dem User – Verifikation vor Behauptung, Mechanismus-Präzision, Hypothesen-Framing |
+| `Sonstiges` | Passt in keinen anderen Tag. **Staging-Area:** dünne/unklare Cluster (z.B. Build/Deps, Harness-Tool-Bedienung wie Edit/replace_all) hier parken – graduieren zu eigenem Tag, sobald ein Muster wächst |
 
 **Pflege der Kontext-Tags:**
 - Alle `Sonstiges`-Einträge werden in jeder Retro explizit gesichtet – Ziel: fehlende Tags ableiten
@@ -95,6 +105,16 @@ Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
 | `principles.md` | Verhaltensregel die in jeder Session gilt; zu querschnittlich für eine Guideline/Skill |
 | `countermeasures.md` | Jedes KRITISCH- oder HOCH-Finding sofort; MITTEL/GERING wenn Retro ein Muster aufdeckt |
 | Guideline / Skill | Das Problem liegt an einem fehlenden oder falschen Schritt in einem konkreten Arbeitsablauf. Die Änderung ist direkt als Regel/Schritt in einem bestehenden Dokument formulierbar. (Meist wird zusätzlich ein `countermeasures.md`-Eintrag angelegt, der auf diese Änderung verweist.) |
+
+**principles.md ⇄ countermeasures.md:** Ein Prinzip in `principles.md` ist die **Fließtext-Leitplanke** (wird jede Session geladen, keine Tags). Jedes Prinzip hat **zusätzlich** einen Tracking-Eintrag in `countermeasures.md` (Tupel Schwere/Kategorie/Kontext + Status) – nur so bleibt es **evaluierbar** (BEWÄHRT/Rückfall) und wird von `retro_report.py` als „abgedeckt" erkannt. Die CM-Maßnahme verweist aufs Prinzip („Regel in principles.md dokumentiert"). BEWÄHRT-CMs bleiben in der Tabelle (Regressionserkennung). Konsequenz: Ein neu angelegtes Prinzip **immer** mit einem CM-Eintrag spiegeln – sonst ist es unsichtbar fürs Script und nicht bewertbar.
+
+**CM-Eingangs-Gate (vor dem Anlegen einer Countermeasure):** Dieselbe Recurrence-Frage wie beim lessons-Eintrag, aber auf Maßnahmen-Ebene und vorgelagert (damit nicht Aufwand in eine Maßnahme fließt, die sofort obsolet wäre):
+
+> „Liegt unter dem Finding eine **wiederkehrende Tätigkeits-Klasse**, die zwangsläufig Teil des normalen Arbeitsablaufs ist – oder war die Auslösung an eine **einmalige Umstellung gebunden, die grundsätzlich nicht wiederkehrt**?"
+
+Keine verallgemeinerbare Klasse darunter → **keine CM** (sie wäre sofort obsolet, siehe Obsolet-Kriterien unten). Klasse vorhanden → CM auf **dieser** Klassen-Ebene formulieren, nicht auf der einmaligen konkreten Auslösung. Filtere nach Häufigkeit *nicht* (fast alles „kann schon wiederkehren") – entscheidend ist die strukturelle Wiederkehrbarkeit der Situation.
+
+**Messwerkzeug bei CM-Definition (gilt für alle Maßnahmen):** Beim Festlegen einer Maßnahme zugleich bestimmen, **woran** ihre Wirksamkeit später beurteilt wird (sonst lässt sich BEWÄHRT/Rückfall nie belegen). Default-Kanal: lessons_learned + Session-Dateien – reicht für **selbst-berichtbare** Probleme. Adressiert die Maßnahme ein Verhalten, das der Agent **nicht** selbst als Problem loggt (z.B. Bash-Permission), muss schon jetzt eine **harte Datenquelle** benannt oder geschaffen werden (z.B. ein Log). Der Check ist leichtgewichtig: Default genügt meistens; nur die Lücke „nicht selbst-berichtet" erzwingt eine explizite Datenquelle.
 
 ---
 
@@ -160,6 +180,8 @@ Eine Maßnahme gilt als BEWÄHRT wenn:
 - "Aufgetreten" = die Art der Arbeit, bei der das Problem hätte entstehen können, hat stattgefunden
 
 Nachweis: Session-Dateien in `docs/history/sessions/` lesen und beurteilen, ob die relevante Arbeit stattfand.
+
+> **Harte Daten bei nicht-selbstberichteten Verhaltensweisen:** Adressiert die Maßnahme ein Agenten-Verhalten, das der Agent **nicht selbst** als Problem in lessons_learned einträgt (z.B. Bash-Permission-Verstöße, abgelehnte Befehle), ist „keine neuen lessons_learned dazu" **kein** Beleg für BEWÄHRT (der Agent sieht es nicht als Problem). Stattdessen die primäre Datenquelle auswerten (z.B. `.claude/tmp/denied-commands.log`). Fehlt diese, ist **keine verlässliche/belastbare Aussage** möglich – dann den User fragen, ob ihm das Verhalten aufgefallen ist und wie mit dem Punkt weiter verfahren werden soll.
 
 ## Obsolet-Kriterien für Countermeasures
 
