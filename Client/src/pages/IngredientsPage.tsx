@@ -3,11 +3,20 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
 import TextField from '@mui/material/TextField'
 import { fetchIngredients } from '../services/ingredientsApi'
 
 export default function IngredientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [unit, setUnit] = useState('')
+
+  const closeDialog = () => {
+    setIsDialogOpen(false)
+    setName('')
+    setUnit('')
+  }
   // Stryker disable next-line ArrayDeclaration -- Default [] nie getestet: data ist während Tests nie undefined (MSW liefert immer []). Entfällt wenn Loading-State-Szenario implementiert ist.
   const { data: ingredients = [] } = useQuery({
     // Stryker disable next-line StringLiteral,ArrayDeclaration -- queryKey ist ein Cache-Bezeichner, kein Verhalten
@@ -22,8 +31,11 @@ export default function IngredientsPage() {
         <p>Noch keine Zutaten angelegt.</p>
         <Button variant="contained" onClick={() => { setIsDialogOpen(true) }}>Zutat anlegen</Button>
         <Dialog open={isDialogOpen}>
-          <TextField label="Name" />
-          <TextField label="Einheit" />
+          <TextField label="Name" value={name} onChange={(e) => { setName(e.target.value) }} />
+          <TextField label="Einheit" value={unit} onChange={(e) => { setUnit(e.target.value) }} />
+          <DialogActions>
+            <Button onClick={closeDialog}>Abbrechen</Button>
+          </DialogActions>
         </Dialog>
       </div>
     )

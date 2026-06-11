@@ -244,6 +244,13 @@ cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run build"   
 
 Bei Major-Bumps zusätzlich auf **Config-Warnungen** achten (nicht nur Exit-Code) – Tools ändern still ihr Config-Schema (z.B. jscpd 5: Feld `languages` → `format`).
 
+Wurde **Playwright** gebumpt, zusätzlich das passende Browser-Binary neu installieren – sonst bricht der E2E-Lauf mit „Executable doesn't exist" ab:
+
+```bash
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npx playwright install chromium"
+python3 .claude/scripts/playwright-test.py   # E2E-Kette nach dem Bump verifizieren
+```
+
 ---
 
 ## Tests

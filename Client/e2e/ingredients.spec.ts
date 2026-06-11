@@ -22,6 +22,19 @@ test.describe('US904_HappyPath: Zutaten verwalten', () => {
     await expect(page.getByLabel('Einheit')).toHaveValue('')
   })
 
+  test('US904_HappyPath_ReopenDialogAfterCancel_FieldsAreEmpty', async ({ page }) => {
+    // When: Dialog öffnen, beide Felder befüllen, abbrechen, erneut öffnen
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Knoblauch')
+    await page.getByLabel('Einheit').fill('Zehen')
+    await page.getByRole('button', { name: 'Abbrechen' }).click()
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+
+    // Then: Name-Feld und Einheit-Feld sind wieder leer
+    await expect(page.getByLabel('Name')).toHaveValue('')
+    await expect(page.getByLabel('Einheit')).toHaveValue('')
+  })
+
   // TODO US-904: Szenario "Zutat anlegen" (Speichern/Persistenz) noch nicht implementiert
   test.skip('US904_HappyPath_CreateIngredient_ValidData_IngredientAppearsInList', async ({ page }) => {
     await page.getByRole('button', { name: 'Zutat anlegen' }).click()

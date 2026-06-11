@@ -28,6 +28,7 @@ Feature: Zutaten verwalten
   Scenario: Felder sind nach Abbrechen beim erneuten Öffnen wieder leer
     When ich auf "Zutat anlegen" klicke
     And ich "Knoblauch" als Name eingebe
+    And ich "Zehen" als Einheit eingebe
     And ich auf "Abbrechen" klicke
     And ich auf "Zutat anlegen" klicke
     Then ist das Name-Feld leer

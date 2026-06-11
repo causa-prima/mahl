@@ -32,6 +32,23 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 081 – 2026-06-11
+
+- **[MITTEL] [PROZESS] [Doku] Guideline-Änderung auf unverifiziertem Tool-Verhalten empfohlen**
+  Was: Pauschalen `fireEvent.click`→`user.click`-Switch samt Guideline-Umschrift empfohlen, gestützt auf ein plausibles Mentalmodell von user.click; erst auf Nutzer-Nachfrage zeigten Messung (9/13 Timeout-Kills, ~2× Laufzeit) + Wegwerf-Test, dass der Mehrwert eng ist (nur `pointer-events:none`-Vorfahr) → Revert.
+  Warum: Das in `principles.md` verankerte „Tool-Verhalten erst nach Verifikation behaupten / Unverifiziertes proaktiv kennzeichnen" wurde nicht angewendet.
+  Regel: Vor einer Guideline-Änderung über Tool-/API-Verhalten dieses empirisch verifizieren (Mess-/Wegwerf-Test); unverifizierte Empfehlungen proaktiv als solche kennzeichnen statt auf Nachfrage zu warten.
+
+- **[MITTEL] [AGENT] [Mutation-Testing] Roh-Report manuell geparst statt vorhandene `--detail`-Flag genutzt**
+  Was: Subagent versuchte Stryker-Survivor aus `mutation.json` manuell zu parsen (vom Bash-Hook blockiert), obwohl `stryker-frontend.py --detail` Survivors (Datei/Zeile/Mutator/Replacement) bereits ausgibt.
+  Warum: Wissenslücke über die `--detail`-Option des vorhandenen Wrapper-Scripts.
+  Regel: Vor manuellem Parsen eines Roh-Reports prüfen, ob das Projekt-Wrapper-Script die benötigte Sicht bereits per Flag anbietet.
+
+- **[MITTEL] [PROZESS] [Doku] Offene Punkte ins falsche Ziel-Dokument einsortiert (Wiederholung S080)**
+  Was: Playwright-Reinstall (Prozess/Setup-Wissen) zunächst in die tech-debt-Tabelle geschrieben und unabhängige Tooling-Punkte gebündelt; der User korrigierte (gehört in `dev-workflow.md`; der Stryker-Punkt war eine Wissenslücke → lessons_learned).
+  Warum: Beim Vermerken nicht am Ist-Zustand klassifiziert – dieselbe Klasse wie S080 („künftige Adoption als Schuld").
+  Regel: Offene Punkte am Ist-Zustand einsortieren – tech-debt nur für real suboptimalen Code; Setup-/Prozesswissen → `dev-workflow`/Doku; Wissenslücke/Verhalten → lessons_learned; unabhängige Punkte trennen.
+
 ## Session 080 – 2026-06-11
 
 - **[MITTEL] [AGENT] [TS-Code] Laufzeit-grün als Korrektheitsbeweis für typ-betreffende Änderung genommen**

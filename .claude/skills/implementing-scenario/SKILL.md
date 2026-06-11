@@ -39,7 +39,7 @@ TaskCreate: "Schritt 0: Architektur-Check"
 TaskCreate: "Schritt 1–3: TDD-Zyklus (Double-Loop)"
 TaskCreate: "Schritt 4: Orchestrator-Check"
 TaskCreate: "Schritt 5: Review-Loop"
-TaskCreate: "Schritt 6: Commit & Session-Abschluss"
+TaskCreate: "Schritt 6: Abschluss (Session-Abschluss & Commit)"
 ```
 
 ── SCHRITT 0: ARCHITEKTUR-CHECK ─────────────────────────────────────────────
@@ -267,8 +267,8 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
 
 Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
 
-── SCHRITT 6: COMMIT & SESSION-ABSCHLUSS ───────────────────────────────────
-→ TaskUpdate "Schritt 5: Review-Loop": completed | TaskUpdate "Schritt 6: Commit & Session-Abschluss": in_progress
+── SCHRITT 6: ABSCHLUSS (SESSION-ABSCHLUSS & COMMIT) ───────────────────────
+→ TaskUpdate "Schritt 5: Review-Loop": completed | TaskUpdate "Schritt 6: Abschluss (Session-Abschluss & Commit)": in_progress
 
 1. **Offene Punkte mit dem User triagieren (bevor committed wird):** Sammle aus dem gesamten Ablauf alles, was nicht in den Szenario-Code eingeflossen ist – nichts darf nur in der Konversation hängen bleiben oder ungefragt irgendwo eingetragen werden:
    - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende oft einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return darauf durchsehen.
@@ -282,27 +282,26 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
 
    Erst eintragen/umsetzen, NACHDEM der User entschieden hat. Kein stilles Eintragen, kein stilles Vergessen.
 
-2. **Commit erstellen** (kein Amend):
-   `git status` prüfen – alle noch unstaged Änderungen stagen (`git add <dateien>`).
+2. **Vorgehen mit dem User klären** – frage per `AskUserQuestion`, was als nächstes passieren soll, damit der Commit i.d.R. die Session-Abschluss-Dateien mit enthält. Optionen:
+   - **Session-Abschluss, dann Commit** (Empfehlung) → erst `closing-session` ausführen, dann committen, sodass die Session-Abschluss-Dateien (Session-Log, AGENT_MEMORY-Phasenzeile, `lessons_learned`, Index) im **selben** Commit liegen.
+   - **Nur Session-Abschluss** → `closing-session` ausführen, **kein** Commit.
+   - **Nur Commit** → jetzt committen, ohne Session-Abschluss; davor `docs/AGENT_MEMORY.md` selbst aktualisieren (Phasenzeile: Szenario als abgeschlossen markieren, nächstes benennen; Technische Schuld + Offene Fragen aktualisieren).
+   - **Etwas anderes** (Freitext) → der Anweisung des Users folgen.
+
+3. **Session-Abschluss** (falls gewählt): `closing-session`-Skill laden und ausführen. Die dort entstandenen/geänderten Dateien fließen in den nachfolgenden Commit ein.
+
+4. **Commit erstellen** (falls gewählt; kein Amend): Der Agent committet selbst. `git commit` steht auf Auto-Deny (PreToolUse-Hook) → mit angehängtem `# --allow-once` ausführen (einmalige User-Freigabe).
+   `git status` prüfen – alle noch unstaged Änderungen stagen (`git add <dateien>`), **inklusive** der Dateien aus dem Session-Abschluss.
    ```
    git commit -m "$(cat <<'EOF'
    US-XXX: [Szenario-Titel]
 
    Co-Authored-By: <MODELLNAME> <noreply@anthropic.com>
    EOF
-   )"
+   )"  # --allow-once
    ```
    Mapping: `@US-904-happy-path` → `US-904` (@ entfernen, alles nach dem zweiten Bindestrich abschneiden). Titel direkt übernehmen.
    Beispiel: `$ARGUMENTS = @US-904-happy-path "Neue Zutat anlegen"` → `"US-904: Neue Zutat anlegen"`
    Co-Authored-By: Modellname aus dem System-Kontext einsetzen.
 
-2. **Session-Abschluss anbieten** – frage den User:
-   > „Szenario abgeschlossen. Soll ich die Session jetzt schließen (`closing-session`)?"
-
-   Antwort abwarten:
-   - **Ja** → `closing-session`-Skill laden und ausführen.
-   - **Nein / später** → nur `docs/AGENT_MEMORY.md` aktualisieren (Phase-Zeile:
-     Szenario als abgeschlossen markieren, nächstes benennen; Technische Schuld + Offene
-     Fragen aktualisieren).
-
-→ TaskUpdate "Schritt 6: Commit & Session-Abschluss": completed
+→ TaskUpdate "Schritt 6: Abschluss (Session-Abschluss & Commit)": completed

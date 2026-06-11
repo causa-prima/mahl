@@ -107,6 +107,7 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 - [ ] Mutierender Endpoint-Test (POST/PUT/PATCH/DELETE): Wird der DB-Zustand nach der Aktion mit **Full State Assertion** (`GetAllXxx()` + `BeEquivalentTo`) geprüft – nicht nur die HTTP-Response? Damit wird sichergestellt, dass genau die erwarteten Änderungen in der DB gelandet sind und keine unerwarteten Seiteneffekte aufgetreten sind (weder fehlende Änderungen noch ungewollte Mutationen anderer Einträge).
   → Auch Fehlerpfade: Zustand nach einem Fehler muss dem Ausgangszustand entsprechen (`BeEquivalentTo(stateBeforeAction)`).
 - [ ] (Frontend) Werden HTTP-Calls in Tests auf falscher Ebene gemockt (`vi.mock` auf Service-Modulen, `vi.stubGlobal('fetch', ...)` o.ä.)? → Ausschließlich MSW verwenden. Service-Funktionen sind Implementierungsdetails – sie werden durch den Komponenten-Test via MSW abgedeckt, nicht direkt getestet. Siehe `docs/guidelines/coding-guideline-typescript.md` Abschnitt 6.
+- [ ] (Frontend) Hängt eine Folge-Interaktion davon ab, dass ein vorheriger UI-Übergang abgeschlossen ist (Dialog/Overlay geschlossen, Element entfernt/aktiviert)? → Wird dieser Übergang **explizit per Assertion** geprüft (z.B. `await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())`)? `fireEvent.click` prüft keine Actionability – ohne die Assertion bliebe ein Regress, der den Übergang unterlässt, unbemerkt. Siehe `docs/guidelines/coding-guideline-typescript.md` Abschnitt 6.
 
 ## UI/UX (aus `docs/guidelines/coding-guideline-ux.md`)
 

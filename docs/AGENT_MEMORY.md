@@ -5,14 +5,14 @@
 > Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`)
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process)
 
-**Letzte Aktualisierung:** 2026-06-11 (Session 080 – jest-dom/user-event eingeführt + npm-Pakete aktualisiert, react-router-high-CVE behoben; Details: session_080)
-**Phase:** SKELETON 🔄 – US-904: „Liste leer" + „Felder leer beim Öffnen" abgeschlossen; nächstes Szenario aus `features/ingredients.feature` via `implementing-scenario`
+**Letzte Aktualisierung:** 2026-06-11 (Session 081 – US-904 „Felder nach Abbrechen wieder leer"; Klick-API geklärt → `fireEvent.click`-Default + Assertion-Pflicht; Details: session_081)
+**Phase:** SKELETON 🔄 – US-904 Szenarien-Fortschritt s. „Nächste Prioritäten"
 
 ---
 
 ## Nächste Prioritäten (Reihenfolge bindend; keine Nummerierung verwenden, sondern nur Anstriche)
 
-- **US-904 weiter implementieren** (Batch-RED-Prozess) – „Zutaten-Liste leer" + „Felder leer beim Öffnen Dialog" abgeschlossen; nächste Szenarien in Reihenfolge aus `features/ingredients.feature`, via `implementing-scenario`. **Hinweis:** das nächste Szenario, das eine *befüllte* Liste rendert („Zutat anlegen" / „Mehrere Zutaten alphabetisch"), killt die 3 zeitlich begrenzten Stryker-Suppressions (s. tech debt) echt – dann entfernen. Beim Tipp-Szenario („Zutat anlegen") `user-event` (`user.type`) für Eingaben nutzen statt `fireEvent`.
+- **US-904 weiter** – „Liste leer" + „Felder leer beim Öffnen" + „Felder nach Abbrechen wieder leer" fertig; nächstes „Abbrechen schließt Dialog und verwirft Eingaben", danach „Zutat anlegen", in Reihenfolge aus `features/ingredients.feature` via `implementing-scenario`. **Hinweis:** „Zutat anlegen"/„Mehrere Zutaten" rendert eine befüllte Liste → killt die 3 zeitlich begrenzten Stryker-Suppressions echt (dann entfernen) + Dialog aus dem Empty-State-Branch ziehen; dort UX nachziehen (`DialogTitle`, `DialogContent`, Touch-Target ≥44px). Eingaben `user.type`, Klicks `fireEvent.click` (s. TS-Guideline).
 
 - **gherkin-workshop US-904 V1:** Separater Schritt vor V1-Implementierung: Feature-Datei und Szenarien ergänzen, die erst in V1 umgesetzt werden (Funktionalität die über MVP hinausgeht: Update einer Zutat + Tags für Zutaten).
 
@@ -34,7 +34,7 @@
 | Frontend Stryker | `= []` Default in `IngredientsPage.tsx` supprimiert – Suppression entfällt wenn Loading-State-Szenario implementiert ist | Niedrig |
 | Frontend Deps | `qs`-DoS (moderate, GHSA-q8mj-m7cp-5q26) via `@stryker-mutator/core`→`typed-rest-client`→`qs` – dev-only, kein untrusted-Input-Pfad, akzeptiert; entfällt bei Stryker-Major-Bump. | Niedrig |
 | Frontend Komponente | Dialog liegt nur im Empty-State-Branch von `IngredientsPage.tsx` – wird beim „Zutat anlegen"-Szenario zur Falle (Anlegen-Funktion verschwindet sobald die erste Zutat existiert); dann herausziehen. | Mittel |
-| Frontend Komponente | `isDialogOpen` als `boolean` – bei Speichern/Validierung auf Discriminated Union (`status`) umstellen statt weitere Flags anzuhängen. | Niedrig |
+| Frontend Komponente | `isDialogOpen` boolean + `closeDialog` synct 3 `useState`-Slices manuell – bei Speichern/Validierung auf Discriminated Union umstellen. Auch: Dialog ohne `onClose`. | Mittel |
 | E2E-Test | `EmptyDb`-Test ohne DB-Reset – latent flaky wenn DB vorher befüllt | Niedrig |
 
 ---
