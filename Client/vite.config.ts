@@ -16,5 +16,9 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/test/setup.ts'],
+    // @mui/material 9.1.x macht in seinem .mjs-Build einen Directory-Import von
+    // react-transition-group, der unter nativem Node-ESM scheitert. Inline-Transform
+    // durch Vite löst den Import korrekt auf.
+    server: { deps: { inline: ['@mui/material'] } },
   },
 })

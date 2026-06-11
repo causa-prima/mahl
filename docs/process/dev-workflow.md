@@ -231,6 +231,19 @@ cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm audit fix"
 
 **Vite-Proxy:** Entwicklung proxied `/api/*` auf `http://localhost:5059` (Backend).
 
+### Nach Dependency-Updates: Pflicht-Verifikation
+
+Updates – auch reine In-Range-Bumps via `npm update` – können Regressionen einführen (z.B. brach ein MUI-Minor-Bump den Vitest-Lauf über einen nicht unterstützten ESM-Directory-Import). Nach jedem `npm install`/`npm update` daher die volle Kette prüfen:
+
+```bash
+python3 .claude/scripts/vitest-run.py      # Laufzeit
+python3 .claude/scripts/eslint-run.py      # Typ-Auflösung + Lint
+python3 .claude/scripts/jscpd-run.py       # Config-Kompatibilität (v.a. nach Major-Bumps)
+cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run build"   # tsc + Vite-Build
+```
+
+Bei Major-Bumps zusätzlich auf **Config-Warnungen** achten (nicht nur Exit-Code) – Tools ändern still ihr Config-Schema (z.B. jscpd 5: Feld `languages` → `format`).
+
 ---
 
 ## Tests

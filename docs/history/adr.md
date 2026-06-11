@@ -867,3 +867,20 @@ Kein einzelner DB-Wert bildet den Collection-Zustand korrekt ab. `MAX(xmin)` ist
 **Hinweis:** Service Worker funktioniert nur mit HTTPS (oder localhost in Dev).
 
 ---
+
+## Test-Tooling Frontend
+
+### ADR-S080-1: Testing-Library `jest-dom` + `user-event`
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, frontend:typescript, tooling:dependencies, testing:unit-test
+
+**Entscheidung:** `@testing-library/jest-dom` und `@testing-library/user-event` als devDependencies. jest-dom registriert in `src/test/setup.ts` via `import '@testing-library/jest-dom/vitest'`.
+
+**Begründung jest-dom:** DOM-aware Matcher (`toHaveValue`, `toBeInTheDocument` etc.) ersetzen Type-Casts wie `(el as HTMLInputElement).value` und liefern bei Fehlschlag das Element samt Ist-Wert statt nackter Primitiv-Diffs. Eigenbau (Vitest-`expect.extend` + Typdeklarationen + Diff-Ausgabe) liegt deutlich über 20 Zeilen und reimplementiert fehleranfällig den De-facto-Standard.
+
+**Begründung user-event:** Simuliert vollständige Event-Sequenzen (`keydown→input→keyup` pro Zeichen) statt eines synthetischen Direkt-Setzens wie `fireEvent.change`. Deckt Bugs in Eingabe-Handlern auf, die `fireEvent` durchwinkt (disabled/readOnly-Felder, zeichenweise Filter-/Trim-Logik), erhöht die Stryker-Mutanten-Tötung auf Input-Pfaden und reduziert die Divergenz zu Playwright.
+
+**Status der Pakete:** Beide aus der Testing-Library-Org (gleiche Maintainer wie das bereits genutzte `@testing-library/react`), aktiv gepflegt, kein `deprecated`-Flag, keine bekannte CVE (Snyk). jest-dom `6.9.1`, user-event `14.6.1`.
+
+**Verworfen:** Status quo (Cast + `.value`, `fireEvent` für Eingaben) – dokumentierte Testschuld, schwache Fehlermeldungen, maskierte Handler-Bugs. Eigen-Matcher – Aufwand/Nutzen schlecht.

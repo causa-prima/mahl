@@ -55,6 +55,8 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 | `vitest` | Testing |
 | `@vitest/coverage-v8` | Testing |
 | `@testing-library/react` | Testing |
+| `@testing-library/jest-dom` | Testing |
+| `@testing-library/user-event` | Testing |
 | `@playwright/test` | E2E Testing |
 | `happy-dom` | Testing |
 | `@stryker-mutator/core` | Testing |

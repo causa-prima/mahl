@@ -36,10 +36,10 @@ describe('IngredientsPage', () => {
 
     // Then: Name-Feld ist leer
     const nameField = await screen.findByLabelText('Name')
-    expect((nameField as HTMLInputElement).value).toBe('')
+    expect(nameField).toHaveValue('')
     // Then: Einheit-Feld ist leer
     const unitField = screen.getByLabelText('Einheit')
-    expect((unitField as HTMLInputElement).value).toBe('')
+    expect(unitField).toHaveValue('')
   })
 
   it('US904_HappyPath_OpenCreateDialog_ClosedInitially_FieldsAbsent', async () => {
@@ -51,7 +51,7 @@ describe('IngredientsPage', () => {
     await screen.findByRole('button', { name: 'Zutat anlegen' })
 
     // Then: Dialog noch nicht geöffnet -> Felder nicht im DOM
-    expect(screen.queryByLabelText('Name')).toBeNull()
-    expect(screen.queryByLabelText('Einheit')).toBeNull()
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Einheit')).not.toBeInTheDocument()
   })
 })

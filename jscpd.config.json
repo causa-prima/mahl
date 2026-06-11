@@ -1,6 +1,6 @@
 {
   "minTokens": 70,
-  "languages": ["typescript", "csharp"],
+  "format": ["typescript", "tsx", "csharp"],
   "path": [
     "Client/src",
     "Server",

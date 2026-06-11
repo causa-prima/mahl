@@ -32,6 +32,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 080 – 2026-06-11
+
+- **[MITTEL] [AGENT] [TS-Code] Laufzeit-grün als Korrektheitsbeweis für typ-betreffende Änderung genommen**
+  Was: Nach Umstellung der Tests auf jest-dom-Matcher lief Vitest grün, obwohl TypeScript die Matcher-Typen gar nicht auflöste (Augmentation nicht im TS-Programm, weil `src/test` excluded ist) – erst der ESLint-`no-unsafe-call`-Lauf deckte es auf.
+  Warum: Vitest strippt Typen zur Laufzeit; ein grüner Testlauf sagt nichts über die Typ-Auflösung aus.
+  Regel: Typ-betreffende Änderungen (neue Augmentations, Matcher, Branded Types) immer mit dem typ-bewussten Check (ESLint/`tsc`) verifizieren – nicht nur mit dem Test-Runner.
+
+- **[GERING] [AGENT] [Doku] Vorausschauende Tool-Adoption als „technische Schuld" etikettiert**
+  Was: Beim Schließen der jest-dom/user-event-Schuld user-event als „installiert aber noch ungenutzt → Schuld" in AGENT_MEMORY geführt, obwohl es keinen suboptimalen Code gibt; der User korrigierte.
+  Warum: „könnten wir später nutzen" mit „aktueller Missstand im Code" verwechselt.
+  Regel: Technische Schuld nur für tatsächlich suboptimalen Ist-Zustand führen; künftige Adoption gehört in Prioritäten/Szenario-Notizen, nicht in die Schuld-Tabelle.
+
 ## Session 079 – 2026-06-10
 
 - **[MITTEL] [PROZESS] [Hook/Script] Agenten-Guidance/UX nicht am frischen Subagenten verifiziert**

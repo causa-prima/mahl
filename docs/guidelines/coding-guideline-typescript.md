@@ -361,6 +361,11 @@ vi.stubGlobal('fetch', vi.fn().mockResolvedValue(...))
 
 `vi.mock` ist für HTTP-kommunizierende Module verboten. Für reine Utility-Funktionen (kein HTTP, keine Side Effects) ist es unnötig – pure Functions können direkt aufgerufen werden.
 
+### DOM-Matcher & Nutzerinteraktion
+
+- **jest-dom-Matcher statt Casts:** `expect(el).toHaveValue('')`, `.toBeInTheDocument()`, `.toBeDisabled()` etc. – nicht `(el as HTMLInputElement).value`. Liefert bei Fehlschlag das Element samt Ist-Wert statt eines nackten Primitiv-Diffs. Registriert global via `import '@testing-library/jest-dom/vitest'` in `src/test/setup.ts`; die Typen hängen an `tsconfig.app.json` → `types` (nötig, weil `src/test` aus dem TS-Programm excluded ist und die Augmentation sonst nicht greift).
+- **`user-event` für Eingaben:** `await user.type(field, 'Tomate')` statt `fireEvent.change(...)` – simuliert echte Event-Sequenzen (zeichenweise) und deckt Bugs in Eingabe-Handlern auf, die `fireEvent` durch Direkt-Setzen des Werts durchwinkt. Für reine Klicks bleibt `fireEvent.click` in Ordnung.
+
 ---
 
 ## 7. Test-Code – Pragmatische Regeln
