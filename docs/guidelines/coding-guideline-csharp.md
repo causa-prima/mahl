@@ -87,7 +87,7 @@ Parameterless-Ctor-Guards und `default(T)`-Guards sind in der Hexagonal Architec
 // Stryker disable once Statement,String : parameterless ctor unreachable via normal construction
 public Ingredient() => throw new InvalidOperationException("Uninitialized");
 
-// Stryker disable once Equality,String : default(T) guard unreachable via normal construction
+// Stryker disable once Equality,String,Conditional : default(T) guard unreachable via normal construction
 public Guid Id => _id == default ? throw new InvalidOperationException("Uninitialized") : _id;
 ```
 

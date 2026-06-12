@@ -73,6 +73,8 @@ kritische-regeln:
 
 **Entscheidung:** Die Reihenfolge ist immer: Gherkin-Szenario (E2E, rot) → Frontend-Test (rot) → Backend-Integration-Test (rot) → Backend-Code (grün). Das Gherkin-Szenario wird zuerst geschrieben – auch wenn das Frontend noch nicht existiert. Kein Backend-Test darf existieren, ohne dass ein darüberliegender Test ihn fordert.
 
+**Addendum (S083) – nicht-E2E-beobachtbare Anforderungen:** Anforderungen, die auf der E2E-/Nutzerebene **nicht beobachtbar** sind (HTTP-Caching-Header wie ETag, Concurrency-Token, sonstige Transport-/Protokoll-Eigenschaften), werden auf der **obersten Schicht getestet, auf der sie beobachtbar sind** – i.d.R. die Service-Client-/HTTP-Boundary (Frontend via MSW: `If-None-Match` gesendet, 304 verarbeitet) bzw. der Backend-Integrationstest (ETag-Header, 304 bei Match). Ein fehlender Gherkin-/E2E-Treiber ist für solche Querschnitts-Eigenschaften **kein** Outside-In-Verstoß; ein E2E-Test, der rohe HTTP-Mechanik durch den Browser prüft, wäre hier das falsche Werkzeug.
+
 ---
 
 ### ADR-S041-6: E2E Quality Gate: Spec-driven Checklist (nicht Coverage-Metrik)
@@ -225,12 +227,14 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 ### ADR-S000-3: GET /api/ingredients – soft-delete filter: Stryker-Suppression
 
-**Status:** Accepted
+**Status:** Accepted – **noch nicht implementiert** (geplant für das Soft-Delete-/Löschen-Szenario)
 **Tags:** scope:feature, resource:ingredients, http:get, testing:stryker, db:soft-delete
 
 **Entscheidung:** `// Stryker disable once Equality` auf der `Where(i => i.DeletedAt == null)` Zeile in `IngredientsEndpoints.cs`.
 
 **Begründung:** In den happy-path-Tests existieren keine soft-deleted Einträge – die DB ist leer oder enthält nur aktive Einträge. Damit ist `== null` und `!= null` im Testkontext äquivalent (beide liefern das gleiche Ergebnis). Das Verhalten mit soft-deleted Einträgen wird durch ein dediziertes Soft-Delete-Szenario (künftiger Zyklus) getestet. Keine Vorabtestung außerhalb des vorgesehenen Szenarios.
+
+**Stand US-904 Happy-Path (Session 083):** Weder die `DeletedAt`-Spalte (`IngredientDbType`) noch der `Where`-Filter existieren bislang – bewusst YAGNI, da noch kein Soft-Delete-/Löschen-Szenario implementiert ist. Diese ADR beschreibt die **geplante** Suppression, die zusammen mit der `DeletedAt`-Spalte im Soft-Delete-Zyklus eingeführt wird. Bis dahin liefert `GET /api/ingredients` bewusst ungefiltert alle Rows. Kein Code-↔-ADR-Drift, sondern dokumentierte Reihenfolge.
 
 ---
 
@@ -242,6 +246,19 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Entscheidung:** `// Stryker disable once String` auf den beiden `NonEmptyTrimmedString.Create(...)` Aufrufen mit Fehlermeldungs-Strings in `IngredientsEndpoints.cs`.
 
 **Begründung:** Die Fehlerpfade (ungültiger `name` / `defaultUnit`) werden bewusst erst im @US-904-error Szenario getestet. Die Strings sind korrekt und notwendig, aber der happy-path-Testlauf ruft diese Pfade nicht auf. Eine Vorabtestung der Fehlermeldungen in diesem Szenario würde das Single-Responsibility-Prinzip der Szenarien verletzen.
+
+---
+
+### ADR-S083-1: GET /api/ingredients – Read-Pfad mappt DB→DTO direkt (ToDomain aufgeschoben)
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:ingredients, http:get, arch:domain-type, arch:error-handling
+
+**Entscheidung:** Der Happy-Path-`GET /api/ingredients` projiziert `IngredientDbType` **direkt** auf `IngredientDto` (`db.Ingredients.Select(i => new IngredientDto(i.Id, i.Name, i.DefaultUnit))`), ohne den Read-Pfad `DbType → ToDomain() → OneOf<Ingredient, Error> → DTO`. Eine `ToDomain()`-Funktion und das Skip-/Log-Verhalten für korrupte DB-Rows werden **nicht** in diesem Zyklus implementiert.
+
+**Begründung:** Der `ToDomain()`-Roundtrip führt einen DB-Inkonsistenz-Fehlerzweig ein (z.B. leerer `Name` in der DB → `NonEmptyTrimmedString.Create` schlägt fehl), den der Happy-Path nicht ausübt und für den keine genehmigte Suppression vorliegt – er würde einen Stryker-Survivor erzeugen oder eine Vorab-Suppression außerhalb des vorgesehenen Szenarios erzwingen. Der DB-Inkonsistenz-Pfad (Skip+Log bei Listen, 500 bei Einzel-Ressource) gehört in ein dediziertes DB-Inkonsistenz-Szenario – analog zur bereits getroffenen Entscheidung für Recipes (ADR-S039-3). Bewusste Abweichung von der kanonischen Read-Pfad-Architektur (architecture.md 4b) für den SKELETON-Happy-Path, hier dokumentiert (Doku-Pflicht für Abweichungen).
+
+**Verworfen:** `ToDomain()`-Read-Pfad jetzt + Suppression auf dem ungeübten Inkonsistenz-Zweig – Vorabtestung/Suppression außerhalb des treibenden Szenarios.
 
 ---
 
@@ -617,6 +634,21 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Entscheidung:** Die Einkaufsliste orientiert sich am UX-Muster von Bring! – Kachel-Layout mit Icon (Strichzeichnung) und zweizeiligem Text (Name inkl. Modifizierer + Menge). Dieses Designprinzip gilt ab SKELETON, nicht erst ab V1.
 
+---
+
+### ADR-S083-2: useResultQuery/useResultMutation – minimale Modellierung (YAGNI), volle Union aufgeschoben
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, frontend:typescript, frontend:hooks, frontend:react
+
+**Entscheidung:** Die Hooks `useResultQuery`/`useResultMutation` (`Client/src/hooks/`) werden zunächst **minimal** modelliert: `useResultQuery` liefert `TData | undefined` (nur success-Zweig); `useResultMutation` liefert `(vars) => void` + `onSuccess`-Callback (nur Erfolgs-Seiteneffekt). Es gibt **kein** vollständiges `MutationState`-Discriminated-Union (`idle|pending|success|error`), **kein** `matchState()`/`matchKind()` und **kein** `throwOnError: true` – abweichend von der kanonischen Spezifikation in `coding-guideline-typescript.md` Abschnitt 4b und ADR-S056-1.
+
+**Begründung:** Eingeführt im US-904-Happy-Path „Zutat anlegen" (Session 083). Dieses Szenario übt nur den success-Pfad aus (befüllte Liste rendern, nach POST invalidieren). Eine volle Union würde unausgeübte `pending`/`error`/`idle`-Zweige erzeugen → Stryker-Survivors → Suppressions außerhalb des treibenden Szenarios. Bewusste YAGNI-Entscheidung des Nutzers, um genau diese Suppressions zu vermeiden. Die Erweiterung auf die volle Union + `matchState` + `throwOnError` erfolgt mit den Szenarien, die sie ausüben: „Speichern-Button deaktiviert während des Speicherns" (pending) und die @US-904-error-Szenarien (error).
+
+**Bekannte Konsequenzen (technische Schuld bis zur Erweiterung):** (1) Name-Kollision mit den kanonischen Wrappern – ein Leser der Guideline erwartet das `MutationState`-Tupel. (2) `onSuccess` feuert auch bei einem `Err`-Result, da `Promise.resolve(ResultAsync)` den `Err` nicht wirft – im success-only-Happy-Path harmlos, aber vor dem Error-Szenario auf `result.match(onSuccess, onError)` umzustellen. (3) Fehlendes `throwOnError` → bei Netzwerkfehler bliebe `query.data` undefined und der Empty-State würde fälschlich gerendert.
+
+**Verworfen:** Volle 4er-Union jetzt – erzeugt unausgeübte Zweige + Suppressions vor dem treibenden Szenario (widerspricht der Suppression-Minimierung).
+
 **Begründung:** Bring! ist im Familienshopping-Kontext etabliert und auf Touch-Geräten gut bedienbar. US-304 (Visuelle Darstellung & Varianten) wurde aufgelöst, weil das Layout kein Feature-Increment ist, sondern ein Designprinzip – die Kachel-Entscheidung fällt einmalig und ist kein eigenständiges Implementierungsticket.
 
 ---
@@ -650,7 +682,7 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Entscheidung:** Guards wie parameterloser Konstruktor (`throw`) und `default(T)`-Property-Guards schützen gegen Sprachmissbrauch (Framework-Magie, versehentliches `new T()`). Sie sind strukturell unerreichbar. Kein Test. `// Stryker disable once` mit expliziter Begründung: `"Guard against language/framework misuse – unreachable via external interfaces"`.
 
-**Kategorien:** Parameterloser Ctor: `Statement,String`. `default(T)` NullCoalescing-Guard (z.B. `_value ?? throw ...`): `NullCoalescing,String`. Equality-Guard (z.B. `_id == default`): `Equality,String`. Die `String`-Kategorie ist jeweils zusätzlich nötig weil Stryker auch den Exception-Meldungstext mutiert.
+**Kategorien:** Parameterloser Ctor: `Statement,String`. `default(T)` NullCoalescing-Guard (z.B. `_value ?? throw ...`): `NullCoalescing,String`. Equality-Guard (z.B. `_id == default`): `Equality,String`. Die `String`-Kategorie ist jeweils zusätzlich nötig weil Stryker auch den Exception-Meldungstext mutiert. Ist der Equality-Guard als Ternär formuliert (`_id == default ? throw new InvalidOperationException("…") : _id` – die kanonische Form für `Guid`), erzeugt Stryker zusätzlich einen `Conditional`-Mutanten → `Equality,String,Conditional`.
 
 ---
 

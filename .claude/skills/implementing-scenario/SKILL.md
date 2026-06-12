@@ -168,6 +168,7 @@ Spawn-Regeln:
   - **ADR-Abgleich:** Findet der Subagent ADRs, die du nicht als relevant eingestuft hast (oder umgekehrt), kritisch prüfen ob sie tatsächlich anwendbar sind. Im Zweifelsfall mit dem Subagenten klären – dessen Begründungen aber ebenfalls kritisch hinterfragen, nicht blind übernehmen. Kein Konflikt: kein weiterer Austausch nötig.
   Erst nach dieser Antwort beginnt der Batch-RED-Zyklus.
 - Haupt-Thread reviewt Diff und Test-Run-Output nach jedem Subagent-Return.
+- **Suppressions-Politik korrekt formulieren:** Dem Subagenten nie „Ziel: NULL neue Suppressions" vorgeben – die Regel ist „keine *unbegründeten* Suppressions". Begründete (äquivalenter Mutant, strukturell unerreichbar, Fehlerpfad bewusst aufs treibende Szenario verschoben) sind erlaubt und werden in Schritt 4 validiert. Eine „null"-Vorgabe drängt den Subagenten, korrekten/guideline-vorgeschriebenen Code zu entfernen statt ihn begründet zu suppressen.
 - Weicht der Subagent von TDD ab → an denselben Subagenten korrigieren (er wartet noch auf Test-Review). Max. 2 Iterationen; nach jeder Korrektur fordert der Subagent erneut Review an, bevor er zu GREEN übergeht. Nach 2 Iterationen ohne Verbesserung: Abbruch + Meldung an User.
 
 **Batch-Test-Review nach RED im Inneren Loop (Haupt-Thread):**

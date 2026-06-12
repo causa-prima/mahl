@@ -47,14 +47,17 @@ test.describe('US904_HappyPath: Zutaten verwalten', () => {
     await expect(page.getByText('Oregano')).toHaveCount(0)
   })
 
-  // TODO US-904: Szenario "Zutat anlegen" (Speichern/Persistenz) noch nicht implementiert
-  test.skip('US904_HappyPath_CreateIngredient_ValidData_IngredientAppearsInList', async ({ page }) => {
+  test('US904_HappyPath_CreateIngredient_ValidData_IngredientAppearsInList', async ({ page }) => {
+    // When: Dialog öffnen, Name + Einheit eingeben, speichern
     await page.getByRole('button', { name: 'Zutat anlegen' }).click()
     await page.getByLabel('Name').fill('Tomaten')
     await page.getByLabel('Einheit').fill('Stück')
     await page.getByRole('button', { name: 'Speichern' }).click()
 
+    // Then: "Tomaten" mit Einheit "Stück" erscheint in der Zutaten-Liste
     await expect(page.getByTestId('ingredient-list').getByText('Tomaten')).toBeVisible()
     await expect(page.getByTestId('ingredient-list').getByText('Stück')).toBeVisible()
+    // Then: der "Zutat anlegen"-Dialog ist geschlossen
+    await expect(page.getByRole('dialog')).toBeHidden()
   })
 })

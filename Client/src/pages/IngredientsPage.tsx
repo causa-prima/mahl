@@ -1,52 +1,63 @@
 import { useState } from 'react'
-// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- useResultQuery noch nicht implementiert; Migration in Szenario 2 (US-904-happy-path)
-import { useQuery } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import TextField from '@mui/material/TextField'
-import { fetchIngredients } from '../services/ingredientsApi'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemText from '@mui/material/ListItemText'
+import { useResultQuery } from '../hooks/useResultQuery'
+import { useResultMutation } from '../hooks/useResultMutation'
+import { fetchIngredients, createIngredient } from '../services/ingredientsApi'
+
+const ingredientsKey = ['ingredients'] as const
 
 export default function IngredientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [name, setName] = useState('')
   const [unit, setUnit] = useState('')
+  const queryClient = useQueryClient()
+  const ingredients = useResultQuery(ingredientsKey, fetchIngredients)
 
   const closeDialog = () => {
     setIsDialogOpen(false)
     setName('')
     setUnit('')
   }
-  // Stryker disable next-line ArrayDeclaration -- Default [] nie getestet: data ist während Tests nie undefined (MSW liefert immer []). Entfällt wenn Loading-State-Szenario implementiert ist.
-  const { data: ingredients = [] } = useQuery({
-    // Stryker disable next-line StringLiteral,ArrayDeclaration -- queryKey ist ein Cache-Bezeichner, kein Verhalten
-    queryKey: ['ingredients'],
-    queryFn: fetchIngredients,
+
+  const save = useResultMutation(createIngredient, () => {
+    closeDialog()
+    void queryClient.invalidateQueries({ queryKey: ingredientsKey })
   })
 
-  // Stryker disable next-line ConditionalExpression: Non-Empty-Listen-Pfad wird von keinem aktuellen Szenario getestet; erst US-904 "Zutat anlegen" rendert Zutaten in der Liste. Zeitlich begrenzte Suppression – mit jenem Szenario entfernen (AGENT_MEMORY tech debt).
-  if (ingredients.length === 0) {
-    return (
-      <div>
-        <p>Noch keine Zutaten angelegt.</p>
-        <Button variant="contained" onClick={() => { setIsDialogOpen(true) }}>Zutat anlegen</Button>
-        <Dialog open={isDialogOpen}>
+  return (
+    <div>
+      {ingredients && ingredients.length > 0
+        ? (
+          <List data-testid="ingredient-list">
+            {ingredients.map((ingredient) => (
+              <ListItem key={ingredient.id}>
+                <ListItemText primary={ingredient.name} secondary={ingredient.defaultUnit} />
+              </ListItem>
+            ))}
+          </List>
+        )
+        : <p>Noch keine Zutaten angelegt.</p>}
+      <Button variant="contained" onClick={() => { setIsDialogOpen(true) }}>Zutat anlegen</Button>
+      <Dialog open={isDialogOpen} aria-labelledby="create-ingredient-title">
+        <DialogTitle id="create-ingredient-title">Zutat anlegen</DialogTitle>
+        <DialogContent>
           <TextField label="Name" value={name} onChange={(e) => { setName(e.target.value) }} />
           <TextField label="Einheit" value={unit} onChange={(e) => { setUnit(e.target.value) }} />
-          <DialogActions>
-            <Button onClick={closeDialog}>Abbrechen</Button>
-          </DialogActions>
-        </Dialog>
-      </div>
-    )
-  }
-
-  return (
-    <ul data-testid="ingredient-list">
-      {
-        // Stryker disable next-line ArrowFunction: Listen-Render-Pfad (NoCoverage) wird von keinem aktuellen Szenario ausgeführt; erst US-904 "Zutat anlegen" rendert Zutaten in der Liste. Zeitlich begrenzte Suppression – mit jenem Szenario entfernen (AGENT_MEMORY tech debt).
-        ingredients.map((_, i) => <li key={i} />)
-      }
-    </ul>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDialog}>Abbrechen</Button>
+          <Button variant="contained" onClick={() => { save({ name, defaultUnit: unit }) }}>Speichern</Button>
+        </DialogActions>
+      </Dialog>
+    </div>
   )
 }

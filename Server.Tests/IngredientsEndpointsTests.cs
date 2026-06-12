@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using AwesomeAssertions;
+using mahl.Infrastructure.DatabaseTypes;
 using mahl.Server.Tests.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace mahl.Server.Tests;
@@ -9,7 +11,8 @@ namespace mahl.Server.Tests;
 public class IngredientsEndpointsTests : EndpointsTestsBase
 {
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
-    private sealed record IngredientResponse(Guid Id, string Name, string DefaultUnit, bool AlwaysInStock);
+    private sealed record IngredientResponse(Guid Id, string Name, string DefaultUnit);
+    private sealed record CreateIngredientRequest(string Name, string DefaultUnit);
 #pragma warning restore CA1812
 
     [Fact]
@@ -20,5 +23,50 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse[]>(TestContext.Current.CancellationToken);
         body.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task US904_HappyPath_CreateIngredient_ValidData_Returns201WithBodyAndLocation()
+    {
+        // Given: name and unit for a new ingredient
+        var request = new CreateIngredientRequest(Name: "Tomaten", DefaultUnit: "Stück");
+
+        // When: ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 201 Created with the created ingredient as body (ADR-S068-1)
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Name.Should().Be("Tomaten");
+        body.DefaultUnit.Should().Be("Stück");
+
+        // Then: Location header points to the new resource (ADR-S068-1)
+        response.Headers.Location.Should().Be($"/api/ingredients/{body.Id}");
+
+        // Then: the ingredient is persisted (full-state DB assertion) with the server-generated id
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = body.Id, Name = "Tomaten", DefaultUnit = "Stück" }]);
+    }
+
+    [Fact]
+    public async Task US904_HappyPath_GetIngredients_AfterCreate_ReturnsCreatedIngredient()
+    {
+        // Given: an ingredient was created
+        var request = new CreateIngredientRequest(Name: "Tomaten", DefaultUnit: "Stück");
+        var createResponse = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+        var created = await createResponse.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        created.Should().NotBeNull();
+
+        // When: the ingredient list is requested
+        var response = await Client.GetAsync("/api/ingredients", TestContext.Current.CancellationToken);
+
+        // Then: the list contains exactly the created ingredient with name and unit
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse[]>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Should().BeEquivalentTo(
+            [new IngredientResponse(Id: created.Id, Name: "Tomaten", DefaultUnit: "Stück")]);
     }
 }

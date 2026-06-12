@@ -32,6 +32,38 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 083 – 2026-06-12
+
+- **[HOCH] [AGENT] [Agent-Prompt] „NULL neue Suppressions" als Absolutregel an Subagenten vorgegeben**
+  Was: Ich gab dem Frontend-Subagenten als „härtesten Maßstab" vor, Ziel seien NULL neue Stryker-Suppressions; daraufhin entfernte er das guideline-vorgeschriebene `throwOnError: true` (statt es zu behalten und begründet zu suppressen), um einen unausgeübten Survivor zu vermeiden → guideline-widriger Code, jetzt Tech-Debt.
+  Warum: Ich habe eine Heuristik (vermeide spekulative ungetestete Zweige) zu einer Absolutregel überdehnt; die Projektregel lautet „keine UNBEGRÜNDETEN Suppressions" – begründete (äquivalent / strukturell unerreichbar / Fehlerpfad bewusst aufs treibende Szenario verschoben) sind erlaubt und werden vom Orchestrator validiert. Beleg der Inkonsistenz: beim Backend habe ich begründete Suppressions (ADR-S000-4/S041-9) korrekt durchgewunken.
+  Regel: Suppressions-Politik an Subagenten nie als „null" formulieren, sondern als „keine unbegründeten – jede Suppression braucht eine valide Äquivalenz-/Nichttestbarkeits-Begründung, die der Orchestrator prüft". Eine nötige begründete Suppression ist kein Scope-Verstoß.
+
+- **[MITTEL] [AGENT] [Kommunikation] Eigene Extrapolation einer User-Entscheidung dem User zugeschrieben**
+  Was: Ich begründete die „NULL Suppressions"-Vorgabe gegenüber dem Subagenten mit „Genau diese Falle will der User vermeiden" – obwohl der User nur „Mutation-State minimal" entschieden hatte, nicht „null Suppressions global".
+  Warum: Aus einer konkreten User-Entscheidung eine breitere Regel abgeleitet und die Autorität des Users dahinter gestellt, statt die Ableitung als meine eigene zu kennzeichnen.
+  Regel: Eigene Ableitungen/Extrapolationen explizit als solche kennzeichnen; nur das dem User zuschreiben, was er tatsächlich entschieden hat. Verleiht eine Extrapolation falsche Autorität, dämpft sie zudem die Kritikbereitschaft des Subagenten.
+
+- **[MITTEL] [PROZESS] [Skill-Nutzung] Scope-Philosophie-Entscheidung an Subagenten delegiert statt dem User vorgelegt**
+  Was: Die Wahl „validierendes Value Object jetzt (mit Suppression) vs. strikt YAGNI später" (Gold-Plating-Grenzfall) habe ich beim Backend dem Subagenten überlassen und seine Option-A-Begründung akzeptiert – während ich die analoge ETag-Scope-Frage korrekt dem User vorlegte.
+  Warum: Inkonsistente Schwelle, wann eine Scope-/Gold-Plating-Abwägung Orchestrator-intern entschieden wird und wann sie dem User gehört.
+  Regel: Entscheidungen, die eine Guideline gegen YAGNI/Gold-Plating ausspielen (untestbare Zweige, vorgezogene Struktur, transiente Suppressions), dem User als A/B-Wahl vorlegen – nicht an den Subagenten delegieren.
+
+- **[MITTEL] [QUALITÄT] [C#-Code] Value Object inkl. Validierungslogik angelegt, bevor ein Szenario die Validierung treibt**
+  Was: Für den „Zutat anlegen"-Happy-Path wurde `NonEmptyTrimmedString` mit voller Validierungslogik angelegt; deren Error-Zweig ist ungeübt → brauchte eine Suppression (ADR-S000-4).
+  Warum: Value-Object-Pflicht gegen YAGNI ausgespielt – die Validierung gehört erst zum @US-904-error-Szenario.
+  Regel: Treibt das Szenario die Validierung noch nicht, das Value Object mit dem **Zielnamen** anlegen, die Validierungslogik aber weglassen (Kommentar: Name vorab gewählt, Validierung folgt im Error-Szenario) – das ist die korrekte Variante (kein ungeübter Zweig, keine Suppression). Volle Validierung+Suppression jetzt oder den Typ ganz aufschieben nur bei signifikantem Vorteil. (Hier blieb der Code als Variante „volle Validierung jetzt", weil der Rückbau den Aufwand nicht wert war – nicht weil das die richtige Schreibweise war.)
+
+- **[MITTEL] [PROZESS] [Doku] Working-Memory-Notiz nicht selbsterklärend (nur für Eingeweihte verständlich)**
+  Was: In AGENT_MEMORY notierte ich „ADR-S000-12-Präzisierung (Middleware vs. pro Endpoint)" – selbst die beim Entwurf beteiligte Userin konnte daraus die eigentliche offene Frage nicht rekonstruieren.
+  Warum: Die Notiz setzte den Session-Kontext voraus, statt die Sache selbst zu enthalten (welcher Widerspruch, welche Entscheidung, woraus).
+  Regel: Jede Handoff-/Working-Memory-Notiz so schreiben, dass ein Agent mit **frischem Kontext** allein daraus die offene Frage und die nötige Entscheidung ableiten kann – Substanz statt Stichwort/geprägter Begriff; bei Verweisen präzise auf den Ort des vollen Kontexts zeigen.
+
+- **[GERING] [PROZESS] [Review] Nicht-E2E-beobachtbare Anforderungen am falschen Test-Level verortet**
+  Was: Bei ETag erwog ich kurz einen E2E-/Frontend-Treiber, obwohl ein Caching-Header weder nutzer- noch (ohne Conditional-Requests) frontend-beobachtbar ist.
+  Warum: Outside-In („kein Code ohne Test darüber", ADR-S041-5) reflexhaft auf eine technische Transport-Eigenschaft angewandt, die auf E2E-Ebene gar nicht beobachtbar ist.
+  Regel: Anforderungen auf der **obersten Schicht testen, auf der sie beobachtbar sind** – Caching-Header/Concurrency-Token auf Service-Client- (MSW) bzw. Integrations-Ebene, nicht via Gherkin/E2E. Ein fehlender E2E-Treiber ist für solche Querschnitts-Eigenschaften kein Outside-In-Verstoß (→ geplantes ADR-S041-5-Addendum).
+
 ## Session 082 – 2026-06-12
 
 - **[MITTEL] [PROZESS] [Gherkin] Szenario-Reihenfolge invertiert – komponiertes vor atomarem Baustein**
