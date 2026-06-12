@@ -255,10 +255,21 @@ Führe die Outputs von A, B, C zusammen:
 
 4. **Sortierreihenfolge:**
    - Kategorienreihenfolge: happy-path → error → edge-case
-   - Innerhalb happy-path: trivialster Anwendungsfall zuerst, dann zunehmend komplexer
-     (z.B. erst „Leere Liste anzeigen", dann „anlegen", dann „mehrere sortiert anzeigen")
-     Konkret: Szenarien ohne Backend-Interaktion (reine UI-Zustandsprüfungen wie Feld-Init,
-     Abbrechen) kommen vor Szenarien mit mutierenden Server-Anfragen.
+   - **Innerhalb jeder Kategorie – Aufbau-/Abhängigkeitsprinzip (PRIMÄR):** Ein Szenario, dessen
+     Vorbedingung oder Then-Aussage ein Verhalten *voraussetzt*, das ein anderes Szenario erst
+     etabliert, kommt **nach** diesem. Atomare/grundlegende Verhaltensbausteine vor den darauf
+     komponierten. Prüffrage je Szenario-Paar: „Setzt B voraus, dass das in A geprüfte Verhalten
+     bereits funktioniert?" Ja → A vor B; steht es andersherum → umsortieren.
+     Kanonisches Beispiel (echte Inversion, die ohne diese Regel durchrutschte): „Abbrechen
+     schließt Dialog und verwirft Eingaben" (atomar: Abbrechen schließt + leert) muss VOR „Felder
+     nach Abbrechen beim erneuten Öffnen wieder leer" (komponiert: setzt Schließen+Leeren voraus,
+     um den Reopen-Zustand überhaupt prüfen zu können). Folge der Inversion: das komponierte
+     Szenario muss beide Verhaltensteile auf einmal erzwingen, und das atomare wird zum
+     wirkungslosen Guard-Test ohne eigenen RED-Beitrag.
+   - **Innerhalb happy-path (SEKUNDÄR, bei gleicher Abhängigkeitsstufe):** trivialster Anwendungsfall
+     zuerst, dann zunehmend komplexer (z.B. erst „Leere Liste anzeigen", dann „anlegen", dann
+     „mehrere sortiert anzeigen"). Szenarien ohne Backend-Interaktion (reine UI-Zustandsprüfungen
+     wie Feld-Init, Abbrechen) kommen vor Szenarien mit mutierenden Server-Anfragen.
    - Innerhalb error: häufigster Fehler im Produktivbetrieb zuerst
    - Innerhalb edge-case: schwerwiegendste Konsequenz bei fehlendem Test zuerst
 

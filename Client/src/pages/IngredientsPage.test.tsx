@@ -71,10 +71,10 @@ describe('IngredientsPage', () => {
     // When: ich auf "Abbrechen" klicke
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
 
-    // Then: Dialog ist wirklich geschlossen -> Felder nicht mehr im DOM
+    // Then: Dialog ist wirklich geschlossen -> Dialog nicht mehr im DOM
     //   (wartet die MUI-Close-Transition ab, statt nur auf den stets sichtbaren Button)
     await waitFor(() => {
-      expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
     // When: ich erneut auf "Zutat anlegen" klicke
@@ -84,5 +84,29 @@ describe('IngredientsPage', () => {
     expect(await screen.findByLabelText('Name')).toHaveValue('')
     // Then: Einheit-Feld ist leer
     expect(screen.getByLabelText('Einheit')).toHaveValue('')
+  })
+
+  it('US904_HappyPath_CancelDialog_ClosesDialogAndDiscardsInput', async () => {
+    // Given: leere Zutaten-Seite (Background: Anwendung gestartet, Zutaten-Seite)
+    const user = userEvent.setup()
+    const openButton = await renderEmptyIngredientsPage()
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(openButton)
+    // When: ich "Oregano" als Name eingebe
+    await user.type(await screen.findByLabelText('Name'), 'Oregano')
+    // When: ich auf "Abbrechen" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
+
+    // Then: der "Zutat anlegen"-Dialog ist geschlossen -> Dialog nicht mehr im DOM
+    //   (wartet die MUI-Close-Transition ab, analog zum Reopen-Test)
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    // Then: "Oregano" nicht als Listentext gerendert (Gherkin "nicht in der Liste").
+    //   Im Empty-State redundant zur Dialog-zu-Assertion oben; greift echt erst, sobald
+    //   die Liste befüllt rendert (Persistenz-Szenario) – im E2E-Test bereits aussagekräftig.
+    expect(screen.queryByText('Oregano')).not.toBeInTheDocument()
   })
 })

@@ -264,6 +264,7 @@ python3 .claude/scripts/dotnet-test.py --verbose
 # Frontend Unit-Tests (vitest)
 python3 .claude/scripts/vitest-run.py
 python3 .claude/scripts/vitest-run.py --filter Pattern   # Substring-Match gegen Testname
+python3 .claude/scripts/vitest-run.py --file Pattern     # Filter nach Dateiname (kombinierbar mit --filter)
 python3 .claude/scripts/vitest-run.py --verbose
 
 # E2E-Tests (Playwright)

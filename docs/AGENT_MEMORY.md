@@ -5,14 +5,14 @@
 > Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`)
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process)
 
-**Letzte Aktualisierung:** 2026-06-11 (Session 081 – US-904 „Felder nach Abbrechen wieder leer"; Klick-API geklärt → `fireEvent.click`-Default + Assertion-Pflicht; Details: session_081)
+**Letzte Aktualisierung:** 2026-06-12 (Session 082 – US-904 „Abbrechen schließt Dialog…" (Guard-Test); `gherkin-workshop` Sortier-Härtung (Reihenfolge-Inversion); `vitest-run.py --filter`→Testname; Details: session_082)
 **Phase:** SKELETON 🔄 – US-904 Szenarien-Fortschritt s. „Nächste Prioritäten"
 
 ---
 
 ## Nächste Prioritäten (Reihenfolge bindend; keine Nummerierung verwenden, sondern nur Anstriche)
 
-- **US-904 weiter** – „Liste leer" + „Felder leer beim Öffnen" + „Felder nach Abbrechen wieder leer" fertig; nächstes „Abbrechen schließt Dialog und verwirft Eingaben", danach „Zutat anlegen", in Reihenfolge aus `features/ingredients.feature` via `implementing-scenario`. **Hinweis:** „Zutat anlegen"/„Mehrere Zutaten" rendert eine befüllte Liste → killt die 3 zeitlich begrenzten Stryker-Suppressions echt (dann entfernen) + Dialog aus dem Empty-State-Branch ziehen; dort UX nachziehen (`DialogTitle`, `DialogContent`, Touch-Target ≥44px). Eingaben `user.type`, Klicks `fireEvent.click` (s. TS-Guideline).
+- **US-904 weiter** – „Liste leer" + „Felder leer beim Öffnen" + „Felder nach Abbrechen wieder leer" + „Abbrechen schließt Dialog und verwirft Eingaben" fertig; **nächstes „Zutat anlegen"**, danach „Mehrere Zutaten sortiert"/„Löschen"/… in Reihenfolge aus `features/ingredients.feature` via `implementing-scenario`. **Hinweis:** „Zutat anlegen" rendert eine befüllte Liste → killt die 3 Stryker-Suppressions + Dialog aus Empty-State-Branch ziehen, UX nachziehen (`DialogTitle`/`DialogContent`/Touch ≥44px). Mit `DialogTitle` dann Test-Schließen-Nachweis auf `getByRole('dialog', { name })` spezifizieren (aktuell ohne Name). Eingaben `user.type`, Klicks `fireEvent.click` (TS-Guideline).
 
 - **gherkin-workshop US-904 V1:** Separater Schritt vor V1-Implementierung: Feature-Datei und Szenarien ergänzen, die erst in V1 umgesetzt werden (Funktionalität die über MVP hinausgeht: Update einer Zutat + Tags für Zutaten).
 
@@ -30,9 +30,9 @@
 |---------|---------|-----------|
 | STJ/Deserialisierung | 400 vs. 500 bei ungültigem URI; STJ via OriginalString unverifiziert | Hoch – erst ab US-602 relevant |
 | Frontend Service | `fetchIngredients` als plain Promise – Migration auf ResultAsync ausstehend | Mittel |
-| Frontend Stryker | 3 **zeitlich begrenzte** Suppressions auf dem Non-Empty-Listen-Pfad: `IngredientsPage.tsx` `if`-ConditionalExpression + `map`-ArrowFunction, `ingredientsApi.ts` URL-StringLiteral. Wurzel: kein Szenario rendert eine befüllte Liste. Beim Szenario „Zutat anlegen" / „Mehrere Zutaten" alle 3 entfernen (werden dann echt gekillt). | Mittel |
+| Frontend Stryker | 3 **zeitlich begrenzte** Suppressions auf dem Non-Empty-Listen-Pfad (`IngredientsPage.tsx` if + map, `ingredientsApi.ts` URL-Literal). Wurzel: kein Szenario rendert eine befüllte Liste. Bei „Zutat anlegen" alle 3 entfernen. | Mittel |
 | Frontend Stryker | `= []` Default in `IngredientsPage.tsx` supprimiert – Suppression entfällt wenn Loading-State-Szenario implementiert ist | Niedrig |
-| Frontend Deps | `qs`-DoS (moderate, GHSA-q8mj-m7cp-5q26) via `@stryker-mutator/core`→`typed-rest-client`→`qs` – dev-only, kein untrusted-Input-Pfad, akzeptiert; entfällt bei Stryker-Major-Bump. | Niedrig |
+| Frontend Deps | `qs`-DoS (moderate) via `@stryker-mutator/core`→`typed-rest-client`→`qs` – dev-only, kein untrusted-Input-Pfad, akzeptiert; entfällt bei Stryker-Major-Bump. | Niedrig |
 | Frontend Komponente | Dialog liegt nur im Empty-State-Branch von `IngredientsPage.tsx` – wird beim „Zutat anlegen"-Szenario zur Falle (Anlegen-Funktion verschwindet sobald die erste Zutat existiert); dann herausziehen. | Mittel |
 | Frontend Komponente | `isDialogOpen` boolean + `closeDialog` synct 3 `useState`-Slices manuell – bei Speichern/Validierung auf Discriminated Union umstellen. Auch: Dialog ohne `onClose`. | Mittel |
 | E2E-Test | `EmptyDb`-Test ohne DB-Reset – latent flaky wenn DB vorher befüllt | Niedrig |
@@ -41,4 +41,4 @@
 
 ## Offene Fragen
 
-- **Soll YAGNI für useResultQuery/MutationState gelten?** → Nur `pending|success` implementieren oder vollständige Union? TypeScript-Exhaustiveness-Check erzwingt alle Zweige. Klären vor dem ersten Szenario mit async HTTP-State (Mutation/Loading) – die nächsten reinen Dialog-Szenarien brauchen es nicht.
+- **Soll YAGNI für useResultQuery/MutationState gelten?** → Nur `pending|success` implementieren oder vollständige Union? TypeScript-Exhaustiveness-Check erzwingt alle Zweige. **Jetzt fällig:** „Zutat anlegen" (nächstes Szenario) ist das erste mit async HTTP-State (POST/Mutation) – vor dessen Implementierung klären.

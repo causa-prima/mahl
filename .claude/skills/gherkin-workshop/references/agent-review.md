@@ -39,11 +39,17 @@ MEDIUM (beheben wenn möglich, sonst dokumentieren):
   Prozessfluss und gleiche Fehlermeldung aus US-Text oder Constraints klar ablesbar sind;
   sonst HIGH (fachliche Semantik unklar)
 - Technische Details in Given/When/Then (HTTP-Codes, SQL, DB-Begriffe)
+- Szenario-Reihenfolge verletzt das Aufbau-/Abhängigkeitsprinzip: ein Szenario setzt ein
+  Verhalten voraus, das erst ein WEITER UNTEN stehendes Szenario etabliert (Prüffrage je Paar:
+  "Setzt B voraus, dass das in A geprüfte Verhalten bereits funktioniert?" – wenn ja, muss A vor
+  B stehen). Typische Inversion: ein komponiertes Szenario ("nach Abbrechen + erneutem Öffnen
+  sind Felder leer") steht vor seinem atomaren Baustein ("Abbrechen schließt + verwirft"). Formal
+  behebbar – konkrete neue Reihenfolge vorschlagen.
 
 LOW (Hinweis):
 - Tag-Inkonsistenz (abweichend von docs/process/e2e-testing.md-Schema)
 - Begriff nicht aus docs/reference/glossary.md
-- Sortierreihenfolge nicht eingehalten (happy-path → error → edge-case)
+- Kategorien-Sortierreihenfolge nicht eingehalten (happy-path → error → edge-case)
 
 Ausgabe pro Finding: [SEVERITY] [Szenario-Titel oder "Global"] – [Problem] – [Vorschlag]
 ```

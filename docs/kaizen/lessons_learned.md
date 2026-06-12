@@ -32,6 +32,13 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 082 – 2026-06-12
+
+- **[MITTEL] [PROZESS] [Gherkin] Szenario-Reihenfolge invertiert – komponiertes vor atomarem Baustein**
+  Was: Ein früherer `gherkin-workshop` ordnete „Felder nach Abbrechen wieder leer" (komponiert) vor „Abbrechen schließt + verwirft" (atomar); Folge bei der Implementierung: das komponierte Szenario musste beide Verhaltensteile auf einmal erzwingen, das atomare wurde zum wirkungslosen Guard-Test ohne RED-Beitrag.
+  Warum: Die Sortierregel kannte nur „trivial→komplex" + „ohne Backend vor mutierend" – beide Szenarien sind No-Backend-UI, fielen in dieselbe Gruppe; das Abhängigkeits-/Aufbauprinzip fehlte als Kriterium.
+  Regel: Szenarien innerhalb einer Kategorie primär nach Aufbau-Abhängigkeit sortieren – setzt B das in A geprüfte Verhalten voraus, muss A vor B; atomare Verhaltensbausteine vor den darauf komponierten (jetzt in `gherkin-workshop` SKILL Schritt 3.4 + Review-Agent verankert).
+
 ## Session 081 – 2026-06-11
 
 - **[MITTEL] [PROZESS] [Doku] Guideline-Änderung auf unverifiziertem Tool-Verhalten empfohlen**
