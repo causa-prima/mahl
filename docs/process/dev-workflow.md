@@ -273,6 +273,8 @@ python3 .claude/scripts/playwright-test.py --filter ingredients  # Datei- oder T
 python3 .claude/scripts/playwright-test.py --verbose
 ```
 
+> **E2E startet das Backend selbst** (`playwright.config.ts`, `reuseExistingServer:false` auf 5059) – vorher **keinen eigenen Backend auf 5059** laufen lassen (sonst Port-Konflikt), Postgres muss aber laufen. Begründung im Config-Kommentar.
+
 ---
 
 ## Datenbank-Workflow

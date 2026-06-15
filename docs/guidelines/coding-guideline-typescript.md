@@ -340,6 +340,8 @@ Die testbare Oberfläche im Frontend ist die **gerenderte Komponente** – analo
 
 Konsequenz: Kein separater `*.test.ts` für Service-Dateien. Wenn Stryker NoCoverage für eine Service-Funktion meldet, ist das Signal, dass der Komponenten-Test noch keinen echten HTTP-Call auslöst – nicht, dass ein neuer Unit-Test fehlt.
 
+**Ausnahme – nicht-UI-beobachtbare Transport-/Protokoll-Mechanik (ADR-S041-5-Addendum, ADR-S084-3):** Verhält sich eine Service-Schicht auf der gerenderten Komponente **nachweislich identisch** (z.B. HTTP-Conditional-Requests: 200 und 304 erzeugen denselben gerenderten Output), ist sie über die Komponente nicht killbar. Dann wird sie auf der obersten beobachtbaren Schicht getestet – der Service-Client-/HTTP-Boundary via MSW (gesendete Header, 304-Verarbeitung). Ein separater Service-`*.test.ts` ist hier korrekt, sofern er weiterhin nur den HTTP-Kontrakt prüft (kein `vi.mock`). Beispiel: `conditionalGet.test.ts`.
+
 ### HTTP-Mocking: ausschließlich MSW
 
 **Einzige erlaubte Mocking-Strategie für HTTP-Calls: MSW (`msw/node`).**
@@ -434,10 +436,12 @@ expect(result).toMatchObject({ name: 'Tomaten' });
 
 Ein `?? []`-Default (z.B. `data ?? []`) erzeugt einen Stryker-Survivor, weil MSW in Tests immer Daten liefert und der Default nie aktiv ist. Dieser Survivor darf mit einem erklärenden Kommentar supprimiert werden:
 
+**Syntax (StrykerJS):** Das Direktiv muss `next-line` (mit Bindestrich) heißen und in **einer** Kommentarzeile stehen, **unmittelbar** über der betroffenen Zeile (Regex: `Stryker (disable|restore)(?: (next-line))? <Mutatoren>(?::<Reason>)?`). Mehrzeilige Begründung also **über** das Direktiv setzen, nicht dazwischen:
+
 ```typescript
-// Stryker disable next line ArrayDeclaration -- Default [] nie aktiv:
-//   data ist während Tests nie undefined (MSW liefert immer).
-//   Entfällt wenn Loading-State-Szenario implementiert ist.
+// data ist während Tests nie undefined (MSW liefert immer); Default [] nie aktiv.
+// Entfällt wenn Loading-State-Szenario implementiert ist.
+// Stryker disable next-line ArrayDeclaration: Default [] nie aktiv (s. o.)
 const items = data ?? [];
 ```
 
@@ -446,7 +450,7 @@ const items = data ?? [];
 String-Literale in `className`-Props erzeugen Stryker-StringLiteral-Mutanten, die kein Test killt, weil Tests nicht auf CSS-Klassen assertieren. Diese dürfen supprimiert werden:
 
 ```typescript
-// Stryker disable next line StringLiteral -- CSS-only, kein Verhalten
+// Stryker disable next-line StringLiteral: CSS-only, kein Verhalten
 <div className="flex gap-4">
 ```
 

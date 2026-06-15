@@ -248,7 +248,7 @@ Entscheidung + Begründung: `docs/history/adr.md` → Sektion "HTTP-Caching & Op
 
 **ETag-Quelle:**
 - Single-Resource-Endpoint: `xmin`-Wert des Rows (PostgreSQL, via Npgsql `UseXminAsConcurrencyToken()`), hex-kodiert: `$"\"{xmin:x8}\""`. Zugriff: `(uint)db.Entry(row).Property("xmin").CurrentValue!`
-- Collection-Endpoint: SHA-256-Hash der serialisierten Response-Body (erster 16 Zeichen hex genügen).
+- Collection-Endpoint: **voller** SHA-256-Hash der serialisierten Response-Body, gebildet von einer generischen Middleware (ADR-S084-1). Format & Vergleich (ADR-S084-2): `$"\"{Convert.ToHexString(SHA256.HashData(body))}\""` (Uppercase-Hex aus dem Encoder, **keine** Truncation, **kein** nachgelagerter `.ToUpper()/.ToLower()`-Call); `If-None-Match` ordinal/verbatim vergleichen (nie case-insensitive). Gründe: vermeidet un-killbare Stryker-Survivor (Casing-Normalisierung + Magic-Number-Truncation). **Voraussetzung:** Collection deterministisch sortieren – sonst variiert der Hash und 304 feuert nie.
 
 **Pflicht-Verhalten:**
 | Endpoint | Situation | Header | Response |

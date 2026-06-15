@@ -1,5 +1,6 @@
 using mahl.Infrastructure;
 using mahl.Server.Endpoints;
+using mahl.Server.Middleware;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,7 @@ builder.Services.AddDbContext<MahlDbContext>(options =>
 
 var app = builder.Build();
 
+app.UseCollectionETag();
 app.MapIngredientsEndpoints();
 
 await app.RunAsync();

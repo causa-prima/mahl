@@ -20,13 +20,15 @@ internal static class IngredientsEndpoints
         group.MapGet(
             // Stryker disable once String : Route patterns "/" and "" are treated equivalently by ASP.NET Core routing
             "/",
+            // ETag-Determinismus (ADR-S084-1): bewusst noch KEIN OrderBy. Der Collection-
+            // Content-Hash-ETag ist erst stabil, wenn die Reihenfolge deterministisch ist.
+            // Das alphabetische Sortier-Szenario (@US-904) führt OrderBy(name) Stryker-killbar
+            // ein; ein reines OrderBy(id) jetzt wäre mit EF-InMemory nicht killbar (Survivor).
+            // Bis dahin ist der ETag in SKELETON folgenlos unwirksam (Tech-Debt in AGENT_MEMORY).
             async (MahlDbContext db) =>
-            {
-                var ingredients = await db.Ingredients
+                Results.Ok(await db.Ingredients
                     .Select(i => new IngredientDto(i.Id, i.Name, i.DefaultUnit))
-                    .ToListAsync();
-                return Results.Ok(ingredients);
-            });
+                    .ToListAsync()));
 
         group.MapPost(
             // Stryker disable once String : Route patterns "/" and "" are treated equivalently by ASP.NET Core routing

@@ -30,6 +30,10 @@ export default function IngredientsPage() {
 
   const save = useResultMutation(createIngredient, () => {
     closeDialog()
+    // Äquivalenter Mutant: Die App hat nur eine Query-Art (['ingredients']), daher ist
+    // invalidateQueries({}) (alle) ≡ invalidateQueries({ queryKey: ingredientsKey }).
+    // Deterministisch tötbar erst mit einer zweiten Query-Art.
+    // Stryker disable next-line ObjectLiteral: aequivalent, nur eine Query-Art (s. o.)
     void queryClient.invalidateQueries({ queryKey: ingredientsKey })
   })
 

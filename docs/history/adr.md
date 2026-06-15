@@ -75,6 +75,8 @@ kritische-regeln:
 
 **Addendum (S083) – nicht-E2E-beobachtbare Anforderungen:** Anforderungen, die auf der E2E-/Nutzerebene **nicht beobachtbar** sind (HTTP-Caching-Header wie ETag, Concurrency-Token, sonstige Transport-/Protokoll-Eigenschaften), werden auf der **obersten Schicht getestet, auf der sie beobachtbar sind** – i.d.R. die Service-Client-/HTTP-Boundary (Frontend via MSW: `If-None-Match` gesendet, 304 verarbeitet) bzw. der Backend-Integrationstest (ETag-Header, 304 bei Match). Ein fehlender Gherkin-/E2E-Treiber ist für solche Querschnitts-Eigenschaften **kein** Outside-In-Verstoß; ein E2E-Test, der rohe HTTP-Mechanik durch den Browser prüft, wäre hier das falsche Werkzeug.
 
+**Testnamen für scenario-lose Querschnitts-Tests:** Da kein `@US-NNN`-Szenario existiert, entfällt das `USxxx_ScenarioType_`-Pflichtpräfix (`docs/process/e2e-testing.md`). Solche Tests tragen stattdessen einen sprechenden, am Concern orientierten Namen (z.B. `ETagMiddleware_IfNoneMatchMatchesETag_Returns304WithoutBody`). Ein erzwungenes `US904`-Präfix auf einer endpoint-agnostischen Middleware wäre semantisch falsch.
+
 ---
 
 ### ADR-S041-6: E2E Quality Gate: Spec-driven Checklist (nicht Coverage-Metrik)
@@ -869,6 +871,70 @@ Kein einzelner DB-Wert bildet den Collection-Zustand korrekt ab. `MAX(xmin)` ist
 **Entscheidung:** ETag-Support wird pro Endpoint beim Szenario-Schritt eingebaut, der den Endpoint erstmalig mit echten DB-Daten belegt. Nicht in Skeleton-Stubs (hardcoded Antworten haben keinen sinnvollen ETag).
 
 `GET /api/ingredients` erhält ETag-Support in US-904 Szenario 2 (erster GET mit echten DB-Rows).
+
+**Addendum (S084) – Präzisierung für Content-Hash-Collections:** Diese „pro Endpoint / nicht in Stubs"-Regel gilt **nur noch für xmin-Single-Resource-ETags** – die brauchen einen echten DB-Row, ein Stub ohne Row hat keinen sinnvollen xmin. Für **Content-Hash-Collection-ETags gilt sie nicht**: Sie werden von einer generischen Middleware (ADR-S084-1) für jede GET-200-Response gebildet, sobald die Middleware registriert ist – es gibt kein per-Endpoint-Opt-in. Die ursprüngliche Begründung „hardcoded Antworten haben keinen sinnvollen ETag" trifft auf Content-Hashes nicht zu: der SHA-256-Hash eines hartkodierten `[]`-Body ist stabil und valide. Der ETag für `GET /api/ingredients` wurde daher nicht „im GET-Szenario", sondern nachgelagert im ETag-Querschnitts-Zyklus (S084) als Middleware umgesetzt.
+
+---
+
+### ADR-S084-1: Collection-ETag via generische Response-Middleware
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, http:etag, arch:caching
+
+**Entscheidung:** Der Collection-Content-Hash-ETag (ADR-S058-3) wird von einer **einzigen generischen Response-Middleware** gebildet, nicht pro Endpoint. Die Middleware puffert jede **GET**-Response, bildet bei **Status 200** den SHA-256-Content-Hash des serialisierten Body, setzt ihn als `ETag`-Header und behandelt `If-None-Match` → 304 uniform. Nicht-GET- und Nicht-200-Responses werden unverändert durchgereicht. Registrierung einmalig in `Program.cs` vor dem Endpoint-Mapping (`app.UseCollectionETag()`).
+
+**Begründung:** Content-Hash ist endpoint-agnostisch (er hasht nur den Body) – eine generische Middleware erfüllt die „alle Endpoints"-Policy (ADR-S058-1) mit einer Implementierung (DRY). Die 304-Logik ist ein echter Querschnitts-Concern.
+
+**Voraussetzung – deterministische Serialisierungs-Reihenfolge:** Der Content-Hash ist nur dann ein stabiles Caching-Token, wenn der Endpoint die Collection in **deterministischer Reihenfolge** serialisiert. Ohne `ORDER BY` ist die PostgreSQL-Reihenfolge undefiniert → der Hash variiert bei identischen Daten → `If-None-Match` matcht nie → 304 feuert nie (Daten bleiben korrekt, das Caching ist aber wirkungslos – ein Effektivitäts-, kein Korrektheits-Bug). Jeder Collection-Endpoint mit Content-Hash-ETag muss daher deterministisch sortieren.
+
+---
+
+### ADR-S084-2: ETag-Format & -Vergleich: voller Hash, ordinal, keine Casing-Normalisierung
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, http:etag, arch:caching, testing:mutation
+
+**Entscheidung:**
+- **Format:** Collection-ETag = `$"\"{Convert.ToHexString(SHA256.HashData(body))}\""` – **voller** SHA-256-Hash als Uppercase-Hex in doppelten Quotes. **Keine Truncation.**
+- **Casing:** Uppercase entsteht direkt aus `Convert.ToHexString` – **kein** nachgelagerter `.ToUpperInvariant()`/`.ToLowerInvariant()`-Call.
+- **Vergleich:** `If-None-Match` wird **ordinal/verbatim** mit dem ETag verglichen (`StringValues ==` ist ordinal) – **nie** case-insensitive. Der Frontend-Client echo't den ETag verbatim zurück (RFC 7232: opake, octet-genaue Tokens; verbatim auch im Frontend-Cache, ADR-S084-3).
+
+**Begründung (Anti-Stryker-Survivor):** Jede Casing-Normalisierung (`.ToUpper()/.ToLower()` auf Vergleichsseite) ist **un-killbar**: Da der Client verbatim echo't, stimmt die Schreibweise immer schon überein – der Mutant „Normalisierung entfernt" ändert das Ergebnis nie. Ebenso erzeugt `Substring(0, 16)` (Truncation) eine Magic-Number-Mutante, die ohne zusätzliche Längen-Assertion überlebt. Voller Hash + ordinaler Vergleich + Casing direkt aus dem Encoder = **0 Suppressionen**. Diese Regel gilt für alle künftigen ETag-Endpoints.
+
+**Verhältnis zu bestehenden Docs:** Präzisiert ADR-S058-3 (dort nur „SHA-256-Hash … hex-kodiert"). Die Notiz in `coding-guideline-csharp.md` §6 „erste 16 Zeichen hex genügen" wird auf den vollen Hash korrigiert. **Kosmetische Divergenz:** xmin-Single-Resource nutzt lowercase (`{xmin:x8}`), Collection-Content-Hash uppercase – akzeptiert, da unabhängige opake Tokens, die nie miteinander verglichen werden.
+
+---
+
+### ADR-S084-3: Frontend-Conditional-Layer (HTTP-Conditional-Requests)
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, http:etag, arch:caching, frontend:react
+
+**Entscheidung:** Ein generischer Service-Helper `conditionalGetJson<T>(url)` (`Client/src/services/conditionalGet.ts`) hält einen modul-lokalen Cache `URL → { etag, body }`, sendet bei vorhandenem ETag `If-None-Match` und liefert bei `304` den gecachten Body. Bei `200` werden ETag + Body (verbatim, keine Normalisierung) gecacht. `fetchIngredients` nutzt diesen Helper.
+
+**Begründung:** react-query macht von Haus aus **keine** HTTP-Conditional-Requests. Ohne diese Schicht hätte der Backend-ETag keinen Konsumenten – der 304-Spareffekt entsteht nur, wenn der Client `If-None-Match` sendet. Eine Frontend-seitige Cache-Invalidierung ist nicht nötig: Nach einem POST ändert sich der Backend-Content-Hash → `If-None-Match` matcht nicht mehr → 200 mit neuem Body → der Cache aktualisiert sich selbst.
+
+**Testung:** Auf der Service-Client-/HTTP-Boundary via MSW (ADR-S041-5-Addendum), nicht E2E – die Conditional-Mechanik ist auf E2E-Ebene nicht beobachtbar (gerenderter Output identisch bei 200 und 304).
+
+---
+
+### ADR-S084-4: Playwright besitzt den Backend-Lebenszyklus für E2E (Poka-Yoke gegen stale Backend)
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:e2e, tooling:build
+
+**Kontext/Problem:** Playwright startete nur Vite (`reuseExistingServer:true`); das Backend war ein separat/manuell verwalteter Prozess (`ASPNETCORE_URLS=…5059 dotnet run`). Ein **veralteter** Backend-Prozess (z.B. von vor einem Code-Change) wurde von der E2E-Suite **still mitgetestet** → irreführende Ergebnisse. In S084 kostete genau das ~1 h Fehlersuche: ein pre-S083-Prozess lieferte hartkodiert leere GETs, wodurch der „Zutat anlegen"-E2E scheinbar fehlschlug, obwohl der aktuelle Code korrekt war.
+
+**Entscheidung:** Playwright besitzt den Backend-Lebenszyklus für E2E. `playwright.config.ts` → `webServer`-Array mit Backend-Eintrag (`dotnet run --project ../Server`, `env: { ASPNETCORE_URLS: 'http://localhost:5059' }`, `reuseExistingServer: false`, `url: /api/ingredients`). Jeder E2E-Lauf **baut & startet das Backend frisch aus dem Quellcode** und fährt es danach herunter. Vite bleibt `reuseExistingServer:true` (nie stale dank Hot-Reload).
+
+**Begründung:** `reuseExistingServer:false` macht es **strukturell unmöglich**, dass ein veralteter Prozess mitgetestet wird (einzige Variante mit echter Garantie). Die `url`-Readiness-Probe (`/api/ingredients`) verifiziert die DB-Verbindung und wärmt EF/JIT → mindert zugleich das Cold-Start-Race. Fehlerfälle werden **laut**: Port belegt → Konflikt; Build-Fehler → webServer-Start scheitert; DB down → Readiness-Timeout.
+
+**Verworfen:**
+- **Status quo** (manuelles Backend, kein Check) – kein Poka-Yoke, verlässt sich auf Disziplin.
+- **Leichter Pre-Flight-Guard** (Probe auf ETag-Header) – fängt nur „down"/„pre-ETag-stale", keine echte Build-Identität.
+- **Build-Identitäts-Guard** (Git-SHA-Endpoint vs. HEAD) – leck bei dirty working tree (uncommittete Änderungen ≠ HEAD-SHA), zusätzliche Infra nötig.
+
+**Kosten:** wenige Sekunden Mehraufwand pro E2E-Lauf (Build/Start/Warmup); kein paralleles eigenes Backend auf 5059 während E2E; Postgres muss laufen.
 
 ---
 

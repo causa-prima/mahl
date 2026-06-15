@@ -1,5 +1,6 @@
 import { ResultAsync } from 'neverthrow'
 import type { ApiError } from '../types/apiError'
+import { conditionalGetJson } from './conditionalGet'
 
 export type Ingredient = {
   readonly id: string
@@ -13,10 +14,8 @@ export type NewIngredient = {
 }
 
 export function fetchIngredients(): ResultAsync<readonly Ingredient[], ApiError> {
-  return ResultAsync.fromPromise(
-    fetch('/api/ingredients').then((r) => r.json() as Promise<readonly Ingredient[]>),
-    (e) => ({ message: String(e) }),
-  )
+  // ADR-S058-1: GET nutzt HTTP-Conditional-Requests (If-None-Match / 304) via Content-Hash-ETag.
+  return conditionalGetJson<readonly Ingredient[]>('/api/ingredients')
 }
 
 export function createIngredient(ingredient: NewIngredient): ResultAsync<Ingredient, ApiError> {

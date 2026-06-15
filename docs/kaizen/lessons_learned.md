@@ -32,6 +32,23 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 084 – 2026-06-15
+
+- **[HOCH] [PROZESS] [Review] Überraschendes E2E-/Integrationsergebnis zuerst gegen "läuft aktueller Code?" prüfen**
+  Was: Ein E2E-Test schlug deterministisch fehl; ich jagte ~1 h einer vermeintlichen Code-Regression nach, bis sich zeigte, dass die Suite gegen einen veralteten, separat verwalteten Backend-Prozess lief.
+  Warum: Das System-under-Test (extern gestarteter Backend) war nicht garantiert der aktuelle Build; kein Mechanismus erzwang Frische.
+  Regel: Liefert ein E2E-/Integrationstest ein überraschendes Ergebnis, **zuerst verifizieren, dass das getestete System aus dem aktuellen Quellcode läuft** (frischer Start / Build-Identität), bevor man eine Code-Regression vermutet. Externe, langlebige Test-Targets per Poka-Yoke frisch erzwingen statt auf Disziplin zu setzen.
+
+- **[MITTEL] [TOOLING] [Doku] Dokumentierte Befehle empirisch verifizieren – auch in Guidelines/Allow-Listen**
+  Was: Die Stryker-Disable-Syntax in der TS-Guideline (`next line` statt `next-line`) und die Bare-`dotnet ef database update`-Form in `--list`/dev-workflow funktionierten beide real nicht.
+  Warum: Beispiele wurden notiert, aber nie ausgeführt; falsche Form sieht plausibel aus.
+  Regel: Bevor man sich auf einen dokumentierten Befehl/Snippet verlässt (besonders Suppressions, CLI-Invocations), einmal real ausführen; Doku-Snippets sind keine verifizierte Wahrheit.
+
+- **[GERING] [AGENT] [Bash/Permission] `--allow-once` nicht reflexartig anhängen**
+  Was: Ich hängte `--allow-once` an Befehle, deren Wirkung bereits über die Allow-Liste abgedeckt war (z.B. taskkill /pid vs. /im).
+  Warum: Bequemlichkeit statt erst die Allow-Liste/Alternativen zu prüfen.
+  Regel: Vor `--allow-once` zuerst `--list` prüfen, ob eine erlaubte Variante denselben Zweck erfüllt; die Ausnahme nur für echte Einzelfälle ohne regulären Weg.
+
 ## Session 083 – 2026-06-12
 
 - **[HOCH] [AGENT] [Agent-Prompt] „NULL neue Suppressions" als Absolutregel an Subagenten vorgegeben**
