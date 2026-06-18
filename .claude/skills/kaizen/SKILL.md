@@ -17,12 +17,14 @@ Definitionen für Schwere, Kategorien, Kontext-Tags, BEWÄHRT- und Obsolet-Krite
 Lege zu Beginn folgende Task-Liste an:
 
 → TaskCreate "0. Noise-Review: lessons_learned + Archiv bereinigen"
-→ TaskCreate "1. retro_report.py ausführen"
-→ TaskCreate "2. countermeasures.md reviewen"
-→ TaskCreate "3. Findings präsentieren & Freigabe"
-→ TaskCreate "4. Änderungen umsetzen"
-→ TaskCreate "5. lessons_learned.md archivieren"
-→ TaskCreate "6. AGENT_MEMORY.md aufräumen"
+→ TaskCreate "1. User-/Meta-Beobachtungen abfragen"
+→ TaskCreate "2. retro_report.py ausführen"
+→ TaskCreate "3. countermeasures.md reviewen"
+→ TaskCreate "4. Backlog-Review & Grooming (observations.md)"
+→ TaskCreate "5. Findings präsentieren & Freigabe"
+→ TaskCreate "6. Änderungen umsetzen"
+→ TaskCreate "7. lessons_learned.md archivieren"
+→ TaskCreate "8. Session-Abschluss anbieten"
 
 ---
 
@@ -30,7 +32,7 @@ Lege zu Beginn folgende Task-Liste an:
 
 → TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": in_progress
 
-Lies `docs/kaizen/lessons_learned.md` und alle `*.md`-Dateien in `docs/kaizen/archive/`. **`.legacy`-Dateien (altes Format) sind bewusst out-of-scope – nicht lesen.** Wende auf jeden Eintrag den Filter-Test aus `docs/kaizen/process.md` an:
+Lies `docs/kaizen/lessons_learned.md` und die **zuletzt archivierte Periode** (die jüngste `*.md`-Datei in `docs/kaizen/archive/`). Wende auf jeden Eintrag den Filter-Test aus `docs/kaizen/process.md` an:
 
 **Test (alle drei Fragen müssen mit Ja beantwortet werden, damit der Eintrag bleibt):**
 1. „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?"
@@ -53,13 +55,34 @@ Präsentiere Kandidaten als Tabelle:
 
 Falls keine Kandidaten gefunden: kurz melden ("Kein Noise gefunden – Preprocessing-CM wirkt.") und direkt mit Schritt 1 weitermachen.
 
-→ TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": completed | TaskUpdate "1. retro_report.py ausführen": in_progress
+→ TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": completed | TaskUpdate "1. User-/Meta-Beobachtungen abfragen": in_progress
 
 ---
 
-## 1. retro_report.py ausführen
+## 1. User-/Meta-Beobachtungen abfragen
 
-→ TaskUpdate "1. retro_report.py ausführen": in_progress
+→ TaskUpdate "1. User-/Meta-Beobachtungen abfragen": in_progress
+
+Den User aktiv nach **zeitraum-/prozessweiten** Beobachtungen fragen, die **nicht an eine einzelne Session** hängen – also genau die Ebene, die der session-lokale `closing-session`-Prompt nicht erreicht:
+
+> „Ist dir über die letzten Sessions hinweg etwas am Prozess/System aufgefallen, das besser sein könnte – eine wiederkehrende Reibung, ein Tooling-Wunsch, eine strukturelle Idee?"
+
+Jeden Punkt per **Erfassungs-Test** (`process.md`, „Zwei Brillen") einsortieren – Erfassung jetzt, Bewertung in Schritt 4:
+- **Vorausschauende Optimierung/Reibung** → **OBS** in `docs/kaizen/observations.md` (`Status: NEU`, `Quelle: User`).
+- **Konkretes Problem aus der abzuschließenden Periode** → LL-Eintrag (mit ID + Erfassungs-Test) in die **aktuelle** `docs/kaizen/lessons_learned.md`, **jetzt** (vor Schritt 2) – dann nimmt `retro_report.py` es in die Muster-Analyse auf und es wird mit der Periode archiviert.
+- **Problem, das während der Retro selbst passiert** → gehört zu dieser Session → beim `closing-session` dieser Session loggen, nicht hier.
+
+Der Noise-Filter (die 3 Fragen aus `process.md`) gilt für ALLE Einträge. Keine Lösung jetzt umsetzen.
+
+**Dieselbe Routing-Regel gilt für alles, was in Schritt 2–4 *festgestellt* wird** (nicht nur für hier Abgefragtes) – einsortieren nach demselben Erfassungs-Test.
+
+→ TaskUpdate "1. User-/Meta-Beobachtungen abfragen": completed | TaskUpdate "2. retro_report.py ausführen": in_progress
+
+---
+
+## 2. retro_report.py ausführen
+
+→ TaskUpdate "2. retro_report.py ausführen": in_progress
 
 ```bash
 python3 .claude/scripts/retro_report.py
@@ -68,8 +91,8 @@ python3 .claude/scripts/retro_report.py
 Standardpfade: `docs/kaizen/lessons_learned.md`, `docs/kaizen/archive/`, `docs/kaizen/countermeasures.md`. Für abweichende Pfade: `--current`, `--archive`, `--cm` als Named-Arguments übergeben.
 
 Falls `docs/kaizen/archive/` leer ist:
-- Wenn `docs/kaizen/countermeasures.md` AKTIV/OFFEN-Einträge enthält: User bestätigen lassen dass das Archiv tatsächlich leer ist (Archiv-Dateien könnten verschoben oder versehentlich gelöscht worden sein). Erst nach Bestätigung mit Schritt 2 weitermachen.
-- Wenn `countermeasures.md` ebenfalls keine AKTIV/OFFEN-Einträge enthält: User bestätigen lassen dass dies tatsächlich die erste Retro ist (auch CMs könnten versehentlich fehlen). Nach Bestätigung: Erster Lauf – kein historischer Vergleich möglich, Script liefert nur aktuelle Statistik. In Schritt 3 darauf hinweisen.
+- Wenn `docs/kaizen/countermeasures.md` AKTIV/OFFEN-Einträge enthält: User bestätigen lassen dass das Archiv tatsächlich leer ist (Archiv-Dateien könnten verschoben oder versehentlich gelöscht worden sein). Erst nach Bestätigung mit Schritt 3 weitermachen.
+- Wenn `countermeasures.md` ebenfalls keine AKTIV/OFFEN-Einträge enthält: User bestätigen lassen dass dies tatsächlich die erste Retro ist (auch CMs könnten versehentlich fehlen). Nach Bestätigung: Erster Lauf – kein historischer Vergleich möglich, Script liefert nur aktuelle Statistik. In Schritt 5 darauf hinweisen.
 
 Das Script gibt einen beschrifteten Abschnitt "Pattern-Kandidaten" aus – Tag-Tripel (Schwere/Kategorie/Kontext), die ≥2× im **Pattern-Fenster** auftreten und nicht durch eine bestehende Countermeasure (OFFEN/AKTIV/IN UMSETZUNG/BEWÄHRT) abgedeckt sind. Das **Pattern-Fenster** = aktuelle Periode + die letzten 3 Archiv-Perioden. Perioden sind die Spannen zwischen Retros, durch den Jenga-Score begrenzt – also **unterschiedlich lang** (die „Sessions gesamt"-Zahl im Header ist nur der aktuelle Wert, keine feste Fenstergröße).
 
@@ -78,17 +101,17 @@ Das Script gibt einen beschrifteten Abschnitt "Pattern-Kandidaten" aus – Tag-T
 - **Priorisierung:** Der Anker „Neue Sessions ab: NNN" markiert die erste Session der aktuellen Periode. Muster mit mindestens einem Mitglied aus der aktuellen Periode priorisieren – reine Alt-Archiv-Muster lagen bereits früheren Retros vor.
 - **Einzel-Einträge lesen:** Cluster sind Tag-Kombinationen, keine semantischen Gruppen – vor jedem Vorschlag die konkreten Einträge prüfen.
 
-Leite aus den verbleibenden Kandidaten konkrete Maßnahmenvorschläge ab (CM-Eingangs-Gate beachten, s.u.). Diese Vorschläge sind der Input für Abschnitt A in Schritt 3.
+Leite aus den verbleibenden Kandidaten konkrete Maßnahmenvorschläge ab (CM-Eingangs-Gate beachten, s.u.). Diese Vorschläge sind der Input für Abschnitt A in Schritt 5.
 
 **CM-Eingangs-Gate:** Bevor ein Pattern-Kandidat zu einem Maßnahmenvorschlag wird, das CM-Eingangs-Gate aus `docs/kaizen/process.md` (Abschnitt „Wann gehört etwas wohin?") anwenden: liegt eine wiederkehrende Tätigkeits-Klasse darunter, oder war es eine einmalige Umstellung? Einmal-Situation ohne verallgemeinerbare Klasse → keine CM. Klasse vorhanden → Vorschlag auf Klassen-Ebene formulieren.
 
-Ergebnis intern festhalten für Schritt 3.
+Ergebnis intern festhalten für Schritt 5.
 
 ---
 
-## 2. countermeasures.md reviewen
+## 3. countermeasures.md reviewen
 
-→ TaskUpdate "1. retro_report.py ausführen": completed | TaskUpdate "2. countermeasures.md reviewen": in_progress
+→ TaskUpdate "2. retro_report.py ausführen": completed | TaskUpdate "3. countermeasures.md reviewen": in_progress
 
 Lies `docs/kaizen/countermeasures.md`. Für jeden AKTIV/OFFEN-Eintrag:
 
@@ -110,7 +133,7 @@ Falls keine Session die relevante Arbeit enthielt: Maßnahme hat keine neue Evid
 **Überarbeiten?** Gibt es Rückfälle in der aktuellen `lessons_learned.md`? Falls ja:
 Maßnahme war unzureichend – verschärfen (bei KRITISCH: Poka-yoke Pflicht, bei anderen: Poka-yoke
 anstreben wenn verhältnismäßig).
-Bei einem Rückfall auf eine KRITISCH-Maßnahme: In Schritt 3 als **KRITISCH-Rückfall** explizit markieren und Poka-yoke-Pflicht in der Empfehlung hervorheben.
+Bei einem Rückfall auf eine KRITISCH-Maßnahme: In Schritt 5 als **KRITISCH-Rückfall** explizit markieren und Poka-yoke-Pflicht in der Empfehlung hervorheben.
 
 **BEWÄHRT-Einträge auf Regressionen prüfen:** Gibt es ein neues Finding in `lessons_learned.md`,
 das inhaltlich zu einem BEWÄHRT-Eintrag passt? Falls ja → zurück auf AKTIV.
@@ -118,27 +141,49 @@ das inhaltlich zu einem BEWÄHRT-Eintrag passt? Falls ja → zurück auf AKTIV.
 **Obsolet?** Ein Eintrag ist obsolet wenn das betroffene Tool/Prozess nicht mehr existiert,
 das Problem strukturell unmöglich geworden ist, oder es eine einmalige Situation war.
 
-Ergebnis intern festhalten für Schritt 3.
+Ergebnis intern festhalten für Schritt 5.
 
 ---
 
-## 3. Findings präsentieren & Freigabe einholen
+## 4. Backlog-Review & Grooming (observations.md)
 
-→ TaskUpdate "2. countermeasures.md reviewen": completed | TaskUpdate "3. Findings präsentieren & Freigabe": in_progress
+→ TaskUpdate "3. countermeasures.md reviewen": completed | TaskUpdate "4. Backlog-Review & Grooming (observations.md)": in_progress
 
-Präsentiere dem User folgende strukturierte Übersicht und **warte auf Freigabe** bevor Änderungen umgesetzt werden. Freigabe kann teilweise erteilt oder abgelehnt werden – nur explizit freigegebene Punkte umsetzen:
+Lies `docs/kaizen/observations.md`. Hier wird das **gesamte offene** Beobachtungs-Backlog getrefiert (Definitionen & Regeln: `docs/kaizen/process.md`, Abschnitte „observations.md – Beobachtungs-Backlog", „Gefahr & Kandidaten-Bewertung", „Backlog-Grooming & Eskalation").
+
+1. **Übersicht:** Alle unbehandelten OBS (Status ≠ UMGESETZT/VERWORFEN) als Liste **ID + Titel** präsentieren.
+2. **Je offenem OBS evaluieren:** Nicht-triviale durchdenken – Kandidaten abwägen, Antwort mit **Gefahr & Beweisbarkeit** wählen (Evaluierungs-Gate: höher-Gefahr/nicht-trivial nicht reflexartig umsetzen). Status pflegen (NEU → IN BEOBACHTUNG / UMGESETZT / VERWORFEN).
+3. **Quer-Bewegung LL ↔ Backlog** mit Gesamt-Prozess-Blick: Steckt hinter einem Backlog-Punkt ein konkreter schlechter Ausgang (→ auch LL/CM)? Steckt hinter einem LL-Muster eine vorausschauende Design-Antwort (→ OBS)? Per `Bezug:` verlinken.
+4. **Themen-Scan über das Backlog:** Häufungen über mehrere OBS hinweg (z.B. „Token-Effizienz", „Doku-Stale") als Cluster benennen.
+5. **OBS-Antworten durch das CM-Eingangs-Gate** (`process.md`, „Wann gehört etwas wohin?"): stehende, verifizierbare Änderung → CM (`Bezug: → CM-…`); Einmal-Änderung → inline `Maßnahme:`, Status UMGESETZT.
+6. **Lange offene Einträge → Eskalations-Entscheidung:** analog zur CM-Regel (nach 2 Retros OFFEN) priorisieren oder begründet verwerfen.
+7. **Aufgelöste** Einträge (UMGESETZT / VERWORFEN) nach `docs/kaizen/archive/observations_archive.md` **verschieben** (nicht kopieren).
+
+Ergebnis intern festhalten für Schritt 5 (Backlog-Block in der Findings-Übersicht).
+
+→ TaskUpdate "4. Backlog-Review & Grooming (observations.md)": completed | TaskUpdate "5. Findings präsentieren & Freigabe": in_progress
+
+---
+
+## 5. Findings präsentieren & Freigabe einholen
+
+→ TaskUpdate "5. Findings präsentieren & Freigabe": in_progress
+
+Präsentiere dem User folgende strukturierte Übersicht und **warte auf Freigabe** bevor Änderungen umgesetzt werden. Freigabe kann teilweise erteilt oder abgelehnt werden – nur explizit freigegebene Punkte umsetzen.
+
+**Pro Finding vier Facetten explizit machen** (in Tabellen als Spalten/Unterzeilen, in Fließtext als benannte Punkte): **Problem** (was ist nicht ideal), **Warum jetzt** (wodurch ausgelöst / warum jetzt Thema), **Vorschlag** (empfohlener Kandidat), **Alternativen** (verworfene Kandidaten + warum verworfen). Ohne diese vier ist für den User nicht erkennbar, was zur Wahl steht.
 
 ```
-## A) Neue/aktualisierte Maßnahmen (aus Schritt 1)
-| Problem | Wohin | Vorschlag |
-|---------|-------|-----------|
-| ...     | countermeasures.md / principles.md / Guideline | ... |
+## A) Neue/aktualisierte Maßnahmen (aus Schritt 2)
+| Problem | Warum jetzt | Wohin | Vorschlag | Alternativen (verworfen) |
+|---------|-------------|-------|-----------|--------------------------|
+| ...     | ...         | countermeasures.md / principles.md / Guideline | ... | ... |
 
-## B) Neue Prinzipien (aus Schritt 1)
+## B) Neue Prinzipien (aus Schritt 2)
 (Nur wenn querschnittlich – sonst besser in Guideline/Skill)
 - ...
 
-## C) Status-Änderungen bestehender Maßnahmen (aus Schritt 2)
+## C) Status-Änderungen bestehender Maßnahmen (aus Schritt 3)
 | Eintrag | Aktuell | Vorgeschlagen | Begründung |
 |---------|---------|---------------|------------|
 
@@ -153,15 +198,21 @@ Präsentiere dem User folgende strukturierte Übersicht und **warte auf Freigabe
 | Eintrag | OFFEN seit | Entscheidung |
 |---------|-----------|--------------|
 | ...     | S...      | Priorisieren oder verwerfen? |
+
+## G) Beobachtungs-Backlog (aus Schritt 4)
+Neue/aktualisierte OBS, getroffene Entscheidungen, Eskalationen, verschobene (aufgelöste) Einträge.
+| OBS | Titel | Status (neu) | Entscheidung/Maßnahme |
+|-----|-------|--------------|------------------------|
+| ... | ...   | ...          | ...                    |
 ```
 
-Abschnitte die leer sind weglassen.
+**Leere Abschnitte nicht still weglassen** – jeden Abschnitt (A–G) nennen und in einem Satz sagen, was er enthalten hätte und warum er leer ist (z.B. „B) Neue Prinzipien: keine – kein querschnittliches Muster in dieser Periode."). Sonst ist intransparent, ob ein Abschnitt geprüft-und-leer oder vergessen wurde.
 
 ---
 
-## 4. Änderungen umsetzen
+## 6. Änderungen umsetzen
 
-→ TaskUpdate "3. Findings präsentieren & Freigabe": completed | TaskUpdate "4. Änderungen umsetzen": in_progress
+→ TaskUpdate "5. Findings präsentieren & Freigabe": completed | TaskUpdate "6. Änderungen umsetzen": in_progress
 
 Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: countermeasures.md verweist auf Ziele die bereits existieren müssen):
 1. `docs/kaizen/principles.md` aktualisieren
@@ -169,13 +220,14 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
    Bei echter Überschneidung: mit User absprechen
 3. `docs/kaizen/countermeasures.md` aktualisieren (Verweise auf principles.md oder Guideline-Änderungen aus Schritt 1+2 ergänzen)
 4. `docs/kaizen/process.md` aktualisieren falls neue Kontext-Tags vereinbart
-5. `docs/AGENT_MEMORY.md` unter „Nächste Prioritäten": Für jeden neuen OFFEN-Eintrag einen Punkt ergänzen (Kurzbeschreibung, Verweis auf countermeasures.md). Falls zutreffend auch als Technische Schuld oder Offene Frage eintragen.
+5. `docs/kaizen/observations.md` + `docs/kaizen/archive/observations_archive.md`: freigegebene OBS-Status/Entscheidungen aus Schritt 4 schreiben; aufgelöste Einträge (UMGESETZT/VERWORFEN) ins Archiv verschieben.
+6. `docs/AGENT_MEMORY.md` unter „Nächste Prioritäten": Für jeden neuen OFFEN-Eintrag einen Punkt ergänzen (Kurzbeschreibung, Verweis auf countermeasures.md). Falls zutreffend auch als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`) eintragen.
 
 ---
 
-## 5. lessons_learned.md archivieren
+## 7. lessons_learned.md archivieren
 
-→ TaskUpdate "4. Änderungen umsetzen": completed | TaskUpdate "5. lessons_learned.md archivieren": in_progress
+→ TaskUpdate "6. Änderungen umsetzen": completed | TaskUpdate "7. lessons_learned.md archivieren": in_progress
 
 1. Prüfe ob mindestens ein Session-Header (Format: `## Session NNN – YYYY-MM-DD`) in `docs/kaizen/lessons_learned.md` vorhanden ist.
    Falls nicht: Archivierung überspringen, User informieren ("Keine Sessions in lessons_learned.md – Archivierung nicht nötig.").
@@ -192,10 +244,16 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
 
 ---
 
-## 6. AGENT_MEMORY.md aufräumen
+## 8. Session-Abschluss anbieten
 
-→ TaskUpdate "5. lessons_learned.md archivieren": completed | TaskUpdate "6. AGENT_MEMORY.md aufräumen": in_progress
+→ TaskUpdate "7. lessons_learned.md archivieren": completed | TaskUpdate "8. Session-Abschluss anbieten": in_progress
 
-Falls in `docs/AGENT_MEMORY.md` unter "Nächste Prioritäten" ein Eintrag steht der den Text `"Retro fällig (Jenga-Score ≤ 0)"` enthält → diesen Eintrag entfernen.
+Die Retro hat den `"Retro fällig (Jenga-Score ≤ 0)"`-Trigger erfüllt. Dem User die **Wahl** anbieten:
 
-→ TaskUpdate "6. AGENT_MEMORY.md aufräumen": completed
+- **A) Session abschließen** (empfohlen): den Trigger aus „Nächste Prioritäten" entfernen, dann Skill `closing-session` starten – der pflegt AGENT_MEMORY voll, legt die Session-Datei an und berechnet den Jenga-Score.
+- **B) Nur aufräumen:** nur den `"Retro fällig (Jenga-Score ≤ 0)"`-Eintrag aus „Nächste Prioritäten" in `docs/AGENT_MEMORY.md` entfernen, kein voller Abschluss.
+- **C) Etwas anderes** – nach User-Wunsch.
+
+In A und B wird der Trigger entfernt – AGENT_MEMORY bleibt in keinem Fall mit erfülltem Trigger zurück. (Die volle AGENT_MEMORY-Pflege bleibt `closing-session` vorbehalten.)
+
+→ TaskUpdate "8. Session-Abschluss anbieten": completed

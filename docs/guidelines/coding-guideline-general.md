@@ -48,8 +48,11 @@ Wähle immer die einfachste Lösung, die den Anforderungen genügt.
 
 - Eine Methode / Funktion hat maximal ~20 Zeilen. Größer → Refactoring-Kandidat.
 - Verschachtelung tiefer als 3 Ebenen → Pattern Matching oder Extraktion erwägen.
+- Wenige Parameter (Richtwert ≤ 4); mehr → Parameter-Objekt / Value Object erwägen.
 - Duplikate oder Copy-Paste-Code → gemeinsamen Helper extrahieren.
 - Toten Code (auskommentierter Code, ungenutzte Variablen/Importe) sofort entfernen.
+
+Diese Zahlen sind Design-Ziele; der Linter erzwingt nur loosere Backstops (Lint ≥ Guideline) – sie einzuhalten heißt nicht, die Aspiration erreicht zu haben. Konkrete Schwellen: `Client/eslint.config.js` (TS/React) bzw. Analyzer/`.editorconfig` (C#).
 
 ---
 

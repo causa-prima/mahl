@@ -23,7 +23,10 @@ _NPM_NOISE = re.compile(r"^> mahl-client@|^npm (warn|error notice)")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="vitest run via cmd.exe (WSL)")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--filter", dest="filter_name", metavar="PATTERN",
                         help="Testname-Filter via vitest -t (Substring/Regex gegen Testnamen)")
     parser.add_argument("--file", dest="file_name", metavar="PATTERN",

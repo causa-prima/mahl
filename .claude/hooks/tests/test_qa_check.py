@@ -7,6 +7,7 @@ jeder existierende Hash per Konstruktion ein Frisch-Lauf-Hash; ein MODE-Feld im 
 import importlib.util
 import json
 import os
+import time
 
 _PATH = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "qa-check.py")
 
@@ -78,3 +79,31 @@ def test_verify_rejects_mismatching_hash():
     other = _args()
     other["tree"] = "veraenderter-code"
     assert qa.verify_hash(h, **other) is False
+
+
+# --- Frische-Schutz (Build-/Lock-Fehler darf keinen alten Report durchwinken) ---
+
+def test_fresh_report_accepted(tmp_path):
+    # // Given ein Report, der nach dem Lauf-Start geschrieben wurde
+    run_started = time.time()
+    report = _write_report(tmp_path, "Killed")
+    os.utime(report, (run_started + 1, run_started + 1))
+    # // When / // Then er gilt als frisch
+    assert qa._is_fresh(report, run_started) is True
+
+
+def test_stale_report_rejected(tmp_path):
+    # // Given ein Report, der lange VOR dem Lauf-Start geschrieben wurde (alter Lauf)
+    run_started = time.time()
+    report = _write_report(tmp_path, "Killed")
+    old = run_started - qa._FRESHNESS_SLACK_SECONDS - 60
+    os.utime(report, (old, old))
+    # // When / // Then er gilt NICHT als frisch → kein stiller Fallback
+    assert qa._is_fresh(report, run_started) is False
+
+
+def test_missing_report_not_fresh(tmp_path):
+    # // Given ein nicht existierender Report-Pfad
+    missing = tmp_path / "does-not-exist.json"
+    # // When / // Then _is_fresh meldet False statt zu werfen
+    assert qa._is_fresh(missing, time.time()) is False

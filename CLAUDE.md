@@ -31,7 +31,8 @@
 | Verhaltensprinzipien (immer gültig) | `docs/kaizen/principles.md` |
 | Maßnahmen-Tracking | `docs/kaizen/countermeasures.md` |
 | Retro durchführen | Skill `kaizen` verwenden |
-| Technische Schuld tracken | `docs/AGENT_MEMORY.md` (Sektion "Technische Schuld") |
+| Technische Schuld tracken | `docs/tech-debt.md` |
+| Offene Fragen / geparkte Diskussionen | `docs/open-questions.md` |
 | Langsame Befehle dokumentieren | `docs/process/slow-commands.md` |
 | Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "Befehlsauswahl & Timeouts") |
 | Task-Liste anlegen / verwalten | `docs/process/task-system.md` |

@@ -3,15 +3,25 @@
 <!--
 Format: Einträge pro Session gruppiert. Ein Bullet pro Erkenntnis.
 Pflicht: Jede Session endet mit mindestens einem Eintrag – "Keine Learnings" nur mit expliziter Begründung.
-Technische Schuld gehört in AGENT_MEMORY.md, nicht hierher.
+Technische Schuld gehört in docs/tech-debt.md, nicht hierher.
 
 Eintrag-Format:
   ## Session NNN – YYYY-MM-DD
 
-  - **[SCHWERE] [KATEGORIE] [KONTEXT] Kurztitel**
+  - **[SCHWERE] [KATEGORIE] [KONTEXT] LL-S<NNN>-<n> – Kurztitel**
+    Quelle: User   (optionale Zeile, nur bei user-gemeldeten Einträgen)
     Was: Ein Satz – was ist passiert?
     Warum: Ein Satz – Ursache.
     Regel: Die destillierte Erkenntnis (imperative Form).
+
+  Beispiel:
+  - **[HOCH] [PROZESS] [TDD] LL-S084-1 – Content-Hash ohne stabile Sortierung nicht killbar**
+    Was: ETag-Mutant überlebte, weil die Collection-Reihenfolge nicht deterministisch war.
+    Warum: OrderBy(name) fehlte → Insertion-Order ≠ alphabetisch.
+    Regel: Content-Hash über Collections immer auf eine stabile Sortierung stützen.
+
+  ID (neue Einträge): LL-S<NNN>-<n>, HINTER den Tags – vor [ würde es die Script-Regexes brechen.
+  Vorausschauende Beobachtungen → docs/kaizen/observations.md.
 
 Schwere:    KRITISCH | HOCH | MITTEL | GERING
 Kategorien: PROZESS | AGENT | QUALITÄT | TOOLING
@@ -27,121 +37,65 @@ Nach der Sitzung prüfen: Gehört ein Eintrag in principles.md oder countermeasu
 KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumentieren.
 -->
 
-> **Format-Referenz:** `docs/kaizen/process.md`
+> **Dieser Header ist die kanonische Format-Quelle** (Eintrag-Format, IDs, Erfassungs-Test).
+> **Definitionen** (Schwere/Kategorie/Kontext) + Reaktionsregeln: `docs/kaizen/process.md`
 > **Archiv:** `docs/kaizen/archive/`
 
 ---
 
-## Session 084 – 2026-06-15
+## Session 088 – 2026-06-18
 
-- **[HOCH] [PROZESS] [Review] Überraschendes E2E-/Integrationsergebnis zuerst gegen "läuft aktueller Code?" prüfen**
-  Was: Ein E2E-Test schlug deterministisch fehl; ich jagte ~1 h einer vermeintlichen Code-Regression nach, bis sich zeigte, dass die Suite gegen einen veralteten, separat verwalteten Backend-Prozess lief.
-  Warum: Das System-under-Test (extern gestarteter Backend) war nicht garantiert der aktuelle Build; kein Mechanismus erzwang Frische.
-  Regel: Liefert ein E2E-/Integrationstest ein überraschendes Ergebnis, **zuerst verifizieren, dass das getestete System aus dem aktuellen Quellcode läuft** (frischer Start / Build-Identität), bevor man eine Code-Regression vermutet. Externe, langlebige Test-Targets per Poka-Yoke frisch erzwingen statt auf Disziplin zu setzen.
+- **[MITTEL] [PROZESS] [Hook/Script] LL-S088-1 – Check ins falsche Gate eingeklinkt (Verantwortungsträger nicht geprüft)**
+  Quelle: User
+  Was: Den E2E-Szenario-Mapping-Guard zuerst in `qa-check.py` (Subagenten-Übergabebeweis) eingebaut, obwohl E2E-Tests Orchestrator-Verantwortung sind und kein Subagent sie anfasst → vollständiger Revert nach User-Hinweis.
+  Warum: Das Gate nach „passt technisch dazu" gewählt, nicht nach „wessen Arbeit/Verantwortung beweist dieses Gate".
+  Regel: Vor dem Einklinken eines Checks in ein bestehendes Gate prüfen, wessen Verantwortung das Gate misst – der Check muss zum Besitzer passen.
 
-- **[MITTEL] [TOOLING] [Doku] Dokumentierte Befehle empirisch verifizieren – auch in Guidelines/Allow-Listen**
-  Was: Die Stryker-Disable-Syntax in der TS-Guideline (`next line` statt `next-line`) und die Bare-`dotnet ef database update`-Form in `--list`/dev-workflow funktionierten beide real nicht.
-  Warum: Beispiele wurden notiert, aber nie ausgeführt; falsche Form sieht plausibel aus.
-  Regel: Bevor man sich auf einen dokumentierten Befehl/Snippet verlässt (besonders Suppressions, CLI-Invocations), einmal real ausführen; Doku-Snippets sind keine verifizierte Wahrheit.
+- **[MITTEL] [AGENT] [Kommunikation] LL-S088-2 – Akzeptanzkriterium aus dem Wortlaut unvollständig abgeleitet**
+  Quelle: User
+  Was: Den Mapping-Hook zuerst nur mit Kommentar-*Gültigkeit* gebaut; die *Präsenz*-Prüfung (jeder Test braucht einen Kommentar) fehlte, obwohl der User-Wortlaut „alle Tests einen gültigen Verweis" beides verlangte.
+  Warum: Den Wortlaut verkürzt gelesen („gültig") statt vollständig („alle … gültig" = Präsenz + Gültigkeit).
+  Regel: Akzeptanzkriterien wörtlich und vollständig ableiten; quantifizierende Wörter („alle", „jeder") als eigene Prüfdimension behandeln.
 
-- **[GERING] [AGENT] [Bash/Permission] `--allow-once` nicht reflexartig anhängen**
-  Was: Ich hängte `--allow-once` an Befehle, deren Wirkung bereits über die Allow-Liste abgedeckt war (z.B. taskkill /pid vs. /im).
-  Warum: Bequemlichkeit statt erst die Allow-Liste/Alternativen zu prüfen.
-  Regel: Vor `--allow-once` zuerst `--list` prüfen, ob eine erlaubte Variante denselben Zweck erfüllt; die Ausnahme nur für echte Einzelfälle ohne regulären Weg.
+## Session 087 – 2026-06-18
 
-## Session 083 – 2026-06-12
+- **[MITTEL] [PROZESS] [Doku] LL-S087-1 – Neue Tracker-Datei ohne Spiegelung der Sibling-Konventionen angelegt**
+  Was: `tech-debt.md`/`open-questions.md` neu erstellt, ohne vorher die Konventionen der bestehenden Tracker-Dateien (Header-Aufbau, ID-Schema, Eintrag-Format, Sortierung) zu spiegeln → ~4 Überarbeitungsrunden bis konsistent.
+  Warum: Format ad hoc erfunden statt am etablierten Muster der Geschwister-Dateien (`lessons_learned`, `observations`, `countermeasures`) ausgerichtet.
+  Regel: Vor dem Anlegen einer neuen Datei eines bestehenden Typs erst die Konventionen der Geschwister-Dateien lesen und spiegeln.
+  Bezug: OBS-S087-2, LL-S085-1
 
-- **[HOCH] [AGENT] [Agent-Prompt] „NULL neue Suppressions" als Absolutregel an Subagenten vorgegeben**
-  Was: Ich gab dem Frontend-Subagenten als „härtesten Maßstab" vor, Ziel seien NULL neue Stryker-Suppressions; daraufhin entfernte er das guideline-vorgeschriebene `throwOnError: true` (statt es zu behalten und begründet zu suppressen), um einen unausgeübten Survivor zu vermeiden → guideline-widriger Code, jetzt Tech-Debt.
-  Warum: Ich habe eine Heuristik (vermeide spekulative ungetestete Zweige) zu einer Absolutregel überdehnt; die Projektregel lautet „keine UNBEGRÜNDETEN Suppressions" – begründete (äquivalent / strukturell unerreichbar / Fehlerpfad bewusst aufs treibende Szenario verschoben) sind erlaubt und werden vom Orchestrator validiert. Beleg der Inkonsistenz: beim Backend habe ich begründete Suppressions (ADR-S000-4/S041-9) korrekt durchgewunken.
-  Regel: Suppressions-Politik an Subagenten nie als „null" formulieren, sondern als „keine unbegründeten – jede Suppression braucht eine valide Äquivalenz-/Nichttestbarkeits-Begründung, die der Orchestrator prüft". Eine nötige begründete Suppression ist kein Scope-Verstoß.
+- **[MITTEL] [AGENT] [Kommunikation] LL-S087-2 – Token-Analyse nur halb betrachtet (Injektion ohne Lese-/Schreib-Redundanz)**
+  Quelle: User
+  Was: Bei der V1-vs-V2-Bewertung der AGENT_MEMORY-Restruktur nur die Auto-Injektions-Kosten betrachtet, die Lese-/Schreib-Token-Redundanz übersehen → Empfehlung auf unvollständiger Basis, vom User korrigiert.
+  Warum: Den Kostenraum nicht vollständig durchdacht – eine Dimension (Injektion) für die ganze Analyse gehalten.
+  Regel: Bei Kosten-/Token-Vergleichen alle Pfade durchgehen (Injektion + Lesen + Schreiben), bevor eine Empfehlung steht.
+  Bezug: principles.md „Unterstützt ≠ beweist – Empirie vor Behauptung"
 
-- **[MITTEL] [AGENT] [Kommunikation] Eigene Extrapolation einer User-Entscheidung dem User zugeschrieben**
-  Was: Ich begründete die „NULL Suppressions"-Vorgabe gegenüber dem Subagenten mit „Genau diese Falle will der User vermeiden" – obwohl der User nur „Mutation-State minimal" entschieden hatte, nicht „null Suppressions global".
-  Warum: Aus einer konkreten User-Entscheidung eine breitere Regel abgeleitet und die Autorität des Users dahinter gestellt, statt die Ableitung als meine eigene zu kennzeichnen.
-  Regel: Eigene Ableitungen/Extrapolationen explizit als solche kennzeichnen; nur das dem User zuschreiben, was er tatsächlich entschieden hat. Verleiht eine Extrapolation falsche Autorität, dämpft sie zudem die Kritikbereitschaft des Subagenten.
+## Session 086 – 2026-06-17
 
-- **[MITTEL] [PROZESS] [Skill-Nutzung] Scope-Philosophie-Entscheidung an Subagenten delegiert statt dem User vorgelegt**
-  Was: Die Wahl „validierendes Value Object jetzt (mit Suppression) vs. strikt YAGNI später" (Gold-Plating-Grenzfall) habe ich beim Backend dem Subagenten überlassen und seine Option-A-Begründung akzeptiert – während ich die analoge ETag-Scope-Frage korrekt dem User vorlegte.
-  Warum: Inkonsistente Schwelle, wann eine Scope-/Gold-Plating-Abwägung Orchestrator-intern entschieden wird und wann sie dem User gehört.
-  Regel: Entscheidungen, die eine Guideline gegen YAGNI/Gold-Plating ausspielen (untestbare Zweige, vorgezogene Struktur, transiente Suppressions), dem User als A/B-Wahl vorlegen – nicht an den Subagenten delegieren.
+- **[MITTEL] [AGENT] [Kommunikation] LL-S086-1 – Kandidaten-Gefahr ohne Verifikation behauptet**
+  Was: Bei OBS-1 Kandidat A (Bash-Hook schreibt Befehl um) als „gefährlich" bewertet und stattdessen B empfohlen, ohne die Hook-Fähigkeit (`updatedInput`) zu prüfen; nach User-Rückfrage zeigte die Recherche A als machbar und die Gefahr als überzogen.
+  Warum: Tool-Fähigkeit/Gefahr angenommen statt verifiziert – Empfehlung auf ungeprüfter Annahme.
+  Regel: Schon bei der Kandidaten-Bewertung Tool-Fähigkeiten verifizieren, bevor Gefahr/Machbarkeit als Entscheidungsgrund behauptet wird.
+  Bezug: CM „Behauptungen über externes Tool-Verhalten als gesichertes Wissen" (S064, AKTIV)
 
-- **[MITTEL] [QUALITÄT] [C#-Code] Value Object inkl. Validierungslogik angelegt, bevor ein Szenario die Validierung treibt**
-  Was: Für den „Zutat anlegen"-Happy-Path wurde `NonEmptyTrimmedString` mit voller Validierungslogik angelegt; deren Error-Zweig ist ungeübt → brauchte eine Suppression (ADR-S000-4).
-  Warum: Value-Object-Pflicht gegen YAGNI ausgespielt – die Validierung gehört erst zum @US-904-error-Szenario.
-  Regel: Treibt das Szenario die Validierung noch nicht, das Value Object mit dem **Zielnamen** anlegen, die Validierungslogik aber weglassen (Kommentar: Name vorab gewählt, Validierung folgt im Error-Szenario) – das ist die korrekte Variante (kein ungeübter Zweig, keine Suppression). Volle Validierung+Suppression jetzt oder den Typ ganz aufschieben nur bei signifikantem Vorteil. (Hier blieb der Code als Variante „volle Validierung jetzt", weil der Rückbau den Aufwand nicht wert war – nicht weil das die richtige Schreibweise war.)
+- **[MITTEL] [AGENT] [Kommunikation] LL-S086-2 – Beobachtung falsch erfasst, weil Verständnis nicht gesichert**
+  Quelle: User
+  Was: OBS-S085-4 hielt „languageServer evtl. buggy" fest – gemeint war „wir nutzen gar keinen Language-Server"; die Beobachtung musste in S086 reframed werden.
+  Warum: Bei der Erfassung das Ziel/Problem nicht rückgefragt, nur die Formulierung notiert.
+  Regel: Vor dem Festhalten einer Beobachtung das Verständnis sichern (bei Unklarheit grill-me), nicht nur die Worte übernehmen.
+  Bezug: OBS-S086-2
 
-- **[MITTEL] [PROZESS] [Doku] Working-Memory-Notiz nicht selbsterklärend (nur für Eingeweihte verständlich)**
-  Was: In AGENT_MEMORY notierte ich „ADR-S000-12-Präzisierung (Middleware vs. pro Endpoint)" – selbst die beim Entwurf beteiligte Userin konnte daraus die eigentliche offene Frage nicht rekonstruieren.
-  Warum: Die Notiz setzte den Session-Kontext voraus, statt die Sache selbst zu enthalten (welcher Widerspruch, welche Entscheidung, woraus).
-  Regel: Jede Handoff-/Working-Memory-Notiz so schreiben, dass ein Agent mit **frischem Kontext** allein daraus die offene Frage und die nötige Entscheidung ableiten kann – Substanz statt Stichwort/geprägter Begriff; bei Verweisen präzise auf den Ort des vollen Kontexts zeigen.
+## Session 085 – 2026-06-16
 
-- **[GERING] [PROZESS] [Review] Nicht-E2E-beobachtbare Anforderungen am falschen Test-Level verortet**
-  Was: Bei ETag erwog ich kurz einen E2E-/Frontend-Treiber, obwohl ein Caching-Header weder nutzer- noch (ohne Conditional-Requests) frontend-beobachtbar ist.
-  Warum: Outside-In („kein Code ohne Test darüber", ADR-S041-5) reflexhaft auf eine technische Transport-Eigenschaft angewandt, die auf E2E-Ebene gar nicht beobachtbar ist.
-  Regel: Anforderungen auf der **obersten Schicht testen, auf der sie beobachtbar sind** – Caching-Header/Concurrency-Token auf Service-Client- (MSW) bzw. Integrations-Ebene, nicht via Gherkin/E2E. Ein fehlender E2E-Treiber ist für solche Querschnitts-Eigenschaften kein Outside-In-Verstoß (→ geplantes ADR-S041-5-Addendum).
+- **[MITTEL] [PROZESS] [Doku] LL-S085-1 – Doku-Form am Charakter des Zielorts ausrichten**
+  Quelle: User
+  Was: In `principles.md` wurde die Verifikations-Regel mit „Verbreitert (S085)" + Rückfall-Session-Nummern angehängt statt umformuliert; im `kaizen`-Skill kam ein „Hintergrund: OBS-12"-Pointer an eine ohnehin vollständige Anweisung. Beides musste der User korrigieren.
+  Warum: „Erkenntnis dokumentieren" und „referenzieren statt duplizieren" auf den falschen Ort-Typ angewandt – `principles.md` ist zeitlos/session-geladen, und eine selbsterklärende Anweisung braucht keinen Backlog-Pointer.
+  Regel: Doku-Form am Zielort ausrichten – timeless/auto-geladene Dateien (principles, CLAUDE.md) ohne Session-/Retro-Referenzen und durch Umformulieren statt Meta-Anhang pflegen; Rationale-Pointer nur für ausgelagerte Inhalte, nicht für vollständige Anweisungen. (s. OBS-S085-15)
 
-## Session 082 – 2026-06-12
-
-- **[MITTEL] [PROZESS] [Gherkin] Szenario-Reihenfolge invertiert – komponiertes vor atomarem Baustein**
-  Was: Ein früherer `gherkin-workshop` ordnete „Felder nach Abbrechen wieder leer" (komponiert) vor „Abbrechen schließt + verwirft" (atomar); Folge bei der Implementierung: das komponierte Szenario musste beide Verhaltensteile auf einmal erzwingen, das atomare wurde zum wirkungslosen Guard-Test ohne RED-Beitrag.
-  Warum: Die Sortierregel kannte nur „trivial→komplex" + „ohne Backend vor mutierend" – beide Szenarien sind No-Backend-UI, fielen in dieselbe Gruppe; das Abhängigkeits-/Aufbauprinzip fehlte als Kriterium.
-  Regel: Szenarien innerhalb einer Kategorie primär nach Aufbau-Abhängigkeit sortieren – setzt B das in A geprüfte Verhalten voraus, muss A vor B; atomare Verhaltensbausteine vor den darauf komponierten (jetzt in `gherkin-workshop` SKILL Schritt 3.4 + Review-Agent verankert).
-
-## Session 081 – 2026-06-11
-
-- **[MITTEL] [PROZESS] [Doku] Guideline-Änderung auf unverifiziertem Tool-Verhalten empfohlen**
-  Was: Pauschalen `fireEvent.click`→`user.click`-Switch samt Guideline-Umschrift empfohlen, gestützt auf ein plausibles Mentalmodell von user.click; erst auf Nutzer-Nachfrage zeigten Messung (9/13 Timeout-Kills, ~2× Laufzeit) + Wegwerf-Test, dass der Mehrwert eng ist (nur `pointer-events:none`-Vorfahr) → Revert.
-  Warum: Das in `principles.md` verankerte „Tool-Verhalten erst nach Verifikation behaupten / Unverifiziertes proaktiv kennzeichnen" wurde nicht angewendet.
-  Regel: Vor einer Guideline-Änderung über Tool-/API-Verhalten dieses empirisch verifizieren (Mess-/Wegwerf-Test); unverifizierte Empfehlungen proaktiv als solche kennzeichnen statt auf Nachfrage zu warten.
-
-- **[MITTEL] [AGENT] [Mutation-Testing] Roh-Report manuell geparst statt vorhandene `--detail`-Flag genutzt**
-  Was: Subagent versuchte Stryker-Survivor aus `mutation.json` manuell zu parsen (vom Bash-Hook blockiert), obwohl `stryker-frontend.py --detail` Survivors (Datei/Zeile/Mutator/Replacement) bereits ausgibt.
-  Warum: Wissenslücke über die `--detail`-Option des vorhandenen Wrapper-Scripts.
-  Regel: Vor manuellem Parsen eines Roh-Reports prüfen, ob das Projekt-Wrapper-Script die benötigte Sicht bereits per Flag anbietet.
-
-- **[MITTEL] [PROZESS] [Doku] Offene Punkte ins falsche Ziel-Dokument einsortiert (Wiederholung S080)**
-  Was: Playwright-Reinstall (Prozess/Setup-Wissen) zunächst in die tech-debt-Tabelle geschrieben und unabhängige Tooling-Punkte gebündelt; der User korrigierte (gehört in `dev-workflow.md`; der Stryker-Punkt war eine Wissenslücke → lessons_learned).
-  Warum: Beim Vermerken nicht am Ist-Zustand klassifiziert – dieselbe Klasse wie S080 („künftige Adoption als Schuld").
-  Regel: Offene Punkte am Ist-Zustand einsortieren – tech-debt nur für real suboptimalen Code; Setup-/Prozesswissen → `dev-workflow`/Doku; Wissenslücke/Verhalten → lessons_learned; unabhängige Punkte trennen.
-
-## Session 080 – 2026-06-11
-
-- **[MITTEL] [AGENT] [TS-Code] Laufzeit-grün als Korrektheitsbeweis für typ-betreffende Änderung genommen**
-  Was: Nach Umstellung der Tests auf jest-dom-Matcher lief Vitest grün, obwohl TypeScript die Matcher-Typen gar nicht auflöste (Augmentation nicht im TS-Programm, weil `src/test` excluded ist) – erst der ESLint-`no-unsafe-call`-Lauf deckte es auf.
-  Warum: Vitest strippt Typen zur Laufzeit; ein grüner Testlauf sagt nichts über die Typ-Auflösung aus.
-  Regel: Typ-betreffende Änderungen (neue Augmentations, Matcher, Branded Types) immer mit dem typ-bewussten Check (ESLint/`tsc`) verifizieren – nicht nur mit dem Test-Runner.
-
-- **[GERING] [AGENT] [Doku] Vorausschauende Tool-Adoption als „technische Schuld" etikettiert**
-  Was: Beim Schließen der jest-dom/user-event-Schuld user-event als „installiert aber noch ungenutzt → Schuld" in AGENT_MEMORY geführt, obwohl es keinen suboptimalen Code gibt; der User korrigierte.
-  Warum: „könnten wir später nutzen" mit „aktueller Missstand im Code" verwechselt.
-  Regel: Technische Schuld nur für tatsächlich suboptimalen Ist-Zustand führen; künftige Adoption gehört in Prioritäten/Szenario-Notizen, nicht in die Schuld-Tabelle.
-
-## Session 079 – 2026-06-10
-
-- **[MITTEL] [PROZESS] [Hook/Script] Agenten-Guidance/UX nicht am frischen Subagenten verifiziert**
-  Was: Hook-Allow-Liste + Framing überarbeitet und für ausreichend gehalten; erst der Subagent-Eval (frischer Agent löst Task-Liste nur anhand `--list`) deckte auf, dass die Wrapper-Scripts unsichtbar waren → `dotnet test`/`npm test` wären weiter in unnötige Denies gelaufen.
-  Warum: „Verständlich für mich, der ich den Hook kenne" ≠ „verständlich für einen kalt startenden Agenten" – das eigene Vorwissen maskiert die Lücke.
-  Regel: Änderungen an agenten-gerichteter Guidance/Hint-/List-UX an einem frischen Subagenten mit konkreter Aufgabenliste empirisch testen, bevor sie als fertig gelten – nicht am eigenen Verständnis.
-
-- **[MITTEL] [PROZESS] [Hook/Script] Korrekter Weg nur reaktiv (per Deny-Hint) statt proaktiv auffindbar**
-  Was: Die Wrapper-Scripts (Tests/Lint/Mutation) standen nur in den WRONG_APPROACH-Hints – der Agent erfuhr den richtigen Befehl erst *nach* einem Deny; proaktiv griff er zum naheliegenden Direktbefehl.
-  Warum: Reaktive Hints heilen, verhindern aber den unnötigen Deny nicht; der korrekte Pfad fehlte in der immer geladenen Liste.
-  Regel: Für wiederkehrende Tätigkeits-Klassen den korrekten Befehl proaktiv in der ständig sichtbaren Quelle (`--list`, SessionStart) anbieten – nicht darauf bauen, dass der Agent ihn über ein Deny lernt.
-
-## Session 078 – 2026-06-10
-
-- **[MITTEL] [PROZESS] [Hook/Script] Matching-Heuristik nur theoretisch begründet, nicht am Datensatz geprüft**
-  Was: Severity-agnostisches CM-Matching (Option A) für `retro_report.py` vorgeschlagen und umgesetzt; erst der Lauf am echten Korpus zeigte massive Über-Maskierung (Wildcard-CM verschluckte distinkte Muster) → revertiert.
-  Warum: Die Heuristik klang theoretisch plausibel; der Delta-Effekt auf reale Findings wurde nicht vor der Empfehlung geprüft.
-  Regel: Änderungen an Matching-/Scoring-Heuristiken vor der Empfehlung am echten Datensatz laufen lassen und den Vorher/Nachher-Delta inspizieren – nicht aus der Theorie schließen.
-
-- **[MITTEL] [AGENT] [Kommunikation] Tool-/Permission-Verhalten ohne Verifikation behauptet**
-  Was: „wc ist nicht auf der Allow-Liste" behauptet, obwohl es das ist – `check-bash-permission.py --list` (im Deny-Hint genannt) hätte es sofort gezeigt.
-  Warum: Aus der Fehlermeldung geschlossen statt die dokumentierte Quelle (`--list`) zu prüfen – Rückfall auf das „Unterstützt ≠ beweist"-Prinzip.
-  Regel: Behauptungen über Allow-Liste/Tool-Verhalten erst nach `--list`-/Quellprüfung – die Verifikationsquelle steht meist im Deny-Hint selbst.
-
-- **[MITTEL] [PROZESS] [Doku] Tag-Migration nur auf eine Form skopiert**
-  Was: Beim Retaggen von `Tooling` wurden nur `[Tooling]`-Einträge erfasst; der `[Session-Struktur]`-Eintrag (eigene Form) wurde vergessen und blieb verwaist.
-  Warum: Migrations-Scope an der häufigsten Form festgemacht, nicht an allen von der Revision betroffenen Tags.
-  Regel: Vor einer Tag-/Referenz-Migration alle betroffenen Formen auflisten und per Gegen-Grep verifizieren, dass keine zurückbleibt (vgl. S076).
+- **[GERING] [PROZESS] [Sonstiges] LL-S085-2 – Nach delegiertem Subagent-Edit Datei vor eigenem Edit neu lesen**
+  Was: Ein Edit an `countermeasures.md` schlug fehl („file modified since read"), weil ein Subagent die Datei zwischenzeitlich editiert hatte.
+  Warum: Den vor der Delegation gelesenen Dateizustand als noch aktuell angenommen.
+  Regel: Bevor ich eine Datei editiere, die ein Subagent in der Zwischenzeit angefasst haben könnte, sie neu lesen.

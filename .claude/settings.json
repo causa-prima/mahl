@@ -21,7 +21,9 @@
         "matcher": "Edit|Write",
         "hooks": [
           { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-dependency-allowlist.py" },
-          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-blocking.py" }
+          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-blocking.py" },
+          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-index-length.py" },
+          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-e2e-scenario-ref.py" }
         ]
       }
     ],

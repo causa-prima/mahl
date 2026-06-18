@@ -146,11 +146,15 @@ def _report_coverage(totals: dict[str, float], gaps: list[FileGap]) -> bool:
 
 
 def main() -> None:
-    check_dotnet_dll_lock()
-    parser = argparse.ArgumentParser(description="dotnet test via cmd.exe (WSL)")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--filter", dest="filter_name", help="Test-Filter (FullyQualifiedName~...)")
     parser.add_argument("--verbose", action="store_true", help="Vollständigen Output anzeigen")
     args = parser.parse_args()
+    # parse_args vor dem DLL-Lock-Check, damit --help/-h ohne Seiteneffekt (PowerShell-Abfrage) greift
+    check_dotnet_dll_lock()
 
     collect_coverage = not args.filter_name  # bei Filter: schneller Feedback-Zyklus, kein Coverage
 

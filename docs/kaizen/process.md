@@ -27,20 +27,66 @@ Alle drei Ja → dokumentieren (Frage 2: auf Klassen-Ebene formulieren, nicht au
 
 ---
 
+## Zwei Brillen: lessons_learned vs. observations
+
+Das Kaizen-System hat zwei Tracks, **keine Partition** – dieselbe Sache kann aus zwei Blickwinkeln in beiden Dateien stehen:
+
+- `lessons_learned.md` = **konkrete schlechte Ausgänge dieser Session** (Symptome: Rework, Fehler, verschwendeter Aufwand, Defekt). Speisen den Jenga-Score.
+- `observations.md` = **vorausschauende System-Design-Beobachtungen** (Optimierungen, Reibung, „so wäre es besser"). Speisen Jenga **nicht**.
+
+**Billige Erfassungs-Tests (gelten bei `closing-session`, auch für user-gemeldete Punkte):**
+- LL: „Ist diese Session ein **konkreter schlechter Ausgang** aufgetreten – Rework, Fehler, verschwendeter Aufwand, ein Defekt?" → ja → `lessons_learned.md` (mit Schwere/Impact). Der Noise-Filter (die 3 Fragen oben) gilt für ALLE Einträge.
+- Observations: „Eine **vorausschauende** Notiz, wie das System besser wäre?" → `observations.md`.
+- **Beides wahr → beides**, per `Bezug:` verlinkt.
+
+**Quer-Bewegung (kein Duplikat-Fehler):** Eine Beobachtung darf als **Symptom** in `lessons_learned.md` UND als **Design-Fix** in `observations.md` stehen, über `Bezug:` verbunden. Das ist dieselbe Sache aus zwei Blickwinkeln, keine Duplikat-Panne.
+
+**Erfassung ist billig, Klassifikation ist teuer:** Erfassung ist lokal/stabil und braucht kein Gesamt-Prozesswissen. Die teure, argumentierbare Klassifikation – Konformanz-Slip vs. Design-Mangel, beste Antwort, Quer-Bewegung LL↔Backlog – passiert in der **Retro** und ist dort jederzeit revidierbar. Die harte Frage „verstößt es gegen den Prozess?" ist **kein Erfassungs-Test**, sondern Retro-Root-Cause.
+
+---
+
+## observations.md – Beobachtungs-Backlog
+
+Der proaktive Track für System-Design-Beobachtungen. Vollständiger Header & Eintrags-Format: `docs/kaizen/observations.md`.
+
+- **Zweck:** vorausschauende Optimierungen/Reibungen festhalten, bevor sie zu konkreten schlechten Ausgängen werden.
+- **Eintrag-Format:** siehe Header von `observations.md` (`## OBS-S<NNN>-<n> – Titel`, dann `Quelle / Status / Impact+Häufigkeit / Kategorie+Kontext / Beobachtung / Kandidaten / Entscheidung-Maßnahme / Bezug`).
+- **ID-Schema (ADR-Stil):** `OBS-S<NNN>-<n>` – 3-stellige Session-Nummer, laufende Nummer innerhalb der Session (wie `ADR-S041-1`).
+- **Impact:** dieselben vier Werte wie die LL-**Schwere** (geteiltes Vokabular – in dieser Datei „Impact" genannt, in `lessons_learned` vorerst weiter „Schwere"; dasselbe Konzept).
+- **Häufigkeit:** „einmalig" wird praktisch kaum erfasst (siehe Erfassungs-Regel), faktisch bleiben *gelegentlich* / *häufig*. **Impact × Häufigkeit = Prioritäts-Matrix.**
+- **Erfassungs-Regel (wann Eintrag?):** Eine **sofort und problemlos umsetzbare** Einmal-Optimierung → einfach machen, **kein Eintrag**. Wird sie **aufgeschoben** (bündeln, blockiert, erst Evaluierung abwarten) → Eintrag, damit sie nicht verloren geht.
+- **Kein Jenga-Einfluss:** Kein Script liest diese Datei (Stand jetzt); Observations erzeugen keinen Problemdruck-Abzug.
+
+---
+
+## Gefahr & Kandidaten-Bewertung
+
+**Gefahr ist eine Eigenschaft eines KANDIDATEN** (der geplanten Änderung), **nicht der Beobachtung/des Findings.** Sie ist daher kein Header-Feld in `observations.md`, sondern wird bei der **Kandidaten-Auswahl** abgewogen. Dieselbe Disziplin gilt beim Wählen einer **CM** für ein LL-Muster.
+
+- **Sorgfalt UND Beweisbarkeit skalieren mit Gefahr:** Je höher die Gefahr eines Kandidaten, desto wichtiger der nachträgliche **Beweis**, dass durch die Änderung **kein neues/anderes Problem** entstanden ist (Verifikation / Pilot / Vorher-Nachher).
+- **Evaluierungs-Gate:** Nicht-triviale oder höher-Gefahr-Antworten werden **NICHT sofort** umgesetzt → Kandidaten notieren, abwägen (meist in der Retro), dann begründet committen. Trivial / niedrige Gefahr → sofort umsetzen + Einzeiler.
+- Gilt für **OBS-Antworten UND CM-Wahl** gleichermaßen.
+
+---
+
+## Backlog-Grooming & Eskalation
+
+Jede Retro trefiert das **gesamte offene** OBS-Backlog: umsetzen / weiter beobachten / verwerfen.
+
+- **Lange offene Einträge** erzwingen eine Entscheidung – analog zur CM-Regel „nach 2 Retros OFFEN → eskalieren" (s.u.): priorisieren oder mit Begründung verwerfen (Status `VERWORFEN (Grund)`).
+- **Aufgelöste Einträge** (Status `UMGESETZT` oder `VERWORFEN`) → nach `docs/kaizen/archive/observations_archive.md` verschieben, damit die Live-`observations.md` scannbar bleibt.
+
+---
+
 ## Eintrag-Format (lessons_learned.md)
 
-Einträge werden pro Session gruppiert:
+**Format-Skeleton, Tags-Liste, Beispiel und Erfassungs-Test stehen kanonisch im Header von `docs/kaizen/lessons_learned.md`** (dort, wo Einträge geschrieben werden) – hier nicht duplizieren. Definitionen der Tags: Abschnitte unten. Dieser Abschnitt ergänzt nur die Prozess-Regeln zu IDs/Quelle:
 
-```markdown
-## Session NNN – YYYY-MM-DD
+**ID für neue LL-Einträge:** `LL-S<NNN>-<n>` (3-stellige Session-Nummer, laufende Nummer innerhalb der Session). Platziert **HINTER den Tags** im Titel: `- **[HOCH] [PROZESS] [TDD] LL-S084-1 – Kurztitel**`. Vor `**[` würde die ID die Parsing-Regexes der Scripts brechen – daher zwingend hinter die Tags.
 
-- **[SCHWERE] [KATEGORIE] [KONTEXT] Kurztitel**
-  Was: Ein Satz – was ist passiert?
-  Warum: Ein Satz – Ursache.
-  Regel: Die destillierte Erkenntnis (imperative Form).
-```
+**Quelle-Markierung:** Bei user-gemeldeten Einträgen optionale Zeile `Quelle: User` (KEINE Session – die steckt in der ID). Keine Noise-Filter-Ausnahme: der 3-Fragen-Test gilt auch für user-gemeldete Einträge.
 
-Alle drei Tags sind Pflicht. Definitionen: Abschnitte unten.
+**Keine retroaktiven IDs:** Bestands-Einträge bekommen NICHT nachträglich IDs (bewusste Entscheidung).
 
 ---
 
@@ -101,12 +147,17 @@ Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
 
 | Ziel | Kriterium |
 |------|-----------|
-| `lessons_learned.md` | Jedes Finding, immer |
+| `lessons_learned.md` | Jeder **konkrete schlechte Ausgang** (Symptom), immer |
+| `observations.md` | Jede **vorausschauende** Beobachtung/Reibung, wie das System besser wäre (Optimierung). Beides wahr → beide Dateien, per `Bezug:` verlinkt |
 | `principles.md` | Verhaltensregel die in jeder Session gilt; zu querschnittlich für eine Guideline/Skill |
 | `countermeasures.md` | Jedes KRITISCH- oder HOCH-Finding sofort; MITTEL/GERING wenn Retro ein Muster aufdeckt |
 | Guideline / Skill | Das Problem liegt an einem fehlenden oder falschen Schritt in einem konkreten Arbeitsablauf. Die Änderung ist direkt als Regel/Schritt in einem bestehenden Dokument formulierbar. (Meist wird zusätzlich ein `countermeasures.md`-Eintrag angelegt, der auf diese Änderung verweist.) |
 
-**principles.md ⇄ countermeasures.md:** Ein Prinzip in `principles.md` ist die **Fließtext-Leitplanke** (wird jede Session geladen, keine Tags). Jedes Prinzip hat **zusätzlich** einen Tracking-Eintrag in `countermeasures.md` (Tupel Schwere/Kategorie/Kontext + Status) – nur so bleibt es **evaluierbar** (BEWÄHRT/Rückfall) und wird von `retro_report.py` als „abgedeckt" erkannt. Die CM-Maßnahme verweist aufs Prinzip („Regel in principles.md dokumentiert"). BEWÄHRT-CMs bleiben in der Tabelle (Regressionserkennung). Konsequenz: Ein neu angelegtes Prinzip **immer** mit einem CM-Eintrag spiegeln – sonst ist es unsichtbar fürs Script und nicht bewertbar.
+**OBS-Antworten durch dasselbe CM-Eingangs-Gate:** Wird in der Retro eine OBS-Antwort beschlossen, läuft sie durch dasselbe CM-Eingangs-Gate wie ein LL-Finding:
+- *Stehende, verifizierbare* Änderung (wiederkehrende Klasse, dauerhafte Leitplanke) → **CM** anlegen; das OBS schließt mit `Bezug: → CM-…` und Status `UMGESETZT`.
+- *Einmal-Änderung ohne Tracking* → inline als `Maßnahme:` im OBS festgehalten, Status `UMGESETZT` (keine CM – sie wäre sofort obsolet).
+
+**principles.md ⇄ countermeasures.md:** Ein Prinzip in `principles.md` ist die **Fließtext-Leitplanke** (wird jede Session geladen, keine Tags). Jedes Prinzip hat **zusätzlich** einen Tracking-Eintrag in `countermeasures.md` (Tupel Schwere/Kategorie/Kontext + Status) – nur so bleibt es **evaluierbar** (BEWÄHRT/Rückfall) und wird von `retro_report.py` als „abgedeckt" erkannt. Die CM-Maßnahme verweist aufs Prinzip („Regel in principles.md dokumentiert"). BEWÄHRT-CMs bleiben in der Datei (Abschnitt „Bewährte Maßnahmen", Regressionserkennung). Konsequenz: Ein neu angelegtes Prinzip **immer** mit einem CM-Eintrag spiegeln – sonst ist es unsichtbar fürs Script und nicht bewertbar.
 
 **CM-Eingangs-Gate (vor dem Anlegen einer Countermeasure):** Dieselbe Recurrence-Frage wie beim lessons-Eintrag, aber auf Maßnahmen-Ebene und vorgelagert (damit nicht Aufwand in eine Maßnahme fließt, die sofort obsolet wäre):
 
@@ -166,7 +217,7 @@ Der Jenga-Score startet automatisch neu – `jenga_score.py` liest immer nur die
 
 ## Umsetzung offener Maßnahmen
 
-**Regel 1 – Sichtbarkeit:** Jede neue OFFEN-Maßnahme wird in derselben Retro-Session unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md` eingetragen. Falls inhaltlich zutreffend auch als Technische Schuld oder Offene Frage. Ablauf: Schritt 4 des `kaizen`-Skills.
+**Regel 1 – Sichtbarkeit:** Jede neue OFFEN-Maßnahme wird in derselben Retro-Session unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md` eingetragen. Falls inhaltlich zutreffend auch als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`). Ablauf: Schritt 4 des `kaizen`-Skills.
 
 **Regel 2 – Eskalation:** Eine Maßnahme die nach 2 Retros noch OFFEN ist, wird in der nächsten Retro (Schritt 3, Abschnitt F) als ESKALIERT präsentiert. Der User entscheidet dann: Umsetzung priorisieren oder bewusst verwerfen (Begründung in der Maßnahme notieren).
 

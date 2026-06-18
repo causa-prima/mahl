@@ -3,15 +3,25 @@
 <!--
 Format: Einträge pro Session gruppiert. Ein Bullet pro Erkenntnis.
 Pflicht: Jede Session endet mit mindestens einem Eintrag – "Keine Learnings" nur mit expliziter Begründung.
-Technische Schuld gehört in AGENT_MEMORY.md, nicht hierher.
+Technische Schuld gehört in docs/tech-debt.md, nicht hierher.
 
 Eintrag-Format:
   ## Session NNN – YYYY-MM-DD
 
-  - **[SCHWERE] [KATEGORIE] [KONTEXT] Kurztitel**
+  - **[SCHWERE] [KATEGORIE] [KONTEXT] LL-S<NNN>-<n> – Kurztitel**
+    Quelle: User   (optionale Zeile, nur bei user-gemeldeten Einträgen)
     Was: Ein Satz – was ist passiert?
     Warum: Ein Satz – Ursache.
     Regel: Die destillierte Erkenntnis (imperative Form).
+
+  Beispiel:
+  - **[HOCH] [PROZESS] [TDD] LL-S084-1 – Content-Hash ohne stabile Sortierung nicht killbar**
+    Was: ETag-Mutant überlebte, weil die Collection-Reihenfolge nicht deterministisch war.
+    Warum: OrderBy(name) fehlte → Insertion-Order ≠ alphabetisch.
+    Regel: Content-Hash über Collections immer auf eine stabile Sortierung stützen.
+
+  ID (neue Einträge): LL-S<NNN>-<n>, HINTER den Tags – vor [ würde es die Script-Regexes brechen.
+  Vorausschauende Beobachtungen → docs/kaizen/observations.md.
 
 Schwere:    KRITISCH | HOCH | MITTEL | GERING
 Kategorien: PROZESS | AGENT | QUALITÄT | TOOLING
@@ -27,7 +37,8 @@ Nach der Sitzung prüfen: Gehört ein Eintrag in principles.md oder countermeasu
 KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumentieren.
 -->
 
-> **Format-Referenz:** `docs/kaizen/process.md`
+> **Dieser Header ist die kanonische Format-Quelle** (Eintrag-Format, IDs, Erfassungs-Test).
+> **Definitionen** (Schwere/Kategorie/Kontext) + Reaktionsregeln: `docs/kaizen/process.md`
 > **Archiv:** `docs/kaizen/archive/`
 
 ---

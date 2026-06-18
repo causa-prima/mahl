@@ -27,6 +27,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 _SCRIPTS = Path(__file__).parent
@@ -63,6 +64,22 @@ def _find_report(layer: str) -> Path | None:
     subdir = "Backend" if layer == "backend" else "Frontend"
     reports = sorted(Path("StrykerOutput").glob(f"{subdir}/*/reports/mutation-report.json"), reverse=True)
     return reports[0] if reports else None
+
+
+# Toleranz für Uhr-/Filesystem-Drift zwischen WSL und dem Windows-Host (NTFS-mtime).
+_FRESHNESS_SLACK_SECONDS = 120
+
+
+def _is_fresh(report_path: Path, run_started_at: float) -> bool:
+    """True, wenn der Report aus dem aktuellen Lauf stammt (mtime >= Lauf-Start − Slack).
+
+    Schützt davor, bei einem fehlgeschlagenen/ohne-Report-Lauf still einen ALTEN Report (aus
+    einem früheren erfolgreichen Lauf) als gültige Übergabe auszugeben.
+    """
+    try:
+        return report_path.stat().st_mtime >= (run_started_at - _FRESHNESS_SLACK_SECONDS)
+    except OSError:
+        return False
 
 
 def _parse_report(report_path: Path) -> tuple[str, str]:
@@ -274,17 +291,47 @@ def main() -> None:
     stryker_gate_failed = False
     if run_stryker_now:
         print(f"[qa-check] Starte Stryker ({args.layer}) …")
+        run_started_at = time.time()
         rc = _run_stryker(args.layer)
+
+        # Build-/DLL-Lock-/Compile-Fehler MÜSSEN als harter Lauf-Fehler durchschlagen –
+        # KEIN stiller Fallback auf einen alten Report (sonst ginge eine ungültige Übergabe
+        # mit veraltetem Hash durch). Unterscheidung Lauf-Fehler ↔ Score-Gate:
+        #   - Score < 100 % (Below-Threshold): Stryker schreibt trotzdem einen FRISCHEN Report
+        #     → rc != 0, aber frischer Report vorhanden → nur Score-Gate (Checks + Hash unten).
+        #   - Build/Lock/Compile-Fehler: KEIN frischer Report → harter Abbruch, kein Hash.
         if rc != 0:
-            # NICHT sofort abbrechen: restliche Checks + Hash trotzdem ausgeben, damit ein zu
-            # niedriger Score keine Probleme in anderen Checks verdeckt. Gate-Exit kommt am Ende.
             stryker_gate_failed = True
-            print(f"[qa-check] ⚠️  Stryker-Gate fehlgeschlagen (Score < 100 % oder Lauf-Fehler, "
-                  f"Exit {rc}) – führe restliche Checks dennoch aus.", file=sys.stderr)
+            fresh = _find_report(args.layer)
+            if fresh is None or not _is_fresh(fresh, run_started_at):
+                print(
+                    f"[qa-check] ❌ Stryker-LAUF fehlgeschlagen (Exit {rc}) und kein frischer Report "
+                    f"erzeugt – das deutet auf Build-/DLL-Lock-/Compile-Fehler hin, NICHT auf ein "
+                    f"Score-Gate. Harter Lauf-Fehler: kein Übergabe-Hash. Ursache oben im Stryker-"
+                    f"Output beheben (z.B. laufende dotnet-Prozesse beenden) und neu starten.",
+                    file=sys.stderr,
+                )
+                sys.exit(rc or 1)
+            print(
+                f"[qa-check] ⚠️  Stryker-Score-Gate fehlgeschlagen (Score < 100 %, Exit {rc}) – "
+                f"frischer Report vorhanden, führe restliche Checks dennoch aus.",
+                file=sys.stderr,
+            )
 
     report_path = _find_report(args.layer)
     if report_path is None:
         print("[qa-check] Kein Stryker-Report gefunden.", file=sys.stderr)
+        sys.exit(1)
+
+    # Auch im --verify/--skip-stryker-Pfad: Ein veralteter Report darf keinen scheinbar gültigen
+    # Hash erzeugen. Bei einem frischen Lauf wurde die Frische oben bereits implizit geprüft;
+    # hier greift der Schutz für die report-lesenden Modi.
+    if run_stryker_now and not _is_fresh(report_path, run_started_at):
+        print(
+            f"[qa-check] ❌ Gefundener Report ist nicht aus diesem Lauf (veraltet): {report_path}. "
+            f"Harter Lauf-Fehler – kein Übergabe-Hash.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     score, report_hash = _parse_report(report_path)

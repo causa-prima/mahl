@@ -5,8 +5,8 @@ Stryker JSON-Report aufbereiten für LLM-Analyse.
 Verwendung:
   python3 .claude/scripts/stryker-summary.py                          # neuester Report
   python3 .claude/scripts/stryker-summary.py path/to/report.json
-  python3 .claude/scripts/stryker-summary.py --detail                 # alle nicht-getöteten Mutanten
-  python3 .claude/scripts/stryker-summary.py path/to/report.json --detail
+  python3 .claude/scripts/stryker-summary.py --verbose                # alle nicht-getöteten Mutanten
+  python3 .claude/scripts/stryker-summary.py path/to/report.json --verbose
 """
 import argparse
 import json
@@ -83,9 +83,12 @@ def gate_code(metrics: dict) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Stryker JSON-Report aufbereiten.")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("report", nargs="?", help="Pfad zur mutation-report.json (optional)")
-    parser.add_argument("--detail", action="store_true", help="Alle nicht-getöteten Mutanten anzeigen (inkl. Ignored, NoCoverage, Timeout)")
+    parser.add_argument("--verbose", action="store_true", help="Alle nicht-getöteten Mutanten anzeigen (inkl. Ignored, NoCoverage, Timeout)")
     args = parser.parse_args()
 
     report_path = Path(args.report) if args.report else find_latest_report()
@@ -108,7 +111,7 @@ def main() -> None:
                 survivors_by_file.setdefault(short_path(path), []).append(m)
             elif status == "NoCoverage":
                 nocoverage_by_file.setdefault(short_path(path), []).append(m)
-            if args.detail and status != "Killed":
+            if args.verbose and status != "Killed":
                 detail_by_file.setdefault(short_path(path), []).append(m)
 
     print(f"Stryker-Report: {report_path.parent.parent.name}")
@@ -119,7 +122,7 @@ def main() -> None:
     if counts["Timeout"] > 0:
         print(
             f"\n⏱️  {counts['Timeout']} Timeout(s) zählen als detected (Standard), können aber\n"
-            f"   Timing-Artefakte bei Partial-Runs sein – mit `--detail` prüfen."
+            f"   Timing-Artefakte bei Partial-Runs sein – mit `--verbose` prüfen."
         )
 
     def _print_group(by_file: dict[str, list[dict]]) -> None:
@@ -143,7 +146,7 @@ def main() -> None:
             print(f"\n⚠️  {counts['NoCoverage']} NoCoverage (von keinem Test ausgeführt):\n")
             _print_group(nocoverage_by_file)
 
-    if args.detail and detail_by_file:
+    if args.verbose and detail_by_file:
         total_detail = sum(len(v) for v in detail_by_file.values())
         print(f"\n📋 Alle nicht-getöteten Mutanten ({total_detail}):\n")
         for file, mutants in sorted(detail_by_file.items()):

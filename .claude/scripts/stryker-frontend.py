@@ -5,7 +5,7 @@ Stryker JS/TS via cmd.exe (WSL-Wrapper) + automatische Auswertung via stryker-su
 Verwendung:
   python3 .claude/scripts/stryker-frontend.py                              # alle Dateien
   python3 .claude/scripts/stryker-frontend.py --mutate src/pages/Foo.tsx   # eine Datei
-  python3 .claude/scripts/stryker-frontend.py --detail                     # alle nicht-getöteten Mutanten
+  python3 .claude/scripts/stryker-frontend.py --verbose                    # alle nicht-getöteten Mutanten
 
 Pfade für --mutate: relativ zu Client/ (z.B. src/pages/IngredientsPage.tsx).
 Output wird nach StrykerOutput/Frontend/<timestamp>/reports/ kopiert.
@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 from _util import REPO_ROOT_WIN, _win_path
+from _run_lock import RunLock
 
 _SCRIPTS_DIR  = Path(__file__).parent
 _REPO_ROOT    = _SCRIPTS_DIR.parent.parent
@@ -47,10 +48,13 @@ def _copy_reports(timestamp: str) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Stryker JS/TS via cmd.exe (WSL)")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--mutate", metavar="GLOB",
                         help="Datei oder Glob relativ zu Client/ (z.B. src/pages/Foo.tsx)")
-    parser.add_argument("--detail", action="store_true",
+    parser.add_argument("--verbose", action="store_true",
                         help="Alle nicht-getöteten Mutanten anzeigen (via stryker-summary.py)")
     args = parser.parse_args()
 
@@ -64,7 +68,8 @@ def main() -> None:
     print(f"Output → {_TMP_FILE}")
 
     cmd_inner = f"cd /d {_CLIENT_WIN} && {stryker_cmd} > {_TMP_FILE_WIN} 2>&1"
-    result = subprocess.run(["cmd.exe", "/c", cmd_inner])
+    with RunLock(_TMP_FILE):
+        result = subprocess.run(["cmd.exe", "/c", cmd_inner])
 
     if _TMP_FILE.exists():
         lines = _TMP_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -86,8 +91,8 @@ def main() -> None:
     # stryker-summary.py ist das maßgebliche Gate (Score < 100 % → exit 1) und deckt sich mit
     # Strykers eigenem break-Threshold. Bei Abweichung gewinnt das Fail.
     summary_args = [sys.executable, str(_SCRIPTS_DIR / "stryker-summary.py"), str(report_json)]
-    if args.detail:
-        summary_args.append("--detail")
+    if args.verbose:
+        summary_args.append("--verbose")
     summary_result = subprocess.run(summary_args)
     sys.exit(summary_result.returncode or (1 if result.returncode != 0 else 0))
 

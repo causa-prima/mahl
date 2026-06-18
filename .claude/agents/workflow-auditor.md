@@ -2,7 +2,7 @@
 name: workflow-auditor
 description: Auditiert das Workflow-/Prozess-DESIGN (nicht Doku-Qualität – das macht review-docs) – Entwickler-Belastung, Robustheit/Single-Points-of-Failure, ob Hooks/Gates TDD wirklich erzwingen, Ressourceneffizienz, Skalierbarkeit. Read-only, liefert Analyse. NUR manuell bei expliziter Anfrage nach einem Workflow-/Prozess-Review – nicht auto-triggern, nicht Teil eines normalen Code-Reviews.
 tools: Read, Grep, Glob
-model: inherit
+model: sonnet
 ---
 
 # Workflow Review Agent

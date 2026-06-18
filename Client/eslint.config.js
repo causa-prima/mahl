@@ -37,9 +37,18 @@ export default defineConfig([
       // Readonly class properties where possible
       '@typescript-eslint/prefer-readonly': 'error',
 
-      // --- Code-Qualitäts-Metriken ---
+      // --- Code-Qualitäts-Metriken (OBS-S085-7) ---
+      // complexity + max-depth: error, gilt auch für Tests – hohe Komplexität/Schachtelung
+      // im Test ist selbst ein Smell (verschleierte Logik gehört nicht in den Test).
       'complexity': ['error', 10],
-      'max-lines-per-function': ['error', { 'max': 50, 'skipBlankLines': true, 'skipComments': true }],
+      'max-depth': ['error', 4],
+      // max-params: warn statt error – Konstruktoren/Domänenobjekte sind nicht sauber per
+      // Glob ausschließbar; der harte Param-Deckel liegt im C#-Layer (SonarAnalyzer/.editorconfig).
+      'max-params': ['warn', 4],
+      // max-lines-per-function: warn (Lint-Deckel). Die Guideline strebt ~20 Zeilen an
+      // (Aspiration); Lint ≥ Guideline. Für Tests aus (Override unten) – tabellengetriebene
+      // Tests/viele Assertions blähen die Zeilenzahl ohne echten Komplexitäts-Smell.
+      'max-lines-per-function': ['warn', { 'max': 50, 'skipBlankLines': true, 'skipComments': true }],
       'max-lines': ['warn', 500],
 
       // --- functional/recommended Overrides ---
@@ -67,6 +76,16 @@ export default defineConfig([
       // aggressiv: es würde auch `throw new Error(...)` in default-never-Zweigen blockieren,
       // die für strukturelle Vollständigkeit nötig sind. Enforcement via Review-Checkliste.
       'functional/no-throw-statements': 'off',
+    },
+  },
+
+  // --- max-lines-per-function: aus für Tests (OBS-S085-7) ---
+  // complexity (10) und max-depth (4) gelten weiter auch für Tests; nur die verrauschte
+  // Zeilen-Metrik ist hier aus.
+  {
+    files: ['**/*.{test,spec}.{ts,tsx}'],
+    rules: {
+      'max-lines-per-function': 'off',
     },
   },
 

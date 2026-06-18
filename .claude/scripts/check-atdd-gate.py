@@ -12,58 +12,9 @@ Exit-Code 0 wenn gefunden, 1 wenn nicht gefunden.
 import sys
 from pathlib import Path
 
+from _feature import parse_feature
+
 _FEATURES_DIR = Path(__file__).parent.parent.parent / "features"
-
-
-def _parse_feature(text: str) -> tuple[list[str], list[dict]]:
-    """Gibt (background_lines, scenarios) zurück.
-    Jedes Szenario: {"tags": set[str], "title": str, "lines": list[str]}
-    """
-    lines = text.splitlines()
-    background: list[str] = []
-    scenarios: list[dict] = []
-    in_background = False
-    current_tags: set[str] = set()
-    current_scenario: dict | None = None
-
-    for line in lines:
-        stripped = line.strip()
-
-        if stripped.startswith("@"):
-            # Tag-Zeile – schließt ggf. vorheriges Szenario ab
-            if current_scenario is not None:
-                scenarios.append(current_scenario)
-                current_scenario = None
-            in_background = False
-            for tag in stripped.split():
-                if tag.startswith("@"):
-                    current_tags.add(tag)
-
-        elif stripped.startswith("Background:"):
-            in_background = True
-            background.append(line)
-
-        elif stripped.startswith("Scenario:") or stripped.startswith("Scenario Outline:"):
-            if current_scenario is not None:
-                scenarios.append(current_scenario)
-            title = stripped.split(":", 1)[1].strip()
-            current_scenario = {"tags": set(current_tags), "title": title, "lines": [line]}
-            current_tags = set()
-            in_background = False
-
-        elif in_background:
-            if stripped and not stripped.startswith("Feature:"):
-                background.append(line)
-
-        elif current_scenario is not None:
-            current_scenario["lines"].append(line)
-
-        # Feature: / Kommentare / leere Zeilen zwischen Szenarien überspringen
-
-    if current_scenario is not None:
-        scenarios.append(current_scenario)
-
-    return background, scenarios
 
 
 def main() -> None:
@@ -82,7 +33,7 @@ def main() -> None:
 
     for feature_file in sorted(_FEATURES_DIR.glob("**/*.feature")):
         text = feature_file.read_text(encoding="utf-8")
-        background, scenarios = _parse_feature(text)
+        _feature_tags, background, scenarios = parse_feature(text)
         for scenario in scenarios:
             if tag not in scenario["tags"]:
                 continue

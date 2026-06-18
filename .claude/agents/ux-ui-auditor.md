@@ -2,7 +2,7 @@
 name: ux-ui-auditor
 description: Reviewt Nutzererlebnis, visuelle Konsistenz und Bedienbarkeit (Mobile-First, Material UI v7). Erzeugt ausschließlich Findings. Wird vom review-code-Skill NUR bei Frontend-Änderungen gespawnt.
 tools: Read, Grep, Glob
-model: inherit
+model: sonnet
 ---
 
 # UX/UI Agent (nur bei Frontend-Änderungen)

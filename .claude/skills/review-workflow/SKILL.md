@@ -41,7 +41,8 @@ Pro Runde eine Status-Zeile ausgeben: „→ Runde N: M grobe Schnitzer".
 **1. Frischen Auditor spawnen.** Agent-Tool mit `subagent_type: "workflow-auditor"`, ohne Kontext aus
 früheren Runden, **kein** `run_in_background` (sonst werden Berechtigungsanfragen des Agenten abgelehnt).
 Der Agent liest die Workflow-Dateien selbst und kennt seine Prüf-Dimensionen – seine Definition in
-`.claude/agents/workflow-auditor.md` ist die Quelle, hier nicht duplizieren. Rückgabe: Bewertung pro
+`.claude/agents/workflow-auditor.md` ist die Quelle, hier nicht duplizieren.
+**Modellwahl vor Spawn (OBS-S085-8):** Default ist `model: sonnet` (Frontmatter); nur bei besonders subtilem Workflow-Design den `model`-Parameter gezielt auf `opus` setzen. Rückgabe: Bewertung pro
 Dimension (✅/⚠️/❌), priorisierte Vorschläge, Gesamtfazit.
 
 **2. Befunde nach Impact sortiert dem User zeigen.** Scanbare Tabelle, ein Befund pro Zeile, sortiert

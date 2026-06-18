@@ -160,6 +160,7 @@ Bereits ausgeführt (nicht nochmal ausführen):
 
 Spawn-Regeln:
 - EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin). Ausnahme: der Frontend-Subagent implementiert Komponente und Service-Client sequenziell in einem Aufruf (siehe Schicht-Reihenfolge oben).
+- **Modellwahl vor Spawn (OBS-S085-8):** Die Layer-Implementer haben `model: inherit` (kein Deckel) – anspruchsvolle TDD-Schichten laufen damit auf dem starken Default. Nur für eine klar einfache Schicht (triviales Mapping/Boilerplate) den `model`-Parameter gezielt auf `sonnet` setzen, um Token zu sparen; im Zweifel Default.
 - **Subagent benennen:** `name: "backend-<schicht>"` bzw. `"frontend-<schicht>"` – nötig damit der Haupt-Thread via `SendMessage` für das Test-Review antworten kann.
 - **KEIN `run_in_background: true`** – andernfalls werden Berechtigungsanfragen des Subagenten automatisch abgelehnt; er kann keine Dateien schreiben oder Befehle ausführen.
 - **Subagent-Lebenszyklus:** Subagenten terminieren nach ihrer Ausgabe nicht – sie schlafen und bleiben via `SendMessage` erreichbar. Das ist das Kernverhalten von `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`. `permissionMode: acceptEdits` in den Subagenten-Definitionen stellt sicher, dass Datei-Edits nicht geblockt werden.
@@ -286,7 +287,7 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
 2. **Vorgehen mit dem User klären** – frage per `AskUserQuestion`, was als nächstes passieren soll, damit der Commit i.d.R. die Session-Abschluss-Dateien mit enthält. Optionen:
    - **Session-Abschluss, dann Commit** (Empfehlung) → erst `closing-session` ausführen, dann committen, sodass die Session-Abschluss-Dateien (Session-Log, AGENT_MEMORY-Phasenzeile, `lessons_learned`, Index) im **selben** Commit liegen.
    - **Nur Session-Abschluss** → `closing-session` ausführen, **kein** Commit.
-   - **Nur Commit** → jetzt committen, ohne Session-Abschluss; davor `docs/AGENT_MEMORY.md` selbst aktualisieren (Phasenzeile: Szenario als abgeschlossen markieren, nächstes benennen; Technische Schuld + Offene Fragen aktualisieren).
+   - **Nur Commit** → jetzt committen, ohne Session-Abschluss; davor `docs/AGENT_MEMORY.md` selbst aktualisieren (Phase/Story/**Nächstes Szenario**: erledigtes markieren, nächstes benennen); technische Schuld → `docs/tech-debt.md`, offene Fragen → `docs/open-questions.md`.
    - **Etwas anderes** (Freitext) → der Anweisung des Users folgen.
 
 3. **Session-Abschluss** (falls gewählt): `closing-session`-Skill laden und ausführen. Die dort entstandenen/geänderten Dateien fließen in den nachfolgenden Commit ein.

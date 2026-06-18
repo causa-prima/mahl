@@ -2,7 +2,7 @@
 name: security-auditor
 description: Reviewt Sicherheitslücken durch geänderte Features – Input/Injection-Validierung, Auth, Datenexposition. Erzeugt ausschließlich Findings. Wird vom review-code-Skill NUR bei Auth / externen Daten / sicherheitsrelevanten Änderungen gespawnt.
 tools: Read, Grep, Glob
-model: inherit
+model: sonnet
 ---
 
 # Security Agent (nur bei Auth / externen Daten / sicherheitsrelevanten Änderungen)

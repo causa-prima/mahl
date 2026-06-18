@@ -10,6 +10,11 @@ hook = import_module("check-bash-permission")
 check_command = hook.check_command
 split_compound_command = hook.split_compound_command
 has_unsafe_output_redirect = hook.has_unsafe_output_redirect
+normalize_repo_paths = hook.normalize_repo_paths
+build_allow_output = hook._build_allow_output
+
+# Repo-Root wie der Hook ihn auf dieser Maschine auflöst (für Pfad-Normalisierungs-Tests).
+REPO_ROOT = hook._NORMALIZE_ROOT
 
 
 class Colors:
@@ -144,7 +149,8 @@ def test_deny_patterns() -> int:
         ("python3 /tmp/script.py", "python3 /tmp/"),
         ("python3 /absolute/path/script.py", "python3 absoluter Pfad"),
         ("python3 ~/scripts/foo.py", "python3 ~/..."),
-        ("python3 /mnt/c/Users/kieritz/source/repos/mahl/.claude/scripts/dotnet-test.py", "python3 absoluter Pfad zu .claude-Script"),
+        # Hinweis: absoluter Repo-Pfad zu .claude-Script wird seit OBS-1 normalisiert → allow
+        # (s. test_path_normalization). Fremde absolute Pfade bleiben deny:
         # git add -f: Secrets-Risiko, kein Override
         ("git add -f .env", "git add -f"),
         ("git add secrets.json --force", "git add --force am Ende"),
@@ -200,7 +206,7 @@ def test_allow_patterns() -> int:
         ("python3 -m pytest .claude/ -q", "pytest .claude/ kurz"),
         # Projekt-Scripts
         ("python3 .claude/scripts/dotnet-test.py --filter TestName", "dotnet-test.py"),
-        ("python3 .claude/scripts/dotnet-stryker.py --mutate Domain/Foo.cs --detail", "dotnet-stryker.py"),
+        ("python3 .claude/scripts/dotnet-stryker.py --mutate Domain/Foo.cs --verbose", "dotnet-stryker.py"),
         # Docker
         ("docker-compose up -d", "docker-compose up"),
         ("docker-compose down", "docker-compose down"),
@@ -296,7 +302,7 @@ def test_allow_patterns() -> int:
         ("python3 .claude/scripts/playwright-test.py --filter ingredients", "playwright-test.py --filter"),
         ("python3 .claude/scripts/stryker-frontend.py", "stryker-frontend.py"),
         ("python3 .claude/scripts/stryker-frontend.py --mutate src/pages/IngredientsPage.tsx", "stryker-frontend.py --mutate"),
-        ("python3 .claude/scripts/stryker-frontend.py --detail", "stryker-frontend.py --detail"),
+        ("python3 .claude/scripts/stryker-frontend.py --verbose", "stryker-frontend.py --verbose"),
         # Compound aus erlaubten Segmenten
         ("ls -la && echo done", "Compound: ls && echo"),
         ("grep foo file | wc -l", "Compound: grep | wc"),
@@ -515,6 +521,117 @@ def test_edge_cases() -> int:
     return failures
 
 
+def test_path_normalization() -> int:
+    print(f"\n{Colors.BOLD}=== Repo-Pfad-Normalisierung (OBS-1) ==={Colors.RESET}")
+    failures = 0
+
+    R = REPO_ROOT  # /mnt/c/Users/kieritz/source/repos/mahl
+
+    # (command, expected_normalized, expected_changed, description)
+    norm_cases = [
+        # Präfix mit Pfad-Fortsetzung → relativ (Hauptfall: python3 absoluter Pfad)
+        (f"python3 {R}/.claude/scripts/dotnet-test.py",
+         "python3 .claude/scripts/dotnet-test.py", True, "python3 absoluter Repo-Pfad"),
+        (f"cat {R}/.claude/tmp/out.txt",
+         "cat .claude/tmp/out.txt", True, "cat absoluter Repo-Pfad"),
+        (f"ls {R}/docs",
+         "ls docs", True, "ls Unterverzeichnis"),
+        # Bare-Root (kein Folge-Pfad) → '.'
+        (f"cd {R} && git status",
+         "cd . && git status", True, "cd bare-root vor &&"),
+        (f"git -C {R} diff --stat HEAD",
+         "git -C . diff --stat HEAD", True, "git -C bare-root"),
+        (f"cd {R}/",
+         "cd .", True, "bare-root mit Trailing-Slash → ."),
+        # Mehrere Vorkommen (breit)
+        (f"diff {R}/a.txt {R}/b.txt",
+         "diff a.txt b.txt", True, "zwei Vorkommen"),
+        # cmd.exe-Inneres unangetastet (Windows-Pfade C:\\…)
+        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build"',
+         'cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build"', False,
+         "cmd.exe-Inneres unverändert (kein /mnt/c)"),
+        # /mnt/c AUSSERHALB von cmd.exe wird normalisiert, cmd.exe-Region bleibt
+        (f'output=$(cmd.exe /c "cd /d C:\\mahl && dotnet build") && cat {R}/.claude/tmp/out.txt',
+         'output=$(cmd.exe /c "cd /d C:\\mahl && dotnet build") && cat .claude/tmp/out.txt', True,
+         "Normalisierung nur außerhalb cmd.exe-Region"),
+        # Kein Repo-Pfad → unverändert
+        ("python3 /tmp/script.py", "python3 /tmp/script.py", False, "fremder absoluter Pfad unverändert"),
+        ("ls docs", "ls docs", False, "bereits relativ"),
+    ]
+    for command, expected, expected_changed, desc in norm_cases:
+        result, changed = normalize_repo_paths(command)
+        ok = result == expected and changed == expected_changed
+        if ok:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [normalize  ] {desc}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [normalize  ] {desc}: {command}")
+            print(f"       Expected: {expected!r} (changed={expected_changed})")
+            print(f"       Got:      {result!r} (changed={changed})")
+            failures += 1
+
+    # check_command normalisiert vor der Prüfung → absoluter Repo-Pfad zu .claude-Script wird allow
+    flip_cases = [
+        (f"python3 {R}/.claude/scripts/dotnet-test.py", "allow",
+         "absoluter Repo-Pfad zu .claude-Script → allow (vorher deny)"),
+        (f"python3 {R}/.claude/hooks/check-code-quality-blocking.py", "allow",
+         "absoluter Repo-Pfad zu .claude-Hook → allow"),
+    ]
+    for command, expected, desc in flip_cases:
+        if not assert_decision(command, expected, desc):
+            failures += 1
+
+    # # --allow-once bleibt unangetastet (ONE_TIME-Check zuerst → ask, keine Normalisierung)
+    if not assert_decision(f"python3 {R}/.claude/scripts/x.py # --allow-once", "ask",
+                           "# --allow-once: ONE_TIME vor Normalisierung"):
+        failures += 1
+
+    # _build_allow_output: bei Änderung updatedInput + additionalContext, sonst nicht
+    changed_cmd = f"python3 {R}/.claude/scripts/dotnet-test.py"
+    out = build_allow_output(changed_cmd)
+    if (out.get("updatedInput", {}).get("command") == "python3 .claude/scripts/dotnet-test.py"
+            and out.get("permissionDecision") == "allow"
+            and out.get("additionalContext")):
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [output     ] updatedInput + additionalContext bei Normalisierung")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] updatedInput fehlt/falsch: {out}")
+        failures += 1
+
+    out_plain = build_allow_output("ls docs")
+    if "updatedInput" not in out_plain and "additionalContext" not in out_plain:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [output     ] kein updatedInput ohne Pfad-Änderung")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] unerwartetes updatedInput: {out_plain}")
+        failures += 1
+
+    return failures
+
+
+def test_allowed_logging() -> int:
+    print(f"\n{Colors.BOLD}=== Allowed-Command-Logging (OBS-3 D) ==={Colors.RESET}")
+    import tempfile
+    failures = 0
+
+    # Erlaubte Befehle gehen in ein SEPARATES Log (nicht ins Deny-Log).
+    if hook._ALLOWED_LOG_FILE != hook._LOG_FILE:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [log        ] allowed-Log ≠ denied-Log")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [log        ] allowed- und denied-Log sind identisch")
+        failures += 1
+
+    # _log_command schreibt [log_type] + Befehl in die angegebene Datei.
+    with tempfile.TemporaryDirectory() as d:
+        target = os.path.join(d, "sub", "allowed.log")  # Verzeichnis wird angelegt
+        hook._log_command("ls -la && echo done", "ALLOW", target)
+        content = open(target, encoding="utf-8").read()
+        if "[ALLOW] ls -la && echo done" in content:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [log        ] _log_command schreibt in Zieldatei")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [log        ] Inhalt unerwartet: {content!r}")
+            failures += 1
+
+    return failures
+
+
 def main() -> None:
     total_failures = 0
 
@@ -526,6 +643,8 @@ def main() -> None:
     total_failures += test_one_time_marker()
     total_failures += test_deny_overrides_allow()
     total_failures += test_edge_cases()
+    total_failures += test_path_normalization()
+    total_failures += test_allowed_logging()
 
     print(f"\n{'=' * 60}")
     if total_failures == 0:

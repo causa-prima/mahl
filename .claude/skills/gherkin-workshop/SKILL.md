@@ -303,8 +303,8 @@ damit der User den Fortschritt sehen kann.
      falsche Annahme würde ungewolltes Verhalten im Produkt erzeugen, z.B. eine implizite
      Validierungsregel die bestimmt was erlaubt oder verboten ist, oder Zustandsübergangs-
      semantik): User fragen, warten
-   - **Nicht lösbar**: in `docs/AGENT_MEMORY.md` dokumentieren mit Kontext [US-ID], Problem,
-     warum nicht gelöst, konkretes Action Item
+   - **Nicht lösbar**: in `docs/open-questions.md` dokumentieren (Format dort) mit Kontext [US-ID],
+     Problem, warum nicht gelöst, konkretes Action Item
 4. LOW → Formulierungskorrekturen selbst beheben; inhaltliche LOW-Findings in der
    Freigabe-Nachricht an den User notieren
 5. Keine CRITICAL/HIGH mehr → weiter mit Schritt 5

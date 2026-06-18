@@ -23,11 +23,24 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Der häufigste Fehlerursprung ist nicht fehlendes Wissen, sondern fehlendes Anwenden.
   Hooks und Pflicht-Schritte in Skills sind zuverlässiger als Lese-Disziplin.
 
+## Doku & Referenzen
+
+- **Single Source of Truth: Information am passendsten Ort, sonst referenzieren.**
+  Jede Information lebt an *einer* Stelle – dem dafür passendsten Dokument – und dort so
+  ausführlich, dass sie **ohne Vorwissen/Session-Kontext** verständlich ist. Andere Stellen
+  **referenzieren** diese Quelle (eine Kurzzusammenfassung ist erlaubt, eine Kopie nicht –
+  Kopien driften). Jede referenzierte Stelle braucht einen **leicht auffindbaren Anchor**
+  (grep-barer Marker / Heading-Text / ID – **keine** „Sektion N"-/Zeilen-Position, die stale wird;
+  Zeilennummern nur für read-only-Dateien wie Session-Logs). Ändert man eine referenzierte Stelle,
+  **prüfen, ob die referenzierenden Stellen mitgepflegt werden müssen.**
+
 ## Kommunikation & Argumentation
 
-- **"Unterstützt" ≠ "beweist" – Präzision bei Mechanismus-Behauptungen.**
-  Vor einer Behauptung über das Verhalten eines Tools oder Prozesses prüfen: Garantiert der
-  Mechanismus das, oder erleichtert er es nur? Starke Behauptungen erst nach Verifikation.
-  Behauptungen über externes Tool-Verhalten sind nur dann gesichert wenn sie auf einem
-  konkreten Tool-Call dieser Session basieren – alles andere proaktiv als unverified
+- **"Unterstützt" ≠ "beweist" – Empirie vor Behauptung, Empfehlung und Fertig-Erklärung.**
+  Vor jeder Aussage oder Handlung, die auf angenommenem Tool-/Prozess-Verhalten beruht – eine
+  Behauptung, eine Empfehlung, ein „fertig", oder das Verlassen auf einen dokumentierten
+  Befehl/Snippet – prüfen: Garantiert der Mechanismus das, oder erleichtert er es nur? Ist ein
+  empirischer Check machbar (Befehl real ausführen, am echten Datensatz, am frischen Agenten),
+  erst verifizieren. Gesichert ist eine Aussage über externes Tool-Verhalten nur, wenn sie auf
+  einem konkreten Tool-Call dieser Session basiert – alles andere proaktiv als unverified
   kennzeichnen und Verifizierung anbieten, nicht warten bis der User nachfragt.

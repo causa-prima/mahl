@@ -6,6 +6,7 @@ Verwendung:
   python3 .claude/scripts/eslint-run.py           # ESLint über src/
   python3 .claude/scripts/eslint-run.py --verbose # vollständiger Output inkl. npm-Header
 """
+import argparse
 import os
 import re
 import sys
@@ -17,11 +18,17 @@ _NPM_NOISE = re.compile(r"^> mahl-client@|^npm (warn|error notice)")
 
 
 def main() -> None:
-    verbose = "--verbose" in sys.argv
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--verbose", action="store_true",
+                        help="Vollständiger Output inkl. npm-Header")
+    args = parser.parse_args()
 
     output, exit_code = run_npm(["run", "lint"])
 
-    if verbose or not output.strip():
+    if args.verbose or not output.strip():
         print(output)
     else:
         lines = [l for l in output.splitlines() if not _NPM_NOISE.match(l)]

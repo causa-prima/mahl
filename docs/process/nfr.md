@@ -53,13 +53,13 @@ Begründung angeben, wenn ein Agent ausgelassen wird.
 - [ ] Alle relevanten Agenten beauftragt (welche bei welchem Scope: Skill `review-code`)
 - [ ] Nach jeder Code-Änderung: betroffene Agenten erneut ausgeführt (mit Begründung für ausgelassene)
 - [ ] Wiederholung bis kein Agent mehr ❌-Findings hat
-- [ ] ⚠️-Findings: gefixt ODER als technische Schuld in `docs/AGENT_MEMORY.md` eingetragen
+- [ ] ⚠️-Findings: gefixt ODER als technische Schuld in `docs/tech-debt.md` eingetragen
 
 ### Gate 4: Learnings & Dokumentation (PFLICHT)
 
 - [ ] Eintrag in `docs/kaizen/lessons_learned.md` erstellt ("keine Learnings" nur mit Begründung akzeptabel)
 - [ ] **Dokumentations-Änderungsvorschläge:** Für jede Kern-Dokument-Datei explizit geprüft: Anpassung nötig? Falls ja: Änderung dem User **vorschlagen** und auf Bestätigung warten – nicht eigenständig anpassen.
-- [ ] `docs/AGENT_MEMORY.md` aktualisiert (Status, technische Schuld, offene Fragen)
+- [ ] Projekt-Status aktualisiert: `docs/AGENT_MEMORY.md` (Phase/Story/Nächstes Szenario/Prioritäten), technische Schuld → `docs/tech-debt.md`, offene Fragen → `docs/open-questions.md`
 - [ ] Commit mit aussagekräftiger Message (`US-XXX: ...`)
 - [ ] Migrations erstellt (falls DB-Änderungen)
 

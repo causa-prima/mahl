@@ -119,6 +119,8 @@ Gherkin-Szenario (@US-201-happy-path)
 
 Alle drei Ebenen tragen denselben Identifier – das ermöglicht direktes Grep (`US201_HappyPath`) über alle Schichten.
 
+**Per-Szenario-Link (Pflicht):** Da die `@US-…`-Tags nur Kategorie-Ebene sind (nicht pro Szenario eindeutig), trägt jeder Playwright-Testfall zusätzlich `// Szenario: <exakter Gherkin-Titel>` direkt über dem `test(`. Dieser Kommentar ist der maschinelle Spec↔Test-Link (DONE-Erkennung, `next_scenario.py`). Präsenz/Gültigkeit/Eindeutigkeit erzwingt der Poka-Yoke-Hook `check-e2e-scenario-ref.py`; Mechanik & Details: ADR-S041-7.
+
 **Testname-Format Backend:** `USxxx_ScenarioType_MethodName_Szenario_ErwartetesErgebnis`
 
 `ScenarioType` = Gherkin-Tag-Suffix des Primär-Szenarios (das den Test im inneren ATDD-Loop erzwungen hat): `HappyPath`, `Error`, `EdgeCase`. Bei mehreren Szenarien, die dasselbe Verhalten exercisen: Primär-Szenario taggen, kein Mehrfach-Tagging.

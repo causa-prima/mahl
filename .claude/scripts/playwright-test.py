@@ -19,7 +19,10 @@ _NPM_NOISE = re.compile(r"^> mahl-client@|^npm (warn|error notice)")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Playwright E2E-Tests via cmd.exe (WSL)")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--filter", dest="filter_name", metavar="PATTERN",
                         help="Dateiname oder Testname-Filter (Substring-Match)")
     parser.add_argument("--verbose", action="store_true",

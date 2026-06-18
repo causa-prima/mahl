@@ -82,7 +82,7 @@ Außerdem: Unix-Befehle (`tail`, `grep`, `head`) **innerhalb** der `cmd.exe /c "
 
 ```bash
 python3 .claude/scripts/dotnet-test.py [--filter TestName] [--verbose]
-python3 .claude/scripts/dotnet-stryker.py [--mutate Domain/Foo.cs] [--detail]
+python3 .claude/scripts/dotnet-stryker.py [--mutate Domain/Foo.cs] [--verbose]
 ```
 
 **B) Für andere cmd.exe-Aufrufe: Output in Variable capturen, dann filtern**
@@ -138,13 +138,18 @@ Test- und Stryker-Aufrufe immer via Projekt-Scripts (kapseln cmd.exe intern):
 ```bash
 # Backend
 python3 .claude/scripts/dotnet-test.py [--filter ...] [--verbose]
-python3 .claude/scripts/dotnet-stryker.py [--mutate ...] [--detail]
+python3 .claude/scripts/dotnet-stryker.py [--mutate ...] [--verbose]
 
 # Frontend
 python3 .claude/scripts/vitest-run.py [--filter ...] [--verbose]
 python3 .claude/scripts/playwright-test.py [--filter ...] [--verbose]
-python3 .claude/scripts/stryker-frontend.py [--mutate src/...] [--detail]
+python3 .claude/scripts/stryker-frontend.py [--mutate src/...] [--verbose]
 ```
+
+> **Einheitliche CLI:** Alle Wrapper-Scripts (auch `eslint-run.py`, `jscpd-run.py`) nutzen
+> `--verbose` für „mehr als die kuratierte Default-Ausgabe" und bieten `--help` mit
+> Verwendung, Beispielen und Parametern. Default-Output ist bereits gefiltert – **nicht**
+> zusätzlich durch `tail`/`grep`/`head` leiten.
 
 Alle anderen dotnet-Befehle via cmd.exe-Wrapper:
 ```bash
@@ -321,18 +326,18 @@ python3 .claude/scripts/dotnet-stryker.py --mutate Domain/Quantity.cs
 python3 .claude/scripts/dotnet-stryker.py
 
 # Mit allen nicht-getöteten Mutanten (Status, StatusReason, Zeile, Spalte)
-python3 .claude/scripts/dotnet-stryker.py --detail
+python3 .claude/scripts/dotnet-stryker.py --verbose
 ```
 
 > **Ausgabe:** `dotnet-stryker.py` zeigt die letzten 30 Zeilen des Stryker-Outputs, dann eine kompakte
 > Zusammenfassung (Score + Survivors mit Datei/Zeile).
 >
-> **`--detail`-Flag:** Zeigt alle nicht-getöteten Mutanten (Survived, Ignored, Timeout, NoCoverage)
+> **`--verbose`-Flag:** Zeigt alle nicht-getöteten Mutanten (Survived, Ignored, Timeout, NoCoverage)
 > mit Status, StatusReason, Zeile und Spalte – nützlich für gezielte Analyse ohne Ad-hoc-Python.
 >
 > **Auswertungs-Script standalone** – nützlich für manuelle Analyse älterer Reports:
-> `python3 .claude/scripts/stryker-summary.py [path/to/report.json] [--detail]`
-> `--detail` zeigt alle nicht-getöteten Mutanten (Survived, Ignored, Timeout, NoCoverage) mit Status, StatusReason, Zeile und Spalte.
+> `python3 .claude/scripts/stryker-summary.py [path/to/report.json] [--verbose]`
+> `--verbose` zeigt alle nicht-getöteten Mutanten (Survived, Ignored, Timeout, NoCoverage) mit Status, StatusReason, Zeile und Spalte.
 > Bei expliziter Pfad-Angabe wird der Timestamp-Check übersprungen.
 
 > **Wichtig:** `--mutate` ersetzt die `mutate`-Liste aus `stryker-config.json`. Die Excludes
@@ -370,7 +375,7 @@ python3 .claude/scripts/stryker-frontend.py
 python3 .claude/scripts/stryker-frontend.py --mutate src/pages/IngredientsPage.tsx
 
 # Mit allen nicht-getöteten Mutanten (analog zu Backend)
-python3 .claude/scripts/stryker-frontend.py --detail
+python3 .claude/scripts/stryker-frontend.py --verbose
 ```
 
 > **Ausgabe:** `stryker-frontend.py` zeigt die letzten 30 Zeilen des Stryker-Outputs, dann eine kompakte

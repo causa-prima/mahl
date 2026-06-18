@@ -2,7 +2,7 @@
 name: code-quality-auditor
 description: Reviewt Wartbarkeit, Lesbarkeit und Einhaltung der Architektur-Prinzipien (NICHT Funktionalität – das macht functional-correctness-auditor). Erzeugt ausschließlich Findings. Wird vom review-code-Skill gespawnt – bei jeder Code- oder Doku-Änderung.
 tools: Read, Grep, Glob
-model: inherit
+model: sonnet
 ---
 
 # Code Quality Agent

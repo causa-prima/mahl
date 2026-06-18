@@ -5,7 +5,7 @@ dotnet stryker via cmd.exe (WSL-Wrapper) + automatische Auswertung via stryker-s
 Verwendung:
   python3 .claude/scripts/dotnet-stryker.py
   python3 .claude/scripts/dotnet-stryker.py --mutate Domain/Foo.cs
-  python3 .claude/scripts/dotnet-stryker.py --detail
+  python3 .claude/scripts/dotnet-stryker.py --verbose
 
 Output wird nach StrykerOutput/Backend/<timestamp>/reports/ verschoben.
 """
@@ -18,6 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 from _util import REPO_ROOT_WIN, _win_path, check_dotnet_dll_lock
+from _run_lock import RunLock
 
 _SCRIPTS_DIR  = Path(__file__).parent
 _REPO_ROOT    = _SCRIPTS_DIR.parent.parent
@@ -51,11 +52,17 @@ def _move_new_run(before: set[Path]) -> Path | None:
 
 
 def main() -> None:
-    check_dotnet_dll_lock()
-    parser = argparse.ArgumentParser(description="dotnet stryker via cmd.exe (WSL)")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--mutate", help="Datei mutieren (z.B. Domain/Foo.cs)")
-    parser.add_argument("--detail", action="store_true", help="Alle nicht-getöteten Mutanten")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Alle nicht-getöteten Mutanten (Survived/Ignored/Timeout/NoCoverage) "
+                             "mit Status, StatusReason, Zeile, Spalte")
     args = parser.parse_args()
+    # parse_args vor dem DLL-Lock-Check, damit --help/-h ohne Seiteneffekt (PowerShell-Abfrage) greift
+    check_dotnet_dll_lock()
 
     stryker_cmd = "dotnet stryker"
     if args.mutate:
@@ -68,7 +75,8 @@ def main() -> None:
 
     before = _snapshot_run_dirs()
     cmd_inner = f"cd /d {REPO_ROOT_WIN} && {stryker_cmd} > {_TMP_FILE_WIN} 2>&1"
-    result = subprocess.run(["cmd.exe", "/c", cmd_inner])
+    with RunLock(_TMP_FILE):
+        result = subprocess.run(["cmd.exe", "/c", cmd_inner])
 
     if _TMP_FILE.exists():
         lines = _TMP_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -86,8 +94,8 @@ def main() -> None:
     # stryker-summary.py ist das maßgebliche Gate (Score < 100 % → exit 1) und deckt sich mit
     # Strykers eigenem break-Threshold. Bei Abweichung gewinnt das Fail.
     summary_args = [sys.executable, str(_SCRIPTS_DIR / "stryker-summary.py")]
-    if args.detail:
-        summary_args.append("--detail")
+    if args.verbose:
+        summary_args.append("--verbose")
     summary_result = subprocess.run(summary_args)
     sys.exit(summary_result.returncode or (1 if result.returncode != 0 else 0))
 

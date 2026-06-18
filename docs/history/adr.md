@@ -99,6 +99,15 @@ kritische-regeln:
 
 **Entscheidung:** Zwei-Richtungs-Prüfung: (1) Spec → Test: Gate schlägt fehl wenn Spec-Eintrag kein Szenario hat. (2) Test → Spec: CI-Check verifiziert dass jeder `@US-ID`-Tag auf einen gültigen Spec-Eintrag zeigt.
 
+**Addendum (S088) – Link-Mechanismus `// Szenario:`-Kommentar:** Der konkrete Träger der Spec↔Test-Verknüpfung ist ein `// Szenario: <exakter Gherkin-Titel>`-Kommentar direkt über jedem Playwright-Testfall in `Client/e2e/**/*.spec.ts`. Der Titel (statt der Kategorie-Tags wie `@US-904-error`, die nicht pro Szenario eindeutig sind) ist der Schlüssel, weil er pro Szenario eindeutig ist und bereits in der Feature-Datei existiert (kein paralleler ID-Namespace).
+
+Drei Invarianten, durchgesetzt vom **PreToolUse-Hook `check-e2e-scenario-ref.py`** (blockiert den Edit, exit 2, bevor ein Verstoß landet – Poka-Yoke):
+- **Präsenz:** jeder Testfall (`test(`/`test.only|skip|fixme(`, nicht `describe`/Hooks) hat einen `// Szenario:`-Kommentar.
+- **Gültigkeit:** jeder Kommentar-Titel matcht exakt ein Szenario in `features/`.
+- **Eindeutigkeit:** kein Titel doppelt über E2E-Specs hinweg.
+
+Verwertet werden die Kommentare von **`next_scenario.py`**: DONE-Erkennung (Titel kommt in einer Spec vor) speist `--open`/`--done` und die Auflösung des `{{NEXT_SCENARIO}}`-Platzhalters in `AGENT_MEMORY.md` (Story → Feature-Datei via deren `@US-NNN`-Tag → erstes unimplementiertes Szenario in Datei-Reihenfolge; Priorität kann das via expliziten Anstrich überschreiben). `next_scenario.py --check` ist der repo-weite Beide-Richtungen-Verifier (fängt auch Feature-Retitle, der einen Kommentar verwaisen lässt). Der Mapping-Check ist bewusst **Orchestrator-Verantwortung** (nur dieser schreibt E2E-Tests) und **nicht** Teil des Subagenten-`qa-check.py`.
+
 ---
 
 ## API-Validierung & Fehlerbehandlung (alle Endpoints)

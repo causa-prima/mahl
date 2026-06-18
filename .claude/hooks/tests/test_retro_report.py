@@ -1,6 +1,7 @@
 """Tests für retro_report.py – CM-Matching (volles Tripel, severity-exakt) und Finding-Parser."""
 import os
 import sys
+import textwrap
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 import retro_report as rr  # noqa: E402
@@ -68,3 +69,67 @@ def test_finding_re_parses_slash_kontext():
     m = rr.FINDING_RE.match(line)
     assert m is not None
     assert m.group("kontext") == "Bash/Permission"
+
+
+# --- load_cm: Fließtext-Format (OBS-S085-14) ---------------------------------
+_CM_SAMPLE = textwrap.dedent("""\
+    # Countermeasures
+
+    ## Aktive Maßnahmen
+
+    ### CM-S070-3 – Multi-Kontext-Maßnahme
+    **Schwere:** HOCH | **Kategorie:** TOOLING | **Kontext:** Bash/Permission, Mutation-Testing | **Status:** AKTIV | **Seit:** S070
+    **Problem:** Tatsächlicher Problemtext, nicht der Titel
+    **Maßnahme:** irgendwas
+
+    ### CM-S047-1 – Wildcard-Kontext
+    **Schwere:** HOCH | **Kategorie:** PROZESS | **Kontext:** – | **Status:** AKTIV | **Seit:** S047
+    **Problem:** P
+    **Maßnahme:** M
+
+    ## Bewährte Maßnahmen
+
+    ### CM-S078-2 – Offene Maßnahme
+    **Schwere:** MITTEL | **Kategorie:** PROZESS | **Kontext:** Skill-Nutzung | **Status:** OFFEN | **Seit:** S078
+    **Problem:** P2
+    **Maßnahme:** M2
+    """)
+
+
+def _write_cm(tmp_path):
+    p = tmp_path / "countermeasures.md"
+    p.write_text(_CM_SAMPLE, encoding="utf-8")
+    return str(p)
+
+
+def test_load_cm_parses_ids_and_fields(tmp_path):
+    cms = rr.load_cm(_write_cm(tmp_path))
+    assert [c.cm_id for c in cms] == ["CM-S070-3", "CM-S047-1", "CM-S078-2"]
+    first = cms[0]
+    assert first.schwere == "HOCH"
+    assert first.kategorie == "TOOLING"
+    assert first.status == "AKTIV"
+    assert first.seit_session == 70
+
+
+def test_load_cm_splits_multi_kontext(tmp_path):
+    cms = rr.load_cm(_write_cm(tmp_path))
+    assert cms[0].kontexte == ["Bash/Permission", "Mutation-Testing"]
+
+
+def test_load_cm_dash_kontext_is_wildcard(tmp_path):
+    cms = rr.load_cm(_write_cm(tmp_path))
+    wildcard = next(c for c in cms if c.cm_id == "CM-S047-1")
+    assert wildcard.kontexte == []  # – → leer → Wildcard (matcht jeden Kontext)
+    assert rr.cm_matches(wildcard, "HOCH", "PROZESS", "BeliebigerKontext")
+
+
+def test_load_cm_problem_line_overrides_title(tmp_path):
+    cms = rr.load_cm(_write_cm(tmp_path))
+    assert cms[0].problem == "Tatsächlicher Problemtext, nicht der Titel"
+
+
+def test_load_cm_parses_status_across_sections(tmp_path):
+    cms = rr.load_cm(_write_cm(tmp_path))
+    offen = next(c for c in cms if c.cm_id == "CM-S078-2")
+    assert offen.status == "OFFEN"

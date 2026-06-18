@@ -108,6 +108,7 @@ class Countermeasure:
     kontexte: list          # leer = Wildcard
     status: str             # OFFEN | AKTIV | BEWÄHRT | IN UMSETZUNG
     seit_session: int = 0
+    cm_id: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +122,20 @@ FINDING_RE = re.compile(
 )
 WAS_RE   = re.compile(r"^\s+Was:\s+(.+)")
 WARUM_RE = re.compile(r"^\s+Warum:\s+(.+)")
+
+# --- Countermeasure-Parser (Fließtext-Format, OBS-S085-14) ---
+# Header:    ### CM-S<NNN>-<n> – Kurztitel
+# Metadaten: **Schwere:** … | **Kategorie:** … | **Kontext:** … | **Status:** … | **Seit:** S<NNN>
+# Problem:   **Problem:** <Text>
+CM_HEADER_RE = re.compile(r"^###\s+(?P<id>CM-S\d+-\d+)\s+[–\-]\s+(?P<titel>.+?)\s*$")
+CM_META_RE = re.compile(
+    r"^\*\*Schwere:\*\*\s*(?P<schwere>KRITISCH|HOCH|MITTEL|GERING)\s*\|\s*"
+    r"\*\*Kategorie:\*\*\s*(?P<kategorie>[\w-]+)\s*\|\s*"
+    r"\*\*Kontext:\*\*\s*(?P<kontext>.*?)\s*\|\s*"
+    r"\*\*Status:\*\*\s*(?P<status>OFFEN|IN UMSETZUNG|AKTIV|BEWÄHRT)\s*\|\s*"
+    r"\*\*Seit:\*\*\s*S?(?P<seit>\d+)"
+)
+CM_PROBLEM_RE = re.compile(r"^\*\*Problem:\*\*\s*(?P<problem>.+)")
 
 
 def parse_file(path: str) -> list[SessionData]:
@@ -197,32 +212,39 @@ def total_sessions_from_range(archive_dir: str, current_sessions: list[SessionDa
 
 
 def load_cm(path: str) -> list[Countermeasure]:
+    """Parst countermeasures.md im Fließtext-Format (OBS-S085-14).
+
+    Pro Maßnahme: Header (CM-ID + Titel) → Metadaten-Zeile → **Problem:**-Zeile.
+    Der Titel dient als Fallback-`problem`, bis die **Problem:**-Zeile ihn überschreibt.
+    """
     cms: list[Countermeasure] = []
     if not os.path.exists(path):
         return cms
+    cur_id = ""
+    cur_titel = ""
     with open(path, encoding="utf-8") as f:
         for line in f:
-            if not line.startswith('|'):
+            m = CM_HEADER_RE.match(line)
+            if m:
+                cur_id = m.group("id")
+                cur_titel = m.group("titel").strip()
                 continue
-            parts = [p.strip() for p in line.split('|')]
-            # | problem | schwere | kategorie | kontext | maßnahme | status | letzte_prüfung |
-            if len(parts) < 8:
+            m = CM_META_RE.match(line)
+            if m and cur_id:
+                kontext_raw = m.group("kontext").strip()
+                kontexte = [] if kontext_raw in ('', '–', '-') else [
+                    k.strip() for k in kontext_raw.split(',') if k.strip()
+                ]
+                cms.append(Countermeasure(
+                    cm_id=cur_id, problem=cur_titel,
+                    schwere=m.group("schwere"), kategorie=m.group("kategorie"),
+                    kontexte=kontexte, status=m.group("status"),
+                    seit_session=int(m.group("seit")),
+                ))
                 continue
-            schwere = parts[2]
-            if schwere not in ('KRITISCH', 'HOCH', 'MITTEL', 'GERING'):
-                continue
-            status = parts[6]
-            if status not in ('OFFEN', 'AKTIV', 'BEWÄHRT', 'IN UMSETZUNG'):
-                continue
-            kontexte = [k.strip() for k in parts[4].split(',') if k.strip()]
-            try:
-                seit_session = int(parts[7])
-            except (IndexError, ValueError):
-                seit_session = 0
-            cms.append(Countermeasure(
-                problem=parts[1], schwere=schwere, kategorie=parts[3],
-                kontexte=kontexte, status=status, seit_session=seit_session,
-            ))
+            m = CM_PROBLEM_RE.match(line)
+            if m and cms and cms[-1].cm_id == cur_id:
+                cms[-1].problem = m.group("problem").strip()
     return cms
 
 
@@ -655,7 +677,8 @@ def render_escalated(cms: list[Countermeasure], archive_dir: str) -> str:
         return "\n".join(lines)
 
     for cm, retros in escalated:
-        lines.append(f"  {clr('ESKALIERT', RED+BOLD)} [seit S{cm.seit_session}, {retros} Retro(s) ohne Umsetzung]")
+        cm_label = f"{cm.cm_id} " if cm.cm_id else ""
+        lines.append(f"  {clr('ESKALIERT', RED+BOLD)} {cm_label}[seit S{cm.seit_session}, {retros} Retro(s) ohne Umsetzung]")
         lines.append(f"  Problem: {cm.problem}")
         lines.append("")
     return "\n".join(lines)

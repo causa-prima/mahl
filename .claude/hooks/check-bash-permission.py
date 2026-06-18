@@ -3,9 +3,13 @@
 
 Reihenfolge in check_command:
 1. ONE_TIME_MARKER → ask (übersteuert alle anderen Prüfungen inkl. WRONG_APPROACH)
-2. WRONG_APPROACH_PATTERNS → deny (kein impliziter Override – # --allow-once nötig)
-3. Compound-Segmente → jedes Segment via check_simple_command
-4. check_simple_command: ALLOW_PATTERNS → DESTRUCTIVE_PATTERNS → deny
+2. Repo-Pfad-Normalisierung (normalize_repo_paths): absoluter WSL-Repo-Root-Präfix
+   → relativ, außerhalb von cmd.exe /c "…"-Regionen. Spart den Permission-Retry,
+   den absolute Pfade sonst auslösen (OBS-S085-1). Bei Änderung gibt der Hook den
+   normalisierten Befehl via updatedInput zurück (s. _build_allow_output).
+3. WRONG_APPROACH_PATTERNS → deny (kein impliziter Override – # --allow-once nötig)
+4. Compound-Segmente → jedes Segment via check_simple_command
+5. check_simple_command: ALLOW_PATTERNS → DESTRUCTIVE_PATTERNS → deny
 
 check_simple_command prüft kein WRONG_APPROACH – das ist Aufgabe von check_command
 auf dem Gesamtbefehl, bevor gesplittet wird.
@@ -56,26 +60,86 @@ _REPO_ROOT = os.environ.get(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'),
 )
 _LOG_FILE = os.path.join(_REPO_ROOT, '.claude', 'tmp', 'denied-commands.log')
+# Separates Log für erlaubte Befehle (OBS-S085-3 D): dient dem Aufspüren von
+# Misuse-Patterns (z.B. Wrapper-Scripts mit nachgelagertem tail/grep), ohne das
+# Deny-Log zu verrauschen. Beim Retro auswertbar (grep), kein Gate.
+_ALLOWED_LOG_FILE = os.path.join(_REPO_ROOT, '.claude', 'tmp', 'allowed-commands.log')
 
 # Extrahiert das innere Kommando aus cmd.exe /c "..."
 _CMDEXE_INNER_RE = re.compile(r'^cmd\.exe\s+/c\s+"(.*)"')
 
 
 # ---------------------------------------------------------------------------
+# Repo-Pfad-Normalisierung (OBS-S085-1)
+# Absolute WSL-Repo-Pfade verschwenden Token: der Agent läuft mit ihnen oft in
+# Permission-Denies (z.B. python3 mit absolutem Pfad → WRONG_APPROACH), obwohl der
+# relative Pfad erlaubt wäre. Wir normalisieren den Repo-Root-Präfix daher auf einen
+# relativen Pfad (Arbeitsverzeichnis = Repo-Root) und geben den umgeschriebenen
+# Befehl via updatedInput zurück. Breit angewandt (alle Vorkommen), da die
+# Einheitlichkeit der Regel der Hauptnutzen ist – AUSSER innerhalb von
+# cmd.exe /c "…"-Regionen, wo Windows-Pfade (C:\…) gelten.
+# ---------------------------------------------------------------------------
+_NORMALIZE_ROOT = os.path.normpath(_REPO_ROOT)
+
+# cmd.exe /c "…"-Region (inneres Argument enthält keine weiteren "): wird beim
+# Normalisieren übersprungen.
+_CMDEXE_REGION_RE = re.compile(r'cmd\.exe\s+/c\s+"[^"]*"')
+
+# Bare Repo-Root (optional mit einem Trailing-Slash) als eigenständige
+# Verzeichnis-Referenz – gefolgt von Whitespace, Ende oder einem Shell-Operator.
+_BARE_ROOT_RE = re.compile(re.escape(_NORMALIZE_ROOT) + r'/?(?=\s|$|[&|;])')
+
+_NORMALIZE_HINT = (
+    "Der absolute Repo-Pfad wurde automatisch auf einen relativen Pfad normalisiert "
+    "(Arbeitsverzeichnis ist der Repo-Root). Künftig direkt relative Pfade verwenden – "
+    "das vermeidet unnötige Permission-Denies."
+)
+
+
+def _strip_repo_root(text: str) -> str:
+    """Ersetzt den Repo-Root in einem Textstück durch relative Pfade.
+
+    Bare-Root (ohne Folge-Pfad) → '.', Präfix mit Pfad-Fortsetzung → relativ.
+    Bare-Root zuerst, damit der Präfix-Replace die '/'-Fortsetzungen nicht stiehlt.
+    """
+    text = _BARE_ROOT_RE.sub('.', text)
+    text = text.replace(_NORMALIZE_ROOT + '/', '')
+    return text
+
+
+def normalize_repo_paths(command: str) -> tuple[str, bool]:
+    """Normalisiert absolute Repo-Root-Pfade auf relative – außer in cmd.exe-Regionen.
+
+    Gibt (neuer_befehl, geändert) zurück.
+    """
+    parts: list[str] = []
+    last = 0
+    for m in _CMDEXE_REGION_RE.finditer(command):
+        parts.append(_strip_repo_root(command[last:m.start()]))
+        parts.append(m.group(0))  # cmd.exe-Region unangetastet (Windows-Pfade)
+        last = m.end()
+    parts.append(_strip_repo_root(command[last:]))
+    result = ''.join(parts)
+    return result, result != command
+
+
+# ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-def _log_command(command: str, log_type: str) -> None:
-    """Protokolliert einen Befehl in denied-commands.log.
+def _log_command(command: str, log_type: str, log_file: str = _LOG_FILE) -> None:
+    """Protokolliert einen Befehl in einem Log (Default: denied-commands.log).
 
     log_type: ALLOW | WRONG_APPROACH | DESTRUCTIVE | UNSAFE_REDIRECT | UNKNOWN |
               COMPOUND_DESTRUCTIVE | COMPOUND_UNSAFE_REDIRECT | COMPOUND_UNKNOWN |
               ONE_TIME
+    log_file: Zielpfad – erlaubte Befehle gehen nach _ALLOWED_LOG_FILE (OBS-S085-3 D),
+              alles andere nach _LOG_FILE.
     Fehler beim Schreiben dürfen den Hook nicht unterbrechen.
     """
     try:
-        os.makedirs(os.path.dirname(_LOG_FILE), exist_ok=True)
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
         ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        with open(_LOG_FILE, 'a', encoding='utf-8') as f:
+        with open(log_file, 'a', encoding='utf-8') as f:
             f.write(f"[{ts}] [{log_type}] {command}\n")
     except OSError:
         pass
@@ -105,8 +169,8 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r'\bdotnet\s+stryker\b'),
         'Stryker immer via Script aufrufen (führt stryker + Auswertung in einem Schritt aus):\n'
-        '  python3 .claude/scripts/dotnet-stryker.py [--mutate Domain/Foo.cs] [--detail]\n'
-        '--detail: zeigt alle nicht-getöteten Mutanten mit Status, StatusReason, Zeile und Spalte.',
+        '  python3 .claude/scripts/dotnet-stryker.py [--mutate Domain/Foo.cs] [--verbose]\n'
+        '--verbose: zeigt alle nicht-getöteten Mutanten mit Status, StatusReason, Zeile und Spalte.',
     ),
     # Frontend E2E-Tests: immer via playwright-test.py (vor dem test-Pattern prüfen)
     (
@@ -136,7 +200,7 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r'\bnpx\s+stryker\b'),
         'Stryker (Frontend) immer via Script aufrufen:\n'
-        '  python3 .claude/scripts/stryker-frontend.py [--mutate src/pages/Foo.tsx] [--detail]',
+        '  python3 .claude/scripts/stryker-frontend.py [--mutate src/pages/Foo.tsx] [--verbose]',
     ),
     # npx eslint / npm run lint: immer via eslint-run.py
     (
@@ -652,22 +716,28 @@ def check_command(command: str) -> tuple[str, str, str]:
 
     Reihenfolge:
       1. ONE_TIME_MARKER → ask (übersteuert alles)
-      2. WRONG_APPROACH  → deny (auf Gesamtbefehl, vor Split)
-      3. Compound-Split  → check_simple_command je Segment
-      4. check_simple_command für einfache Befehle
+      2. Repo-Pfad-Normalisierung (absolute Repo-Pfade → relativ)
+      3. WRONG_APPROACH  → deny (auf Gesamtbefehl, vor Split)
+      4. Compound-Split  → check_simple_command je Segment
+      5. check_simple_command für einfache Befehle
 
     decision: 'allow' | 'deny' | 'ask'
     """
-    # 1. ONE_TIME_MARKER übersteuert alles inkl. WRONG_APPROACH
+    # 1. ONE_TIME_MARKER übersteuert alles inkl. WRONG_APPROACH (vor Normalisierung)
     if ONE_TIME_MARKER in command:
         return ("ask", "", "ONE_TIME")
 
-    # 2. WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells)
+    # 2. Repo-Pfad-Normalisierung: absolute Repo-Pfade → relativ, dann auf dem
+    #    normalisierten Befehl weiterprüfen (so wird z.B. python3 <absoluter Pfad>
+    #    zu python3 .claude/... und matcht die Allow-Liste statt WRONG_APPROACH).
+    command, _ = normalize_repo_paths(command)
+
+    # 3. WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells)
     for pattern, reason in WRONG_APPROACH_PATTERNS:
         if pattern.search(command):
             return ("deny", reason, "WRONG_APPROACH")
 
-    # 3. Compound-Split + Segment-Check (check_simple_command ohne WRONG_APPROACH)
+    # 4. Compound-Split + Segment-Check (check_simple_command ohne WRONG_APPROACH)
     segments = split_compound_command(command)
     is_compound = len(segments) > 1
     for segment in segments:
@@ -693,13 +763,24 @@ def _build_deny_message(reason: str) -> str:
 # ihn erst nach einem unnötigen Deny). Bei Script-Umbenennung hier + WRONG_APPROACH_PATTERNS syncen.
 _PROJECT_TASK_SCRIPTS: list[str] = [
     "Backend-Tests:       python3 .claude/scripts/dotnet-test.py [--filter X] [--verbose]",
-    "Backend-Mutation:    python3 .claude/scripts/dotnet-stryker.py [--mutate Domain/Foo.cs] [--detail]",
+    "Backend-Mutation:    python3 .claude/scripts/dotnet-stryker.py [--mutate Domain/Foo.cs] [--verbose]",
     "Frontend-Unit-Tests: python3 .claude/scripts/vitest-run.py [--filter X] [--verbose]",
     "Frontend-E2E:        python3 .claude/scripts/playwright-test.py [--filter X] [--verbose]",
-    "Frontend-Mutation:   python3 .claude/scripts/stryker-frontend.py [--mutate src/..] [--detail]",
+    "Frontend-Mutation:   python3 .claude/scripts/stryker-frontend.py [--mutate src/..] [--verbose]",
     "ESLint:              python3 .claude/scripts/eslint-run.py [--verbose]",
     "Duplikate (jscpd):   python3 .claude/scripts/jscpd-run.py [--verbose]",
 ]
+
+# Nutzungshinweis zu den Wrapper-Scripts (OBS-S085-3 C). Erscheint via --list auch in
+# der SessionStart-Injection (session-start.sh ruft --list auf) → eine Quelle.
+_SCRIPT_USAGE_HINT: str = (
+    "Diese Wrapper geben bereits NUR das Relevante aus – normal OHNE nachgelagertes\n"
+    "| tail / | grep / | head aufrufen (der Output ist dafür kuratiert). Mehr Tiefe bei\n"
+    "Bedarf: --verbose (einheitlich bei allen Wrappern). Details/Beispiele: --help.\n"
+    "Ist der Output trotzdem zu viel oder zu wenig → als Beobachtung in\n"
+    "docs/kaizen/observations.md sammeln, statt ad-hoc zu filtern (so verbessern wir die\n"
+    "Scripts, statt das Symptom zu kaschieren)."
+)
 
 
 def _print_allow_list() -> None:
@@ -716,6 +797,8 @@ def _print_allow_list() -> None:
     print("Häufige Projekt-Tasks – immer via Wrapper-Script (Direktaufruf wird geblockt):")
     for line in _PROJECT_TASK_SCRIPTS:
         print(f"  {line}")
+    print()
+    print(_SCRIPT_USAGE_HINT)
     print()
 
     print("Erlaubte Befehle (Allow-Liste):")
@@ -754,6 +837,27 @@ def _print_allow_list() -> None:
         print(f"  {label}")
 
 
+def _build_allow_output(command: str) -> dict:
+    """Baut den allow-`hookSpecificOutput`.
+
+    Enthält die Normalisierung einen geänderten Befehl (außer bei # --allow-once),
+    werden `updatedInput` (umgeschriebener Befehl) und `additionalContext` (Hinweis)
+    ergänzt, damit Claude Code den relativen Befehl ausführt und der Agent lernt,
+    künftig relative Pfade zu nutzen.
+    """
+    hso: dict = {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "allow",
+        "permissionDecisionReason": _ALLOW_REASON,
+    }
+    if ONE_TIME_MARKER not in command:
+        normalized, changed = normalize_repo_paths(command)
+        if changed:
+            hso["updatedInput"] = {"command": normalized}
+            hso["additionalContext"] = _NORMALIZE_HINT
+    return hso
+
+
 def main() -> None:
     if "--list" in sys.argv:
         _print_allow_list()
@@ -774,15 +878,12 @@ def main() -> None:
 
     decision, reason, log_type = check_command(command)
 
-    # allow: kein Log – denied-commands.log ist ausschließlich für Denies/Asks
+    # allow: in separates allowed-commands.log (Misuse-Pattern-Analyse, OBS-S085-3 D) –
+    # denied-commands.log bleibt ausschließlich für Denies/Asks.
+    # _build_allow_output ergänzt bei normalisiertem Repo-Pfad updatedInput + Hinweis.
     if decision == "allow":
-        print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "allow",
-                "permissionDecisionReason": reason,
-            }
-        }))
+        _log_command(command, "ALLOW", _ALLOWED_LOG_FILE)
+        print(json.dumps({"hookSpecificOutput": _build_allow_output(command)}))
         sys.exit(0)
 
     if decision == "ask":
