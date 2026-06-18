@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Playwright E2E-Tests via cmd.exe (WSL-Wrapper).
+Playwright E2E-Tests (nativ über npm).
 
 Verwendung:
   python3 .claude/scripts/playwright-test.py                        # alle E2E-Tests

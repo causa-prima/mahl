@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests für check-bash-permission.py – verifiziert deny/allow/ask."""
+"""Tests für check-bash-permission.py – verifiziert deny/allow/ask (WSL-native Toolchain)."""
 import sys
 import os
 
@@ -47,10 +47,9 @@ def test_compound_detection() -> int:
         ("ls | grep foo", True, "Pipe"),
         ("ls && echo done", True, "AND"),
         ("echo hello; echo world", True, "Semikolon"),
-        ('cmd.exe /c "cd /d C:\\mahl && dotnet build"', False, "cmd.exe: && in Quotes"),
-        ('cmd.exe /c "dotnet test | tee log.txt"', False, "cmd.exe: Pipe in Quotes"),
         ("echo 'hello | world'", False, "Pipe in Single-Quotes"),
         ('echo "hello && world"', False, "AND in Double-Quotes"),
+        ('echo "a | b"', False, "Pipe in Double-Quotes"),
     ]
     for command, expected, desc in compound_cases:
         result = len(split_compound_command(command)) > 1
@@ -66,7 +65,7 @@ def test_compound_detection() -> int:
         ("ls -la && echo done", ["ls -la", "echo done"], "&& → 2 Segmente"),
         ("a; b; c", ["a", "b", "c"], "; → 3 Segmente"),
         ("a || b", ["a", "b"], "|| → 2 Segmente"),
-        ('cmd.exe /c "a && b" 2>&1 | tail -60', ['cmd.exe /c "a && b" 2>&1', 'tail -60'], "cmd.exe: && in Quotes bleibt Segment"),
+        ('echo "a && b" 2>&1 | tail -60', ['echo "a && b" 2>&1', 'tail -60'], "&& in Quotes bleibt Segment, dann Pipe-Split"),
         ("grep foo file | wc -l", ["grep foo file", "wc -l"], "grep | wc"),
     ]
     for command, expected_segs, desc in split_cases:
@@ -99,13 +98,8 @@ def test_redirect_detection() -> int:
         ("grep foo file >> .claude/tmp/results.txt", False, "append zu .claude/tmp/"),
         ("cat file > /dev/stderr", False, "/dev/stderr"),
         # Sicher: File-Descriptor-Redirect (2>&1 etc.)
-        ('cmd.exe /c "..." 2>&1', False, "2>&1 kein Datei-Redirect"),
+        ("dotnet build 2>&1", False, "2>&1 kein Datei-Redirect"),
         ("some-cmd >&2", False, ">&2 kein Datei-Redirect"),
-        # cmd.exe: Redirect innerhalb der Anführungszeichen
-        ('cmd.exe /c "dotnet test > C:\\Windows\\Temp\\out.txt"', True, "cmd.exe: unsafe Redirect in Quotes"),
-        ('cmd.exe /c "dotnet test > C:\\Users\\kieritz\\AppData\\Local\\Temp\\test_out.txt 2>&1"', True, "cmd.exe: unsafe Redirect in Quotes mit 2>&1"),
-        ('cmd.exe /c "dotnet test > /dev/null"', False, "cmd.exe: safe Redirect (/dev/null) in Quotes"),
-        ('cmd.exe /c "dotnet build > .claude/tmp/build.txt"', False, "cmd.exe: safe Redirect (.claude/tmp/) in Quotes"),
         # Unsicher: Redirect zu Produktionsdateien
         ("echo '' > CLAUDE.md", True, "Redirect auf CLAUDE.md"),
         ("cat /dev/null > Server/Program.cs", True, "cat > .cs-Datei"),
@@ -134,23 +128,18 @@ def test_deny_patterns() -> int:
 
     deny_cases = [
         # dotnet test: immer via Script
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet test"', "dotnet test direkt"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet test > C:\\Users\\kieritz\\AppData\\Local\\Temp\\test_out.txt 2>&1"', "dotnet test mit unsafe Redirect"),
-        (
-            'output=$(cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet test")\necho "$output" | grep -E "(Failed|Passed)"',
-            "Variable-Capture dotnet test",
-        ),
+        ("dotnet test", "dotnet test direkt"),
+        ("dotnet test --filter FooTest", "dotnet test mit Filter"),
+        ("dotnet test | tail -60", "dotnet test mit Pipe"),
         # Stryker: immer via Script, nie direkt
-        ('cmd.exe /c "cd /d C:\\mahl && dotnet stryker"', "Stryker allein"),
-        ('cmd.exe /c "cd /d C:\\mahl && dotnet stryker --mutate src/Foo.cs"', "Stryker --mutate allein"),
-        # WSL: Pipe in cmd.exe
-        ('cmd.exe /c "cd /d C:\\mahl && dotnet test" | tail -60', "Pipe nach cmd.exe"),
+        ("dotnet stryker", "Stryker allein"),
+        ("dotnet stryker --mutate src/Foo.cs", "Stryker --mutate allein"),
         # python3 mit absolutem Pfad
         ("python3 /tmp/script.py", "python3 /tmp/"),
         ("python3 /absolute/path/script.py", "python3 absoluter Pfad"),
         ("python3 ~/scripts/foo.py", "python3 ~/..."),
         # Hinweis: absoluter Repo-Pfad zu .claude-Script wird seit OBS-1 normalisiert → allow
-        # (s. test_path_normalization). Fremde absolute Pfade bleiben deny:
+        # (s. test_path_normalization). Fremde absolute Pfade bleiben deny.
         # git add -f: Secrets-Risiko, kein Override
         ("git add -f .env", "git add -f"),
         ("git add secrets.json --force", "git add --force am Ende"),
@@ -160,21 +149,18 @@ def test_deny_patterns() -> int:
         ("cat /dev/null > Server/Program.cs", "cat > .cs-Datei"),
         ("grep foo file > output.cs", "grep > .cs"),
         ("sort input.txt > sorted.cs", "sort > .cs"),
-        # cmd.exe type → Read-Tool verwenden
-        ('cmd.exe /c "type C:\\Users\\kieritz\\source\\repos\\mahl\\docs\\GLOSSARY.md"', "cmd.exe type"),
-        ('output=$(cmd.exe /c "type C:\\Users\\kieritz\\source\\repos\\mahl\\docs\\GLOSSARY.md")', "output=$(cmd.exe type)"),
         # Frontend Tests: immer via Python-Script, nie direkt
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test"', "npm run test direkt"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test -- run"', "npm run test -- run direkt"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test:e2e"', "npm run test:e2e direkt"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npx vitest run"', "npx vitest run via cmd.exe"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npx playwright test"', "npx playwright test via cmd.exe"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npx stryker run"', "npx stryker run via cmd.exe"),
-        ("npx vitest run", "npx vitest run (WSL direkt)"),
-        ("npx playwright test e2e/ingredients.spec.ts", "npx playwright test (WSL direkt)"),
-        ("npx stryker run", "npx stryker run (WSL direkt)"),
-        ("npm run test", "npm run test (WSL direkt)"),
-        ("npm run test:e2e", "npm run test:e2e (WSL direkt)"),
+        ("npm run test", "npm run test direkt"),
+        ("npm run test -- run", "npm run test -- run direkt"),
+        ("npm run test:e2e", "npm run test:e2e direkt"),
+        ("npx vitest run", "npx vitest run"),
+        ("npx playwright test e2e/ingredients.spec.ts", "npx playwright test"),
+        ("npx stryker run", "npx stryker run"),
+        # Lint/Mutation: immer via Wrapper
+        ("npm run lint", "npm run lint direkt"),
+        ("npm run lint:duplicates", "npm run lint:duplicates direkt"),
+        ("npx eslint .", "npx eslint direkt"),
+        ("npx jscpd src/", "npx jscpd direkt"),
     ]
 
     for command, desc in deny_cases:
@@ -189,28 +175,41 @@ def test_allow_patterns() -> int:
     failures = 0
 
     allow_cases = [
-        # dotnet build über cmd.exe
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build"', "dotnet build"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build --no-restore"', "dotnet build --no-restore"),
+        # dotnet build (nativ)
+        ("dotnet build", "dotnet build"),
+        ("dotnet build --no-restore", "dotnet build --no-restore"),
+        ("dotnet build | grep -E 'error|warning CS'", "dotnet build | grep (Compound)"),
+        # dotnet run (nativ)
+        ("dotnet run --project Server", "dotnet run --project Server"),
+        ("dotnet run --project Server &", "dotnet run im Hintergrund"),
         # dotnet ef (sichere Subcommands)
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef migrations add InitialCreate"', "dotnet ef migrations add"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef migrations remove"', "dotnet ef migrations remove"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef migrations list"', "dotnet ef migrations list"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef database update"', "dotnet ef database update"),
-        # npm run / npm audit
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run build"', "npm run build"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm audit"', "npm audit"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm outdated"', "npm outdated"),
+        ("dotnet ef migrations add InitialCreate", "dotnet ef migrations add"),
+        ("dotnet ef migrations remove", "dotnet ef migrations remove"),
+        ("dotnet ef migrations list", "dotnet ef migrations list"),
+        ("dotnet ef database update", "dotnet ef database update"),
+        # dotnet tool (lokales Manifest)
+        ("dotnet tool restore", "dotnet tool restore"),
+        ("dotnet tool list", "dotnet tool list"),
+        # npm run / audit / outdated / update / ci (nativ)
+        ("npm run build", "npm run build"),
+        ("npm run dev", "npm run dev"),
+        ("npm run test:coverage", "npm run test:coverage (kein Wrapper)"),
+        ("npm audit", "npm audit"),
+        ("npm outdated", "npm outdated"),
+        ("npm update", "npm update"),
+        ("npm ci", "npm ci (reproduzierbarer Lock-Install)"),
+        # kill per PID (gezielt)
+        ("kill 1234", "kill PID"),
+        ("kill -9 99999", "kill -9 PID"),
         # python3 -m pytest auf .claude/
         ("python3 -m pytest .claude/hooks/tests/ -p no:cacheprovider -s -q", "pytest .claude/hooks/"),
         ("python3 -m pytest .claude/ -q", "pytest .claude/ kurz"),
         # Projekt-Scripts
         ("python3 .claude/scripts/dotnet-test.py --filter TestName", "dotnet-test.py"),
         ("python3 .claude/scripts/dotnet-stryker.py --mutate Domain/Foo.cs --verbose", "dotnet-stryker.py"),
-        # Docker
-        ("docker-compose up -d", "docker-compose up"),
-        ("docker-compose down", "docker-compose down"),
+        # Docker v2-Plugin (nativ in WSL); v1 docker-compose → deny (s. test_deny)
         ("docker compose up -d", "docker compose up"),
+        ("docker compose down", "docker compose down"),
         # Lese-Befehle
         ("ls", "ls solo"),
         ("ls -la", "ls -la"),
@@ -240,7 +239,6 @@ def test_allow_patterns() -> int:
         ("rm file1.ts file2.ts", "rm mehrere Dateien"),
         # mv: Dateien verschieben/umbenennen (kaizen-Archivierung)
         ("mv docs/kaizen/lessons_learned.md docs/kaizen/archive/session_056_to_063.md", "mv kaizen archivieren"),
-        ("mv docs/kaizen/lessons_learned.md docs/kaizen/archive/session_064_to_070.md", "mv kaizen archivieren 2"),
         ("mv some-file.ts other-file.ts", "mv umbenennen"),
         # cp: Dateien kopieren (ohne -r/-R)
         ("cp .claude/skills/kaizen/references/lessons_learned_template.md docs/kaizen/lessons_learned.md", "cp template"),
@@ -250,11 +248,7 @@ def test_allow_patterns() -> int:
         ("python3 .claude/scripts/stryker-summary.py", "python3 .claude/scripts/"),
         ("python3 .claude/scripts/jenga_score.py", "jenga_score.py"),
         ("python3 .claude/scripts/jenga_score.py --file docs/kaizen/lessons_learned.md", "jenga_score.py mit --file"),
-        ("python3 .claude/scripts/retro_report.py", "retro_report.py"),
-        ("python3 .claude/scripts/retro_report.py --current docs/kaizen/lessons_learned.md", "retro_report.py mit --current"),
         ("python3 .claude/hooks/check-code-quality-blocking.py", "python3 .claude/hooks/"),
-        # sed \r-Bereinigung
-        ("sed -i 's/\\r//' some-file.sh", "sed \\r"),
         # Redirects auf erlaubte Ziele
         ("echo 'output' > .claude/tmp/debug.txt", "echo > .claude/tmp/"),
         ("grep errors log > .claude/tmp/errors.txt", "grep > .claude/tmp/"),
@@ -276,24 +270,6 @@ def test_allow_patterns() -> int:
         ("git add -p", "git add -p (interaktiv)"),
         ("git stash push -m 'save'", "git stash push"),
         ("git stash pop", "git stash pop"),
-        # Variable-Capture-Pattern für dotnet build (nicht test – dafür Script nutzen)
-        (
-            'output=$(cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build Server.Tests 2>&1")\necho "$output" | grep -E "(error|warning CS|Build succeeded)" | head -30',
-            "Variable-Capture dotnet build + grep | head",
-        ),
-        # dotnet run mit vollständigem Projektpfad (neues Format)
-        ('cmd.exe /c "dotnet run --project C:\\Users\\kieritz\\source\\repos\\mahl\\Server"', "dotnet run --project Vollpfad"),
-        ('cmd.exe /c "dotnet run --project C:\\Users\\kieritz\\source\\repos\\mahl\\Server" &', "dotnet run --project Vollpfad im Hintergrund"),
-        ('cmd.exe /c "set ASPNETCORE_URLS=http://localhost:5059 && dotnet run --project C:\\Users\\kieritz\\source\\repos\\mahl\\Server"', "dotnet run --project Vollpfad mit Env-Var"),
-        # taskkill per PID (gezielte Prozess-Beendigung aus DLL-Lock-Check)
-        ('cmd.exe /c "taskkill /f /pid 1234"', "taskkill /f /pid"),
-        ('cmd.exe /c "taskkill /f /pid 99999"', "taskkill /f /pid großer Wert"),
-        # docker-compose via cmd.exe
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && docker-compose up -d"', "docker-compose up via cmd.exe"),
-        # npm run build/dev/test:coverage via cmd.exe (kein Wrapper nötig)
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run dev"', "npm run dev"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run build"', "npm run build"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run test:coverage"', "npm run test:coverage (kein Wrapper)"),
         # Frontend-Wrapper-Scripts
         ("python3 .claude/scripts/vitest-run.py", "vitest-run.py"),
         ("python3 .claude/scripts/vitest-run.py --filter IngredientsPage", "vitest-run.py --filter"),
@@ -313,19 +289,18 @@ def test_allow_patterns() -> int:
         # cd-Navigation (harmlos – gefährliche Kombis bleiben via WRONG_APPROACH/DESTRUCTIVE gedeckt)
         ("cd Client", "cd solo"),
         ("cd .claude/hooks && ls -la", "cd && ls"),
-        ("cd /mnt/c/Users/kieritz/source/repos/mahl && git status", "cd && git status"),
+        ("cd Client && git status", "cd && git status"),
         ("cd docs/kaizen/archive && wc -l *.md", "cd && wc"),
         # sed read-only (kein -i) → erlaubt
         ("sed -n '1,40p' docs/process/e2e-testing.md", "sed -n Zeilenbereich"),
-        ("sed -n '154,162p' .claude/hooks/test-bash-permission.py", "sed -n zweiter Bereich"),
         ("cat foo | sed 's/x/y/'", "sed im Pipe (read-only, kein -i)"),
         # find | xargs <safe-readonly> → erlaubt
         ("find . -name '*.feature' | xargs grep -l Zutat", "find | xargs grep"),
         ("find . -name '*.md' | xargs wc -l", "find | xargs wc"),
         ("find . -type f | xargs -I {} grep foo {}", "find | xargs -I grep"),
         # git -C <pfad> read-only → erlaubt
-        ("git -C /mnt/c/Users/kieritz/source/repos/mahl diff --stat HEAD", "git -C diff"),
         ("git -C Client log --oneline -3", "git -C log"),
+        ("git -C Client diff --stat HEAD", "git -C diff"),
     ]
 
     for command, desc in allow_cases:
@@ -349,15 +324,13 @@ def test_deny() -> int:
         ("python3 -c 'print(1)'", "python3 -c"),
         ("python3 -c 'import os; os.system(\"rm -rf /\")'", "python3 -c mit rm -rf (Obfuskation → deny)"),
         # dotnet ef database drop → deny
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet ef database drop"', "dotnet ef database drop"),
+        ("dotnet ef database drop", "dotnet ef database drop"),
         # dotnet: andere Subcommands nicht erlaubt
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet publish"', "dotnet publish"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet format"', "dotnet format"),
-        # Falsche Variable → kein Auto-Allow
-        (
-            'result=$(cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build")\necho "$result"',
-            "Variable-Capture falsche Variable (result statt output)",
-        ),
+        ("dotnet publish", "dotnet publish"),
+        ("dotnet format", "dotnet format"),
+        # docker-compose (v1) nicht verfügbar in dieser WSL-Distro → deny mit Smart-Hint auf docker compose
+        ("docker-compose up -d", "docker-compose v1 → deny (nutze docker compose)"),
+        ("docker-compose down", "docker-compose down v1 → deny"),
         # cp -r: rekursives Kopieren → deny
         ("cp -r docs/ backup/", "cp -r (rekursiv)"),
         ("cp -R src/ dest/", "cp -R (rekursiv, Großbuchstabe)"),
@@ -375,8 +348,8 @@ def test_deny() -> int:
         # Unbekannte Befehle
         ("curl https://example.com", "curl"),
         ("wget https://example.com", "wget"),
-        ("npm install", "npm install (nicht über cmd.exe)"),
-        ("npm outdated", "npm outdated (WSL direkt, ohne cmd.exe)"),
+        ("npm install", "npm install (Dependency-Prozess)"),
+        ("npm install left-pad", "npm install <pkg>"),
         ("apt-get install foo", "apt-get"),
         ("whoami", "whoami"),
         # Compound mit unbekanntem Segment
@@ -400,14 +373,16 @@ def test_deny() -> int:
         ("git clean -xfd", "git clean -xfd"),
         ("git checkout .", "git checkout ."),
         ("git restore .", "git restore ."),
-        # taskkill ist destruktiv (in DESTRUCTIVE_PATTERNS)
-        ('cmd.exe /c "taskkill /f /im dotnet.exe"', "taskkill ohne Marker"),
+        # Prozess-Kill nach Name ist destruktiv (in DESTRUCTIVE_PATTERNS)
+        ("pkill -f dotnet", "pkill ohne Marker"),
+        ("killall node", "killall ohne Marker"),
         # cd erlaubt – aber gefährliche Folge-Segmente bleiben deny
         ("cd Client && rm -rf dist", "cd && rm -rf → deny (DESTRUCTIVE-Segment)"),
         ("cd Client && npx vitest run", "cd && npx → deny (WRONG_APPROACH)"),
         ("cd Server && dotnet publish", "cd && dotnet publish → deny (unbekanntes Segment)"),
-        # sed mit -i (nicht \r-Spezialfall) bleibt deny – Edit-Tool verwenden
+        # sed mit -i bleibt deny – Edit-Tool verwenden (auch s/\r// – kein NTFS-Sonderfall mehr auf ext4)
         ("sed -i 's/foo/bar/' file.txt", "sed -i Edit → deny"),
+        ("sed -i 's/\\r//' some-file.sh", "sed -i s/\\r// → deny (ext4: kein CRLF)"),
         ("cat x | sed -i 's/a/b/' y.txt", "sed -i im Pipe → deny"),
         # xargs mit nicht-read-only Child bleibt deny
         ("find . -name '*.tmp' | xargs rm", "find | xargs rm → deny"),
@@ -428,9 +403,10 @@ def test_one_time_marker() -> int:
 
     ask_cases = [
         # Unbekannte / seltene Befehle
-        ('cmd.exe /c "taskkill /f /im dotnet.exe" # --allow-once', "taskkill mit Marker"),
+        ('pkill -f dotnet # --allow-once', "pkill mit Marker"),
         ('some-unknown-command --args # --allow-once', "unbekannter Befehl mit Marker"),
         ('npm install # --allow-once', "npm install mit Marker"),
+        ('curl https://example.com/dotnet-install.sh # --allow-once', "curl mit Marker"),
         # Destruktive Befehle: Marker macht sie freigabefähig
         ('rm -rf Client/dist/ # --allow-once', "rm -rf mit Marker → ask"),
         ('rm -r some-directory # --allow-once', "rm -r mit Marker → ask"),
@@ -440,7 +416,7 @@ def test_one_time_marker() -> int:
         ('find . -delete # --allow-once', "find -delete mit Marker → ask"),
         ("find . -exec sh -c 'rm -rf {}' \\; # --allow-once", "find -exec sh mit Marker → ask"),
         # WRONG_APPROACH: Marker übersteuert jetzt auch diese
-        ('cmd.exe /c "cd /d C:\\mahl && dotnet test" # --allow-once', "dotnet test + Marker → ask"),
+        ('dotnet test # --allow-once', "dotnet test + Marker → ask"),
         ('git add -f .env # --allow-once', "git add -f + Marker → ask"),
         ('python3 /tmp/script.py # --allow-once', "python3 absoluter Pfad + Marker → ask"),
     ]
@@ -456,23 +432,18 @@ def test_deny_overrides_allow() -> int:
     failures = 0
 
     cases = [
-        # cmd.exe+dotnet MIT Pipe → deny (nicht allow)
-        ('cmd.exe /c "cd /d C:\\mahl && dotnet test" | tail -60', "deny",
-         "cmd.exe MIT Pipe → deny"),
+        # dotnet test MIT Pipe → deny (WRONG_APPROACH schlägt allow)
+        ("dotnet test | tail -60", "deny", "dotnet test | tail → deny"),
         # git add -f schlägt git-add-Allow
         ("git add -f .env", "deny", "git add -f schlägt git-add-allow"),
         # Stryker immer deny → Script verwenden
-        ('cmd.exe /c "cd /d C:\\mahl && dotnet stryker"', "deny", "Stryker direkt → deny"),
-        # dotnet run via cd /d → WRONG_APPROACH (Prozess nicht identifizierbar)
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet run --project Server"', "deny",
-         "dotnet run via cd /d → deny (kein Vollpfad)"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && set ASPNETCORE_URLS=http://localhost:5059 && dotnet run --project Server"', "deny",
-         "dotnet run via cd /d mit Env-Var → deny"),
+        ("dotnet stryker", "deny", "Stryker direkt → deny"),
         # npm run lint / lint:duplicates → immer Wrapper-Script (WRONG_APPROACH)
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint"', "deny",
-         "npm run lint → deny (eslint-run.py verwenden)"),
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl\\Client && npm run lint:duplicates"', "deny",
-         "npm run lint:duplicates → deny (jscpd-run.py verwenden)"),
+        ("npm run lint", "deny", "npm run lint → deny (eslint-run.py verwenden)"),
+        ("npm run lint:duplicates", "deny", "npm run lint:duplicates → deny (jscpd-run.py verwenden)"),
+        # npm run test → Wrapper; npm run build → allow
+        ("npm run test", "deny", "npm run test → deny (vitest-run.py)"),
+        ("npm run build", "allow", "npm run build → allow (kein Wrapper nötig)"),
         # find ohne destruktive Flags → allow; destruktive find-Varianten → deny
         ("find . -name '*.cs'", "allow", "find ohne destruktive Flags → allow"),
         ("find . -delete", "deny", "find -delete → deny (freigabefähig)"),
@@ -480,9 +451,11 @@ def test_deny_overrides_allow() -> int:
         # rm einzelne Datei → allow; rm -rf → deny (nicht allow)
         ("rm file.ts", "allow", "rm einzelne Datei → allow"),
         ("rm -rf /tmp", "deny", "rm -rf → deny (freigabefähig)"),
+        # kill per PID → allow; pkill/killall by-name → deny
+        ("kill 1234", "allow", "kill PID → allow"),
+        ("pkill -f dotnet", "deny", "pkill → deny (freigabefähig)"),
         # git add ohne -f → allow (negativfilter explizit im Pattern)
         ("git add src/Foo.cs", "allow", "git add ohne -f → allow"),
-        ("git add -f .env", "deny", "git add -f → deny (WRONG_APPROACH)"),
     ]
 
     for command, expected, desc in cases:
@@ -525,7 +498,7 @@ def test_path_normalization() -> int:
     print(f"\n{Colors.BOLD}=== Repo-Pfad-Normalisierung (OBS-1) ==={Colors.RESET}")
     failures = 0
 
-    R = REPO_ROOT  # /mnt/c/Users/kieritz/source/repos/mahl
+    R = REPO_ROOT  # absoluter Repo-Root wie vom Hook aufgelöst
 
     # (command, expected_normalized, expected_changed, description)
     norm_cases = [
@@ -546,14 +519,6 @@ def test_path_normalization() -> int:
         # Mehrere Vorkommen (breit)
         (f"diff {R}/a.txt {R}/b.txt",
          "diff a.txt b.txt", True, "zwei Vorkommen"),
-        # cmd.exe-Inneres unangetastet (Windows-Pfade C:\\…)
-        ('cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build"',
-         'cmd.exe /c "cd /d C:\\Users\\kieritz\\source\\repos\\mahl && dotnet build"', False,
-         "cmd.exe-Inneres unverändert (kein /mnt/c)"),
-        # /mnt/c AUSSERHALB von cmd.exe wird normalisiert, cmd.exe-Region bleibt
-        (f'output=$(cmd.exe /c "cd /d C:\\mahl && dotnet build") && cat {R}/.claude/tmp/out.txt',
-         'output=$(cmd.exe /c "cd /d C:\\mahl && dotnet build") && cat .claude/tmp/out.txt', True,
-         "Normalisierung nur außerhalb cmd.exe-Region"),
         # Kein Repo-Pfad → unverändert
         ("python3 /tmp/script.py", "python3 /tmp/script.py", False, "fremder absoluter Pfad unverändert"),
         ("ls docs", "ls docs", False, "bereits relativ"),

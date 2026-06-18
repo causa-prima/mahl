@@ -59,7 +59,7 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 
 ## OBS-S085-4 – Kein Language-Server für die Agenten-Programmierung im Einsatz
 - Quelle: User
-- Status: IN BEOBACHTUNG
+- Status: IN BEOBACHTUNG – Blocker entfernt (S089: Node WSL-nativ + `typescript-language-server` installiert); TS-LSP-Pilot (a) damit **durchführbar**, aber **noch offen** (Pilot-Session lief nicht). C# weiter zurückgestellt (Client-Showstopper #1359).
 - Impact: MITTEL–HOCH (von GERING revidiert)    Häufigkeit: häufig
 - Kategorie: TOOLING    Kontext: Sonstiges
 - Beobachtung: Wir nutzen aktuell **keinen** Language-Server, der Claude Code Code-Intelligence bereitstellt. Recherche (S086): Claude Code v2.1.172 unterstützt LSP (`ENABLE_LSP_TOOL` + Marketplace-Plugin pro Sprache). Nutzen potenziell **hoch** (Auto-Typfehler nach jedem Edit, find-refs, Symbole, Call-Hierarchie → kürzere Edit-Fix-Schleifen) → Impact GERING→MITTEL/HOCH revidiert.

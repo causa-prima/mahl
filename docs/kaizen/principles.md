@@ -17,6 +17,13 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Vor jeder Übernahme eines Agent-Vorschlags prüfen: Ist die Begründung stichhaltig, oder klingt
   sie nur plausibel? Umsetzbar ≠ inhaltlich korrekt.
 
+- **Findings ohne Zwischen-Nachfrage abarbeiten.**
+  Beim Abarbeiten einer Finding-Liste (z.B. review-code/review-docs, implementing-scenario Schritt 5)
+  nach jedem umgesetzten Finding kurz bestätigen und **sofort** zum nächsten übergehen – kein
+  Pause-und-Fragen (User hat das explizit so gewünscht). **Ausnahme – invalide Findings** (nach
+  Verifikation nicht haltbar): kurz erklären, warum der Reviewer darauf gekommen sein könnte und was
+  ich evtl. übersehen habe, **dann** beim User nachfragen, bevor weitergearbeitet wird.
+
 ## Prozess-Disziplin
 
 - **Guidelines aktiv auf den konkreten Fall anwenden.**

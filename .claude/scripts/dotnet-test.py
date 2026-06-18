@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-dotnet test via cmd.exe (WSL-Wrapper).
+dotnet test (nativ).
 
 Verwendung:
   python3 .claude/scripts/dotnet-test.py
@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
-from _util import run_dotnet, REPO_ROOT_WIN, check_dotnet_dll_lock
+from _util import REPO_ROOT, run_dotnet
 
 _RELEVANT = re.compile(
     r"(^\s*Failed|^\s*Passed|^\s*Skipped|^\s*Total"
@@ -27,18 +27,10 @@ _RELEVANT = re.compile(
     re.MULTILINE,
 )
 
-_LINUX_ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR", "/mnt/c/Users/kieritz/source/repos/mahl"))
-_RESULTS_DIR = _LINUX_ROOT / "TestResults" / "coverage"
-_RESULTS_DIR_WIN = REPO_ROOT_WIN + r"\TestResults\coverage"
-_RUNSETTINGS = "coverlet.runsettings"
+_RESULTS_DIR = REPO_ROOT / "TestResults" / "coverage"
+# Deterministischer Output-Pfad (kein rglob/latest → kein Stale-Masking).
+_COVERAGE_FILE = _RESULTS_DIR / "coverage.cobertura.xml"
 _THRESHOLD = 1.0  # 100 %
-
-
-def _find_latest_cobertura() -> Path | None:
-    if not _RESULTS_DIR.exists():
-        return None
-    files = list(_RESULTS_DIR.rglob("*.cobertura.xml"))
-    return max(files, key=lambda p: p.stat().st_mtime) if files else None
 
 
 # LineDetail = (line_number | None, description)
@@ -153,21 +145,16 @@ def main() -> None:
     parser.add_argument("--filter", dest="filter_name", help="Test-Filter (FullyQualifiedName~...)")
     parser.add_argument("--verbose", action="store_true", help="Vollständigen Output anzeigen")
     args = parser.parse_args()
-    # parse_args vor dem DLL-Lock-Check, damit --help/-h ohne Seiteneffekt (PowerShell-Abfrage) greift
-    check_dotnet_dll_lock()
 
-    collect_coverage = not args.filter_name  # bei Filter: schneller Feedback-Zyklus, kein Coverage
+    # Coverage-Gate geparkt (docs/tech-debt.md TD-S089-1): unter dem MTP-Runner ist
+    # coverlet.collector wirkungslos und ein MTP-natives Setup steht noch aus. Bis dahin
+    # KEINE Coverage erheben (kein Fake-100% über Stale-Reports). Re-Enable: Collection-Args
+    # engine-abhängig setzen (Output → _COVERAGE_FILE) + collect_coverage reaktivieren.
+    collect_coverage = False
 
     dotnet_args = ["test"]
     if args.filter_name:
         dotnet_args.extend(["--filter", args.filter_name])
-    if collect_coverage:
-        # Kein --collect: der DataCollector wird via coverlet.runsettings aktiviert.
-        # "XPlat Code Coverage" mit Leerzeichen scheitert an cmd.exe-Quoting (MSB1008).
-        dotnet_args.extend([
-            "--settings", _RUNSETTINGS,
-            "--results-directory", _RESULTS_DIR_WIN,
-        ])
 
     output, exit_code = run_dotnet(dotnet_args)
 
@@ -182,15 +169,25 @@ def main() -> None:
             # Kein Match → vollständigen Output zeigen (z.B. unerwarteter Fehler)
             print(output)
 
-    if collect_coverage and exit_code == 0:
-        cobertura = _find_latest_cobertura()
-        if cobertura:
-            totals, gaps = _parse_coverage(cobertura)
-            all_ok = _report_coverage(totals, gaps)
-            if not all_ok:
-                sys.exit(1)
-        else:
-            print("\n[coverage] Kein cobertura.xml gefunden – Coverage-Bericht nicht verfügbar.", file=sys.stderr)
+    if collect_coverage:
+        # Fail-closed: keine cobertura = kein bestandenes Gate (nie wieder still durchwinken).
+        if exit_code != 0:
+            sys.exit(exit_code)  # Tests rot → Coverage irrelevant
+        if not _COVERAGE_FILE.exists():
+            print(
+                f"\n[coverage] FEHLER: keine cobertura erzeugt ({_COVERAGE_FILE}) → Gate fail-closed.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        totals, gaps = _parse_coverage(_COVERAGE_FILE)
+        all_ok = _report_coverage(totals, gaps)
+        if not all_ok:
+            sys.exit(1)
+    else:
+        print(
+            "\n[coverage] ⚠️  Gate deaktiviert – MTP-Coverage-Setup ausstehend (docs/tech-debt.md TD-S089-1).",
+            file=sys.stderr,
+        )
 
     sys.exit(exit_code)
 

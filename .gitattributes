@@ -1,0 +1,4 @@
+# WSL-natives Repo (ext4): Zeilenenden konsequent LF.
+# text=auto → Git erkennt Text vs. Binär automatisch; eol=lf erzwingt LF
+# im Working-Tree UND im Repo (kein CRLF mehr, kein autocrlf nötig).
+* text=auto eol=lf

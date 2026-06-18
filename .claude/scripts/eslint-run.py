@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ESLint run via cmd.exe (WSL-Wrapper).
+ESLint run (nativ über npm).
 
 Verwendung:
   python3 .claude/scripts/eslint-run.py           # ESLint über src/

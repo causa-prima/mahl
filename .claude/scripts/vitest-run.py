@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-vitest run via cmd.exe (WSL-Wrapper).
+vitest run (nativ über npm).
 
 Verwendung:
   python3 .claude/scripts/vitest-run.py                   # alle Tests (einmalig, kein Watch)

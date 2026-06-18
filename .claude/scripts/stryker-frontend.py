@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stryker JS/TS via cmd.exe (WSL-Wrapper) + automatische Auswertung via stryker-summary.py.
+Stryker JS/TS (nativ via npx) + automatische Auswertung via stryker-summary.py.
 
 Verwendung:
   python3 .claude/scripts/stryker-frontend.py                              # alle Dateien
@@ -19,14 +19,11 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
-from _util import REPO_ROOT_WIN, _win_path
 from _run_lock import RunLock
 
 _SCRIPTS_DIR  = Path(__file__).parent
 _REPO_ROOT    = _SCRIPTS_DIR.parent.parent
 _TMP_FILE     = _SCRIPTS_DIR.parent / "tmp" / "stryker_frontend_out.txt"
-_TMP_FILE_WIN = _win_path(str(_TMP_FILE))
-_CLIENT_WIN   = REPO_ROOT_WIN + r"\Client"
 _CLIENT_DIR   = _REPO_ROOT / "Client"
 _STRYKER_SRC  = _CLIENT_DIR / "reports" / "mutation"
 _OUTPUT_BASE  = _REPO_ROOT / "StrykerOutput" / "Frontend"
@@ -58,18 +55,17 @@ def main() -> None:
                         help="Alle nicht-getöteten Mutanten anzeigen (via stryker-summary.py)")
     args = parser.parse_args()
 
-    stryker_cmd = "npx stryker run"
+    stryker_args = ["npx", "stryker", "run"]
     if args.mutate:
-        stryker_cmd += f" --mutate {args.mutate}"
+        stryker_args += ["--mutate", args.mutate]
 
     _TMP_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Starte: {stryker_cmd}")
+    print(f"Starte: {' '.join(stryker_args)}")
     print(f"Output → {_TMP_FILE}")
 
-    cmd_inner = f"cd /d {_CLIENT_WIN} && {stryker_cmd} > {_TMP_FILE_WIN} 2>&1"
-    with RunLock(_TMP_FILE):
-        result = subprocess.run(["cmd.exe", "/c", cmd_inner])
+    with RunLock(_TMP_FILE), open(_TMP_FILE, "w", encoding="utf-8") as out:
+        result = subprocess.run(stryker_args, cwd=str(_CLIENT_DIR), stdout=out, stderr=subprocess.STDOUT)
 
     if _TMP_FILE.exists():
         lines = _TMP_FILE.read_text(encoding="utf-8", errors="replace").splitlines()

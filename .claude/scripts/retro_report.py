@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kaizen_constants import SCHWERE_WEIGHTS
+from _util import REPO_ROOT
 
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -63,7 +64,6 @@ def clr(text: str, color: str) -> str:
 # ---------------------------------------------------------------------------
 # Konstanten
 # ---------------------------------------------------------------------------
-REPO_ROOT = os.environ.get("CLAUDE_PROJECT_DIR", "/mnt/c/Users/kieritz/source/repos/mahl")
 DEFAULT_CURRENT = os.path.join(REPO_ROOT, "docs", "kaizen", "lessons_learned.md")
 DEFAULT_ARCHIVE = os.path.join(REPO_ROOT, "docs", "kaizen", "archive")
 DEFAULT_CM      = os.path.join(REPO_ROOT, "docs", "kaizen", "countermeasures.md")

@@ -82,7 +82,7 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 | `xunit.v3` | Server.Tests |
 | `xunit.runner.visualstudio` | Server.Tests |
 | `AwesomeAssertions` | Server.Tests |
-| `coverlet.collector` | Server.Tests |
+| `coverlet.MTP` | Server.Tests |
 
 ## Enforcement
 

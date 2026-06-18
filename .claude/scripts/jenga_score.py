@@ -19,8 +19,8 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kaizen_constants import SCHWERE_WEIGHTS
+from _util import REPO_ROOT
 
-REPO_ROOT = os.environ.get("CLAUDE_PROJECT_DIR", "/mnt/c/Users/kieritz/source/repos/mahl")
 DEFAULT_FILE = os.path.join(REPO_ROOT, "docs", "kaizen", "lessons_learned.md")
 SESSION_DEDUCTION = 5
 START_SCORE = 100

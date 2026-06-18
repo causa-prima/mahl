@@ -3,12 +3,11 @@
 <!--
 wann-lesen: Bei jedem Ausführen von Befehlen (Build, Test, Run, Migration, Stryker) und beim Entwickeln von Hooks
 kritische-regeln:
+  - Toolchain ist WSL-nativ (.NET + Node) – dotnet/npm/npx direkt aufrufen
   - Test- und Stryker-Aufrufe: immer Python-Wrapper aus .claude/scripts/ verwenden – Hook erzwingt das und zeigt den richtigen Befehl
-  - Alle anderen dotnet-Befehle: cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ..." (WSL hat kein .NET)
-  - Pipes nach cmd.exe funktionieren nicht in WSL – Variable capturen oder Script verwenden
+  - .NET-Tools (dotnet-ef, dotnet-stryker) sind lokal gepinnt (.config/dotnet-tools.json) – nach Clone: dotnet tool restore
   - Timeouts immer setzen – Richtwerte in der Tabelle unten
   - Stryker --mutate: Pfad ist projektrelativ (ohne Server/-Präfix für Backend, ohne Client/-Präfix für Frontend)
-  - Shell-Scripts nach Write sofort: sed -i 's/\r//' datei.sh (NTFS-Zeilenenden)
 -->
 
 ## Inhalt
@@ -16,16 +15,15 @@ kritische-regeln:
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
 | Befehlsauswahl & Timeouts | Auto-deny/allow-once-Mechanismus, Timeout-Richtwerte für alle relevanten Kommandos | Vor jedem lang laufenden Befehl |
-| Bash-Befehle in WSL/cmd.exe | Pipe-Regeln, Varianten (Script / Variable / Datei / direkt) | Bei cmd.exe + Unix-Pipe-Problemen |
 | Tool-Call-Failure-Analyse | Root Cause → korrektes Muster ableiten → dokumentieren → wiederholen | Bei fehlgeschlagenen Befehlen |
-| KRITISCH: dotnet in WSL | `cmd.exe /c "..."` Wrapper-Pflicht, Beispiele | Immer wenn dotnet aufgerufen wird |
+| WSL-native Toolchain | .NET + Node nativ; lokale Tool-Manifest; Test/Stryker via Wrapper | Beim Aufrufen von dotnet/npm |
 | Datenbank starten | Docker Compose, Connection String | Beim Starten der lokalen Umgebung |
 | Backend | Build, Run, Seed-Daten | Beim Starten / Bauen des Backends |
 | Frontend | npm install, dev-Server, Produktions-Build, Vite-Proxy | Beim Starten / Bauen des Frontends |
 | Tests | Alle Tests / einzelnes Projekt / einzelner Test / Frontend-Tests | Beim Ausführen von Tests |
 | Datenbank-Workflow | Drop+Recreate (Entwicklung) vs. Migrations (ab V1), Seed-Daten | Bei Schema-Änderungen |
 | Mutation Testing | Stryker gezielt (eine Datei) und vollständig, --mutate-Pfad-Konvention | Nach jeder Phase oder gezielt nach Änderungen |
-| Hook-Entwicklung | Exit-Code-Semantik, $CLAUDE_PROJECT_DIR in settings.json, NTFS-Zeilenenden, NTFS-Löschen | Beim Schreiben oder Debuggen von Hooks |
+| Hook-Entwicklung | Exit-Code-Semantik, $CLAUDE_PROJECT_DIR in settings.json | Beim Schreiben oder Debuggen von Hooks |
 | Hook-Tests | pytest-Aufruf, Subshell-Pflicht, Edit-vs-Write-Delta-Verhalten | Nach Änderungen an Hook-Dateien |
 
 > **Wann lesen:** Bei Build/Run-Problemen, Datenbankänderungen, Test-Ausführung, Mutation Testing.
@@ -60,7 +58,7 @@ kritische-regeln:
 | `playwright-test.py` | 10–30 s | 60 000 ms |
 | `stryker-frontend.py` (eine Datei) | 1–3 min | 180 000 ms |
 | `stryker-frontend.py` (vollständig) | 2–5 min | 360 000 ms |
-| `docker-compose up -d` | 5–30 s | 60 000 ms |
+| `docker compose up -d` | 5–30 s | 60 000 ms |
 
 Wenn ein Prozess den Timeout überschreitet:
 - Warum könnte das sein? Falsches Kommando? Hängender Prozess?
@@ -70,53 +68,6 @@ Wenn ein Prozess den Timeout überschreitet:
 **Unerwartet langsame Befehle** → Zeile in `docs/process/slow-commands.md` aktualisieren (keine neuen Zeilen anlegen – bestehende Einträge updaten).
 
 ---
-
-## Bash-Befehle in WSL/cmd.exe: Pipe-Regeln
-
-Pipes nach `cmd.exe` funktionieren nicht in WSL (`cmd.exe ... | grep ...` schlägt fehl).
-Außerdem: Unix-Befehle (`tail`, `grep`, `head`) **innerhalb** der `cmd.exe /c "..."` Quotes sind cmd.exe unbekannt.
-
-### Varianten – wann welche?
-
-**A) Standard für dotnet test / dotnet stryker: Projekt-Scripts verwenden**
-
-```bash
-python3 .claude/scripts/dotnet-test.py [--filter TestName] [--verbose]
-python3 .claude/scripts/dotnet-stryker.py [--mutate Domain/Foo.cs] [--verbose]
-```
-
-**B) Für andere cmd.exe-Aufrufe: Output in Variable capturen, dann filtern**
-Wenn Output in den Context passt.
-
-```bash
-output=$(cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet build")
-echo "$output" | grep -E "(error|warning CS|Build succeeded|Build FAILED)"
-```
-
-**C) Sehr große Outputs: Redirect in Datei**
-Nur wenn der Output zu groß für den Context wäre. Datei danach löschen.
-
-```bash
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && <befehl> > .claude\tmp\out.txt 2>&1"
-cat /mnt/c/Users/kieritz/source/repos/mahl/.claude/tmp/out.txt
-```
-
-**D) Kein Filter nötig: cmd.exe direkt**
-Wenn der vollständige Output erwünscht ist.
-
-```bash
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet build"
-```
-
-### Was NICHT funktioniert
-
-```bash
-# FALSCH – Pipe nach cmd.exe funktioniert nicht in WSL:
-cmd.exe /c "cd /d C:\...\mahl && dotnet build" 2>&1 | tail -20
-
-# FALSCH – Unix-Befehle innerhalb der cmd.exe-Quotes:
-cmd.exe /c "cd /d C:\...\mahl && dotnet build 2>&1 | tail -20"
-```
 
 ## Tool-Call-Failure-Analyse (Pflicht)
 
@@ -130,11 +81,20 @@ Parameter einfach weglassen oder "blind" variieren ist kein Debugging.
 
 ---
 
-## KRITISCH: dotnet in WSL
+## WSL-native Toolchain
 
-.NET ist **nur auf dem Windows-Host** installiert – nicht in WSL.
+.NET (SDK via `dotnet-install.sh` nach `~/.dotnet`) und Node (via `fnm`, Version in `Client/.nvmrc`)
+laufen **nativ in WSL** auf einem ext4-Repo. `dotnet`/`npm`/`npx` werden direkt aufgerufen.
 
-Test- und Stryker-Aufrufe immer via Projekt-Scripts (kapseln cmd.exe intern):
+> **Warum WSL-nativ:** .NET und Node sind auf Linux erstklassig, die DB läuft im Container
+> (kein Windows-Zwang), und das ext4-Repo vermeidet die `/mnt/c`-Mount-Latenz – alle Tool-Aufrufe
+> laufen damit direkt.
+
+**.NET-Tools sind lokal gepinnt** (`.config/dotnet-tools.json`: `dotnet-ef`, `dotnet-stryker`):
+nach einem frischen Clone einmalig `dotnet tool restore`. `dotnet ef`/`dotnet stryker` lösen die
+lokalen Tools dann automatisch auf.
+
+Test- und Stryker-Aufrufe immer via Projekt-Scripts:
 ```bash
 # Backend
 python3 .claude/scripts/dotnet-test.py [--filter ...] [--verbose]
@@ -151,23 +111,15 @@ python3 .claude/scripts/stryker-frontend.py [--mutate src/...] [--verbose]
 > Verwendung, Beispielen und Parametern. Default-Output ist bereits gefiltert – **nicht**
 > zusätzlich durch `tail`/`grep`/`head` leiten.
 
-Alle anderen dotnet-Befehle via cmd.exe-Wrapper:
+Alle anderen dotnet-Befehle direkt:
 ```bash
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet <command>"
-
-# Beispiele:
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet build"
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ef migrations add InitialCreate"
+dotnet build
+dotnet ef migrations add InitialCreate
+dotnet run --project Server          # Dev-Server (Port via Server/Properties/launchSettings.json: :5059)
 ```
 
-`dotnet run` **immer mit vollständigem Projektpfad** (kein `cd /d`):
-```bash
-# Pflicht: vollständiger Pfad damit laufende Prozesse im DLL-Lock-Check identifizierbar sind
-cmd.exe /c "dotnet run --project C:\Users\kieritz\source\repos\mahl\Server"
-
-# Mit Umgebungsvariable:
-cmd.exe /c "set ASPNETCORE_URLS=http://localhost:5059 && dotnet run --project C:\Users\kieritz\source\repos\mahl\Server"
-```
+> **Parallele Builds:** Kein `dotnet watch` gleichzeitig mit `build`/`test`/`stryker` auf
+> demselben Projekt laufen lassen (Race auf `bin`/`obj`). Sonst sind parallele dotnet-Prozesse unkritisch.
 
 ---
 
@@ -185,7 +137,7 @@ Beim Hinzufügen einer neuen Projektreferenz: `Infrastructure` → `Server` und 
 ## Datenbank starten (Docker)
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 **Connection String** (`Server/appsettings.json`):
@@ -199,40 +151,43 @@ Host=localhost;Port=5432;Database=mahl;Username=mahl_user;Password=mahl_dev_pass
 
 ```bash
 # Build
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet build"
+dotnet build
 
-# Run (Backend API)
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet run --project Server"
-# → läuft auf https://localhost:7xxx / http://localhost:5059 (OpenAPI JSON unter /openapi/v1.json)
+# Run (Backend API – Dev-Server)
+dotnet run --project Server
+# → http://localhost:5059 (Port via Server/Properties/launchSettings.json; HTTP-only; OpenAPI JSON unter /openapi/v1.json)
 
 # Seed-Daten laden (10 Rezepte + 45 Zutaten)
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet run --project Server -- --seed-data"
+dotnet run --project Server -- --seed-data
 ```
 
 ---
 
 ## Frontend
 
-> **WSL-Hinweis:** `npm` in WSL zeigt auf die Windows-nvm-Installation mit defekten Pfaden. Alle npm-Befehle via `cmd.exe /c` ausführen (analog zu dotnet):
+Node wird von `fnm` verwaltet (Version in `Client/.nvmrc`); npm/npx laufen nativ. npm-Befehle im `Client/`-Verzeichnis ausführen:
 
 ```bash
-# npm install (einmalig)
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm install"
-
-# Playwright-Browser installieren (einmalig nach npm install)
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npx playwright install chromium"
+# Dependencies installieren (reproduzierbar aus package-lock.json)
+cd Client && npm ci
 
 # Dev-Server
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run dev"
+cd Client && npm run dev
 # → http://localhost:5173
 
 # Produktions-Build (Output → Server/wwwroot/)
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run build"
+cd Client && npm run build
 
-# npm update / audit
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm update"
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm audit fix"
+# Update / Audit
+cd Client && npm update
+cd Client && npm audit fix
 ```
+
+> **Playwright-Browser** (einmalig nach `npm ci` bzw. nach einem Playwright-Bump):
+> `cd Client && npx playwright install chromium`; die System-Libs brauchen Root und werden
+> **vom User** ausgeführt: `sudo env "PATH=$PATH" npx playwright install-deps`
+> (plain `sudo npx …` schlägt fehl – `npx` liegt im fnm-User-PATH, nicht in sudos `secure_path`).
+> (Neue Dependency hinzufügen statt nur installieren: `docs/reference/dependencies.md`-Prozess, dann `npm install <pkg>`.)
 
 **Vite-Proxy:** Entwicklung proxied `/api/*` auf `http://localhost:5059` (Backend).
 
@@ -244,7 +199,7 @@ Updates – auch reine In-Range-Bumps via `npm update` – können Regressionen 
 python3 .claude/scripts/vitest-run.py      # Laufzeit
 python3 .claude/scripts/eslint-run.py      # Typ-Auflösung + Lint
 python3 .claude/scripts/jscpd-run.py       # Config-Kompatibilität (v.a. nach Major-Bumps)
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run build"   # tsc + Vite-Build
+cd Client && npm run build                 # tsc + Vite-Build
 ```
 
 Bei Major-Bumps zusätzlich auf **Config-Warnungen** achten (nicht nur Exit-Code) – Tools ändern still ihr Config-Schema (z.B. jscpd 5: Feld `languages` → `format`).
@@ -252,7 +207,7 @@ Bei Major-Bumps zusätzlich auf **Config-Warnungen** achten (nicht nur Exit-Code
 Wurde **Playwright** gebumpt, zusätzlich das passende Browser-Binary neu installieren – sonst bricht der E2E-Lauf mit „Executable doesn't exist" ab:
 
 ```bash
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npx playwright install chromium"
+cd Client && npx playwright install chromium
 python3 .claude/scripts/playwright-test.py   # E2E-Kette nach dem Bump verifizieren
 ```
 
@@ -289,14 +244,13 @@ python3 .claude/scripts/playwright-test.py --verbose
 **KEINE Migrations-Hölle** – bei Schema-Änderungen einfach neu aufbauen:
 
 ```bash
-# Im Server-Verzeichnis (via cmd.exe wrapper):
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Server && dotnet ef database drop --force"
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Server && dotnet ef migrations remove"
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Server && dotnet ef migrations add InitialCreate"
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Server && dotnet ef database update"
+dotnet ef database drop --force --project Server   # drop ist deny → # --allow-once anhängen
+dotnet ef migrations remove --project Server
+dotnet ef migrations add InitialCreate --project Server
+dotnet ef database update --project Server
 
 # Danach Seed-Daten laden:
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet run --project Server -- --seed-data"
+dotnet run --project Server -- --seed-data
 ```
 
 **Seed-Daten:** `Server/Data/SeedDataExtensions.cs` – implementiert als C# Extension Method `app.SeedDatabase()`.
@@ -305,10 +259,10 @@ cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet run --project Ser
 
 ```bash
 # Neue Migration hinzufügen
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ef migrations add MigrationName --project Server"
+dotnet ef migrations add MigrationName --project Server
 
 # Migrations anwenden
-cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ef database update --project Server"
+dotnet ef database update --project Server
 ```
 
 ---
@@ -417,50 +371,23 @@ Hook-Commands müssen **`$CLAUDE_PROJECT_DIR`** statt `$PWD` verwenden:
 cd .claude/hooks && python3 -m pytest tests/ -q
 
 # RICHTIG – Subshell, CWD bleibt erhalten:
-(cd .claude/hooks && python3 -m pytest tests/ -p no:cacheprovider -s -q)
+(cd .claude/hooks && python3 -m pytest tests/ -q)
 ```
 
 ### Hooks werden dynamisch geladen
 
 Änderungen an `settings.json` werden **sofort** wirksam – kein Neustart von Claude Code nötig. Claude Code liest die Hook-Konfiguration bei jeder Hook-Invocation neu.
 
-### Shell-Scripts auf NTFS (WSL)
-
-Das `Write`-Tool erzeugt auf NTFS `\r\n`-Zeilenenden. Nach jedem `Write` einer `.sh`-Datei:
-
-```bash
-sed -i 's/\r//' /pfad/zur/datei.sh
-```
-
-Alternativ: Script via `Bash`-Tool mit `cat > file << 'EOF' ... EOF` erstellen (schreibt Unix-Zeilenenden).
-
-### Dateien auf NTFS löschen (WSL)
-
-`rm` auf `/mnt/c/...`-Pfaden kann mit "Read-only file system" scheitern. Alternative:
-
-```bash
-cmd.exe /c "del /f C:\Users\kieritz\source\repos\mahl\pfad\zur\datei.txt"
-```
-
-Mehrere Dateien sequenziell:
-
-```bash
-cmd.exe /c "del /f C:\...\datei1.txt && del /f C:\...\datei2.txt && echo Done"
-```
-
----
-
 ## Tests: Code-Quality-Hooks
 
 Nach Änderungen an Hook-Dateien automatisierte Tests ausführen:
 
 ```bash
-python3 -m pytest .claude/hooks/tests/ -p no:cacheprovider -s -q
+python3 -m pytest .claude/hooks/tests/ -q
 ```
 
-> **`-p no:cacheprovider -s`** ist nötig wegen WSL/NTFS-Einschränkungen (pytest-Tempfiles).
-> pytest muss mit `.claude/hooks/tests/` als Pfad aufgerufen werden (nicht `.claude/hooks/`),
-> damit das `checks`-Package korrekt importiert wird.
+> pytest mit `.claude/hooks/tests/` als Pfad aufrufen (nicht `.claude/hooks/`), damit das
+> `checks`-Package korrekt importiert wird.
 
 > **Edit vs. Write:** `tdd_one_test` und `test_patterns` berechnen bei Edit ein **Delta**
 > (new − old). Bei Write wird das Delta gegen die aktuelle Datei auf Disk berechnet

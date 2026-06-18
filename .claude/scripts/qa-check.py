@@ -66,7 +66,7 @@ def _find_report(layer: str) -> Path | None:
     return reports[0] if reports else None
 
 
-# Toleranz für Uhr-/Filesystem-Drift zwischen WSL und dem Windows-Host (NTFS-mtime).
+# Kleine Toleranz für mtime-Granularität bei der Freshness-Prüfung.
 _FRESHNESS_SLACK_SECONDS = 120
 
 
@@ -294,21 +294,21 @@ def main() -> None:
         run_started_at = time.time()
         rc = _run_stryker(args.layer)
 
-        # Build-/DLL-Lock-/Compile-Fehler MÜSSEN als harter Lauf-Fehler durchschlagen –
+        # Build-/Compile-Fehler MÜSSEN als harter Lauf-Fehler durchschlagen –
         # KEIN stiller Fallback auf einen alten Report (sonst ginge eine ungültige Übergabe
         # mit veraltetem Hash durch). Unterscheidung Lauf-Fehler ↔ Score-Gate:
         #   - Score < 100 % (Below-Threshold): Stryker schreibt trotzdem einen FRISCHEN Report
         #     → rc != 0, aber frischer Report vorhanden → nur Score-Gate (Checks + Hash unten).
-        #   - Build/Lock/Compile-Fehler: KEIN frischer Report → harter Abbruch, kein Hash.
+        #   - Build/Compile-Fehler: KEIN frischer Report → harter Abbruch, kein Hash.
         if rc != 0:
             stryker_gate_failed = True
             fresh = _find_report(args.layer)
             if fresh is None or not _is_fresh(fresh, run_started_at):
                 print(
                     f"[qa-check] ❌ Stryker-LAUF fehlgeschlagen (Exit {rc}) und kein frischer Report "
-                    f"erzeugt – das deutet auf Build-/DLL-Lock-/Compile-Fehler hin, NICHT auf ein "
+                    f"erzeugt – das deutet auf Build-/Compile-Fehler hin, NICHT auf ein "
                     f"Score-Gate. Harter Lauf-Fehler: kein Übergabe-Hash. Ursache oben im Stryker-"
-                    f"Output beheben (z.B. laufende dotnet-Prozesse beenden) und neu starten.",
+                    f"Output beheben und neu starten.",
                     file=sys.stderr,
                 )
                 sys.exit(rc or 1)

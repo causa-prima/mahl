@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-jscpd (Duplikat-Analyse) via cmd.exe (WSL-Wrapper).
+jscpd (Duplikat-Analyse, nativ über npm).
 
 Verwendung:
   python3 .claude/scripts/jscpd-run.py           # jscpd über src/

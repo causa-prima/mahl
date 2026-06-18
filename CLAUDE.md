@@ -1,8 +1,8 @@
 # CLAUDE.md – Navigationszentrale
 
-## KRITISCH: dotnet in WSL
+## WSL-native Toolchain
 
-.NET ist **nur auf dem Windows-Host** installiert. Details: `docs/process/dev-workflow.md` (Sektion "KRITISCH: dotnet in WSL").
+.NET und Node laufen **nativ in WSL** (Repo auf ext4). Details: `docs/process/dev-workflow.md` (Sektion "WSL-native Toolchain").
 
 ---
 

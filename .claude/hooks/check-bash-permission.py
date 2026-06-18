@@ -3,10 +3,10 @@
 
 Reihenfolge in check_command:
 1. ONE_TIME_MARKER → ask (übersteuert alle anderen Prüfungen inkl. WRONG_APPROACH)
-2. Repo-Pfad-Normalisierung (normalize_repo_paths): absoluter WSL-Repo-Root-Präfix
-   → relativ, außerhalb von cmd.exe /c "…"-Regionen. Spart den Permission-Retry,
-   den absolute Pfade sonst auslösen (OBS-S085-1). Bei Änderung gibt der Hook den
-   normalisierten Befehl via updatedInput zurück (s. _build_allow_output).
+2. Repo-Pfad-Normalisierung (normalize_repo_paths): absoluter Repo-Root-Präfix
+   → relativ. Spart den Permission-Retry, den absolute Pfade sonst auslösen
+   (OBS-S085-1). Bei Änderung gibt der Hook den normalisierten Befehl via
+   updatedInput zurück (s. _build_allow_output).
 3. WRONG_APPROACH_PATTERNS → deny (kein impliziter Override – # --allow-once nötig)
 4. Compound-Segmente → jedes Segment via check_simple_command
 5. check_simple_command: ALLOW_PATTERNS → DESTRUCTIVE_PATTERNS → deny
@@ -65,25 +65,17 @@ _LOG_FILE = os.path.join(_REPO_ROOT, '.claude', 'tmp', 'denied-commands.log')
 # Deny-Log zu verrauschen. Beim Retro auswertbar (grep), kein Gate.
 _ALLOWED_LOG_FILE = os.path.join(_REPO_ROOT, '.claude', 'tmp', 'allowed-commands.log')
 
-# Extrahiert das innere Kommando aus cmd.exe /c "..."
-_CMDEXE_INNER_RE = re.compile(r'^cmd\.exe\s+/c\s+"(.*)"')
-
 
 # ---------------------------------------------------------------------------
 # Repo-Pfad-Normalisierung (OBS-S085-1)
-# Absolute WSL-Repo-Pfade verschwenden Token: der Agent läuft mit ihnen oft in
+# Absolute Repo-Pfade verschwenden Token: der Agent läuft mit ihnen oft in
 # Permission-Denies (z.B. python3 mit absolutem Pfad → WRONG_APPROACH), obwohl der
 # relative Pfad erlaubt wäre. Wir normalisieren den Repo-Root-Präfix daher auf einen
 # relativen Pfad (Arbeitsverzeichnis = Repo-Root) und geben den umgeschriebenen
 # Befehl via updatedInput zurück. Breit angewandt (alle Vorkommen), da die
-# Einheitlichkeit der Regel der Hauptnutzen ist – AUSSER innerhalb von
-# cmd.exe /c "…"-Regionen, wo Windows-Pfade (C:\…) gelten.
+# Einheitlichkeit der Regel der Hauptnutzen ist.
 # ---------------------------------------------------------------------------
 _NORMALIZE_ROOT = os.path.normpath(_REPO_ROOT)
-
-# cmd.exe /c "…"-Region (inneres Argument enthält keine weiteren "): wird beim
-# Normalisieren übersprungen.
-_CMDEXE_REGION_RE = re.compile(r'cmd\.exe\s+/c\s+"[^"]*"')
 
 # Bare Repo-Root (optional mit einem Trailing-Slash) als eigenständige
 # Verzeichnis-Referenz – gefolgt von Whitespace, Ende oder einem Shell-Operator.
@@ -108,18 +100,11 @@ def _strip_repo_root(text: str) -> str:
 
 
 def normalize_repo_paths(command: str) -> tuple[str, bool]:
-    """Normalisiert absolute Repo-Root-Pfade auf relative – außer in cmd.exe-Regionen.
+    """Normalisiert absolute Repo-Root-Pfade auf relative.
 
     Gibt (neuer_befehl, geändert) zurück.
     """
-    parts: list[str] = []
-    last = 0
-    for m in _CMDEXE_REGION_RE.finditer(command):
-        parts.append(_strip_repo_root(command[last:m.start()]))
-        parts.append(m.group(0))  # cmd.exe-Region unangetastet (Windows-Pfade)
-        last = m.end()
-    parts.append(_strip_repo_root(command[last:]))
-    result = ''.join(parts)
+    result = _strip_repo_root(command)
     return result, result != command
 
 
@@ -152,12 +137,6 @@ def _log_command(command: str, log_type: str, log_file: str = _LOG_FILE) -> None
 # Kein ^-Anker: Pattern soll auch in Compound-Kommandos und Subshells matchen.
 # ---------------------------------------------------------------------------
 WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    # Dateien lesen via cmd.exe type → Read-Tool verwenden
-    (
-        re.compile(r'(?:output=\$\()?cmd\.exe\s+/c\s+"type\b'),
-        'Dateien nicht via cmd.exe type lesen – stattdessen das Read-Tool verwenden.\n'
-        'Das Read-Tool ist schneller, erzeugt keine Prozesse und liefert den Inhalt direkt.',
-    ),
     # dotnet test: immer via Script aufrufen
     (
         re.compile(r'\bdotnet\s+test\b'),
@@ -214,26 +193,6 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         'jscpd immer via Script aufrufen:\n'
         '  python3 .claude/scripts/jscpd-run.py [--verbose]',
     ),
-    # WSL: Pipe direkt nach cmd.exe funktioniert nicht
-    (
-        re.compile(r'\bcmd\.exe\b.*\|'),
-        "Pipe nach cmd.exe funktioniert nicht in WSL.\n"
-        "Richtige Alternativen – je nach Situation:\n"
-        "\n"
-        "A) Normalfall (Output passt in Context): Variable capturen, dann filtern:\n"
-        "   output=$(cmd.exe /c \"cd /d C:\\\\...\\\\mahl && dotnet build\")\n"
-        "   echo \"$output\" | grep -E '(error|warning CS|Build)'\n"
-        "\n"
-        "B) Sehr große Outputs: Redirect in Datei:\n"
-        "   cmd.exe /c \"... > .claude/tmp/out.txt 2>&1\"\n"
-        "   cat /mnt/c/Users/kieritz/source/repos/mahl/.claude/tmp/out.txt\n"
-        "   (Datei danach löschen!)\n"
-        "\n"
-        "C) Kein Filter nötig: cmd.exe direkt aufrufen, vollständiger Output.\n"
-        "\n"
-        "Für dotnet test und dotnet stryker: Projekt-Scripts verwenden statt cmd.exe direkt:\n"
-        "  python3 .claude/scripts/dotnet-test.py / dotnet-stryker.py",
-    ),
     # python3 mit absolutem Pfad
     (
         re.compile(r'\bpython3\s+[/~]'),
@@ -242,14 +201,6 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         '  python3 .claude/scripts/dotnet-test.py\n'
         '  python3 .claude/scripts/dotnet-stryker.py\n'
         '  python3 .claude/hooks/...',
-    ),
-    # dotnet run via cd /d: Prozess nicht per Projektpfad identifizierbar → --project <vollpfad> verwenden
-    (
-        re.compile(r'cd\s+/d\s+[^"]*mahl[^"]*&&\s*(?:set\s+\S+\s+&&\s+)?dotnet\s+run\b'),
-        'dotnet run immer mit vollständigem Projektpfad aufrufen:\n'
-        '  cmd.exe /c "dotnet run --project C:\\\\Users\\\\kieritz\\\\source\\\\repos\\\\mahl\\\\Server"\n'
-        '  (mit Env-Var: cmd.exe /c "set KEY=VALUE && dotnet run --project C:\\\\...\\\\mahl\\\\Server")\n'
-        'cd /d macht laufende Prozesse im DLL-Lock-Check nicht identifizierbar.',
     ),
     # git add -f: ignorierte Dateien könnten Secrets enthalten – User muss manuell handeln
     (
@@ -311,10 +262,11 @@ DESTRUCTIVE_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
         'git restore .',
     ),
     (
-        re.compile(r'\btaskkill\b'),
-        "Prozess-Kill ist ein destruktiver Eingriff.\n"
-        "  Beispiel: cmd.exe /c \"taskkill /f /im dotnet.exe\" # --allow-once",
-        'cmd.exe /c "taskkill /f /im <prozess.exe>"',
+        re.compile(r'\b(?:pkill|killall)\b'),
+        "Prozess-Kill nach Name ist ein destruktiver Eingriff (trifft potenziell mehrere Prozesse).\n"
+        "  Gezielt per PID ist erlaubt: kill <pid>\n"
+        "  Beispiel: pkill -f dotnet # --allow-once",
+        'pkill|killall <name>',
     ),
 ]
 
@@ -328,56 +280,47 @@ DESTRUCTIVE_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
 #                Leer ('') → kein Eintrag in --list (nur Pattern-Matching-Variante)
 # ---------------------------------------------------------------------------
 ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
-    # dotnet build über cmd.exe (direkt oder via Variable capturen)
+    # dotnet build (nativ)
     (
-        re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+build\b'),
+        re.compile(r'^dotnet\s+build\b'),
         None,
-        r'cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet build"',
+        'dotnet build',
     ),
+    # dotnet run (nativ; Dev-Server). Kein DLL-Lock-Zwang mehr unter Linux → relativer --project ok.
     (
-        re.compile(r'^output=\$\(cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+build\b'),
+        re.compile(r'^dotnet\s+run\b'),
         None,
-        '',  # Variante: output=$(cmd.exe /c "... && dotnet build")
+        'dotnet run [--project Server]',
     ),
-    # dotnet run mit vollständigem Projektpfad (Pflicht für DLL-Lock-Identifikation)
+    # kill eines einzelnen Prozesses per PID (gezielt). pkill/killall by-name → DESTRUCTIVE.
     (
-        re.compile(r'^cmd\.exe\s+/c\s+"(?:set\s+\S+\s+&&\s+)?dotnet\s+run\s+--project\s+[^"]*[Mm]ahl'),
+        re.compile(r'^kill\s+(?:-\w+\s+)?\d+$'),
         None,
-        r'cmd.exe /c "dotnet run --project C:\Users\kieritz\source\repos\mahl\Server"',
-    ),
-    # taskkill für einen einzelnen dotnet-Prozess per PID (gezielter Kill)
-    (
-        re.compile(r'^cmd\.exe\s+/c\s+"taskkill\s+/f\s+/pid\s+\d+"$'),
-        None,
-        'cmd.exe /c "taskkill /f /pid <PID>"',
+        'kill [-SIG] <PID>',
     ),
     # dotnet ef (sichere Subcommands; database drop bleibt deny)
     (
-        re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*dotnet\s+ef\s+(migrations\s+(add|remove|list)|database\s+update)\b'),
+        re.compile(r'^dotnet\s+ef\s+(?:migrations\s+(?:add|remove|list)|database\s+update)\b'),
         None,
-        r'cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && dotnet ef migrations add|remove|list"  (auch: database update)',
+        'dotnet ef migrations add|remove|list  (auch: database update)',
     ),
-    # docker-compose: WSL-direkt und via cmd.exe
+    # dotnet tool restore/list (lokales Tool-Manifest .config/dotnet-tools.json)
     (
-        re.compile(r'^docker-compose\s+(up|down)\b'),
+        re.compile(r'^dotnet\s+tool\s+(?:restore|list)\b'),
         None,
-        'docker-compose up|down',
+        'dotnet tool restore|list',
     ),
+    # docker compose up|down (v2-Plugin, nativ in WSL). docker-compose (v1) → Smart-Deny-Hint.
     (
         re.compile(r'^docker\s+compose\s+(up|down)\b'),
         None,
         'docker compose up|down',
     ),
+    # npm run/audit/outdated/update/ci (nativ). npm run test|lint → WRONG_APPROACH; npm install [pkg] → deny.
     (
-        re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl[^"]*&&\s*docker-compose\s+(up|down)\b'),
+        re.compile(r'^npm\s+(?:run\s|audit\b|outdated\b|update\b|ci\b)'),
         None,
-        r'cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl && docker-compose up|down"',
-    ),
-    # npm run / npm audit / npm outdated über cmd.exe (npm install bleibt deny)
-    (
-        re.compile(r'^cmd\.exe\s+/c\s+"cd\s+/d\s+[^"]*mahl\\Client[^"]*&&\s*npm\s+(?:run\s|audit\b|outdated\b)'),
-        None,
-        r'cmd.exe /c "cd /d C:\Users\kieritz\source\repos\mahl\Client && npm run <script> | audit | outdated"',
+        'npm run <script> | audit | outdated | update | ci',
     ),
     # python3 -m pytest auf .claude/ (Hook-Tests)
     (
@@ -437,12 +380,6 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         None,
         'python3 .claude/scripts/<script>.py  /  python3 .claude/hooks/<hook>.py',
     ),
-    # sed für \r-Bereinigung (\\r oder \\\\r, einfache oder doppelte Anführungszeichen)
-    (
-        re.compile(r"^sed\s+-i\s+['\"]s/\\\\?r//['\"]"),
-        None,
-        "sed -i 's/\\r//' <datei>",
-    ),
     # git read-only (optional mit -C <pfad>, um in anderem Repo/Worktree zu lesen)
     (
         re.compile(r'^git\s+(?:-C\s+\S+\s+)?(status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog)\b'),
@@ -460,10 +397,14 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
 # ---------------------------------------------------------------------------
 _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
     (
+        re.compile(r'\bdocker-compose\b'),
+        "docker-compose (v1) ist in dieser WSL-Distro nicht verfügbar.\n"
+        "  Nutze die v2-Form mit Leerzeichen: docker compose up|down.",
+    ),
+    (
         re.compile(r'\bsed\b'),
         "Für Datei-Edits: Edit-Tool verwenden.\n"
-        "Für Lesen von Zeilenbereichen: Read-Tool mit offset/limit-Parametern verwenden.\n"
-        "(Erlaubt: sed -i 's/\\r//' zur \\r-Bereinigung)",
+        "Für Lesen von Zeilenbereichen: Read-Tool mit offset/limit-Parametern verwenden.",
     ),
     (
         re.compile(r'\bgit\s+push\b'),
@@ -474,20 +415,15 @@ _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
         "git commit: Befehl dem User mitteilen – Commits sind User-Aktionen.",
     ),
     (
-        re.compile(r'\bnpm\s+install\b'),
-        "npm install: docs/reference/dependencies.md-Prozess durchführen, dann User bitten den Befehl auszuführen.",
+        re.compile(r'\bnpm\s+(?:install|i|add)\b'),
+        "npm install <pkg> fügt eine Dependency hinzu → erst den docs/reference/dependencies.md-Prozess.\n"
+        "Für reinen Lock-Install (nach Clone): npm ci (erlaubt, reproduzierbar aus package-lock.json).",
     ),
     (
         re.compile(r'\bnpm\b'),
-        "npm immer via cmd.exe aufrufen (npm läuft nur auf Windows, nicht in WSL):\n"
-        "  cmd.exe /c \"cd /d C:\\\\Users\\\\kieritz\\\\source\\\\repos\\\\mahl\\\\Client && npm <subcommand>\"\n"
-        "  Erlaubt (Allow-Liste): npm run <script>, npm audit, npm outdated",
-    ),
-    (
-        re.compile(r'\bdotnet\s+run\b'),
-        "dotnet run immer mit vollständigem Projektpfad (für DLL-Lock-Identifikation):\n"
-        "  cmd.exe /c \"dotnet run --project C:\\\\Users\\\\kieritz\\\\source\\\\repos\\\\mahl\\\\Server\"\n"
-        "  (.NET läuft nur auf Windows, nicht direkt in WSL)",
+        "npm-Subcommand nicht auf der Allow-Liste.\n"
+        "  Erlaubt: npm run <script>, npm audit, npm outdated, npm update, npm ci\n"
+        "  Tests/Lint/Mutation NICHT direkt – via Wrapper-Scripts (vitest-run.py, eslint-run.py, …).",
     ),
     (
         re.compile(r'^python3\s+-c\b'),
@@ -546,7 +482,7 @@ _ALLOW_REASON = "Auto-approved by bash permission hook"
 _UNSAFE_REDIRECT_DENY_REASON = (
     "Output-Redirect auf nicht erlaubtes Ziel.\n"
     "Bevorzugte Alternative: Output in Variable capturen (kein Datei-Müll):\n"
-    "  output=$(cmd.exe /c \"...\")\n"
+    "  output=$(dotnet build)\n"
     "  echo \"$output\" | grep ...\n"
     "Falls Datei-Redirect nötig (sehr großer Output): nur .claude/tmp/ erlaubt; Datei danach löschen.\n"
     "Sonstige erlaubte Redirect-Ziele: /dev/null, /dev/stderr, /dev/stdout.\n"
@@ -565,14 +501,7 @@ def has_unsafe_output_redirect(command: str) -> bool:
 
     Erlaubt: SAFE_REDIRECT_PREFIXES (z.B. .claude/tmp/, /dev/null)
     Erlaubt: >&N / N>&M (redirect zu File-Descriptor, keine Datei)
-
-    Bei cmd.exe /c "..." wird der innere Befehl geprüft, da cmd.exe dessen
-    Redirects direkt ausführt – auch wenn sie auf Shell-Ebene gequotet erscheinen.
     """
-    m = _CMDEXE_INNER_RE.match(command)
-    if m:
-        return has_unsafe_output_redirect(m.group(1))
-
     in_single_quote = False
     in_double_quote = False
     i = 0
@@ -595,9 +524,6 @@ def has_unsafe_output_redirect(command: str) -> bool:
 
                 if rest.startswith('&'):
                     # File-Descriptor-Redirect (2>&1, >&2 etc.) – immer erlaubt.
-                    # Hinweis: cmd.exe kennt andere Redirect-Syntax (1>&2 statt 2>&1),
-                    # aber wir prüfen hier bash-style. Ungültige cmd.exe-Syntax wird
-                    # von cmd.exe selbst zur Laufzeit abgefangen.
                     i += 1
                     continue
 
@@ -827,7 +753,6 @@ def _print_allow_list() -> None:
 
     print()
     print("Verknüpfung mit |, ||, &&, ; ist erlaubt – jedes Segment wird einzeln geprüft.")
-    print("Ausnahme: cmd.exe ... | ... ist verboten (WSL-Pipe-Limitation, WRONG_APPROACH).")
     print()
     print("Destruktive Befehle (nur mit # --allow-once, User-Freigabe nötig):")
     for _pattern, _hint, label in sorted(

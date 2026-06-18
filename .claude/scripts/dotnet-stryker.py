@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-dotnet stryker via cmd.exe (WSL-Wrapper) + automatische Auswertung via stryker-summary.py.
+dotnet stryker (nativ) + automatische Auswertung via stryker-summary.py.
 
 Verwendung:
   python3 .claude/scripts/dotnet-stryker.py
@@ -17,13 +17,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
-from _util import REPO_ROOT_WIN, _win_path, check_dotnet_dll_lock
 from _run_lock import RunLock
 
 _SCRIPTS_DIR  = Path(__file__).parent
 _REPO_ROOT    = _SCRIPTS_DIR.parent.parent
 _TMP_FILE     = _SCRIPTS_DIR.parent / "tmp" / "stryker_out.txt"
-_TMP_FILE_WIN = _win_path(str(_TMP_FILE))
 _STRYKER_OUT  = _REPO_ROOT / "StrykerOutput"
 _BACKEND_OUT  = _STRYKER_OUT / "Backend"
 
@@ -61,22 +59,19 @@ def main() -> None:
                         help="Alle nicht-getöteten Mutanten (Survived/Ignored/Timeout/NoCoverage) "
                              "mit Status, StatusReason, Zeile, Spalte")
     args = parser.parse_args()
-    # parse_args vor dem DLL-Lock-Check, damit --help/-h ohne Seiteneffekt (PowerShell-Abfrage) greift
-    check_dotnet_dll_lock()
 
-    stryker_cmd = "dotnet stryker"
+    stryker_args = ["dotnet", "stryker"]
     if args.mutate:
-        stryker_cmd += f" --mutate {args.mutate}"
+        stryker_args += ["--mutate", args.mutate]
 
     _TMP_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Starte: {stryker_cmd}")
+    print(f"Starte: {' '.join(stryker_args)}")
     print(f"Output → {_TMP_FILE}")
 
     before = _snapshot_run_dirs()
-    cmd_inner = f"cd /d {REPO_ROOT_WIN} && {stryker_cmd} > {_TMP_FILE_WIN} 2>&1"
-    with RunLock(_TMP_FILE):
-        result = subprocess.run(["cmd.exe", "/c", cmd_inner])
+    with RunLock(_TMP_FILE), open(_TMP_FILE, "w", encoding="utf-8") as out:
+        result = subprocess.run(stryker_args, cwd=str(_REPO_ROOT), stdout=out, stderr=subprocess.STDOUT)
 
     if _TMP_FILE.exists():
         lines = _TMP_FILE.read_text(encoding="utf-8", errors="replace").splitlines()

@@ -771,6 +771,26 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 ---
 
+### ADR-S089-1: MTP-natives Coverage-Gate (coverlet.MTP bevorzugt)
+
+**Status:** Proposed
+**Tags:** scope:cross-cutting, tooling:build
+
+**Kontext:** Das Test-Projekt nutzt den MTP-Runner (ADR-S063-1). Darunter ist `coverlet.collector` (VSTest-DataCollector) wirkungslos. Beim WSL-/ext4-Umzug (S089) zeigte sich, dass das Branch-Coverage-Gate dadurch nur über veraltete cobertura-Reports „bestand" (Stale-Masking).
+
+**Entscheidung:** Das Coverage-Gate läuft über eine **MTP-native** Engine, bevorzugt **`coverlet.MTP`** (in der Dependency-Allowlist). Die Umsetzung ist vertagt; operativer Stand + Trigger: **TD-S089-1**.
+
+**Begründung:** `coverlet.MTP` reproduziert die bisherige Mess-Semantik (gleiche Engine; `--coverlet-skip-auto-props` schließt **präzise** nur Auto-Properties aus, nicht async/yield) → „100%" behält dieselbe Bedeutung; cobertura ist coverlet-nativ (Parser-kompatibel); OSS/inspizierbar.
+
+**Verworfen:**
+- **`coverlet.collector` (VSTest)** – unter dem MTP-Runner wirkungslos (Ursache des Stale-Maskings).
+- **`Microsoft.Testing.Extensions.CodeCoverage`** – Auto-Props nur via breitem `CompilerGeneratedAttribute`-Exclude (schließt async/yield mit aus → überzeichnet ein 100%-Branch-Gate); Closed-Source. Bleibt **Fallback**.
+- **Zurück zu VSTest** – Rückschritt gegen die xunit-v3/MTP-Wahl (ADR-S063-1).
+
+**Status Proposed (nicht Accepted):** vor der realen Nutzung ist noch eine MTP-Versions-Kompatibilität zu lösen – Details und Trigger in TD-S089-1.
+
+---
+
 ## Code-Qualität & Abhängigkeiten
 
 ### ADR-S041-10: CA1515: `internal`-Pflicht via Analyzer erzwungen

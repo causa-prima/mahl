@@ -4,16 +4,15 @@
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process, observations)
 > Technische Schuld: `docs/tech-debt.md` | Offene Fragen: `docs/open-questions.md`
 
-**Letzte Aktualisierung:** 2026-06-18 (Session 088 – Szenario-Tracking automatisiert; bidirektionaler Poka-Yoke)
+**Letzte Aktualisierung:** 2026-06-20 (WSL-native Toolchain-Migration abgeschlossen – .NET + Node nativ in WSL, Repo auf ext4 `~/repos/mahl`)
 **Phase:** SKELETON 🔄
 **Aktuelle Story:** US-904 (Zutaten)
 
 ---
 
-## Nächste Prioritäten (Reihenfolge bindend; keine Nummerierung verwenden, sondern nur Anstriche)
+## Nächste Prioritäten
 
-- **Offene OBS-Umsetzung** (evaluiert S086, Entscheidungen in `docs/kaizen/observations.md`):
-  - **OBS-4** TS-LSP-Pilot (eine Session) – einziges offenes Umsetzungs-Item; C# zurückgestellt (Trigger: claude-code#1359). Ausgenommen: OBS-2 (Spike), OBS-10 (deferred).
+- **TS-LSP-Pilot (OBS-S085-4) – ZUERST:** Migration hat den Blocker entfernt (Node WSL-nativ + `typescript-language-server` installiert). Jetzt `typescript-lsp`-Plugin + `ENABLE_LSP_TOOL` eine Session testweise evaluieren (Nutzen: Auto-Typfehler nach Edits, find-refs, Symbole). C# bleibt zurückgestellt (Client-Showstopper #1359).
 
 - **US-904 weiter:**
   - **Zuerst der `@US-904-error`-Block** (vor dem happy-path-Rest, also vor „sortiert"): erzwingt `NonEmptyTrimmedString`-Validierung, ADR-S000-4-Suppression entfällt.
