@@ -12,8 +12,6 @@
 
 ## Nächste Prioritäten
 
-- **TS-LSP-Pilot (OBS-S085-4) – ZUERST:** Migration hat den Blocker entfernt (Node WSL-nativ + `typescript-language-server` installiert). Jetzt `typescript-lsp`-Plugin + `ENABLE_LSP_TOOL` eine Session testweise evaluieren (Nutzen: Auto-Typfehler nach Edits, find-refs, Symbole). C# bleibt zurückgestellt (Client-Showstopper #1359).
-
 - **US-904 weiter:**
   - **Zuerst der `@US-904-error`-Block** (vor dem happy-path-Rest, also vor „sortiert"): erzwingt `NonEmptyTrimmedString`-Validierung, ADR-S000-4-Suppression entfällt.
   - **Danach Feature-Reihenfolge** – nächstes laut Feature-Datei: {{NEXT_SCENARIO}}. Offene/erledigte Szenarien: `python3 .claude/scripts/next_scenario.py --open|--done`.

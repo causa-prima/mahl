@@ -6,7 +6,10 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh" }
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+          }
         ]
       }
     ],
@@ -14,16 +17,31 @@
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-bash-permission.py" }
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-bash-permission.py"
+          }
         ]
       },
       {
         "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-dependency-allowlist.py" },
-          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-blocking.py" },
-          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-index-length.py" },
-          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-e2e-scenario-ref.py" }
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-dependency-allowlist.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-blocking.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-index-length.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-e2e-scenario-ref.py"
+          }
         ]
       }
     ],
@@ -31,37 +49,55 @@
       {
         "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-nonblocking.py" }
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-nonblocking.py"
+          }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/check-memory.sh" }
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/check-memory.sh"
+          }
         ]
       }
     ],
     "PreCompact": [
       {
         "hooks": [
-          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh" }
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh"
+          }
         ]
       }
     ],
     "TaskCompleted": [
       {
         "hooks": [
-          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/task-completed.sh" }
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/task-completed.sh"
+          }
         ]
       }
     ],
     "SessionEnd": [
       {
         "hooks": [
-          { "type": "command", "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh" }
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh"
+          }
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true
   }
 }
