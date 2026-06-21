@@ -1,5 +1,7 @@
 #!/bin/bash
-REPO="/mnt/c/Users/kieritz/source/repos/mahl"
+# Repo-Wurzel: CLAUDE_PROJECT_DIR (vom Harness gesetzt), sonst aus dem Skript-Pfad ableiten.
+# (Früher hartkodiert auf den alten /mnt/c-Windows-Pfad – nach der WSL-/ext4-Migration falsch.)
+REPO="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 MEMORY="$REPO/docs/AGENT_MEMORY.md"
 if [ -f "$MEMORY" ]; then
   echo "=== AGENT_MEMORY.md ==="

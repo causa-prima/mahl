@@ -16,7 +16,7 @@ def test_package_json_blocked():
     assert get_denial_reason("Client/package.json") is not None
 
 def test_package_json_absolute_path_blocked():
-    assert get_denial_reason("/mnt/c/Users/kieritz/source/repos/mahl/Client/package.json") is not None
+    assert get_denial_reason("/home/kieritz/repos/mahl/Client/package.json") is not None
 
 def test_csproj_blocked():
     assert get_denial_reason("Server/mahl.Server.csproj") is not None

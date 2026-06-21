@@ -1,5 +1,6 @@
 #!/bin/bash
-REPO="/mnt/c/Users/kieritz/source/repos/mahl"
+# Repo-Wurzel dynamisch (CLAUDE_PROJECT_DIR, sonst aus Skript-Pfad) – nach WSL-/ext4-Migration.
+REPO="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 CHANGES=$(git -C "$REPO" status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}' | grep -v "^docs/" | grep -c . || true)
 LEARNED=$(git -C "$REPO" status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}' | grep -c "lessons_learned" || true)
 echo "CONTEXT COMPACTION steht bevor!"
