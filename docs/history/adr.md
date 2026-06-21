@@ -114,12 +114,43 @@ Verwertet werden die Kommentare von **`next_scenario.py`**: DONE-Erkennung (Tite
 
 ### ADR-S000-1: Collect-all Validation: kein Fail-Fast für unabhängige Felder
 
-**Status:** Accepted
+**Status:** Superseded by ADR-S090-1 (Body-Form `string[]` → feld-keyed; collect-all-Prinzip bleibt gültig)
 **Tags:** scope:cross-cutting, arch:validation, http:422
 
 **Entscheidung:** Alle unabhängigen Felder werden vollständig validiert; alle Fehler werden gesammelt zurückgegeben (`422`, Body: `string[]`). Abhängige Validierungen (z.B. `unit` nur prüfen wenn `quantity` gesetzt) bleiben kurzschließend.
 
 **Begründung:** Nutzer sollen alle ihre Fehler auf einmal sehen, nicht einen nach dem anderen.
+
+**Hinweis (S090):** Das collect-all-Prinzip (alle unabhängigen Felder validieren, Fehler sammeln, abhängige Validierungen kurzschließend) bleibt unverändert gültig. Nur die **Body-Form** wurde von flachem `string[]` auf feld-keyed umgestellt – siehe ADR-S090-1.
+
+---
+
+### ADR-S090-1: 422-Fehler-Contract ist feld-keyed (RFC 9457), nicht flaches string[]
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:validation, http:422
+
+**Entscheidung:** Der 422-Validierungsfehler-Body ist **feld-keyed** im Stil von RFC 9457 / ASP.NET `ValidationProblemDetails`: ein `errors`-Objekt, das jeden Feldnamen (= JSON-Property-Name des Requests, z.B. `name`, `defaultUnit`) auf seine Fehlermeldungen (`string[]`) abbildet.
+
+```json
+{ "status": 422, "errors": { "name": ["Name darf nicht leer sein."] } }
+```
+
+Das Frontend konsumiert ausschließlich `errors` und ordnet jede Meldung ihrem Feld zu (Feld markieren + Helper-Text). Weitere Envelope-Felder (`type`/`title`/`status` aus ProblemDetails) sind erlaubt, aber kein Vertragsbestandteil. Die konkrete ASP.NET-Mechanik (`Results.ValidationProblem(errors, statusCode: 422)` o.ä.) wählt der Implementer unter TDD.
+
+**Begründung:**
+1. **Feld-Zuordnung ohne String-Matching:** Ein flaches `string[]` zwingt das Frontend, Meldungen per Textvergleich Feldern zuzuordnen – fragil und an die exakten deutschen Texte (ADR-S051-2) gekoppelt. Feld-Keys lösen das strukturell.
+2. **Single Source of Truth bleibt server-seitig:** Reine Display-Information wandert ins Frontend, die Validierungs**logik** und die Texte bleiben einzig im Backend → kein Drift (Mutation Score schützt nachweislich *nicht* gegen Cross-Stack-Drift; nur ein Full-Stack-E2E am Grenzwert oder eine einzige Quelle tut das).
+3. **Forward-kompatibel mit OpenAPI:** Feld-keyed ProblemDetails *ist* der RFC-9457-/ASP.NET-Standard; eine spätere OpenAPI-/Codegen-Migration baut darauf auf statt sie zu ersetzen.
+
+**Geltungsbereich Feldnamen:** Keys = Request-JSON-Property-Namen. Collection-/Cross-Field-Fehler (z.B. Recipe `ingredients`/`steps` leer) keyen auf den jeweiligen Feldnamen; ein eventueller globaler Key wird festgelegt, sobald ein solcher Endpoint implementiert wird (derzeit nur Ingredients implementiert).
+
+**Validierung bleibt server-only / Client-Validierung aufgeschoben:** Die Validierungslogik liegt ausschließlich im Backend; das Frontend zeigt die 422-Antwort. Client-seitige Validierungs*logik* (Submit-Blockieren, Instant-Feedback) ist YAGNI und wird erst eingeführt, wenn ein UX-Szenario sie fordert – dank des feld-keyed Contracts dann günstig nachrüstbar. Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und wird per eigenem Szenario ergänzt.
+
+**Verworfen:**
+- **Flaches `string[]`** (ADR-S000-1) – keine Feld-Zuordnung, Frontend müsste auf exakte Texte matchen.
+- **Client-seitige Validierungslogik als gleichwertige zweite Quelle** – dupliziert Regeln → Drift-Fläche, die nur durch teure Full-Stack-E2E-Grenzwert-Tests pro Constraint absicherbar wäre.
+- **Shared Validation Schema (Zod/JSON-Schema über beide Seiten)** – scheitert am C#/TS-Sprachbruch (kein gemeinsamer Runtime).
 
 ---
 

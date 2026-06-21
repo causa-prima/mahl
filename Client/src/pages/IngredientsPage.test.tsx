@@ -22,6 +22,24 @@ async function renderEmptyIngredientsPage() {
 
 const tomaten = { id: '1', name: 'Tomaten', defaultUnit: 'Stück' } as const
 
+const salz = { id: '7', name: 'Salz', defaultUnit: 'g' } as const
+
+// @US-904-error: Ausgangszustand = eine bestehende Zutat (Salz); der POST eines
+// leeren Namens beantwortet das Backend mit 422 + feld-keyed Body (ADR-S090-1):
+// { errors: { name: ["Name darf nicht leer sein."] } }. GET liefert unverändert
+// [salz] (kein optimistic add), sodass "Liste bleibt unverändert" echt prüfbar ist.
+function useEmptyNameRejectingHandlers(): void {
+  server.use(
+    http.get('/api/ingredients', () => HttpResponse.json([salz])),
+    http.post('/api/ingredients', () =>
+      HttpResponse.json(
+        { status: 422, errors: { name: ['Name darf nicht leer sein.'] } },
+        { status: 422 },
+      ),
+    ),
+  )
+}
+
 type CapturedPost = {
   body: unknown
   contentType: string | null
@@ -72,6 +90,9 @@ describe('IngredientsPage', () => {
     expect(await screen.findByLabelText('Name')).toHaveValue('')
     // Then: Einheit-Feld ist leer
     expect(screen.getByLabelText('Einheit')).toHaveValue('')
+    // Then: ohne Fehler ist das Name-Feld NICHT als ungültig markiert
+    //   (killt den Dauer-error={true}-Mutanten am Name-Feld)
+    expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'false')
   })
 
   it('US904_HappyPath_OpenCreateDialog_ClosedInitially_FieldsAbsent', async () => {
@@ -192,5 +213,64 @@ describe('IngredientsPage – Zutat anlegen', () => {
     expect(captured.current?.body).toEqual({ name: 'Tomaten', defaultUnit: 'Stück' })
     // Then: der POST sendete JSON (Content-Type), damit das Backend den Body bindet
     expect(captured.current?.contentType).toBe('application/json')
+  })
+})
+
+describe('IngredientsPage – Zutat anlegen schlägt fehl (leerer Name)', () => {
+  // Helper: Dialog öffnen, "g" als Einheit eingeben, "Speichern" klicken.
+  // Gemeinsames When für alle Tests dieses Szenarios.
+  async function submitEmptyNameWithUnitGramm() {
+    const user = userEvent.setup()
+    renderWithProviders(<IngredientsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    // When: ich keinen Namen eingebe (Name-Feld bleibt leer)
+    // When: ich "g" als Einheit eingebe
+    await user.type(await screen.findByLabelText('Einheit'), 'g')
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+  }
+
+  it('US904_Error_CreateIngredient_EmptyName_ShowsErrorMessage', async () => {
+    // Given: bestehende Zutat (Salz); leerer Name -> Backend antwortet 422
+    useEmptyNameRejectingHandlers()
+
+    // When: leeren Namen + Einheit "g" speichern
+    await submitEmptyNameWithUnitGramm()
+
+    // Then: ich sehe die Fehlermeldung "Name darf nicht leer sein."
+    expect(await screen.findByText('Name darf nicht leer sein.')).toBeInTheDocument()
+    // Then: das Name-Feld ist als ungültig markiert (a11y-Fehlerzustand, UX-Guideline §4)
+    expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('US904_Error_CreateIngredient_EmptyName_KeepsDialogOpen', async () => {
+    // Given: bestehende Zutat (Salz); leerer Name -> Backend antwortet 422
+    useEmptyNameRejectingHandlers()
+
+    // When: leeren Namen + Einheit "g" speichern
+    await submitEmptyNameWithUnitGramm()
+
+    // Then: der Dialog bleibt offen (sonst wäre die Meldung nicht korrigierbar)
+    //   Auf das Erscheinen der Meldung warten, dann den noch offenen Dialog prüfen.
+    await screen.findByText('Name darf nicht leer sein.')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('US904_Error_CreateIngredient_EmptyName_ListUnchanged', async () => {
+    // Given: bestehende Zutat (Salz); leerer Name -> Backend antwortet 422
+    useEmptyNameRejectingHandlers()
+
+    // When: leeren Namen + Einheit "g" speichern
+    await submitEmptyNameWithUnitGramm()
+
+    // Then: die Zutaten-Liste bleibt unverändert (kein optimistisches Hinzufügen)
+    //   Auf das Erscheinen der Meldung warten, dann den Listenzustand prüfen.
+    //   hidden: true – der (korrekt) offene MUI-Dialog setzt den Hintergrund inkl. Liste
+    //   auf aria-hidden; die <li> sind weiter im DOM und exakt unverändert (genau Salz),
+    //   die role-Query braucht hidden:true, um sie zu sehen.
+    await screen.findByText('Name darf nicht leer sein.')
+    const list = screen.getByTestId('ingredient-list')
+    expect(within(list).getAllByRole('listitem', { hidden: true })).toHaveLength(1)
+    expect(within(list).getByText('Salz')).toBeInTheDocument()
   })
 })

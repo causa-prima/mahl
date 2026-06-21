@@ -30,6 +30,60 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 
 ---
 
+## OBS-S090-1 – Vitest ist typ-blind; Typfehler erst im Stryker-Dry-Run sichtbar
+- Quelle: Agent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: frontend-tdd
+- Beobachtung: `vitest` (esbuild, transpile-only) prüft **keine** Typen. Echte TS-Fehler (z.B. `ResultAsync` ≠ `Promise`; `errAsync`-`kind`-Widening) blieben bis zum Stryker-typescript-checker-Dry-Run unsichtbar (~1 Zyklus Verzögerung). Kein `tsc --noEmit`-Wrapper auf der Bash-Allow-Liste → der Layer-Implementer konnte Typen nicht isoliert **vor** dem teuren Stryker-Lauf prüfen.
+- Kandidaten: A) `tsc --noEmit`-Wrapper-Script (analog `eslint-run.py`) auf die Allow-Liste (gering) | B) Status quo (Stryker fängt es, aber spät)
+- Entscheidung/Maßnahme: aufgeschoben (NEU) – vor Bewertung sammeln; Kandidat A wahrscheinlich.
+
+---
+
+## OBS-S090-2 – qa-check-Übergabe-Hash erzwingt Extra-Stryker-Lauf bei Re-Stage
+- Quelle: Agent (Orchestrator-Beobachtung)
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: implementing-scenario / qa-check
+- Beobachtung: Der `qa-check.py`-Übergabe-Hash rechnet über den **gestageten** Zustand. Stagt der Orchestrator nach der Subagent-Hash-Berechnung noch eine freigegebene Test-Änderung, mismatcht `--verify` → ein **erneuter** (teurer) Stryker-Lauf nur, um einen frischen Hash über den finalen Index zu erzeugen. In dieser Session 2× passiert (Frontend Option-A-Restage; variant-c).
+- Kandidaten: A) Stage-vor-Hash als feste Reihenfolge-Konvention | B) Hash über Working-Tree statt Index | C) Subagent stagt final selbst + Hash zuletzt
+- Entscheidung/Maßnahme: aufgeschoben (NEU) – Reihenfolge-Konvention im implementing-scenario-Flow klären; vor Bewertung sammeln.
+
+---
+
+## OBS-S090-3 – Alt-Hooks überprüfen/entschlacken
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Hook/Script
+- Beobachtung: Die Hook-Scripte (`check-memory.sh`, `pre-compact.sh`, `session-start.sh`, `session-end.sh`, `task-completed.sh`) stammen aus einer frühen Projektphase mit noch geringem Claude-Code-Verständnis. Mehrere tragen evtl. veraltete Annahmen (z.B. der jetzt korrigierte `/mnt/c`-Hardcode, S090). Ungeprüft, ob einzelne Hooks heute noch ihren Zweck erfüllen, redundant sind oder angepasst/entfernt gehören.
+- Kandidaten: A) Hook-für-Hook-Audit (Zweck, Trigger, Mehrwert, Redundanz) | B) gegen aktuelle CC-Hook-Mechanik (Events/Matcher) gegenchecken | C) Status quo
+- Entscheidung/Maßnahme: aufgeschoben (NEU) – in der nächsten Retro evaluieren; verwandt mit OBS-S088-1 (Hook-Dispatcher/Reload-Friktion).
+- Bezug: OBS-S088-1
+
+## OBS-S090-4 – Subagent-`git add` umgeht den Test-Review-Gate
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: TDD
+- Beobachtung: Die Layer-Implementer haben das `Bash`-Tool und die Allow-Liste erlaubt `git add <datei>` → ein Subagent kann (und tat es in S090) Dateien selbst stagen. Der `qa-check`-Übergabe-Hash rechnet über den **gestageten** Zustand, weshalb der Subagent sogar stagen *muss*. Damit ist der dokumentierte Gate „Haupt-Thread reviewt Tests, *dann* staged er" faktisch nicht erzwungen: Ein Subagent könnte ungeprüfte Assertions stagen und trotzdem einen grünen 100%-Hash erzeugen. **Mutation-Score + Hash beweisen „getestet+gemutet", nicht „vom Orchestrator inhaltlich freigegeben".** Kein konkreter Schaden in S090 (Review fand statt) — Integritäts-Risiko, kein Fehlausgang.
+- Kandidaten: A) Hash über die Test-/alle gestageten Dateien berechnen, sodass nachträgliches Subagent-Staging den Hash bricht (User-Hinweis: vermutlich leicht umsetzbar) | B) `git add` aus dem Layer-Implementer-Bash entfernen, Staging komplett beim Haupt-Thread | C) Status quo + explizite Prozess-Warnung
+- Entscheidung/Maßnahme: aufgeschoben (NEU) – Kandidat A wirkt am günstigsten; in der nächsten Retro entscheiden.
+- Bezug: OBS-S090-2 (qa-check-Hash/Staging-Reihenfolge)
+
+## OBS-S090-5 – TD-Grooming-Lücke: Infra-Schuld fällt durchs Raster
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Sonstiges
+- Beobachtung: Technische Schuld wird heute nur **opportunistisch** gegroomt (Architektur-Check in `implementing-scenario`: passende TD zum aktuellen Szenario mitnehmen). Schuld ohne Szenario-Bezug — typisch Infrastruktur, z.B. **TD-S083-5** (dirty-Postgres, kein Reset zwischen E2E-Läufen) — mappt auf kein Szenario und wird so **nie** angefasst. Zusätzlich fehlt am Session-Ende ein Check, ob TD unbewusst miterledigt wurde (dann Eintrag schließen).
+- Kandidaten: A) periodisches/retro-gebundenes TD-Grooming für szenario-fremde Schuld | B) Session-End-Check „wurde TD unbewusst behoben?" | C) Infra-TD eigene Behandlung/Trigger geben
+- Entscheidung/Maßnahme: aufgeschoben (NEU) – Lösung in der nächsten Retro finden (User: „dazu müssen wir eine Lösung finden").
+- Bezug: OBS-S087-1 (TD relevanz-filterbar machen)
+
+---
+
 ## OBS-S085-1 – Absolute-Pfad-Retries bei Bash verschwenden Token
 - Quelle: User
 - Status: UMGESETZT (S087) – `normalize_repo_paths` in `check-bash-permission.py`; `updatedInput`+`additionalContext` live verifiziert.
@@ -37,7 +91,7 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 - Kategorie: PROZESS    Kontext: Bash/Permission
 - Beobachtung: Agenten versuchen wiederholt Bash mit absoluten Pfaden, laufen in den Permission-Deny und verschwenden Token (Deny-Log S086: 113/295 Zeilen mit `/mnt/c/...`, steigender Trend).
 - Kandidaten: A) Hook schreibt Befehl auf relativen Pfad um | B) Deny mit gezieltem Hinweis | C) Doku/Allow-Liste schärfen
-- Entscheidung/Maßnahme: **Kandidat A** (bei sauberem Scoping geringe Gefahr; spart den Retry-Round-Trip, den B kostet). `check-bash-permission.py` normalisiert als erster Schritt jeden Repo-Root-Präfix `/mnt/c/Users/kieritz/source/repos/mahl/` → relativ (**breit**, da Einheitlichkeit der Regel der Hauptnutzen ist), **außer** Inneres von `cmd.exe /c "…"` (Windows-`C:\…`); `# --allow-once`-Befehle unangetastet (ONE_TIME-Check zuerst). Bei Änderung `updatedInput` (umgeschriebener Befehl) + `additionalContext` (Hinweis an Agent). `defer` verworfen – würde die Hook-eigene Analyse umgehen.
+- Entscheidung/Maßnahme: **Kandidat A** (bei sauberem Scoping geringe Gefahr; spart den Retry-Round-Trip, den B kostet). `check-bash-permission.py` normalisiert als erster Schritt jeden absoluten Repo-Root-Präfix (dynamisch via `CLAUDE_PROJECT_DIR`/Skript-Pfad; ursprünglich der `/mnt/c/...`-Windows-Pfad) → relativ (**breit**, da Einheitlichkeit der Regel der Hauptnutzen ist). [S089: WSL-nativ – die `cmd.exe /c`-Ausnahme (Windows-`C:\…`) entfällt.] `# --allow-once`-Befehle unangetastet (ONE_TIME-Check zuerst). Bei Änderung `updatedInput` (umgeschriebener Befehl) + `additionalContext` (Hinweis an Agent). `defer` verworfen – würde die Hook-eigene Analyse umgehen.
 
 ## OBS-S085-2 – Zu verbose Kommunikation (Orchestrator↔Subagenten) verschwendet Token
 - Quelle: User
@@ -56,6 +110,7 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 - Beobachtung: Agenten greppen/`tail`-en Stryker-&-Co-Output, obwohl unsere Scripte gezielt nur das Relevante ausgeben sollen (Deny-Log S086: 81 head/tail-Zeilen).
 - Kandidaten: A) prüfen ob alle Scripte nur Relevantes ausgeben | B) `tail`/Filter auf unsere CMDs per Deny unterbinden | C) `--help` + Session-Hinweis | D) erlaubte Befehle loggen, um Misuse-Patterns zu finden
 - Entscheidung/Maßnahme: **A + C + D**; **B zurückgestellt** bis mehr Daten (mittlere Gefahr, könnte legitime Nutzung blocken). C über `--list` + SessionStart-Injection: knappe Script-Anwendungsfälle + Hinweis „normal **ohne** `tail`/Filter nutzen (Output ist optimal); wo nicht → als Beobachtung sammeln". D = erlaubte Befehle loggen.
+- **Rezidiv (S090, Quelle: User):** Trotz Gegenmaßnahme C erneut aufgetreten — `grep` mehrfach auf qa-check-Output, `tail` auf playwright-test. Der Session-Hinweis (C) allein verhindert das Verhalten nicht zuverlässig. Konsequenz: Die geplante **D-Analyse** (`allowed-commands.log` auf Misuse-Patterns auswerten) ist überfällig und sollte in der nächsten Retro erfolgen — Datengrundlage, um über das zurückgestellte B (gezieltes Deny von `tail`/Filter auf Wrapper-CMDs) zu entscheiden.
 
 ## OBS-S085-4 – Kein Language-Server für die Agenten-Programmierung im Einsatz
 - Quelle: User
@@ -88,6 +143,7 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 - Beobachtung: Alle 8 Agenten sind `model: inherit`; Token werden verschwendet, wenn nicht das passende Modell genutzt wird.
 - Kandidaten: A) Orchestrator wählt Modell nach Schwierigkeit | B) Cap pro Agent via Frontmatter | C) Status quo
 - Entscheidung/Maßnahme: **A+B kombiniert** (Tool-Vertrag bestätigt: `Agent`-`model`-Param übersteuert Frontmatter → Frontmatter = Default, kein Deckel). Defaults: 6 read-only-Auditoren `model: sonnet`, beide Layer-Implementer `inherit`. Skills (`implementing-scenario`, `review-code`, `kaizen`/`review-workflow`) weisen an: Modell vor jedem Spawn nach Schwierigkeit wählen.
+- **Rezidiv + offene Design-Frage (S090, Quelle: User):** In S090 keine bewusste Pro-Spawn-Modellwahl durchgeführt (Layer-Implementer liefen via `inherit` auf Opus 4.8, Auditoren auf Sonnet-Default) — der „reicht der Default?"-Check (Maßnahme A) wurde nicht dokumentiert angewandt. Daraus die noch nicht beantwortete Default-Frage: Ist `inherit` (→ Orchestrator-Modell, hier Opus) der richtige **Implementer**-Default, oder sollte er auf `sonnet` stehen mit gezielter Opus-Eskalation für schwere Schichten? (Orchestrator-Opus gilt als gerechtfertigt — strittig ist nur der Implementer-Default.) In der nächsten Retro entscheiden.
 
 ## OBS-S085-10 – „Schwere" → „Impact" umbenennen (deferred Meta-Änderung)
 - Quelle: Agent

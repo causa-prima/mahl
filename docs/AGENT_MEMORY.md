@@ -4,7 +4,7 @@
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process, observations)
 > Technische Schuld: `docs/tech-debt.md` | Offene Fragen: `docs/open-questions.md`
 
-**Letzte Aktualisierung:** 2026-06-20 (WSL-native Toolchain-Migration abgeschlossen – .NET + Node nativ in WSL, Repo auf ext4 `~/repos/mahl`)
+**Letzte Aktualisierung:** 2026-06-21 (US-904 `@US-904-error` „leerer Name" full-stack + Validierungs-Architektur festgelegt, ADR-S090-1)
 **Phase:** SKELETON 🔄
 **Aktuelle Story:** US-904 (Zutaten)
 
@@ -12,8 +12,11 @@
 
 ## Nächste Prioritäten
 
+- **Vor dem nächsten Szenario:** `noUncheckedIndexedAccess` aktivieren (bisher lokal per `Partial<…>` approximiert; TD-S083-5-Umfeld).
+
 - **US-904 weiter:**
-  - **Zuerst der `@US-904-error`-Block** (vor dem happy-path-Rest, also vor „sortiert"): erzwingt `NonEmptyTrimmedString`-Validierung, ADR-S000-4-Suppression entfällt.
+  - **`@US-904-error`-Block fortsetzen:** „leerer Name" ✅ (S090). Nächstes: „leere Einheit anlegen schlägt fehl" (+ Variante „beide leer"). Szenario ggf. erst via `gherkin-workshop` in die Feature-Datei aufnehmen.
+  - **Erst-Formular-UX-Baseline** (mit der Implementierung, nicht vorab): Pflichtfeld-Affordance (Markierung) + Fokus-auf-Fehler als eigenes Szenario; UX-Guideline-Regel landet **mit** dem Code; `gherkin-workshop` um „Formular-UX-Baseline"-Checkliste ergänzen. Zeichenlimits nur gegen Abuse (keine Max-Length-Hints).
   - **Danach Feature-Reihenfolge** – nächstes laut Feature-Datei: {{NEXT_SCENARIO}}. Offene/erledigte Szenarien: `python3 .claude/scripts/next_scenario.py --open|--done`.
   - **Roadmap-Kontext** (nicht an „nächstes" gebunden): „sortiert" führt `OrderBy(name)` ein → aktiviert den S084-ETag real (TD-S084-2; Stryker-killbar weil Insertion-Order ≠ alphabetisch); „Speichern-Button deaktiviert" = pending-State (behebt Cold-Start-Race TD-S083-3). `user.type`/`fireEvent.click` (TS-Guideline).
 

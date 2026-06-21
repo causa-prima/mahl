@@ -39,10 +39,10 @@ Eintrag-Format:
 
 ---
 
-## TD-S083-1 — Frontend Hooks: `onSuccess` feuert auch bei `Err`
-**Priorität:** Mittel – Error-Szenario
-**Problem:** `useResultMutation.onSuccess` feuert auch bei `Err` (`Promise.resolve(ResultAsync)` wirft nicht). `throwOnError` entfernt + kein `r.ok`-Check in `ingredientsApi` (ADR-S083-2). **Erweitert (S084):** `conditionalGet.ts` setzt das Muster fort – kein `response.ok`-Check, d.h. ein 4xx/5xx-Body würde als Erfolg geparst+gecacht; zusätzlich `cached!` im 304-Pfad (YAGNI, 304 ohne Cache-Eintrag würfe).
-**Behebung/Trigger:** Vor dem Error-Szenario auf `result.match(onSuccess, onError)` umstellen – dieselbe Error-Handling-Umstellung konsistent für GET+POST (ApiError-aus-Status, `response.ok`-Check).
+## TD-S083-1 — Frontend GET-Pfad: kein `response.ok`-Check, Err wird verschluckt
+**Priorität:** Mittel – resilience-„Laden"-Szenarien
+**Teilweise behoben (S090):** Der POST/Mutation-Pfad ist erledigt – `useResultMutation.onSuccess` feuert via `result.match` nur noch im `Ok`-Zweig, und `createIngredient` prüft den Status (422 → `FieldErrors`). **Offen bleibt der GET-Pfad:** `conditionalGet.ts` hat weiterhin **keinen `response.ok`-Check** (ein 4xx/5xx-Body würde als Erfolg geparst+gecacht; zusätzlich `cached!` im 304-Pfad, YAGNI). Außerdem **schluckt `useResultQuery` den `Err`** via `unwrapOr(undefined as TData)` (Type-Lie) → ein GET-Fehler ist nicht von „noch keine Daten"/Leerzustand unterscheidbar (war separat als Review-Finding cq-F3/„TD3" notiert).
+**Behebung/Trigger:** Mit den resilience-„Laden"-Szenarien (`@NFR-resilience` „Backend nicht erreichbar/Serverfehler beim Laden") den GET-Fehlerpfad einführen: `response.ok`-Check in `conditionalGet`, GET-Err in `useResultQuery` als beobachtbaren Fehlerzustand statt Leerzustand.
 
 ---
 
@@ -68,9 +68,9 @@ Eintrag-Format:
 ---
 
 ## TD-S083-5 — E2E-Test: `EmptyDb`-Test ohne DB-Reset
-**Priorität:** Niedrig
-**Problem:** `EmptyDb`-Test ohne DB-Reset – latent flaky wenn DB vorher befüllt (durch „Zutat anlegen" jetzt verschärft).
-**Behebung/Trigger:** DB-Reset/Isolation im E2E-Setup einführen.
+**Priorität:** Mittel (hochgestuft S090 – empirisch bestätigt)
+**Problem:** Die E2E-Postgres hat **kein** Per-Run-Reset (persistentes Volume `mahl_postgres_data`, kein globalSetup/teardown, kein TRUNCATE/EnsureDeleted). **S090 bestätigt:** beim „leerer Name"-Lauf lagen 2 Residual-Zutaten in der DB; der `EmptyDb`-Happy-Path-Test („Noch keine Zutaten angelegt.") schlägt gegen eine befüllte DB fehl. (Abgegrenzt: die **Backend-Integrationstests** sind via `InMemoryDatabaseRoot`/ADR-S000-11 isoliert – nur die **E2E** gegen echtes Postgres nicht.)
+**Behebung/Trigger:** DB-Reset/Isolation im E2E-Setup (z.B. Truncate vor jedem Lauf via globalSetup, oder tmpfs-Volume + Migration je Lauf). Sollte vor weiteren E2E-abhängigen Szenarien erfolgen.
 
 ---
 
@@ -92,3 +92,31 @@ Eintrag-Format:
 **Priorität:** Hoch – das Branch-Coverage-Gate (NFR/DoD) ist aktuell ohne Wirkung
 **Problem:** Das Test-Projekt nutzt den Microsoft.Testing.Platform-Runner (xunit.v3). `coverlet.collector` (VSTest-DataCollector) ist darunter wirkungslos → der alte `dotnet-test.py` „bestand" das Gate über **veraltete** cobertura-Reports aus dem `/mnt/c`-Altrepo (Stale-Masking; erst durch den ext4-Umzug aufgedeckt). MTP-native Engines klemmen am gepinnten Stack: `Microsoft.Testing.Extensions.CodeCoverage` 18.3.2 und `coverlet.MTP` 8.0.1/10.0.1 → `TypeLoadException` (`TestHost.IDataConsumer`) gegen MTP 2.0.2.0/2.2.2.0; nur CodeCoverage 17.14.2 lief, scheiterte aber am `--coverage-settings`-Format. Gate daher in `dotnet-test.py` **explizit deaktiviert** (`collect_coverage = False`; kein Fake-100%, kein Hard-Block); Parser/Reporter + fail-closed-Logik bleiben re-enable-bereit.
 **Behebung/Trigger:** MTP-Coverage sauber aufsetzen — entweder `Microsoft.Testing.Extensions.CodeCoverage` **18.1.x** (versionsalignt zu MTP 2.0.x; `--coverage-settings` = bloßes `<Configuration>`-Root; Auto-Props nur via breitem `CompilerGeneratedAttribute`-Exclude, schließt async/yield mit aus) **oder** `xunit.v3`-Bump auf den MTP-2.2-Stack + `coverlet.MTP` 10.x (präzises `--coverlet-skip-auto-props`, bevorzugt). Danach `collect_coverage` reaktivieren + 100% verifizieren.
+
+---
+
+## TD-S090-1 — Backend-Validierung: collect-all + feld-tragender Fehlertyp
+**Priorität:** Mittel – fällig beim „leere Einheit"/„beide leer"-Szenario
+**Problem:** `IngredientsEndpoints.ToDomain` verkettet die Feld-Validierung per `Bind` (kurzschließend) und `NonEmptyTrimmedString.Create` liefert einen **payloadlosen** `Error` (Feldursprung geht verloren) → `NameRequiredProblem()` keyt hart auf `name`. Das „beide Pflichtfelder leer"-Szenario verlangt aber **beide** Meldungen gleichzeitig (ADR-S000-1 collect-all), und „leere Einheit" braucht den `defaultUnit`-Key — beides mit der Bind-Kette strukturell unerreichbar.
+**Behebung/Trigger:** Beim „leere Einheit"/„beide leer"-Szenario `ToDomain` auf **unabhängige** Validierung beider Felder + Merge der Error-Maps umstellen; einen feld-tragenden Fehlertyp einführen (z.B. `IngredientValidationError` mit `NameEmpty`/`UnitEmpty`-Varianten) statt payloadlosem `Error`.
+
+---
+
+## TD-S090-2 — Frontend: `matchKind` für Komponenten-Fehler-Unions noch nicht adoptiert
+**Priorität:** Niedrig – fällig mit dem resilience-`QueryCache.onError`-Setup
+**Problem:** `IngredientsPage` liest den Domain-Fehler per geguardetem direktem `kind`-Check (`saveError?.kind === 'FieldErrors' ? …`), nicht über `matchKind` (ADR-S056-1 / Guideline §4b „Pflicht"). Bewusst aufgeschoben (Code-Kommentar an der Stelle): das kanonische Muster trennt Netzwerk/5xx (werfen → `QueryCache.onError`/Toast) von Domain-Fehlern (matchKind); `onError` existiert noch nicht, daher trägt `ApiError` aktuell den `Unexpected`-kind. `matchKind` jetzt über `FieldErrors|Unexpected` bräuchte eine Suppression auf dem ungetesteten `Unexpected`-Arm, den die resilience-Arbeit wieder entfernt (Churn).
+**Behebung/Trigger:** Mit dem resilience-„Speichern/Laden"-Szenario `QueryCache.onError` einführen → Netzwerk/5xx wirft dorthin, die Komponenten-Fehler-Union kollabiert auf Domain-Fehler-only (`FieldErrors`), dann `matchKind` mit einem voll getriebenen Arm (kein Survivor).
+
+---
+
+## TD-S090-3 — Backend: `CreateIngredientDto` non-nullable → fehlendes JSON-Property evtl. 400 statt 422
+**Priorität:** Niedrig – kein treibendes Szenario
+**Problem:** `CreateIngredientDto(string Name, string DefaultUnit)` ist non-nullable. Lässt ein Client das `name`-Property **ganz weg** (statt `""`), kann ASP.NET Minimal API je nach STJ-Konfiguration `null` binden (Warnung) oder **400** vor dem Handler werfen — nicht das vertragliche **422** mit `{"errors":{…}}`. Der Client parst in `toIngredientResult` nur `status === 422` als Fehler; ein 400 würde als `Ingredient` interpretiert → stiller Fehlzustand. Aktuell unerreichbar (das Szenario sendet stets `name: ""`).
+**Behebung/Trigger:** Sobald ein Szenario fehlende/null-Properties adressiert: `string?`-Properties + bewusste Null-Behandlung in `ToDomain`, oder ein einheitlicher 4xx→`{"errors"}`-Mapper.
+
+---
+
+## TD-S090-4 — FE/BE: ungeprüfter Cast auf Response-Body, kein geteilter Contract-Typ
+**Priorität:** Niedrig
+**Problem:** `createIngredient` castet `response.json() as Promise<FieldErrorBody>` ungeprüft; der 422-Body-Shape ist zwischen Backend (`Results.ValidationProblem`) und Frontend (`FieldErrorBody`) nicht durch einen gemeinsamen Typ/Contract-Test abgesichert (ADR-S090-1 benennt selbst: „Mutation Score schützt nicht gegen Cross-Stack-Drift"). Unkritisch solange nur Display-Text fließt.
+**Behebung/Trigger:** Sobald mehrere Error-Feld-Szenarien existieren bzw. der Body über Display-Text hinausgeht: gemeinsamen Response-Shape-Typ zentralisieren (ggf. via OpenAPI-Codegen, vgl. ADR-S090-1-Diskussion) statt pro Test-/Service-Datei zu inlinen.

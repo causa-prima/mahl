@@ -17,13 +17,13 @@ internal readonly record struct NonEmptyTrimmedString
     private NonEmptyTrimmedString(string value) => _value = value;
 
     // ADR-S051-1: trim before validation, store the trimmed value.
-    public static OneOf<NonEmptyTrimmedString, Error<string>> Create(string input)
+    // Payloadless Error (OneOf.Types.Error): field-specific messages belong at the API boundary
+    // that knows the field (ADR-S051-2), not in this field-agnostic primitive.
+    public static OneOf<NonEmptyTrimmedString, Error> Create(string input)
     {
         var trimmed = input?.Trim();
         if (string.IsNullOrEmpty(trimmed))
-            // ADR-S000-4: error branch is not exercised by the happy path – pre-approved Stryker suppression on the message string.
-            // Stryker disable once String : error message not exercised by happy path (ADR-S000-4)
-            return new Error<string>("Value cannot be empty.");
+            return new Error();
 
         return new NonEmptyTrimmedString(trimmed);
     }

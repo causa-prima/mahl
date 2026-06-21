@@ -13,6 +13,7 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
     private sealed record IngredientResponse(Guid Id, string Name, string DefaultUnit);
     private sealed record CreateIngredientRequest(string Name, string DefaultUnit);
+    private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
 #pragma warning restore CA1812
 
     [Fact]
@@ -68,5 +69,30 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
         body.Should().NotBeNull();
         body.Should().BeEquivalentTo(
             [new IngredientResponse(Id: created.Id, Name: "Tomaten", DefaultUnit: "Stück")]);
+    }
+
+    [Fact]
+    public async Task US904_Error_CreateIngredient_EmptyName_Returns422WithFieldKeyedError()
+    {
+        // Given: a request with an empty name and a valid unit
+        var request = new CreateIngredientRequest(Name: "", DefaultUnit: "g");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 422 Unprocessable Entity (ADR-S090-1: status must be 422, not 400)
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        // Then: field-keyed error body maps the "name" field to its message (ADR-S090-1, ADR-S051-2)
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["name"] = ["Name darf nicht leer sein."],
+        });
+
+        // Then: nothing is persisted – the ingredient list stays unchanged (empty)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEmpty();
     }
 }

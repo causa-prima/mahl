@@ -66,3 +66,33 @@ test.describe('US904_HappyPath: Zutaten verwalten', () => {
     await expect(page.getByRole('dialog')).toBeHidden()
   })
 })
+
+// @US-904-error
+test.describe('US904_Error: Zutaten-Validierung', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/ingredients')
+  })
+
+  // Szenario: Zutat mit leerem Namen anlegen schlägt fehl
+  test('US904_Error_CreateIngredient_EmptyName_ShowsErrorAndListUnchanged', async ({ page }) => {
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert"). Erst auf das
+    // Abklingen des initialen GET warten – während des Ladens zeigt die Seite denselben
+    // Empty-State wie bei echt-leerer Liste, ein zu früher Count wäre fälschlich 0.
+    // includeHidden, weil der gleich offene Dialog (MUI Modal) den Hintergrund inkl.
+    // Liste auf aria-hidden setzt -> Vor- und Nach-Count brauchen dieselbe Basis.
+    await page.waitForLoadState('networkidle')
+    const listItems = page.getByTestId('ingredient-list').getByRole('listitem', { includeHidden: true })
+    const itemsBefore = await listItems.count()
+
+    // When: Dialog öffnen, keinen Namen eingeben, "g" als Einheit, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: Fehlermeldung erscheint
+    await expect(page.getByText('Name darf nicht leer sein.')).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert (DB-Ausgangszustand nach Fehler,
+    // e2e-testing.md "Assertion-Tiefe"). toHaveCount retryt, bis der Zustand stabil ist.
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
+})

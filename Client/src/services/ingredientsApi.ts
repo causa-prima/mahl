@@ -1,6 +1,9 @@
-import { ResultAsync } from 'neverthrow'
+import { ResultAsync, errAsync } from 'neverthrow'
 import type { ApiError } from '../types/apiError'
 import { conditionalGetJson } from './conditionalGet'
+
+// ADR-S090-1: 422-Body ist feld-keyed. Das Frontend konsumiert ausschließlich `errors`.
+type FieldErrorBody = { readonly errors: Readonly<Record<string, readonly string[]>> }
 
 export type Ingredient = {
   readonly id: string
@@ -24,7 +27,17 @@ export function createIngredient(ingredient: NewIngredient): ResultAsync<Ingredi
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ingredient),
-    }).then((r) => r.json() as Promise<Ingredient>),
-    (e) => ({ message: String(e) }),
-  )
+    }),
+    (e): ApiError => ({ kind: 'Unexpected', message: String(e) }),
+  ).andThen(toIngredientResult)
+}
+
+// ADR-S090-1: 422 -> feld-keyed Validierungsfehler (Err); sonst der angelegte Datensatz.
+function toIngredientResult(response: Response): ResultAsync<Ingredient, ApiError> {
+  if (response.status === 422) {
+    return ResultAsync.fromSafePromise(response.json() as Promise<FieldErrorBody>).andThen((body) =>
+      errAsync<Ingredient, ApiError>({ kind: 'FieldErrors', fields: body.errors }),
+    )
+  }
+  return ResultAsync.fromSafePromise(response.json() as Promise<Ingredient>)
 }

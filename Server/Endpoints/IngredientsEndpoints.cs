@@ -35,7 +35,7 @@ internal static class IngredientsEndpoints
             "/",
             async (CreateIngredientDto dto, MahlDbContext db) =>
                 await dto.ToDomain()
-                    .MapError<Ingredient, Error<string>, IResult>(e => Results.UnprocessableEntity(e.Value))
+                    .MapError<Ingredient, Error, IResult>(_ => IngredientMappings.NameRequiredProblem())
                     .BindAsync<Ingredient, IngredientDto, IResult>(async ingredient =>
                     {
                         db.Ingredients.Add(ingredient.ToDbType());
@@ -50,11 +50,21 @@ internal static class IngredientsEndpoints
 
 file static class IngredientMappings
 {
-    public static OneOf<Ingredient, Error<string>> ToDomain(this CreateIngredientDto dto) =>
+    public static OneOf<Ingredient, Error> ToDomain(this CreateIngredientDto dto) =>
         NonEmptyTrimmedString.Create(dto.Name)
             .Bind(name => NonEmptyTrimmedString.Create(dto.DefaultUnit)
                 // ADR-S030-1: server-side UUIDv7 primary key.
                 .Map(unit => Ingredient.Create(Guid.CreateVersion7(), name, unit)));
+
+    // ADR-S090-1: field-keyed 422 body { "errors": { "<field>": ["<msg>"] } }; key = request JSON property name.
+    // ADR-S051-2: fixed German message for an empty Ingredient name. defaultUnit-keyed messages are
+    // deferred to the "leere Einheit"-scenario (unit is valid here), so the only reachable error is name.
+    public static IResult NameRequiredProblem() => Results.ValidationProblem(
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["name"] = ["Name darf nicht leer sein."],
+        },
+        statusCode: StatusCodes.Status422UnprocessableEntity);
 
     public static IngredientDbType ToDbType(this Ingredient domain) =>
         new() { Id = domain.Id, Name = domain.Name.Value, DefaultUnit = domain.DefaultUnit.Value };

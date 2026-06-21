@@ -5,12 +5,12 @@ namespace mahl.Server;
 
 internal static class OneOfExtensions
 {
-    public static OneOf<TOut, Error<string>> Map<TIn, TOut>(
-        this OneOf<TIn, Error<string>> source, Func<TIn, TOut> map) =>
-        source.Match<OneOf<TOut, Error<string>>>(ok => map(ok), err => err);
+    public static OneOf<TOut, TError> Map<TIn, TOut, TError>(
+        this OneOf<TIn, TError> source, Func<TIn, TOut> map) =>
+        source.Match<OneOf<TOut, TError>>(ok => map(ok), err => err);
 
-    public static OneOf<TOut, Error<string>> Bind<TIn, TOut>(
-        this OneOf<TIn, Error<string>> source, Func<TIn, OneOf<TOut, Error<string>>> bind) =>
+    public static OneOf<TOut, TError> Bind<TIn, TOut, TError>(
+        this OneOf<TIn, TError> source, Func<TIn, OneOf<TOut, TError>> bind) =>
         source.Match(ok => bind(ok), err => err);
 
     public static OneOf<T, TError> MapError<T, TErrorIn, TError>(

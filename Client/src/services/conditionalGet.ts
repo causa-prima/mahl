@@ -36,5 +36,8 @@ async function requestJson<T>(url: string, cached: CacheEntry | undefined): Prom
 }
 
 export function conditionalGetJson<T>(url: string): ResultAsync<T, ApiError> {
-  return ResultAsync.fromPromise(requestJson<T>(url, cache.get(url)), (e) => ({ message: String(e) }))
+  return ResultAsync.fromPromise(requestJson<T>(url, cache.get(url)), (e) => ({
+    kind: 'Unexpected',
+    message: String(e),
+  }))
 }

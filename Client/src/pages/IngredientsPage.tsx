@@ -28,7 +28,7 @@ export default function IngredientsPage() {
     setUnit('')
   }
 
-  const save = useResultMutation(createIngredient, () => {
+  const [save, saveError] = useResultMutation(createIngredient, () => {
     closeDialog()
     // Äquivalenter Mutant: Die App hat nur eine Query-Art (['ingredients']), daher ist
     // invalidateQueries({}) (alle) ≡ invalidateQueries({ queryKey: ingredientsKey }).
@@ -36,6 +36,22 @@ export default function IngredientsPage() {
     // Stryker disable next-line ObjectLiteral: aequivalent, nur eine Query-Art (s. o.)
     void queryClient.invalidateQueries({ queryKey: ingredientsKey })
   })
+
+  // Direkter kind-Check statt matchKind (ADR-S056-1) ist hier bewusst aufgeschoben:
+  // ADR-S056-1's kanonisches Muster trennt Netzwerk/5xx (werfen -> QueryCache.onError/
+  // Toast) von Domain-Fehlern (matchKind). onError existiert noch nicht (resilience-
+  // Szenario). Bis dahin trägt ApiError den Unexpected-kind und die Komponente liest
+  // FieldErrors geguarded direkt; matchKind wird im resilience-Szenario adoptiert, wenn
+  // die Komponenten-Fehler-Union auf Domain-Fehler-only kollabiert. Tracking: docs/tech-debt.md.
+  // ADR-S090-1: feld-keyed 422-Fehler -> Meldung am Name-Feld (UX-Guideline §4: nah am
+  // betroffenen Element). Nur der FieldErrors-kind trägt feldbezogene Meldungen.
+  // name?.[0]: Guard gegen Render-Crash, falls ein FieldErrors OHNE name-Key ankommt
+  // (contractlich möglich nach ADR-S090-1, z.B. nur defaultUnit-Fehler beim 'leere
+  // Einheit'-Szenario; der fields-Typ ist Partial -> Lookup ehrlich `... | undefined`).
+  // Der name-absent-Zweig ist von DIESEM Szenario nicht test-getrieben -> Stryker-
+  // Suppression; ein echter Test ersetzt sie mit dem 'leere Einheit'-Szenario.
+  // Stryker disable next-line OptionalChaining: name-absent-Zweig erst im 'leere Einheit'-Szenario test-getrieben (s. o.)
+  const nameError = saveError?.kind === 'FieldErrors' ? saveError.fields.name?.[0] : undefined
 
   return (
     <div>
@@ -54,7 +70,13 @@ export default function IngredientsPage() {
       <Dialog open={isDialogOpen} aria-labelledby="create-ingredient-title">
         <DialogTitle id="create-ingredient-title">Zutat anlegen</DialogTitle>
         <DialogContent>
-          <TextField label="Name" value={name} onChange={(e) => { setName(e.target.value) }} />
+          <TextField
+            label="Name"
+            value={name}
+            onChange={(e) => { setName(e.target.value) }}
+            error={Boolean(nameError)}
+            helperText={nameError}
+          />
           <TextField label="Einheit" value={unit} onChange={(e) => { setUnit(e.target.value) }} />
         </DialogContent>
         <DialogActions>

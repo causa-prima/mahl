@@ -289,6 +289,8 @@ function CreateIngredientForm() {
 
 **Pflicht:** Komponenten verwenden ausschließlich `matchState()`/`matchKind()` – kein direkter `state.status`-Zugriff (Review-Kriterium: direkter Zugriff = CRITICAL Finding).
 
+**Erfolg als Render-Zustand vs. Seiteneffekt:** Der `success`-Zweig von `matchState` ist für **Render**-Erfolg (eine Erfolgsmeldung/-ansicht zeigen). Erfolg, der ein **Seiteneffekt** ist (Dialog schließen, Query invalidieren, navigieren), läuft über den **`onSuccess`-Callback** von `useResultMutation` – nicht über `matchState`, das sonst einen `useEffect` zum Auslösen des Effekts bräuchte. Beides koexistiert: `onSuccess` für den Effekt, `matchState`/`matchKind` für das, was gerendert wird (inkl. `error`-Zweig). Der `onSuccess`-Callback feuert ausschließlich im `Ok`-Pfad (der `Err`-Wert reist durch React Querys Success-Pfad und wird als beobachtbarer Fehlerzustand zurückgegeben).
+
 ### QueryCache-Setup (App-Root, einmalig)
 
 ```typescript

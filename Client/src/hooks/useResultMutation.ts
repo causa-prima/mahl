@@ -1,17 +1,31 @@
+import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import type { ResultAsync } from 'neverthrow'
+import type { Result, ResultAsync } from 'neverthrow'
 
-// US-904 Zutat anlegen: Mutation-State Minimal/YAGNI – nur der Erfolgs-Seiteneffekt
-// (onSuccess) wird ausgeübt. Volle MutationState-Union (pending/error) aufgeschoben
-// (ADR-S083-2) – Erweiterung bei Button-Disable-/Error-Szenarien.
+// US-904 Zutat anlegen: success-Seiteneffekt (onSuccess) + beobachtbarer Fehlerzustand.
+// ADR-S083-2: der aufgeschobene Error-State wird hier eingelöst. Domain-Err reist als
+// Result durch React Querys Success-Pfad (kein throw); onSuccess feuert NUR bei Ok,
+// der Err-Wert wird als `error` zurückgegeben. pending/success-Union weiterhin
+// aufgeschoben (kein treibendes Szenario).
 export function useResultMutation<TData, TError, TVariables>(
   fn: (variables: TVariables) => ResultAsync<TData, TError>,
   onSuccess: () => void,
-): (variables: TVariables) => void {
-  const mutation = useMutation({
+): readonly [(variables: TVariables) => void, TError | undefined] {
+  const [error, setError] = useState<TError | undefined>(undefined)
+  const mutation = useMutation<Result<TData, TError>, Error, TVariables>({
+    // Promise.resolve flacht die ResultAsync (thenable) zu Promise<Result> ab –
+    // React Query erwartet ein echtes Promise, nicht das ResultAsync selbst.
     mutationFn: (variables: TVariables) => Promise.resolve(fn(variables)),
-    onSuccess,
+    onSuccess: (result) => {
+      result.match(
+        () => {
+          setError(undefined)
+          onSuccess()
+        },
+        (e) => { setError(e) },
+      )
+    },
   })
 
-  return mutation.mutate
+  return [mutation.mutate, error]
 }

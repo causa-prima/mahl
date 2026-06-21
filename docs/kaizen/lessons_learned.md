@@ -43,6 +43,13 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 090 – 2026-06-21
+
+- **[MITTEL] [QUALITÄT] [TS-Code] LL-S090-1 – Offener MUI-Dialog macht den Hintergrund `aria-hidden` → rollenbasierte Queries finden nichts**
+  Was: Bei offenem „Zutat anlegen"-Dialog liefen `getByRole('listitem')` (Komponenten-Test) und `getByRole('listitem')` (E2E) ins Leere, weil MUI v7 den Hintergrund per `aria-hidden` ausblendet — der Test schlug scheinbar grundlos fehl, derselbe latente Bug steckte in beiden Schichten.
+  Warum: Ein `Dialog` im `open`-Zustand setzt `aria-hidden` auf den restlichen Baum; Rollen-Queries ignorieren versteckte Elemente per Default.
+  Regel: Müssen Hintergrund-Elemente bei offenem Dialog/Overlay über ihre Rolle abgefragt werden, explizit versteckte einschließen — testing-library `{ hidden: true }`, Playwright `{ includeHidden: true }`.
+
 ## Session 088 – 2026-06-18
 
 - **[MITTEL] [PROZESS] [Hook/Script] LL-S088-1 – Check ins falsche Gate eingeklinkt (Verantwortungsträger nicht geprüft)**
