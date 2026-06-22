@@ -1,4 +1,15 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+// Erfasst die Zutaten-Liste samt Ausgangs-Anzahl für "Liste bleibt unverändert"-Assertions.
+// networkidle: initiales GET abklingen lassen – während des Ladens zeigt die Seite denselben
+// Empty-State wie bei echt-leerer Liste, ein zu früher Count wäre fälschlich 0.
+// includeHidden: der gleich offene Dialog (MUI Modal) setzt den Hintergrund inkl. Liste auf
+// aria-hidden -> Vor- und Nach-Count brauchen dieselbe Basis.
+async function captureIngredientList(page: Readonly<Page>) {
+  await page.waitForLoadState('networkidle')
+  const listItems = page.getByTestId('ingredient-list').getByRole('listitem', { includeHidden: true })
+  return { listItems, itemsBefore: await listItems.count() }
+}
 
 // @US-904-happy-path
 test.describe('US904_HappyPath: Zutaten verwalten', () => {
@@ -75,14 +86,8 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
 
   // Szenario: Zutat mit leerem Namen anlegen schlägt fehl
   test('US904_Error_CreateIngredient_EmptyName_ShowsErrorAndListUnchanged', async ({ page }) => {
-    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert"). Erst auf das
-    // Abklingen des initialen GET warten – während des Ladens zeigt die Seite denselben
-    // Empty-State wie bei echt-leerer Liste, ein zu früher Count wäre fälschlich 0.
-    // includeHidden, weil der gleich offene Dialog (MUI Modal) den Hintergrund inkl.
-    // Liste auf aria-hidden setzt -> Vor- und Nach-Count brauchen dieselbe Basis.
-    await page.waitForLoadState('networkidle')
-    const listItems = page.getByTestId('ingredient-list').getByRole('listitem', { includeHidden: true })
-    const itemsBefore = await listItems.count()
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert")
+    const { listItems, itemsBefore } = await captureIngredientList(page)
 
     // When: Dialog öffnen, keinen Namen eingeben, "g" als Einheit, speichern
     await page.getByRole('button', { name: 'Zutat anlegen' }).click()
@@ -96,13 +101,28 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     await expect(listItems).toHaveCount(itemsBefore)
   })
 
+  // Szenario: Zutat mit Namen aus nur Leerzeichen anlegen schlägt fehl
+  test('US904_Error_CreateIngredient_WhitespaceName_ShowsErrorAndListUnchanged', async ({ page }) => {
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert")
+    const { listItems, itemsBefore } = await captureIngredientList(page)
+
+    // When: Dialog öffnen, nur Leerzeichen als Name, "g" als Einheit, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('   ')
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: dieselbe Fehlermeldung wie bei leerem Namen erscheint (beobachtbares Verhalten).
+    // Das serverseitige Trimming (Whitespace -> leer, ADR-S051-1) selbst prüft der Backend-Test.
+    await expect(page.getByText('Name darf nicht leer sein.')).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
+
   // Szenario: Zutat mit leerer Einheit anlegen schlägt fehl
   test('US904_Error_CreateIngredient_EmptyUnit_ShowsErrorAndListUnchanged', async ({ page }) => {
-    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert"). Begründung für
-    // networkidle + includeHidden: identisch zum leeren-Namen-Test oben.
-    await page.waitForLoadState('networkidle')
-    const listItems = page.getByTestId('ingredient-list').getByRole('listitem', { includeHidden: true })
-    const itemsBefore = await listItems.count()
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert")
+    const { listItems, itemsBefore } = await captureIngredientList(page)
 
     // When: Dialog öffnen, "Salz" als Name, keine Einheit, speichern
     await page.getByRole('button', { name: 'Zutat anlegen' }).click()

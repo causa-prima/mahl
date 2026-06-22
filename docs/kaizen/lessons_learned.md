@@ -43,7 +43,15 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
-## Session 091 – 2026-06-22
+## Session 092 – 2026-06-22
+
+- **[MITTEL] [PROZESS] [Mutation-Testing] LL-S092-1 – Mutation Score & Branch Coverage sind blind für Datentransformations-Korrektheit**
+  Was: `.Trim()` (ADR-S051-1) lag seit dem Skeleton-Baseline-Commit ungetrieben/ungetestet im Code (Gold-Plating) – 100% Mutation Score und 100% Branch Coverage schlugen nie an, weil Standard-Stryker `.Trim()` nicht mutiert und Trim auf einer nicht-verzweigenden Anweisung sitzt.
+  Warum: Beide automatischen Gates messen keine datenabhängige Transformation – ein „leerer" und ein „getrimmt-leerer" String nehmen denselben Pfad und es existiert kein zugehöriger Mutant.
+  Regel: Datentransformations-*Korrektheit* (Trim, Casing, Normalisierung) nie auf Mutation/Coverage verlassen – sie braucht einen szenariogetriebenen Verhaltenstest auf den beobachtbaren Output; im Review aktiv fragen „welches Szenario treibt diese Transformationszeile?".
+  Bezug: ADR-S092-1
+
+
 
 - **[MITTEL] [AGENT] [Bash/Permission] LL-S091-1 – Kuratierten Wrapper-Output gefiltert + Methode falsch behauptet**
   Quelle: User

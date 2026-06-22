@@ -71,11 +71,18 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
             [new IngredientResponse(Id: created.Id, Name: "Tomaten", DefaultUnit: "Stück")]);
     }
 
-    [Fact]
-    public async Task US904_Error_CreateIngredient_EmptyName_Returns422WithFieldKeyedError()
+    // Same invariant ("Pflichtfeld leer oder nur Whitespace -> 422 feld-keyed"), nur Input variiert
+    // -> ein parametrisierter Test (docs/process/tdd-process.md "Parametrisierte Tests").
+    // ADR-S051-1: Strings werden vor der Validierung getrimmt -> "   " ist nach Trimming leer.
+    [Theory]
+    [InlineData("", "g", "name", "Name darf nicht leer sein.")]
+    [InlineData("   ", "g", "name", "Name darf nicht leer sein.")]
+    [InlineData("Salz", "", "defaultUnit", "Einheit darf nicht leer sein.")]
+    public async Task US904_Error_CreateIngredient_InvalidInput_Returns422WithFieldKeyedError(
+        string name, string unit, string expectedKey, string expectedMessage)
     {
-        // Given: a request with an empty name and a valid unit
-        var request = new CreateIngredientRequest(Name: "", DefaultUnit: "g");
+        // Given: a request whose required field is empty or whitespace-only
+        var request = new CreateIngredientRequest(Name: name, DefaultUnit: unit);
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -83,37 +90,12 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
         // Then: 422 Unprocessable Entity (ADR-S090-1: status must be 422, not 400)
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        // Then: field-keyed error body maps the "name" field to its message (ADR-S090-1, ADR-S051-2)
+        // Then: field-keyed error body maps the offending field to its message (ADR-S090-1, ADR-S051-2)
         var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["name"] = ["Name darf nicht leer sein."],
-        });
-
-        // Then: nothing is persisted – the ingredient list stays unchanged (empty)
-        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
-        persisted.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task US904_Error_CreateIngredient_EmptyUnit_Returns422WithFieldKeyedError()
-    {
-        // Given: a request with a valid name and an empty unit
-        var request = new CreateIngredientRequest(Name: "Salz", DefaultUnit: "");
-
-        // When: the ingredient is created
-        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
-
-        // Then: 422 Unprocessable Entity (ADR-S090-1: status must be 422, not 400)
-        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-
-        // Then: field-keyed error body maps the "defaultUnit" field to its message (ADR-S090-1, ADR-S051-2)
-        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
-        body.Should().NotBeNull();
-        body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
-        {
-            ["defaultUnit"] = ["Einheit darf nicht leer sein."],
+            [expectedKey] = [expectedMessage],
         });
 
         // Then: nothing is persisted – the ingredient list stays unchanged (empty)

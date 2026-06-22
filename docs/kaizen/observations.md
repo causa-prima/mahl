@@ -302,3 +302,37 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 - Kandidaten: — (Retro; u.a.: Script sammelt Stryker-/`.editorconfig`-Suppressions + gruppiert nach Klasse/Begründung; optionales Feld „behoben-durch-Szenario" pro Suppression)
 - Entscheidung/Maßnahme: offen (Retro)
 - Bezug: ADR-S000-4 (gelöschte Suppression-Vertagung), OBS-S090-5 (TD-Grooming-Lücke)
+
+---
+
+## OBS-S092-1 – Doppelte LL/OBS-Erfassung: implementing-scenario Schritt 6.1 vs. closing-session
+- Quelle: User
+- Status: NEU
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: implementing-scenario / closing-session
+- Beobachtung: `implementing-scenario` Schritt 6.1 („Offene Punkte triagieren") erfasst LLs/OBSs/Tech-Debt, und `closing-session` (Schritt 2/3/5) erfasst dieselbe Klasse von Punkten erneut. Bei direktem Übergang Szenario → Abschluss ist die Vorab-Triage in 6.1 redundant – sie ist nur nötig, wenn die Session **nicht** abgeschlossen wird (Szenario fertig, Session läuft weiter). In dieser Session führte das zu doppeltem Abfragen.
+- Kandidaten: A) 6.1 erfasst nur, wenn KEIN Abschluss folgt; bei Abschluss an closing-session delegieren (gering) | B) 6.1 sammelt nur (kein Schreiben), closing-session schreibt einmalig | C) Status quo (Doppel-Prompt akzeptieren)
+- Entscheidung/Maßnahme: offen (Retro) – Kandidat A/B wahrscheinlich.
+
+---
+
+## OBS-S092-2 – Dokumentiertes Kommando zum Header-Lesen (statt eigenes Script)
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Doku/Hook/Script
+- Beobachtung: Viele Doku-Dateien tragen im Header die Meta-Infos inkl. Schema/Format (z.B. lessons_learned, observations, adr, tech-debt). Agenten lesen sie ad-hoc (sed/Read), teils unvollständig. Es genügt ein **dokumentiertes Kommando-Pattern** mit bestehenden Tools (z.B. `sed -n '1,/^-->/p' <datei>` o.ä.), aufgenommen in den Startup-Hinweis bzw. die `--list`-Referenz – **kein eigenes Script** (Wartung) und **nicht** alle Header im Startup injizieren (zu teuer). Ggf. zweigeteilt (Metadaten vs. Schema), aber evtl. besser immer beides gemeinsam, da Schema ohne Metadaten selten nützt.
+- Kandidaten: A) Kommando-Pattern (bestehende Tools, z.B. `sed`-Range bis `-->`/erstes `---`) im Startup-Hinweis / auf der `--list`-Referenz dokumentieren (gering) | B) doch eigenes Script (mehr Wartung) | C) Status quo
+- Entscheidung/Maßnahme: offen (Retro) – Kandidat A wahrscheinlich; Header-Endmarker-Konvention (`-->` vs. `---`) projektweit klären, damit ein einzelnes Pattern alle Docs trifft.
+
+---
+
+## OBS-S092-3 – kaizen-Workshop prüft LL-Metadaten (v.a. Impact) vor dem Retro-Skript
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Review
+- Beobachtung: LL-Metadaten (insb. Impact) könnten falsch/inkonsistent gesetzt sein und damit Jenga-/Prioritäts-Matrix verzerren. Idee: Der kaizen-Workshop listet vor dem Retro-Skript potentielle Metadaten-Fehler auf. Nutzen ist empirisch prüfbar: mehrere Subagenten bewerten bestehende Einträge (oder ein Sample) **blind** neu; viele Abweichungen → analysieren und Schlüsse ziehen (echte Fehlklassifikation vs. bloßer Drift / subjektive Streuung).
+- Kandidaten: — (Retro; erster Schritt = Validierungs-Experiment mit blinden Subagenten-Neubewertungen eines Samples, dann Abweichungs-Analyse)
+- Entscheidung/Maßnahme: offen (Retro) – erst Nutzen via Blind-Rebewertung verifizieren, bevor ein Workshop-Schritt eingebaut wird.
+- Bezug: OBS-S085-10 (Impact-Vokabular geteilt mit LL-Schwere)

@@ -710,6 +710,24 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 ---
 
+### ADR-S092-1: Stryker Mutation-Level „Standard" beibehalten (nicht auf Advanced anheben)
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:stryker, tooling:build
+
+**Entscheidung:** Das Stryker-Mutation-Level bleibt auf „Standard" (Default) – es wird nicht auf Advanced angehoben. Advanced ist das einzige höhere Level mit zusätzlichen Mutator-Kategorien: Regex, Math Methods, **String Methods**. „Complete" ist laut Stryker.NET-Doku **deckungsgleich mit Advanced** (verifiziert S092: die Level-Tabelle listet keine Complete-exklusiven Mutationen, nur die Beschreibung „all possible mutations") – die einzige relevante Schwelle ist also Standard → Advanced.
+
+**Begründung:**
+1. **Der Anlass schließt den Blindspot nicht:** String-Method-Mutationen (z.B. `Trim()`) sind erst ab Advanced aktiv. Der einzige Advanced-Mutant für `input?.Trim()` ist `Trim() → ""` – er macht jeden Wert leer und wird vom Happy-Path-Test trivial getötet. Trim-*Korrektheit* (Whitespace wird entfernt, getrimmter Wert gespeichert) pinnt damit **kein** Mutation-Level, sondern nur ein szenariogetriebener Verhaltenstest auf den gespeicherten/zurückgegebenen Wert (vgl. LL-S092-1).
+2. **Advanced verteuert das 100%-Gate (ADR-S041-8):** mehr Mutanten, mehr *äquivalente* Mutanten → mehr begründete Suppressions + Triage, langsamere Läufe – ohne proportionalen Korrektheitsgewinn, da die hochwertigen Verhaltensweisen (Trim, Casing, URL) ohnehin szenariogetrieben gepinnt werden.
+3. **Standard ist der Upstream-Default** (einfachere Baseline).
+
+**Revisit-Trigger:** Advanced neu bewerten, sobald regex-/string-method-schwerer Code entsteht – konkret die `sourceUrl`-Validierung (Regex) oder die Duplikat-Erkennung „abweichende Schreibweise" (falls via `.ToUpper()`/`.ToLower()` statt `StringComparer.OrdinalIgnoreCase`). Dann ist der Nutzen an einem konkreten Codepfad messbar.
+
+**Verworfen:** Jetzt auf Advanced anheben – Gate-Mehraufwand ohne aktuellen Nutzen; schließt den Trim-Blindspot nicht (s.o.). (Complete ist keine separate Option, da laut Doku ≡ Advanced.)
+
+---
+
 ### ADR-S041-9: Defensive Guards: kein Test, Stryker disable mit Begründung
 
 **Status:** Accepted
