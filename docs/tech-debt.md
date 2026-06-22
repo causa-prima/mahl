@@ -68,8 +68,8 @@ Eintrag-Format:
 ---
 
 ## TD-S083-5 — E2E-Test: `EmptyDb`-Test ohne DB-Reset
-**Priorität:** Mittel (hochgestuft S090 – empirisch bestätigt)
-**Problem:** Die E2E-Postgres hat **kein** Per-Run-Reset (persistentes Volume `mahl_postgres_data`, kein globalSetup/teardown, kein TRUNCATE/EnsureDeleted). **S090 bestätigt:** beim „leerer Name"-Lauf lagen 2 Residual-Zutaten in der DB; der `EmptyDb`-Happy-Path-Test („Noch keine Zutaten angelegt.") schlägt gegen eine befüllte DB fehl. (Abgegrenzt: die **Backend-Integrationstests** sind via `InMemoryDatabaseRoot`/ADR-S000-11 isoliert – nur die **E2E** gegen echtes Postgres nicht.)
+**Priorität:** Mittel (hochgestuft S090; **2. Rezidiv S091** – Muster, kein Einzelfall)
+**Problem:** Die E2E-Postgres hat **kein** Per-Run-Reset (persistentes Volume `mahl_postgres_data`, kein globalSetup/teardown, kein TRUNCATE/EnsureDeleted). **S090 bestätigt:** beim „leerer Name"-Lauf lagen 2 Residual-Zutaten in der DB; der `EmptyDb`-Happy-Path-Test („Noch keine Zutaten angelegt.") schlägt gegen eine befüllte DB fehl. **S091 Rezidiv:** beim „leere Einheit"-Lauf schlug der Happy-Path `CreateIngredient_ValidData` mit Playwright-`strict mode violation: 'Tomaten' resolved to 2 elements` fehl — ein „Tomaten" aus einem früheren Lauf lag noch in der DB, der Test legt jedes Mal ein weiteres an. (Abgegrenzt: die **Backend-Integrationstests** sind via `InMemoryDatabaseRoot`/ADR-S000-11 isoliert – nur die **E2E** gegen echtes Postgres nicht.)
 **Behebung/Trigger:** DB-Reset/Isolation im E2E-Setup (z.B. Truncate vor jedem Lauf via globalSetup, oder tmpfs-Volume + Migration je Lauf). Sollte vor weiteren E2E-abhängigen Szenarien erfolgen.
 
 ---
@@ -95,10 +95,10 @@ Eintrag-Format:
 
 ---
 
-## TD-S090-1 — Backend-Validierung: collect-all + feld-tragender Fehlertyp
-**Priorität:** Mittel – fällig beim „leere Einheit"/„beide leer"-Szenario
-**Problem:** `IngredientsEndpoints.ToDomain` verkettet die Feld-Validierung per `Bind` (kurzschließend) und `NonEmptyTrimmedString.Create` liefert einen **payloadlosen** `Error` (Feldursprung geht verloren) → `NameRequiredProblem()` keyt hart auf `name`. Das „beide Pflichtfelder leer"-Szenario verlangt aber **beide** Meldungen gleichzeitig (ADR-S000-1 collect-all), und „leere Einheit" braucht den `defaultUnit`-Key — beides mit der Bind-Kette strukturell unerreichbar.
-**Behebung/Trigger:** Beim „leere Einheit"/„beide leer"-Szenario `ToDomain` auf **unabhängige** Validierung beider Felder + Merge der Error-Maps umstellen; einen feld-tragenden Fehlertyp einführen (z.B. `IngredientValidationError` mit `NameEmpty`/`UnitEmpty`-Varianten) statt payloadlosem `Error`.
+## TD-S090-1 — Backend-Validierung: collect-all-Merge (beide Felder gleichzeitig)
+**Priorität:** Mittel – fällig beim „beide leer"-Szenario
+**Problem:** `IngredientsEndpoints.ToDomain` validiert die Felder **sequenziell/kurzschließend** (Name zuerst, dann Einheit) → sind beide leer, kommt nur die erste Meldung zurück. Das „Beide Pflichtfelder leer"-Szenario verlangt aber **beide** Meldungen gleichzeitig (ADR-S000-1 collect-all).
+**Behebung/Trigger:** Beim „beide leer"-Szenario `ToDomain` auf **unabhängige** Validierung beider Felder + Merge der Fehler umstellen (`IngredientValidationError` zu einer Menge/Liste erweitern).
 
 ---
 
@@ -113,10 +113,3 @@ Eintrag-Format:
 **Priorität:** Niedrig – kein treibendes Szenario
 **Problem:** `CreateIngredientDto(string Name, string DefaultUnit)` ist non-nullable. Lässt ein Client das `name`-Property **ganz weg** (statt `""`), kann ASP.NET Minimal API je nach STJ-Konfiguration `null` binden (Warnung) oder **400** vor dem Handler werfen — nicht das vertragliche **422** mit `{"errors":{…}}`. Der Client parst in `toIngredientResult` nur `status === 422` als Fehler; ein 400 würde als `Ingredient` interpretiert → stiller Fehlzustand. Aktuell unerreichbar (das Szenario sendet stets `name: ""`).
 **Behebung/Trigger:** Sobald ein Szenario fehlende/null-Properties adressiert: `string?`-Properties + bewusste Null-Behandlung in `ToDomain`, oder ein einheitlicher 4xx→`{"errors"}`-Mapper.
-
----
-
-## TD-S090-4 — FE/BE: ungeprüfter Cast auf Response-Body, kein geteilter Contract-Typ
-**Priorität:** Niedrig
-**Problem:** `createIngredient` castet `response.json() as Promise<FieldErrorBody>` ungeprüft; der 422-Body-Shape ist zwischen Backend (`Results.ValidationProblem`) und Frontend (`FieldErrorBody`) nicht durch einen gemeinsamen Typ/Contract-Test abgesichert (ADR-S090-1 benennt selbst: „Mutation Score schützt nicht gegen Cross-Stack-Drift"). Unkritisch solange nur Display-Text fließt.
-**Behebung/Trigger:** Sobald mehrere Error-Feld-Szenarien existieren bzw. der Body über Display-Text hinausgeht: gemeinsamen Response-Shape-Typ zentralisieren (ggf. via OpenAPI-Codegen, vgl. ADR-S090-1-Diskussion) statt pro Test-/Service-Datei zu inlinen.

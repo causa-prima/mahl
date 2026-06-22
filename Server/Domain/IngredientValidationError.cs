@@ -1,0 +1,26 @@
+using mahl.Server.Types;
+
+namespace mahl.Server.Domain;
+
+// Field-bearing validation error as a sum-type (ADR-S018-1 Variante A): identifies which Ingredient field
+// failed validation, so the API boundary can key the field-keyed 422 body (ADR-S090-1) on the right field.
+// Private nested subtypes, with Match<T> as the sole consumer entry point (ADR-S018-1). Payloadless cases –
+// the field-to-key/text mapping lives at the boundary (ADR-S051-2), so the cases carry no data.
+internal abstract record IngredientValidationError
+{
+    private IngredientValidationError() { } // prevents external subtypes (strongest encapsulation)
+
+    private sealed record NameEmptyCase : IngredientValidationError;
+    private sealed record UnitEmptyCase : IngredientValidationError;
+
+    public static IngredientValidationError NameEmpty { get; } = new NameEmptyCase();
+    public static IngredientValidationError UnitEmpty { get; } = new UnitEmptyCase();
+
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage] // ADR-S040-1: structurally unreachable _-arm
+    public T Match<T>(Func<T> onNameEmpty, Func<T> onUnitEmpty) => this switch
+    {
+        NameEmptyCase => onNameEmpty(),
+        UnitEmptyCase => onUnitEmpty(),
+        _ => SumType.Unreachable<T>(), // ADR-S040-1: private subtypes make this arm unreachable
+    };
+}

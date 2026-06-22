@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 91 | 2026-06-22 | SKELETON (US-904 Szenario – Validierung) | `@US-904-error` „leere Einheit" full-stack (vorgezogen, behebt Feld-Key-Bug): erster Sum-Type `IngredientValidationError`+`SumType.cs` (ADR-S040-1/S018), feld-keyed 422; `noUncheckedIndexedAccess` an. ADR-S000-4+TD-S090-4 gelöscht. LL-S091-1..3, OBS-S091-1..4. |
 | 90 | 2026-06-21 | SKELETON (US-904 Szenario – Validierung) | US-904 `@US-904-error` „leerer Name schlägt fehl" full-stack: feld-keyed 422 (ADR-S090-1, supersedet S000-1), NonEmptyTrimmedString→OneOf, Frontend FieldErrors+onSuccess-Hook; beide Stryker 100%. Validierung server-only. /mnt/c-Pfad-Fixes (5 Hooks). LL-S090-1 (Dialog aria-hidden). |
 | 89 | 2026-06-18 | SKELETON (WSL-native Toolchain) | Dev-Toolchain WSL-nativ: Node 24 LTS via fnm-Binary (.nvmrc), .NET 10 SDK nativ, dotnet-Tools per Manifest; Repo auf ext4; cmd.exe-Wrapper + DLL-Lock raus. Migration bewusst KEIN ADR (Host-Setup); ADR-S089-1+TD-S089-1 = Coverage-Gate geparkt. Verifikation nativ grün (E2E 5/5). |
 | 88 | 2026-06-18 | SKELETON (Szenario-Tracking + Poka-Yoke) | Nächstes-Szenario in AGENT_MEMORY automatisiert (OBS-S085-16 Teil B): next_scenario.py löst {{NEXT_SCENARIO}} aus `// Szenario:`-Kommentaren auf (--render/--open/--done/--check), Header-Feld entfällt; bidirektionaler Poka-Yoke-Hook check-e2e-scenario-ref.py (Spec+Feature-Edit); ADR-S041-7-Addendum. |

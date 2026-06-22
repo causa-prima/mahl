@@ -95,4 +95,23 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     // e2e-testing.md "Assertion-Tiefe"). toHaveCount retryt, bis der Zustand stabil ist.
     await expect(listItems).toHaveCount(itemsBefore)
   })
+
+  // Szenario: Zutat mit leerer Einheit anlegen schlägt fehl
+  test('US904_Error_CreateIngredient_EmptyUnit_ShowsErrorAndListUnchanged', async ({ page }) => {
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert"). Begründung für
+    // networkidle + includeHidden: identisch zum leeren-Namen-Test oben.
+    await page.waitForLoadState('networkidle')
+    const listItems = page.getByTestId('ingredient-list').getByRole('listitem', { includeHidden: true })
+    const itemsBefore = await listItems.count()
+
+    // When: Dialog öffnen, "Salz" als Name, keine Einheit, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Salz')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: Fehlermeldung erscheint
+    await expect(page.getByText('Einheit darf nicht leer sein.')).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
 })

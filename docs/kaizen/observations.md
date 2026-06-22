@@ -262,3 +262,43 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 - Kandidaten: — (gemeinsame Discovery in der Retro, OBS-S086-1; grobe Richtung: In-Process-Registry wie check-code-quality-blocking vs. Subprozess-Liste)
 - Entscheidung/Maßnahme: offen (Retro) – als eigener fokussierter Refactor mit eigenen Tests, getrennt vom Szenario-Tracking-Commit
 - Bezug: OBS-S085-16 (Reload-Friktion-Familie)
+
+## OBS-S091-1 – `dotnet-test.py` zeigt bei RED keine Assertion-Details (MTP-Runner)
+- Quelle: Agent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: jeder Backend-RED
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: `dotnet-test.py` gibt bei Fehlschlag (Default **und** `--verbose`) nur `Failed: N, Passed: M` + einen Verweis auf eine UTF-16-`.log` aus — **keine** Assertion-Message/Expected-Actual. Empirisch verifiziert (S091, gezielt gebrochene Assertion, voller ungefilterter Output): der MTP-Runner (xunit.v3, TD-S089-1) schreibt Fehlerdetails nur in `TestResults/*.log`, nicht auf stdout im Format, das das `_RELEVANT`-Regex (`Error Message`/`at mahl.`) erwartet. Beim RED-Debugging fehlt damit genau die Info, die man braucht (der Backend-Subagent musste die UTF-16-Datei manuell lesen).
+- Kandidaten: — (Retro; u.a.: Wrapper extrahiert die fehlgeschlagene Assertion aus der `.log` vs. MTP auf stdout-Ausgabe konfigurieren)
+- Entscheidung/Maßnahme: offen (Retro)
+- Bezug: TD-S089-1 (MTP-Migration)
+
+## OBS-S091-2 – Wrapper-Aufrufpfad cwd-relativ, kollidiert mit Projekt-Tooling-cwd
+- Quelle: Agent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Die Wrapper liegen im Repo-Root (`.claude/scripts/`) und lösen ihren Root intern via `_util.REPO_ROOT` auf — aber der **Aufrufpfad** `python3 .claude/scripts/foo.py` ist cwd-relativ. Projekt-Tooling (`npm`/`dotnet`/`vite`) zieht die Shell in `Client/`/`Server/`-Subdirs; der nächste Wrapper-Aufruf scheitert dann mit „No such file" (S091: beide Subagenten + Orchestrator betroffen).
+- Kandidaten: — (Retro; u.a.: grep-bare Regel „Wrapper nie nach einem `cd` aufrufen" vs. Wrapper per absolutem Pfad/Alias aufrufbar machen)
+- Entscheidung/Maßnahme: offen (Retro)
+- Bezug: —
+
+## OBS-S091-3 – `vitest-run.py --filter` Substring-Semantik nicht offensichtlich
+- Quelle: Agent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: `vitest-run.py --filter X` matcht X als Substring über den **voll-qualifizierten** Testnamen (inkl. `describe`-Block). Ein neuer describe-Block „…(leere Einheit)" wurde dadurch zunächst übersprungen → irreführendes „N passed" statt der erwarteten Gesamtzahl (der FE-Subagent zog ungefiltert nach). Verbesserung: Filter-Semantik dokumentieren oder die Zahl gematchter/übersprungener Tests ausweisen.
+- Kandidaten: — (Retro)
+- Entscheidung/Maßnahme: offen (Retro)
+- Bezug: OBS-S085-3 (Filter-/Output-Familie)
+
+## OBS-S091-4 – Suppressions systematisch tracken (Script)
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Suppressions (Stryker + Analyzer/`.editorconfig`) systematisch tracken, vermutlich per Script. Zwei Ziele: **(1)** Suppressions, die ein nachfolgendes Szenario beheben soll, nicht aus den Augen verlieren — S091 hing das an manueller Erinnerung (die FE-`:53`-Suppression wurde planmäßig im „leere Einheit"-Szenario aufgelöst; ADR-S000-4 war eine solche Vertagung, die obsolet wurde und lingerte). **(2)** Suppressions ohne Szenario-Bezug periodisch, **nach Klasse gruppiert** reviewen — ändert sich etwas, das eine Klasse überflüssig macht (z.B. löste `noUncheckedIndexedAccess` den `Partial<…>`-Workaround), will man wissen, wo diese Suppressions sitzen.
+- Kandidaten: — (Retro; u.a.: Script sammelt Stryker-/`.editorconfig`-Suppressions + gruppiert nach Klasse/Begründung; optionales Feld „behoben-durch-Szenario" pro Suppression)
+- Entscheidung/Maßnahme: offen (Retro)
+- Bezug: ADR-S000-4 (gelöschte Suppression-Vertagung), OBS-S090-5 (TD-Grooming-Lücke)

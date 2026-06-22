@@ -274,3 +274,63 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leerer Name)', () => 
     expect(within(list).getByText('Salz')).toBeInTheDocument()
   })
 })
+
+// @US-904-error: Ausgangszustand = eine bestehende Zutat (Salz); der POST mit leerer
+// Einheit (gültiger Name "Salz") beantwortet das Backend mit 422 + feld-keyed Body
+// (ADR-S090-1): { errors: { defaultUnit: ["Einheit darf nicht leer sein."] } }. Der Key
+// `defaultUnit` ist die Request-JSON-Property exakt wie das FE im POST sendet. GET liefert
+// unverändert [salz] (kein optimistic add), sodass "Liste bleibt unverändert" echt gilt.
+function useEmptyUnitRejectingHandlers(): void {
+  server.use(
+    http.get('/api/ingredients', () => HttpResponse.json([salz])),
+    http.post('/api/ingredients', () =>
+      HttpResponse.json(
+        { status: 422, errors: { defaultUnit: ['Einheit darf nicht leer sein.'] } },
+        { status: 422 },
+      ),
+    ),
+  )
+}
+
+describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () => {
+  // Helper: Dialog öffnen, "Salz" als Name eingeben, Einheit leer lassen, "Speichern".
+  // Gemeinsames When für alle Tests dieses Szenarios (spiegelbildlich zum leeren Namen).
+  async function submitEmptyUnitWithNameSalz() {
+    const user = userEvent.setup()
+    renderWithProviders(<IngredientsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    // When: ich "Salz" als Name eingebe
+    await user.type(await screen.findByLabelText('Name'), 'Salz')
+    // When: ich keine Einheit eingebe (Einheit-Feld bleibt leer)
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+  }
+
+  it('US904_Error_CreateIngredient_EmptyUnit_ShowsErrorMessage', async () => {
+    // Given: bestehende Zutat (Salz); leere Einheit -> Backend antwortet 422
+    useEmptyUnitRejectingHandlers()
+
+    // When: Name "Salz" + leere Einheit speichern
+    await submitEmptyUnitWithNameSalz()
+
+    // Then: ich sehe die Fehlermeldung "Einheit darf nicht leer sein."
+    expect(await screen.findByText('Einheit darf nicht leer sein.')).toBeInTheDocument()
+    // Then: das Einheit-Feld ist als ungültig markiert (a11y-Fehlerzustand, UX-Guideline §4)
+    expect(screen.getByLabelText('Einheit')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('US904_Error_CreateIngredient_EmptyUnit_MarksOnlyUnitField', async () => {
+    // Given: bestehende Zutat (Salz); leere Einheit -> Backend antwortet 422
+    useEmptyUnitRejectingHandlers()
+
+    // When: Name "Salz" + leere Einheit speichern
+    await submitEmptyUnitWithNameSalz()
+
+    // Then: das Einheit-Feld ist als ungültig markiert (der defaultUnit-Fehler landet dort)
+    expect(await screen.findByLabelText('Einheit')).toHaveAttribute('aria-invalid', 'true')
+    // Then: das Name-Feld ist NICHT als ungültig markiert (der Fehler betrifft nur die
+    //   Einheit) — killt den Mutanten "es wird immer dasselbe Feld markiert" und treibt
+    //   den name-absent-Zweig (FieldErrors ohne name-Key).
+    expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'false')
+  })
+})

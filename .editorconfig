@@ -309,6 +309,12 @@ dotnet_diagnostic.MA0051.severity = none
 # MA0048: File name must match type name – Razor Pages convention: PageName.cshtml.cs / PageNameModel.
 dotnet_diagnostic.MA0048.severity = none
 
+# --- Sum-types: central Match<T> dispatch (ADR-S040-1) ---
+[Server/Domain/IngredientValidationError.cs]
+# S3060 kollidiert mit dem verpflichtenden zentralen Sum-Type-Match-Dispatch (ADR-S040-1);
+# polymorpher Dispatch ist dort explizit verworfen. Pro Sum-Type-Datei zu wiederholen.
+dotnet_diagnostic.S3060.severity = none
+
 # --- Program.cs: integration-testing entry point ---
 [Server/Program.cs]
 # S1118: Add protected ctor or static – public partial class Program is the canonical ASP.NET Core

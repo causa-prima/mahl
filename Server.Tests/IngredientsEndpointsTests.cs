@@ -95,4 +95,29 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task US904_Error_CreateIngredient_EmptyUnit_Returns422WithFieldKeyedError()
+    {
+        // Given: a request with a valid name and an empty unit
+        var request = new CreateIngredientRequest(Name: "Salz", DefaultUnit: "");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 422 Unprocessable Entity (ADR-S090-1: status must be 422, not 400)
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        // Then: field-keyed error body maps the "defaultUnit" field to its message (ADR-S090-1, ADR-S051-2)
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["defaultUnit"] = ["Einheit darf nicht leer sein."],
+        });
+
+        // Then: nothing is persisted – the ingredient list stays unchanged (empty)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEmpty();
+    }
 }

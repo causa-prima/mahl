@@ -147,6 +147,8 @@ Das Frontend konsumiert ausschließlich `errors` und ordnet jede Meldung ihrem F
 
 **Validierung bleibt server-only / Client-Validierung aufgeschoben:** Die Validierungslogik liegt ausschließlich im Backend; das Frontend zeigt die 422-Antwort. Client-seitige Validierungs*logik* (Submit-Blockieren, Instant-Feedback) ist YAGNI und wird erst eingeführt, wenn ein UX-Szenario sie fordert – dank des feld-keyed Contracts dann günstig nachrüstbar. Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und wird per eigenem Szenario ergänzt.
 
+**Cross-Stack-Drift-Strategie (konkreter Trigger):** Der 422-Body-Shape ist zwischen BE (`Results.ValidationProblem`) und FE (`FieldErrorBody`) nicht durch eine einzige Quelle abgesichert, sondern **behavioral pro Feld** über Full-Stack-E2E der geübten Fehlerfelder (Shape-Drift bricht das E2E). Das genügt, solange der Body nur **Display-Text** trägt – das FE rendert, verzweigt aber keine Logik auf der Struktur. Eine **einzige Quelle** (OpenAPI-Codegen; bewusst als YAGNI aufgeschoben, weil die Schnittstelle klein und feld-keyed-forward-kompatibel ist) wird eingeführt, **sobald das Frontend den 422-Body über reines Anzeigen hinaus für Logik konsumiert** (auf Body-Struktur/Codes verzweigt statt nur Text zu rendern). Der derzeitige ungeprüfte `as`-Cast in `createIngredient` ist bis dahin kosmetisch.
+
 **Verworfen:**
 - **Flaches `string[]`** (ADR-S000-1) – keine Feld-Zuordnung, Frontend müsste auf exakte Texte matchen.
 - **Client-seitige Validierungslogik als gleichwertige zweite Quelle** – dupliziert Regeln → Drift-Fläche, die nur durch teure Full-Stack-E2E-Grenzwert-Tests pro Constraint absicherbar wäre.
@@ -277,17 +279,6 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Begründung:** In den happy-path-Tests existieren keine soft-deleted Einträge – die DB ist leer oder enthält nur aktive Einträge. Damit ist `== null` und `!= null` im Testkontext äquivalent (beide liefern das gleiche Ergebnis). Das Verhalten mit soft-deleted Einträgen wird durch ein dediziertes Soft-Delete-Szenario (künftiger Zyklus) getestet. Keine Vorabtestung außerhalb des vorgesehenen Szenarios.
 
 **Stand US-904 Happy-Path (Session 083):** Weder die `DeletedAt`-Spalte (`IngredientDbType`) noch der `Where`-Filter existieren bislang – bewusst YAGNI, da noch kein Soft-Delete-/Löschen-Szenario implementiert ist. Diese ADR beschreibt die **geplante** Suppression, die zusammen mit der `DeletedAt`-Spalte im Soft-Delete-Zyklus eingeführt wird. Bis dahin liefert `GET /api/ingredients` bewusst ungefiltert alle Rows. Kein Code-↔-ADR-Drift, sondern dokumentierte Reihenfolge.
-
----
-
-### ADR-S000-4: POST /api/ingredients – Validierungs-Fehlermeldungsstrings: Stryker-Suppression
-
-**Status:** Accepted
-**Tags:** scope:feature, resource:ingredients, http:post, testing:stryker, arch:validation
-
-**Entscheidung:** `// Stryker disable once String` auf den beiden `NonEmptyTrimmedString.Create(...)` Aufrufen mit Fehlermeldungs-Strings in `IngredientsEndpoints.cs`.
-
-**Begründung:** Die Fehlerpfade (ungültiger `name` / `defaultUnit`) werden bewusst erst im @US-904-error Szenario getestet. Die Strings sind korrekt und notwendig, aber der happy-path-Testlauf ruft diese Pfade nicht auf. Eine Vorabtestung der Fehlermeldungen in diesem Szenario würde das Single-Responsibility-Prinzip der Szenarien verletzen.
 
 ---
 
@@ -470,8 +461,10 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 1. `Match<T>` nutzt immer `switch` mit `_ => SumType.Unreachable<T>()`. Der Helper `SumType.Unreachable<T>()` liegt in `Server/Types/SumType.cs` – Stryker-Suppress einmal dort, nicht in jeder Implementierung.
 2. Kein Ternary (`this is X u ? ... : ...`) – bei einer neuen Variante die in `Match<T>` vergessen wird, ruft Ternary still den falschen Arm auf; Switch wirft klar.
 3. `[ExcludeFromCodeCoverage]` auf `Match<T>` (strukturell unerreichbarer `_`-Arm).
+4. **S3060 pro Sum-Type-Datei unterdrücken (S091):** SonarAnalyzer S3060 feuert auf den `this switch`-Typ-Test in `Match<T>` (will polymorphen Dispatch, der hier nach Punkt 2 bewusst verworfen ist). Pro Sum-Type-Datei einen `[<pfad>]`-Block mit `dotnet_diagnostic.S3060.severity = none` in `.editorconfig` (Muster S091, analog zu S1118/MA0048). **Nicht** projektweit – S3060 hat außerhalb von Sum-Types legitime Treffer (Typ-Test-Verzweigung, die Polymorphie sein sollte).
 
 **Verworfen:** Ternary – besser für Coverage, schlechter für Korrektheit bei Erweiterungen.
+**Verworfen (S091):** Polymorpher Dispatch (abstrakte `Match<T>` je Subtyp, was S3060 will) – S3060-konform und suppression-frei, aber das Hinzufügen einer Variante ändert die `Match<T>`-Signatur und zwingt damit Edits in **jedem** bestehenden Subtyp-Override (O(N)); der zentrale Switch ist O(1) je neuer Variante. Der einmalige Setup-Preis (S3060-Suppression + `SumType.cs`) wiegt leichter als die wiederkehrende O(N)-Steuer.
 **Verworfen:** Switch ohne `_`-Arm – Coverlet trackt die compiler-generierte `throw new SwitchExpressionException()`-Branch auf IL-Ebene, Branch Coverage fällt auf ~98%. Kein Gewinn gegenüber dem expliziten `_`-Arm.
 
 ---

@@ -43,6 +43,27 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 091 – 2026-06-22
+
+- **[MITTEL] [AGENT] [Bash/Permission] LL-S091-1 – Kuratierten Wrapper-Output gefiltert + Methode falsch behauptet**
+  Quelle: User
+  Was: `dotnet-test.py`-Output 2× mit `tail`/`grep` gefiltert und dabei behauptet „kein `tail` genutzt" (faktisch falsch); eine empirische Schlussfolgerung auf den gefilterten Output gestützt.
+  Warum: Reflex zum Output-Eingrenzen, gegen die Allow-Listen-Regel „Wrapper-Output ist kuratiert – nicht nachgelagert filtern".
+  Regel: Kuratierten Wrapper-Output nie per `tail`/`grep`/`head` filtern; bei empirischen Checks die volle Ausgabe nehmen und die eigene Methode wahrheitsgemäß benennen.
+
+- **[MITTEL] [PROZESS] [Skill-Nutzung] LL-S091-2 – Eigenes Design entworfen, statt einschlägige ADRs in Schritt 0 zu konsultieren**
+  Was: Der Fehlertyp durchlief drei Iterationen (enum → OneOf-Union → hand-rolled Sum-Type), weil die bereits beschlossenen Sum-Type-ADRs (S040-1/S018) nicht im Architektur-Check (Schritt 0) geprüft wurden.
+  Warum: Bei „eine geschlossene Menge von Fällen dispatchen" wurde nicht gefragt, ob das Projekt dafür schon ein Muster entschieden hat.
+  Regel: Führt ein Szenario ein Konstrukt ein, für das ein etabliertes Architektur-Muster existieren könnte (Sum-Type-Dispatch, Validierung, Fehler-Contract), in Schritt 0 gezielt nach einschlägigen ADRs suchen, bevor ein eigenes Design entsteht.
+
+- **[MITTEL] [AGENT] [Kommunikation] LL-S091-3 – Bereits-bekanntes Faktum als neue Einsicht zur Stützung der eigenen Position präsentiert**
+  Quelle: User
+  Was: Das in S090 schon dokumentierte „E2E deckt Cross-Stack-Drift" als neue Einsicht aufgebracht, um „TD-S090-4 löschen" zu begründen.
+  Warum: Der gefundene Beleg wurde als Bestätigung gelesen, nicht dagegen geprüft, ob er bei der ursprünglichen Entscheidung schon vorlag.
+  Regel: Stützt ein gefundener Beleg die eigene aktuelle Position, erst prüfen, ob dieselbe Information bei der ursprünglichen Entscheidung schon bekannt war — wenn ja, ist es kein neues Argument für eine Neubewertung.
+
+---
+
 ## Session 090 – 2026-06-21
 
 - **[MITTEL] [QUALITÄT] [TS-Code] LL-S090-1 – Offener MUI-Dialog macht den Hintergrund `aria-hidden` → rollenbasierte Queries finden nichts**
