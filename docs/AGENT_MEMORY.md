@@ -12,10 +12,8 @@
 
 ## Nächste Prioritäten
 
-- **Vor dem nächsten Szenario:** `noUncheckedIndexedAccess` aktivieren (bisher lokal per `Partial<…>` approximiert; TD-S083-5-Umfeld).
-
 - **US-904 weiter:**
-  - **`@US-904-error`-Block fortsetzen:** „leerer Name" ✅ (S090). Nächstes: „leere Einheit anlegen schlägt fehl" (+ Variante „beide leer"). Szenario ggf. erst via `gherkin-workshop` in die Feature-Datei aufnehmen.
+  - **`@US-904-error`-Block fortsetzen:** „leerer Name" ✅ (S090). Alle Error-Szenarien stehen bereits in der Feature-Datei. **Nächstes (bewusst vorgezogen vor die „nur Leerzeichen"-Varianten): „Zutat mit leerer Einheit anlegen schlägt fehl"** — eng gekoppelt mit „Beide Pflichtfelder leer". **Warum vorgezogen:** behebt einen latenten, heute erreichbaren Korrektheits-Bug — `IngredientsEndpoints.ToDomain` nutzt eine kurzschließende `Bind`-Kette + `MapError(_ => NameRequiredProblem())` keyt hart auf `name` → leere Einheit liefert fälschlich eine *Namens*-Meldung, „beide leer" nur **eine** statt beider (verletzt collect-all). Behebung = **TD-S090-1** (unabhängige Feld-Validierung + Merge, feld-tragender Fehlertyp). Code-Kommentar `IngredientsEndpoints.cs:59-61` dokumentiert die Defer. Die „nur Leerzeichen"-Trim-Varianten (Name/Einheit) falten sich danach billig um denselben Code. Offene Liste: `python3 .claude/scripts/next_scenario.py --open`.
   - **Erst-Formular-UX-Baseline** (mit der Implementierung, nicht vorab): Pflichtfeld-Affordance (Markierung) + Fokus-auf-Fehler als eigenes Szenario; UX-Guideline-Regel landet **mit** dem Code; `gherkin-workshop` um „Formular-UX-Baseline"-Checkliste ergänzen. Zeichenlimits nur gegen Abuse (keine Max-Length-Hints).
   - **Danach Feature-Reihenfolge** – nächstes laut Feature-Datei: {{NEXT_SCENARIO}}. Offene/erledigte Szenarien: `python3 .claude/scripts/next_scenario.py --open|--done`.
   - **Roadmap-Kontext** (nicht an „nächstes" gebunden): „sortiert" führt `OrderBy(name)` ein → aktiviert den S084-ETag real (TD-S084-2; Stryker-killbar weil Insertion-Order ≠ alphabetisch); „Speichern-Button deaktiviert" = pending-State (behebt Cold-Start-Race TD-S083-3). `user.type`/`fireEvent.click` (TS-Guideline).
