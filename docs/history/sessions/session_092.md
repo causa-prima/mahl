@@ -34,6 +34,9 @@
 - Backend parametrisieren; E2E bewusst NICHT (ADR-S041-7-Vorrang).
 - Mutation-Level Standard beibehalten (ADR-S092-1).
 
+## Nachtrag (gleiche Session)
+- **„Einheit aus nur Leerzeichen" ✅** – identische Trim-Faltung: ein `[InlineData("Salz","   ",…)]` im Backend-`[Theory]` + ein E2E-Test (Klon des Einheit-Falls). Kein Prodcode, Stryker 100% (25/25). Eigener Commit.
+
 ## Offene Punkte
-- `@US-904-error` weiter: „Einheit aus nur Leerzeichen", „beide Pflichtfelder leer" (= collect-all-Merge, TD-S090-1), Duplikat-/Reaktivierungs-Szenarien.
+- `@US-904-error` weiter: „beide Pflichtfelder leer" (= collect-all-Merge, TD-S090-1), Duplikat-/Reaktivierungs-Szenarien.
 - OBS-S092-1 (+ offene S090/S091-OBS) für die nächste Retro.

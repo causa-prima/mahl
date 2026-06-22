@@ -78,6 +78,7 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
     [InlineData("", "g", "name", "Name darf nicht leer sein.")]
     [InlineData("   ", "g", "name", "Name darf nicht leer sein.")]
     [InlineData("Salz", "", "defaultUnit", "Einheit darf nicht leer sein.")]
+    [InlineData("Salz", "   ", "defaultUnit", "Einheit darf nicht leer sein.")]
     public async Task US904_Error_CreateIngredient_InvalidInput_Returns422WithFieldKeyedError(
         string name, string unit, string expectedKey, string expectedMessage)
     {

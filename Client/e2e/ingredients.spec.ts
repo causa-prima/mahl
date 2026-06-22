@@ -134,4 +134,22 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     // Then: die Zutaten-Liste bleibt unverändert
     await expect(listItems).toHaveCount(itemsBefore)
   })
+
+  // Szenario: Zutat mit Einheit aus nur Leerzeichen anlegen schlägt fehl
+  test('US904_Error_CreateIngredient_WhitespaceUnit_ShowsErrorAndListUnchanged', async ({ page }) => {
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert")
+    const { listItems, itemsBefore } = await captureIngredientList(page)
+
+    // When: Dialog öffnen, "Salz" als Name, nur Leerzeichen als Einheit, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Salz')
+    await page.getByLabel('Einheit').fill('   ')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: dieselbe Fehlermeldung wie bei leerer Einheit erscheint (beobachtbares Verhalten).
+    // Das serverseitige Trimming (Whitespace -> leer, ADR-S051-1) selbst prüft der Backend-Test.
+    await expect(page.getByText('Einheit darf nicht leer sein.')).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
 })
