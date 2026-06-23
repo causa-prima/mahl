@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 93 | 2026-06-23 | SKELETON (US-904 Szenario – Validierung) | `@US-904-error` „beide Pflichtfelder leer": Backend-`ToDomain` von kurzschließend auf collect-all umgestellt (feld-keyed 422 mit beiden Keys), löst TD-S090-1; Frontend unverändert (emergent). `csharp-rop.md`-Helper-Verweis korrigiert. |
 | 92 | 2026-06-22 | SKELETON (US-904 Szenario – Validierung) | `@US-904-error` „Namen nur Leerzeichen": bereits durch Trim (ADR-S051-1) erfüllt → reiner Test-Pin (E2E+Backend, kein Prodcode). Backend-Fehlertests zu `[Theory]` parametrisiert; E2E-Setup-Helper. ADR-S092-1 (Mutation-Level Standard bleibt), LL-S092-1, OBS-S092-1. |
 | 91 | 2026-06-22 | SKELETON (US-904 Szenario – Validierung) | `@US-904-error` „leere Einheit" full-stack (vorgezogen, behebt Feld-Key-Bug): erster Sum-Type `IngredientValidationError`+`SumType.cs` (ADR-S040-1/S018), feld-keyed 422; `noUncheckedIndexedAccess` an. ADR-S000-4+TD-S090-4 gelöscht. LL-S091-1..3, OBS-S091-1..4. |
 | 90 | 2026-06-21 | SKELETON (US-904 Szenario – Validierung) | US-904 `@US-904-error` „leerer Name schlägt fehl" full-stack: feld-keyed 422 (ADR-S090-1, supersedet S000-1), NonEmptyTrimmedString→OneOf, Frontend FieldErrors+onSuccess-Hook; beide Stryker 100%. Validierung server-only. /mnt/c-Pfad-Fixes (5 Hooks). LL-S090-1 (Dialog aria-hidden). |

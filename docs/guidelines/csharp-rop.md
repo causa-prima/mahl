@@ -86,20 +86,20 @@ return await Ingredient.Create(id, dto.Name, dto.DefaultUnit)
         error  => error);
 ```
 
-### Pre-validiertes Unwrap: `ValueOrThrowUnreachable()`
+### Pre-validiertes Unwrap: `ValueOrThrowUnreachable()` (noch nicht implementiert)
 
-Wenn eine `OneOf<T, Error<string>>`-Instanz in einer LINQ-Pipeline vorkommt und der Fehlerfall durch eine vorgelagerte Validierung nachweislich ausgeschlossen ist, darf `.ValueOrThrowUnreachable()` verwendet werden – **nicht** das rohe `.Match(r => r, _ => throw ...)`.
+> **Status: Muster, noch kein Code.** `Server/OneOfExtensions.cs` enthält aktuell **nur** `Map`/`Bind`/`MapError`/`BindAsync`/`MatchAsync`. `ValueOrThrowUnreachable()` (und das hier ebenfalls erwähnte `ValueOrThrow(string)`) existieren **nicht** – sie sind das vorgesehene Muster für den ersten Fall, der ein pre-validiertes Unwrap in einer LINQ-Pipeline braucht. Wer den Helper zuerst benötigt: in `OneOfExtensions.cs` anlegen und die Designentscheidung (zentralisierte Stryker-Suppression statt throw-Lambda) per ADR festhalten. Bis dahin gibt es keinen Aufrufer.
+
+Wenn eine `OneOf<T, Error<string>>`-Instanz in einer LINQ-Pipeline vorkommt und der Fehlerfall durch eine vorgelagerte Validierung nachweislich ausgeschlossen ist, soll ein gekapseltes `.ValueOrThrowUnreachable()` verwendet werden – **nicht** das rohe `.Match(r => r, _ => throw ...)`.
 
 ```csharp
 // ❌ Verboten: throw-Lambda direkt im LINQ-Select
 .Select(i => RecipeIngredient.Create(...).Match(r => r, _ => throw new InvalidOperationException("Unreachable.")))
 
-// ✅ Korrekt: ValueOrThrowUnreachable() aus OneOfExtensions
+// ✅ Ziel-Muster: ValueOrThrowUnreachable() aus OneOfExtensions (erst anzulegen)
 .Select(i => RecipeIngredient.Create(...).ValueOrThrowUnreachable())
 ```
 
-`ValueOrThrowUnreachable()` ist in `Server/OneOfExtensions.cs` definiert und kapselt das Throw-Pattern sowie die Stryker-Suppression an einer einzigen Stelle. **Warum nicht `.Match(r => r, _ => throw ...)`?** Weil der throw-Pfad unreachable ist und Stryker ihn als Survivor markiert. `ValueOrThrowUnreachable()` zentralisiert die Suppression – alle Aufrufer profitieren ohne eigene Suppression.
-
-Es gibt außerdem `ValueOrThrow(string message)` für Fälle mit eigener Fehlermeldung.
+Der Helper soll das Throw-Pattern sowie die Stryker-Suppression an einer einzigen Stelle kapseln. **Warum nicht `.Match(r => r, _ => throw ...)`?** Weil der throw-Pfad unreachable ist und Stryker ihn als Survivor markiert. Ein zentraler `ValueOrThrowUnreachable()` zentralisiert die Suppression – alle Aufrufer profitieren ohne eigene Suppression.
 
 **Voraussetzung:** Die Inputs wurden bereits in einer `.Bind()`-Kette validiert. `ValueOrThrowUnreachable()` ist kein Ersatz für echte Fehlerbehandlung – nur für nachweislich unerreichbare Fehlerpfade.

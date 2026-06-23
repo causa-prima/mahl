@@ -152,4 +152,21 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     // Then: die Zutaten-Liste bleibt unverändert
     await expect(listItems).toHaveCount(itemsBefore)
   })
+
+  // Szenario: Beide Pflichtfelder leer – beide Fehlermeldungen erscheinen gleichzeitig
+  test('US904_Error_CreateIngredient_BothFieldsEmpty_ShowsBothErrorsAndListUnchanged', async ({ page }) => {
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert")
+    const { listItems, itemsBefore } = await captureIngredientList(page)
+
+    // When: Dialog öffnen, weder Name noch Einheit eingeben, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: BEIDE Fehlermeldungen erscheinen gleichzeitig (collect-all, ADR-S000-1/S090-1).
+    // Treibt den Backend-Merge: kurzschließende Validierung lieferte nur die Name-Meldung.
+    await expect(page.getByText('Name darf nicht leer sein.')).toBeVisible()
+    await expect(page.getByText('Einheit darf nicht leer sein.')).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
 })

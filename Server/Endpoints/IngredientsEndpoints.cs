@@ -5,6 +5,7 @@ using mahl.Server.Dtos;
 using mahl.Server.Types;
 using Microsoft.EntityFrameworkCore;
 using OneOf;
+using OneOf.Types;
 
 namespace mahl.Server.Endpoints;
 
@@ -34,7 +35,7 @@ internal static class IngredientsEndpoints
             "/",
             async (CreateIngredientDto dto, MahlDbContext db) =>
                 await dto.ToDomain()
-                    .MapError<Ingredient, IngredientValidationError, IResult>(IngredientMappings.ValidationProblemFor)
+                    .MapError<Ingredient, IReadOnlyList<IngredientValidationError>, IResult>(IngredientMappings.ValidationProblemFor)
                     .BindAsync<Ingredient, IngredientDto, IResult>(async ingredient =>
                     {
                         db.Ingredients.Add(ingredient.ToDbType());
@@ -49,29 +50,48 @@ internal static class IngredientsEndpoints
 
 file static class IngredientMappings
 {
-    // Sequential/short-circuit validation (name first, then unit); each error carries which field failed
-    // as a sum-type (IngredientValidationError). No collect-all merge – a single empty field is output-
-    // identical to short-circuit, so the merge is deferred to the "beide Pflichtfelder leer"-scenario
-    // (TD-S090-1, ADR-S000-1).
-    internal static OneOf<Ingredient, IngredientValidationError> ToDomain(this CreateIngredientDto dto) =>
-        NonEmptyTrimmedString.Create(dto.Name)
-            .MapError(_ => IngredientValidationError.NameEmpty)
-            .Bind(name => NonEmptyTrimmedString.Create(dto.DefaultUnit)
-                .MapError(_ => IngredientValidationError.UnitEmpty)
-                // ADR-S030-1: server-side UUIDv7 primary key.
-                .Map(unit => Ingredient.Create(Guid.CreateVersion7(), name, unit)));
+    // Collect-all validation of the independent required fields (ADR-S000-1, gültig laut ADR-S090-1):
+    // name and unit are validated independently and all errors collected, so both-fields-empty reports both
+    // field errors at once. The Bind/Map chain carries the validated values on success; MapError replaces the
+    // chain's first error with the full collected set.
+    internal static OneOf<Ingredient, IReadOnlyList<IngredientValidationError>> ToDomain(this CreateIngredientDto dto)
+    {
+        var name = NonEmptyTrimmedString.Create(dto.Name);
+        var unit = NonEmptyTrimmedString.Create(dto.DefaultUnit);
 
-    // ADR-S090-1: field-keyed 422 body { "errors": { "<jsonPropertyName>": ["<msg>"] } }.
-    // ADR-S051-2: fixed German messages per field. The field-to-(key, text) mapping lives here at the
-    // API boundary that knows the request shape – NonEmptyTrimmedString stays field-agnostic (ADR-S051-2).
-    // Exhaustive .Match over the sum-type – a new field variant breaks this signature at compile time.
-    internal static IResult ValidationProblemFor(IngredientValidationError error) => error.Match(
-        onNameEmpty: () => FieldProblem("name", "Name darf nicht leer sein."),
-        onUnitEmpty: () => FieldProblem("defaultUnit", "Einheit darf nicht leer sein."));
+        // 0-or-1 error per field, concatenated -> the collect-all error set (empty when both fields are valid).
+        IReadOnlyList<IngredientValidationError> errors =
+        [
+            .. name.ErrorOrEmpty(IngredientValidationError.NameEmpty),
+            .. unit.ErrorOrEmpty(IngredientValidationError.UnitEmpty),
+        ];
 
-    private static IResult FieldProblem(string key, string message) => Results.ValidationProblem(
-        new Dictionary<string, string[]>(StringComparer.Ordinal) { [key] = [message] },
-        statusCode: StatusCodes.Status422UnprocessableEntity);
+        // ADR-S030-1: server-side UUIDv7 primary key.
+        return name
+            .Bind(validName => unit.Map(validUnit => Ingredient.Create(Guid.CreateVersion7(), validName, validUnit)))
+            .MapError<Ingredient, Error, IReadOnlyList<IngredientValidationError>>(_ => errors);
+    }
+
+    // 0-or-1 error for a validated field: empty when valid, the field's error otherwise.
+    private static IEnumerable<IngredientValidationError> ErrorOrEmpty(
+        this OneOf<NonEmptyTrimmedString, Error> field, IngredientValidationError error) =>
+        field.Match(_ => Enumerable.Empty<IngredientValidationError>(), _ => [error]);
+
+    // ADR-S090-1: field-keyed 422 body { "errors": { "<jsonPropertyName>": ["<msg>"] } } – multiple field
+    // errors group into one dictionary so all messages appear simultaneously.
+    internal static IResult ValidationProblemFor(IReadOnlyList<IngredientValidationError> errors) =>
+        Results.ValidationProblem(
+            errors.Select(Describe)
+                .GroupBy(d => d.Key, d => d.Message, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.Ordinal),
+            statusCode: StatusCodes.Status422UnprocessableEntity);
+
+    // ADR-S051-2 / ADR-S090-1: one error case maps to one (request-JSON-property key, fixed German message) pair.
+    // Mapping lives here at the API boundary that knows the request shape – NonEmptyTrimmedString stays
+    // field-agnostic. Exhaustive .Match – a new field variant breaks this signature at compile time.
+    private static (string Key, string Message) Describe(IngredientValidationError error) => error.Match(
+        onNameEmpty: () => ("name", "Name darf nicht leer sein."),
+        onUnitEmpty: () => ("defaultUnit", "Einheit darf nicht leer sein."));
 
     internal static IngredientDbType ToDbType(this Ingredient domain) =>
         new() { Id = domain.Id, Name = domain.Name.Value, DefaultUnit = domain.DefaultUnit.Value };

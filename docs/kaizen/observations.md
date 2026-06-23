@@ -336,3 +336,37 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 - Kandidaten: — (Retro; erster Schritt = Validierungs-Experiment mit blinden Subagenten-Neubewertungen eines Samples, dann Abweichungs-Analyse)
 - Entscheidung/Maßnahme: offen (Retro) – erst Nutzen via Blind-Rebewertung verifizieren, bevor ein Workshop-Schritt eingebaut wird.
 - Bezug: OBS-S085-10 (Impact-Vokabular geteilt mit LL-Schwere)
+
+---
+
+## OBS-S093-1 – SonarAnalyzer S125 feuert auf deutsche Kommentare mit Satz-Ende „;"
+- Quelle: Agent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Build/Analyzer
+- Beobachtung: SonarAnalyzer S125 („Sections of code should not be commented out") interpretiert deutschsprachige Kommentare, die mit „…;" enden, als auskommentierten Code und bricht den Build. In dieser Session musste ein korrekter Erklär-Kommentar nur umformuliert werden, um S125 zu beruhigen – inhaltlich unnötiger Eingriff.
+- Kandidaten: A) Kommentar-Stil-Hinweis in coding-guideline-csharp.md (dt. Kommentare nicht auf „;" enden) (gering, kaschiert Symptom) | B) S125 gezielt feinjustieren/dämpfen (mittel, Analyzer-Config) | C) Status quo (Einzelfall umformulieren)
+- Entscheidung/Maßnahme: offen (Retro) – Impact gering; vor Config-Änderung Häufigkeit beobachten.
+
+---
+
+## OBS-S093-2 – implementing-scenario Schritt 0: expliziter Modell-Eignungs-Check pro Schicht
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Skill-Nutzung
+- Beobachtung: Die Modellwahl für Schicht-Subagenten (OBS-S085-8: starker Default, `sonnet` nur für klar triviale Schichten) wird aktuell erst unmittelbar **vor dem Spawn** entschieden. Idee: in Schritt 0 (Architektur-Check) bereits pro erwarteter Schicht festhalten, welches Modell voraussichtlich genügt – die Komplexitätseinschätzung liegt dort ohnehin vor (YAGNI-Scope, Domain-Typen). Spart eine spätere Ad-hoc-Entscheidung und macht die Token-/Eignungs-Abwägung nachvollziehbar.
+- Kandidaten: A) Schritt-0-Punkt „Modell-Eignung je geplanter Schicht" ergänzen, der beim Spawn nur noch bestätigt wird (gering) | B) Status quo (Entscheidung am Spawn) | C) Heuristik-Tabelle (Schicht-Typ → Modell) in den Skill
+- Entscheidung/Maßnahme: offen (Retro) – Kandidat A wahrscheinlich; mit OBS-S085-8 abgleichen, um keine doppelte Regel zu schaffen.
+- Bezug: OBS-S085-8 (Modellwahl vor Spawn)
+
+---
+
+## OBS-S093-3 – „Nächste Prioritäten" brauchen pro Vorzieh-Item Scope + Begründung + Done-Zustand
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: In `AGENT_MEMORY.md` → „Nächste Prioritäten" wurde ein vorgezogenes Item zu weit gefasst notiert („`@US-904-error`-Block vorziehen") und ohne dauerhaft sichtbare Begründung. Folge: Der Vorzieh-Grund (S091 feld-keyed-422-Bug) wurde inertial weitergeschleppt, obwohl er längst erledigt war; ein Agent konnte weder erkennen, woraus das Vorgezogene besteht, noch wann es fertig ist. „Error-Szenarien vorziehen" ist zu weit; „Error-Szenario leerer Name + leere Einheit vorziehen, weil <Grund>" ist eng genug. Gilt auch für andere Vorzieh-Items (z.B. „Erst-Formular-UX-Baseline vor dem Feature-Fluss" braucht ebenfalls einen notierten Grund).
+- Kandidaten: A) Konvention für Vorzieh-Einträge: konkretes Szenario(-Set) + Begründung + Done-Kriterium, beim Erledigen entfernen (gering) | B) frei wie bisher (driftet) | C) Vorzieh-Items ganz verbieten, immer Feature-Reihenfolge (zu rigide)
+- Entscheidung/Maßnahme: offen (Retro) – Kandidat A wahrscheinlich; ggf. als Schreib-Hinweis in closing-session Schritt 8 / AGENT_MEMORY-Header.

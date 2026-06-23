@@ -4,7 +4,7 @@
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process, observations)
 > Technische Schuld: `docs/tech-debt.md` | Offene Fragen: `docs/open-questions.md`
 
-**Letzte Aktualisierung:** 2026-06-22 (US-904 `@US-904-error` „Namen nur Leerzeichen" = reiner Test-Pin, bereits durch Trim/ADR-S051-1 erfüllt; Backend-Fehlertests parametrisiert; ADR-S092-1 Mutation-Level Standard)
+**Letzte Aktualisierung:** 2026-06-23 (US-904 `@US-904-error` „beide Pflichtfelder leer" = collect-all-Merge umgesetzt, TD-S090-1 erledigt; Backend-`ToDomain` kurzschließend→collect-all, Frontend unverändert; F1-Refactor Describe-Tupel; LL-S093-1, OBS-S093-1/-2)
 **Phase:** SKELETON 🔄
 **Aktuelle Story:** US-904 (Zutaten)
 
@@ -13,8 +13,7 @@
 ## Nächste Prioritäten
 
 - **US-904 weiter:**
-  - **`@US-904-error`-Block (läuft vorgezogen vor der Feature-Reihenfolge):** Als nächstes **„Beide Pflichtfelder leer" (= collect-all-Merge, TD-S090-1)**, danach Duplikat-/Reaktivierungs-Szenarien. Erledigt/offen: `python3 .claude/scripts/next_scenario.py --done|--open`.
-  - **Erst-Formular-UX-Baseline** (mit der Implementierung, nicht vorab): Pflichtfeld-Affordance (Markierung) + Fokus-auf-Fehler als eigenes Szenario; UX-Guideline-Regel landet **mit** dem Code; `gherkin-workshop` um „Formular-UX-Baseline"-Checkliste ergänzen. Zeichenlimits nur gegen Abuse (keine Max-Length-Hints).
+  - **Vorgezogen (jetzt fällig) — Erst-Formular-UX-Baseline:** EIN gebündeltes, eigenes Szenario: Pflichtfeld-Affordance (Markierung) + Fokus-auf-**erstes**-Fehlerfeld (cross-cutting Formular-Mechanismen, je ein Code-Pfad, ein Test treibt+bewacht — **nicht** in jedes Error-Szenario retrofitten). **Grund der Vorziehung:** „Fokus aufs *erste* Fehlerfeld" ist erst bei **mehreren** gleichzeitigen Fehlern beobachtbar; diese Voraussetzung („beide Pflichtfelder leer") ist mit S093 erfüllt. Baseline jetzt am ersten Formular etablieren, bevor weitere Formulare das Muster vervielfachen (Retrofit-Vermeidung). UX-Guideline-Regel + `gherkin-workshop`-„Formular-UX-Baseline"-Checkliste landen **mit** dem Code. Zeichenlimits nur gegen Abuse (keine Max-Length-Hints). **Done, wenn** Affordance- + Fokus-Szenario implementiert + Guideline/Checkliste ergänzt.
   - **Danach Feature-Reihenfolge** – nächstes laut Feature-Datei: {{NEXT_SCENARIO}}. Offene/erledigte Szenarien: `python3 .claude/scripts/next_scenario.py --open|--done`.
   - **Roadmap-Kontext** (nicht an „nächstes" gebunden): „sortiert" führt `OrderBy(name)` ein → aktiviert den S084-ETag real (TD-S084-2; Stryker-killbar weil Insertion-Order ≠ alphabetisch); „Speichern-Button deaktiviert" = pending-State (behebt Cold-Start-Race TD-S083-3). `user.type`/`fireEvent.click` (TS-Guideline).
 

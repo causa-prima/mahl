@@ -43,6 +43,15 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 093 – 2026-06-23
+
+- **[GERING] [PROZESS] [Doku] LL-S093-1 – Guideline behauptete einen Helper als „definiert", der nicht existierte**
+  Was: `csharp-rop.md` beschrieb `ValueOrThrowUnreachable()` als „in `Server/OneOfExtensions.cs` definiert"; der Helper existiert dort nicht (nur Map/Bind/MapError/BindAsync/MatchAsync). Der Backend-Subagent vertraute der Aussage und lief kurz in die Sackgasse, ihn selbst anlegen zu wollen.
+  Warum: Ein dokumentiertes Ziel-Muster wurde als bereits implementierter Fakt formuliert – Doku-Drift zwischen Guideline-Behauptung und Code-Realität, von keinem Gate gefangen.
+  Regel: In Guidelines klar zwischen „Ziel-Muster (noch anzulegen)" und „existierender Code" trennen; bevor man auf eine als „in Datei X definiert" beschriebene Hilfe baut, deren Existenz verifizieren (greppen) – die Behauptung der Doku genügt nicht.
+
+---
+
 ## Session 092 – 2026-06-22
 
 - **[MITTEL] [PROZESS] [Mutation-Testing] LL-S092-1 – Mutation Score & Branch Coverage sind blind für Datentransformations-Korrektheit**
