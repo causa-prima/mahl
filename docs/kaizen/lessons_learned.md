@@ -43,6 +43,28 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 094 – 2026-06-24
+
+- **[HOCH] [PROZESS] [Gherkin] LL-S094-1 – Formular-UX-Baseline rutschte mangels Checklisten-Slot durch den Workshop**
+  Was: Pflichtfeld-Affordance, Autofokus, Fokus-aufs-Fehlerfeld und Tastatur-Submit standen in keiner gherkin-workshop-Checkliste; der US-904-Workshop produzierte sie nie, der Fokus-Mangel wurde erst von einem UX-Review (S090-F1) als vertagtes ⚠️ entdeckt.
+  Warum: Schritt 0.E scannte nur Prinzip 7/3/4, die UI-Verhaltens-Checkliste nur Erfolg/Abbrechen/Init/Async – kein Slot für statische Affordance, Fokus-Führung oder Tastatur.
+  Regel: Wenn ein Review findet, was der Workshop hätte finden müssen, ist das eine Checklisten-Lücke – die Klasse (hier: cross-cutting Formular-/Dialog-UX-Baseline) in die Workshop-Checkliste aufnehmen, nicht das Einzelsymptom nachrüsten.
+
+- **[GERING] [PROZESS] [Doku] LL-S094-2 – Stabile Quelle auf volatile Stelle verwiesen (dangling-anfällig)**
+  Quelle: User
+  Was: ADR-S090-1 verwies zweimal auf einen open-questions-Eintrag (OQ-S094-1), der bei Lösung gelöscht wird – die Referenz würde dann ins Leere zeigen.
+  Warum: Referenz-Richtung nicht bedacht – die volatile OQ darf die stabile ADR referenzieren, nicht umgekehrt; relevante Info muss in der stabilen Quelle leben.
+  Regel: Referenzen laufen volatil → stabil, nie umgekehrt (jetzt in `principles.md` festgehalten).
+
+- **[MITTEL] [PROZESS] [Doku] LL-S094-3 – AGENT_MEMORY-Anstrich in ~8 Runden zerredet, statt Doku-Regeln vorab anzuwenden**
+  Quelle: User
+  Was: Die Formulierung eines einzigen „Nächste Prioritäten"-Anstrichs brauchte ~8 Korrekturrunden – redundante Changelog-/Navigations-Inhalte, diskussions-interne „B"-Labels, irrelevante Mechanik-Erklärung, ein literaler `{{NEXT_SCENARIO}}`-Token in Prosa (vom Renderer mitersetzt), technische Schuld inline statt in `tech-debt.md`.
+  Warum: Inhalt wurde frei/verbos gedraftet und das Kürzen dem User überlassen, statt die bereits existierenden Regeln vorab anzuwenden (AGENT_MEMORY lean = Phase/Story/Prioritäten; Single Source / keine Duplikate anderer auto-geladener Quellen wie CLAUDE.md/Index/git; Schuld → `tech-debt.md` + referenzieren; kein Jargon, keine Template-Token in Prosa).
+  Regel: Vor dem Schreiben in häufig-injizierte/kanonische Dokumente je Zeile prüfen – richtige (einzige) Stelle? Braucht der Ziel-Leser es zum Handeln? – und die Scope-Regeln des Dokuments zuerst selbst anwenden, statt das Pruning an den User auszulagern.
+  Bezug: OBS-S094-1
+
+---
+
 ## Session 093 – 2026-06-23
 
 - **[GERING] [PROZESS] [Doku] LL-S093-1 – Guideline behauptete einen Helper als „definiert", der nicht existierte**

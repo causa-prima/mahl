@@ -18,6 +18,7 @@ sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müsse
 | 5. Destructive Actions schützen | Bei Löschen, Archivieren, Überschreiben |
 | 6. Konsistente Terminologie | Bei allen sichtbaren Texten (Labels, Buttons, Meldungen) |
 | 7. Leerer Zustand erklärt sich | Bei jeder Liste, Tabelle oder Ansicht, die leer sein kann |
+| 8. Formular-/Dialog-Baseline | Bei jedem Formular oder Dialog (Pflichtfeld-Markierung, Fokus-Führung, Tastatur) |
 
 > **Voraussetzung:** Diese Guideline gilt für alle React-Komponenten.
 > `docs/guidelines/coding-guideline-typescript.md` beschreibt die technische Umsetzung.
@@ -148,3 +149,33 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 ❌ "Keine Daten vorhanden." (erklärt nicht warum und was zu tun ist)
 
 **Gefilterter vs. echter leerer Zustand:** Ist die Liste durch einen aktiven Filter leer, erklärt der leere Zustand den Filter und wie man ihn aufhebt — nicht "Noch nichts angelegt".
+
+---
+
+## 8. Formular-/Dialog-Baseline
+
+**Warum:** Jedes Formular braucht dieselben Grund-Mechaniken (Pflichtfeld-Erkennbarkeit, Fokus-Führung, Tastatur-Bedienung). Werden sie pro Formular neu — oder gar nicht — entschieden, driften sie auseinander, und Tastatur-/Screenreader-Nutzer verlieren die Orientierung. Diese Baseline gilt für **jedes** Formular und jeden Dialog.
+
+**Entscheidungsregel — pro Mechanismus zuerst fragen: Liefert das Framework / HTML-native das Verhalten?**
+- **Ja → kein Szenario.** Per dieser Guideline + Review erzwingen (beim Schreiben *und* beim Reviewen). Ein Szenario würde nur das Framework testen.
+- **Nein (eigene Logik) → Szenario/Assert** wie unten.
+
+### Custom — mit Szenario abgesichert
+
+| Mechanismus | Verhalten | Träger |
+|---|---|---|
+| **Pflichtfeld-Affordance** | Jedes Pflichtfeld ist als solches markiert (MUI `required` → Asterisk + `aria-required`), sichtbar **beim Öffnen**, vor jeder Eingabe. | Eigenes Happy-Path-Szenario („… sind als Pflichtfeld markiert"), getestet beim Öffnen (nicht im Fehler-Szenario — separates Behavior, eigener Fehlergrund). **Quelle der Wahrheit, *welche* Felder Pflicht sind = die Leerwert-Error-Szenarien** („leeres X schlägt fehl"). Jedes Feld mit solchem Error-Szenario muss markiert sein. |
+| **Autofokus beim Öffnen** | Beim Öffnen liegt der Fokus auf dem **visuell ersten** Eingabefeld. | Eigenes Happy-Path-Szenario, **E2E** (visuell oberstes Input hat Fokus). Invariant: Formularfelder **nicht per CSS umsortieren** (DOM-Reihenfolge == visuelle Reihenfolge) — sonst fokussiert `autoFocus` ein nicht-erstes Feld, besonders im responsiven/Mobile-Layout. |
+| **Fokus aufs erste fehlerhafte Feld** | Nach Validierungsfehler springt der Fokus auf das **erste fehlerhafte** Feld (ein Fehler → dieses; mehrere → das erste). | Asserts an die bestehenden Error-Szenarien — mind. ein Fall „erstes Feld fehlerhaft" **und** ein Fall „nur späteres Feld fehlerhaft", damit „erstes" gepinnt ist. Custom, weil die Validierung server-only ist (ADR-S090-1) → kein nativer Client-Fokus. |
+
+### Framework-geliefert — KEIN Szenario, per Review erzwungen
+
+| Mechanismus | Verhalten | Geliefert von / zu erzwingen |
+|---|---|---|
+| **Enter sendet ab** | Enter in einem **einzeiligen** Feld sendet das Formular ab; in einem **mehrzeiligen** Feld (`textarea`) erzeugt Enter einen Zeilenumbruch (kein Submit). Submit aus mehrzeiligem Feld optional via Cmd/Ctrl+Enter. | Natives `<form>` + Submit-Button. **Review:** echtes `<form>` mit `type="submit"`-Button — **keine** manuellen `keydown→submit`-Handler an Feldern (die brechen den Textarea-Zeilenumbruch). |
+| **Escape schließt** | Escape schließt den Dialog / bricht ab. | MUI `Dialog` (`onClose` feuert auf `escapeKeyDown`). **Review:** `onClose` ist ans tatsächliche Schließen verdrahtet. |
+| **Fokus-Falle** | Tab/Shift+Tab zyklen innerhalb des Dialogs. | MUI `Dialog` (`disableEnforceFocus=false`, Default). Nicht abschalten. |
+| **Fokus-Rückkehr** | Beim Schließen kehrt der Fokus zum auslösenden Element zurück. | MUI `Dialog` (`disableRestoreFocus=false`, Default). Nicht abschalten. |
+
+✅ Pflichtfelder mit Asterisk; Fokus beim Öffnen im ersten Feld; nach Fehler Fokus aufs fehlerhafte Feld; Enter speichert; Escape schließt.
+❌ Pflichtfelder optisch nicht von optionalen unterscheidbar; nach „Speichern" mit Fehler bleibt der Fokus auf dem Button und die Fehlermeldung steht ungesehen darüber; ein manueller Enter-Handler, der in einem künftigen mehrzeiligen Feld den Zeilenumbruch verschluckt.

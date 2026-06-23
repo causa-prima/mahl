@@ -145,13 +145,20 @@ Das Frontend konsumiert ausschließlich `errors` und ordnet jede Meldung ihrem F
 
 **Geltungsbereich Feldnamen:** Keys = Request-JSON-Property-Namen. Collection-/Cross-Field-Fehler (z.B. Recipe `ingredients`/`steps` leer) keyen auf den jeweiligen Feldnamen; ein eventueller globaler Key wird festgelegt, sobald ein solcher Endpoint implementiert wird (derzeit nur Ingredients implementiert).
 
-**Validierung bleibt server-only / Client-Validierung aufgeschoben:** Die Validierungslogik liegt ausschließlich im Backend; das Frontend zeigt die 422-Antwort. Client-seitige Validierungs*logik* (Submit-Blockieren, Instant-Feedback) ist YAGNI und wird erst eingeführt, wenn ein UX-Szenario sie fordert – dank des feld-keyed Contracts dann günstig nachrüstbar. Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und wird per eigenem Szenario ergänzt.
+**Validierung bleibt server-only / Client-Validierung aufgeschoben:** Die Validierungslogik liegt ausschließlich im Backend; das Frontend zeigt die 422-Antwort. Client-seitige Validierungs*logik* (Submit-Blockieren, Instant-Feedback) ist **aufgeschoben aus YAGNI** – *nicht* weil Drift unlösbar wäre, sondern weil sich der Aufwand für den realistischen Bedarf derzeit nicht lohnt. Die maßgebliche Argumentkette (gilt auch für ein künftiges Wiederaufgreifen – diese Abwägung kam schon mehrfach auf, daher hier **front-loaded** festgehalten, damit sie nicht erneut von vorn aufgerollt wird):
+
+1. **Nur Required braucht realistisch Client-Validierung.** maxLength ist abuse-only (valide Nutzer treffen das Limit nie → Instant-„zu lang" wertarm); Range/Regex werden in dieser trivialen Domäne selten falsch eingegeben. Der UX-Gewinn konzentriert sich auf „Pflichtfeld leer".
+2. **Drift ist lösbar, nicht unmöglich.** Drift-frei wäre *backend-getriebene* Constraint-Metadaten: ein Constraints-Endpoint, der per Reflection aus den Domänen-Typen ableitet (z.B. Property-Typ `NonEmptyTrimmedString` ⇒ Pflicht-String) → generischer Client-Validator. Setzt voraus, dass Constraints als **reflektierbare Metadaten** am Domänen-Typ liegen (heute teils imperativ → Refactor nötig). OpenAPI-Codegen ist im harten Teil ~äquivalent (DTOs ≠ Domänen-Objekte; die Ableitung ist die eigentliche Arbeit). Native HTML-`required`/`maxLength` ist *nicht* der Weg (siehe Verworfen).
+3. **Fokus-aufs-erste-Fehlerfeld bleibt ohnehin custom.** Uniqueness (Duplikat-Name) ist inhärent server-only → 422; Client-Validierung ersetzt das nicht. Die Affordance-/Fokus-Baseline (UX-Guideline Prinzip 8) ist also unabhängig von dieser Frage nötig.
+4. **Cross-Stack-Contract-Test schützt nur mit geteilter Fixture**, die beide Stacks konsumieren (zwei separate Asserts pro Stack = wieder Drift); alternativ Pact.
+
+Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und per eigenem Szenario abgedeckt (UX-Guideline Prinzip 8).
 
 **Cross-Stack-Drift-Strategie (konkreter Trigger):** Der 422-Body-Shape ist zwischen BE (`Results.ValidationProblem`) und FE (`FieldErrorBody`) nicht durch eine einzige Quelle abgesichert, sondern **behavioral pro Feld** über Full-Stack-E2E der geübten Fehlerfelder (Shape-Drift bricht das E2E). Das genügt, solange der Body nur **Display-Text** trägt – das FE rendert, verzweigt aber keine Logik auf der Struktur. Eine **einzige Quelle** (OpenAPI-Codegen; bewusst als YAGNI aufgeschoben, weil die Schnittstelle klein und feld-keyed-forward-kompatibel ist) wird eingeführt, **sobald das Frontend den 422-Body über reines Anzeigen hinaus für Logik konsumiert** (auf Body-Struktur/Codes verzweigt statt nur Text zu rendern). Der derzeitige ungeprüfte `as`-Cast in `createIngredient` ist bis dahin kosmetisch.
 
 **Verworfen:**
 - **Flaches `string[]`** (ADR-S000-1) – keine Feld-Zuordnung, Frontend müsste auf exakte Texte matchen.
-- **Client-seitige Validierungslogik als gleichwertige zweite Quelle** – dupliziert Regeln → Drift-Fläche, die nur durch teure Full-Stack-E2E-Grenzwert-Tests pro Constraint absicherbar wäre.
+- **Client-seitige Validierungslogik als hand-duplizierte zweite Quelle** (native HTML-`required`/`maxLength` o.ä.) – dupliziert Regeln → Drift-Fläche, und Browser-Default-Meldungen kollidieren mit unseren Texten (ADR-S051-2). Drift-*frei* wäre nur backend-getriebene Constraint-Metadaten (→ Aufschub-Begründung oben, Punkt 2) → als YAGNI aufgeschoben.
 - **Shared Validation Schema (Zod/JSON-Schema über beide Seiten)** – scheitert am C#/TS-Sprachbruch (kein gemeinsamer Runtime).
 
 ---

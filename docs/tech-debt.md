@@ -113,3 +113,10 @@ Eintrag-Format:
 **Priorität:** Niedrig – kein treibendes Szenario
 **Problem:** `CreateIngredientDto(string Name, string DefaultUnit)` ist non-nullable. Lässt ein Client das `name`-Property **ganz weg** (statt `""`), kann ASP.NET Minimal API je nach STJ-Konfiguration `null` binden (Warnung) oder **400** vor dem Handler werfen — nicht das vertragliche **422** mit `{"errors":{…}}`. Der Client parst in `toIngredientResult` nur `status === 422` als Fehler; ein 400 würde als `Ingredient` interpretiert → stiller Fehlzustand. Aktuell unerreichbar (das Szenario sendet stets `name: ""`).
 **Behebung/Trigger:** Sobald ein Szenario fehlende/null-Properties adressiert: `string?`-Properties + bewusste Null-Behandlung in `ToDomain`, oder ein einheitlicher 4xx→`{"errors"}`-Mapper.
+
+---
+
+## TD-S094-1 — Zutaten-Dialog: Formular-UX-Baseline (Prinzip 8) unvollständig
+**Priorität:** Mittel – mit den nächsten Baseline-Szenarien am selben Dialog
+**Problem:** Der Zutaten-Dialog erfüllt UX-Guideline Prinzip 8 noch nicht: (1) **Fokus aufs erste fehlerhafte Feld** ist in den Error-Szenarien „leere Einheit" (→ Fokus Einheit) und „beide leer" (→ Fokus Name) bereits als Assert spezifiziert, aber nicht implementiert — und **unsichtbar für `next_scenario.py`**, weil die Szenarien schon „done" sind (Asserts nachträglich ergänzt); (2) **Enter sendet nicht ab** — der Dialog nutzt einen `onClick`-Button statt eines echten `<form>` mit `type="submit"`. Escape/`onClose` ist separat als **TD-S077-1** erfasst.
+**Behebung/Trigger:** Gemeinsam mit den nächsten Baseline-Szenarien (Pflichtfeld-Markierung, Autofokus) am Zutaten-Dialog umsetzen; per Review (Prinzip 8) erzwungen.

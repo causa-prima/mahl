@@ -370,3 +370,14 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 - Beobachtung: In `AGENT_MEMORY.md` → „Nächste Prioritäten" wurde ein vorgezogenes Item zu weit gefasst notiert („`@US-904-error`-Block vorziehen") und ohne dauerhaft sichtbare Begründung. Folge: Der Vorzieh-Grund (S091 feld-keyed-422-Bug) wurde inertial weitergeschleppt, obwohl er längst erledigt war; ein Agent konnte weder erkennen, woraus das Vorgezogene besteht, noch wann es fertig ist. „Error-Szenarien vorziehen" ist zu weit; „Error-Szenario leerer Name + leere Einheit vorziehen, weil <Grund>" ist eng genug. Gilt auch für andere Vorzieh-Items (z.B. „Erst-Formular-UX-Baseline vor dem Feature-Fluss" braucht ebenfalls einen notierten Grund).
 - Kandidaten: A) Konvention für Vorzieh-Einträge: konkretes Szenario(-Set) + Begründung + Done-Kriterium, beim Erledigen entfernen (gering) | B) frei wie bisher (driftet) | C) Vorzieh-Items ganz verbieten, immer Feature-Reihenfolge (zu rigide)
 - Entscheidung/Maßnahme: offen (Retro) – Kandidat A wahrscheinlich; ggf. als Schreib-Hinweis in closing-session Schritt 8 / AGENT_MEMORY-Header.
+
+---
+
+## OBS-S094-1 – AGENT_MEMORY auf Skill-Scope eindampfen (Cruft dupliziert auto-geladene Quellen)
+- Quelle: User
+- Status: NEU
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: `AGENT_MEMORY.md` wird bei jedem Session-Start voll injiziert (jede Zeile kostet Token), enthält aber Inhalte, die **andere ebenfalls auto-geladene Quellen** duplizieren: (a) die „Letzte Aktualisierung"-Zeile (Datum aus git/Index/Harness ableitbar, Änderungs-Summary ↔ Session-Index-Zeile); (b) der Navigations-Header (Session-Logs, adr via `decisions.py`, Kaizen, tech-debt, open-questions) ↔ CLAUDE.md-Navigationstabelle (die „Navigationszentrale", ebenfalls beim Start geladen). Der `closing-session`-Skill (Schritt 8) scoped die Datei ohnehin auf **Phase + Aktuelle Story + Nächste Prioritäten** – Header/Changelog stehen quer dazu.
+- Kandidaten: A) „Letzte Aktualisierung"-Zeile + Navigations-Header streichen, AGENT_MEMORY auf Phase/Story/Prioritäten reduzieren, `closing-session` Schritt 8 klarstellen (gering; Datei + Skill gemeinsam, sonst Drift) | B) Status quo (redundant, Token-Kosten je Start)
+- Entscheidung/Maßnahme: offen (Retro) – Kandidat A wahrscheinlich; Datei + Skill **zusammen** ändern (sonst driftet die Datei gegen den Skill, der die Zeilen implizit erwartet).

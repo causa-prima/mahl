@@ -41,6 +41,11 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Zeilennummern nur für read-only-Dateien wie Session-Logs). Ändert man eine referenzierte Stelle,
   **prüfen, ob die referenzierenden Stellen mitgepflegt werden müssen.**
 
+- **Referenzen laufen von volatil → stabil, nie umgekehrt.**
+  Eine stabile Quelle (z.B. ADR) darf **keine** volatile Stelle referenzieren (z.B. `open-questions.md`,
+  die bei Lösung gelöscht wird) – sonst dangelt die Referenz, sobald die volatile Stelle verschwindet.
+  Die volatile Stelle referenziert die stabile; relevante Informationen leben (auch) in der stabilen Quelle.
+
 ## Kommunikation & Argumentation
 
 - **"Unterstützt" ≠ "beweist" – Empirie vor Behauptung, Empfehlung und Fertig-Erklärung.**

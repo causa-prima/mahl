@@ -118,6 +118,7 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 - [ ] Destructive Actions: Bevorzugt Soft-Delete mit Wiederherstellungsmöglichkeit im UI. Bestätigungsdialog nur wenn Soft-Delete nicht machbar.
 - [ ] Terminologie: Verwendet die UI ausschließlich Begriffe aus `docs/reference/glossary.md`? Keine Synonyme in Labels, Buttons, Fehlermeldungen oder leeren Zuständen.
 - [ ] Leere Zustände: Erklärt jede potenziell leere Liste (1) warum sie leer ist und (2) was der Nutzer tun kann?
+- [ ] Formular-/Dialog-Baseline (Prinzip 8, nur bei Formularen/Dialogen): Pflichtfelder markiert (`required`/`aria-required`, jedes Feld mit Leerwert-Fehler)? Fokus beim Öffnen im visuell ersten Feld (kein CSS-Reorder)? Nach Validierungsfehler Fokus aufs erste fehlerhafte Feld? Enter sendet via echtem `<form>` (kein manueller `keydown→submit`)? Escape/Fokus-Falle/Fokus-Rückkehr durch MUI `Dialog` nicht abgeschaltet?
 
 ## Test-Audit (aus `docs/process/e2e-testing.md`)
 

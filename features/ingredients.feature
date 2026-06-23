@@ -25,6 +25,18 @@ Feature: Zutaten verwalten
     And ist das Einheit-Feld leer
 
   @US-904-happy-path
+  Scenario: Pflichtfelder im Dialog sind als solche markiert
+    When ich auf "Zutat anlegen" klicke
+    Then ist das Name-Feld als Pflichtfeld markiert
+    And ist das Einheit-Feld als Pflichtfeld markiert
+
+  @US-904-happy-path
+  Scenario: Beim Öffnen des Dialogs liegt der Fokus auf dem ersten Feld
+    When ich auf "Zutat anlegen" klicke
+    Then ist das Name-Feld das erste Eingabefeld im Dialog
+    And hat das Name-Feld den Fokus
+
+  @US-904-happy-path
   Scenario: Felder sind nach Abbrechen beim erneuten Öffnen wieder leer
     When ich auf "Zutat anlegen" klicke
     And ich "Knoblauch" als Name eingebe
@@ -114,6 +126,7 @@ Feature: Zutaten verwalten
     And ich keine Einheit eingebe
     And ich auf "Speichern" klicke
     Then sehe ich die Fehlermeldung "Einheit darf nicht leer sein."
+    And hat das Einheit-Feld den Fokus
     And die Zutaten-Liste bleibt unverändert
 
   @US-904-error
@@ -133,6 +146,7 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then sehe ich die Fehlermeldung "Name darf nicht leer sein."
     And sehe ich die Fehlermeldung "Einheit darf nicht leer sein."
+    And hat das Name-Feld den Fokus
     And die Zutaten-Liste bleibt unverändert
 
   @US-904-error

@@ -90,6 +90,7 @@ Prüfe für jede Operation aus A) welche UX-Prinzipien zutreffen – notiere je 
 - **Prinzip 7 – Leerer Zustand:** Gibt es Listen oder Ansichten, die leer sein können? Bei "Relevant": Leerer Zustand erfordert Erklärungstext ("Noch keine X angelegt.") + nächste Aktion.
 - **Prinzip 3 – Sichtbares Feedback:** Gibt es mutierende Operationen, die auf eine Server-Antwort warten? Bei "Relevant": Lade- und Bestätigungszustand beschreiben.
 - **Prinzip 4 – Fehlermeldungen:** Gibt es Fehlerfälle mit UI-Fehlermeldungen? Bei "Relevant": Format "[Was ist falsch]." oder "[Was ist falsch] ([Constraint])." – Platzierung nahe am betroffenen Element.
+- **Prinzip 1 – Pflichtfeld-Affordance (Least Surprise):** Hat eine Operation ein Formular mit Pflichtfeldern? Bei "Relevant": Pflichtfelder müssen erkennbar markiert sein – eigenes Szenario (→ Formular-/Dialog-Baseline in der UI-Verhaltens-Checkliste, Schritt 1; Details: UX-Guideline Prinzip 8).
 
 Notiere A–E schriftlich – Schritt 2 übergibt sie verbatim an die Agents.
 
@@ -171,6 +172,15 @@ nicht später als Implementierungsdetail überlassen.
 | **Abbrechen** | Gibt es einen Abbrechen-Pfad (Button, Escape, Klick außerhalb)? Wohin führt er? Gehen Eingaben verloren? | Szenario formulieren, das die Abbrechen-Navigation und den Endzustand beschreibt |
 | **Feld-Initialisierung** | Welche Werte haben Felder beim ersten Öffnen des Dialogs/Formulars? (Leer, Defaults, vorausgefüllt?) | Szenario formulieren, das den initialen Zustand beim Öffnen beschreibt |
 | **Async-Zustände** | Gibt es sichtbare Loading-States oder Disabled-States während laufender Operationen? | Szenario formulieren, das beschreibt was der Nutzer während der Operation sieht |
+| **Pflichtfeld-Affordance** | Hat das Formular Pflichtfelder? Sind sie als solche markiert (statisch, vor jeder Eingabe sichtbar)? | Eigenes Happy-Path-Szenario „Pflichtfelder sind als solche markiert" (getestet **beim Öffnen**, nicht im Error-Szenario) |
+| **Autofokus beim Öffnen** | Liegt der Fokus beim Öffnen auf dem visuell ersten Feld? | Eigenes Happy-Path-Szenario (E2E: visuell oberstes Input hat Fokus) + Guideline-Invariant „kein CSS-Reorder von Formularfeldern" |
+| **Fokus nach Validierungsfehler** | Springt der Fokus nach Submit-Fehler aufs erste fehlerhafte Feld? | **Asserts an bestehende Error-Szenarien** (kein neues Szenario): ein Fall „erstes Feld fehlerhaft" + ein Fall „nur späteres Feld fehlerhaft" |
+| **Tastatur & Dialog-Fokus** (Enter-Submit, Escape, Fokus-Falle/-Rückkehr) | Liefert das Framework/HTML-native das Verhalten (echtes `<form>`, MUI `Dialog`)? | **Kein Szenario** — per UX-Guideline Prinzip 8 + Review erzwingen |
+
+**Träger-Regel (Formular-/Dialog-Baseline — welcher Mechanismus bekommt ein Szenario?):**
+Frage pro Mechanismus zuerst: *Liefert das Framework / HTML-native das Verhalten?*
+- **Ja → kein Szenario**, per UX-Guideline Prinzip 8 + Review erzwingen (sonst testet das Szenario nur das Framework).
+- **Nein (eigene Logik) → Szenario/Assert.** Dabei: statische Affordance (Markierung) → **eigenes** Szenario beim Öffnen (one-behavior, eigener Fehlergrund). Nur im Fehlerzustand beobachtbare Mechanik (Fokus aufs erste fehlerhafte Feld) → **Asserts an bestehende Error-Szenarien**, weil „erstes fehlerhaftes Feld" mehrere Input-Partitionen braucht, die die Error-Szenarien schon liefern. Begründung + Details: UX-Guideline Prinzip 8.
 
 Notiere das Ergebnis der Checkliste schriftlich — für jeden Aspekt entweder:
 - „Relevant – Szenario formuliert: [Titel]"

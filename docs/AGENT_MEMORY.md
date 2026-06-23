@@ -4,7 +4,7 @@
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process, observations)
 > Technische Schuld: `docs/tech-debt.md` | Offene Fragen: `docs/open-questions.md`
 
-**Letzte Aktualisierung:** 2026-06-23 (US-904 `@US-904-error` „beide Pflichtfelder leer" = collect-all-Merge umgesetzt, TD-S090-1 erledigt; Backend-`ToDomain` kurzschließend→collect-all, Frontend unverändert; F1-Refactor Describe-Tupel; LL-S093-1, OBS-S093-1/-2)
+**Letzte Aktualisierung:** 2026-06-24 (Formular-/Dialog-UX-Baseline als Spec+Prozess etabliert; Umsetzung am Zutaten-Dialog offen → siehe Prioritäten)
 **Phase:** SKELETON 🔄
 **Aktuelle Story:** US-904 (Zutaten)
 
@@ -12,9 +12,11 @@
 
 ## Nächste Prioritäten
 
+**Retro fällig (Jenga-Score ≤ 0):** Nächste Session mit Skill `kaizen` beginnen.
+
 - **US-904 weiter:**
-  - **Vorgezogen (jetzt fällig) — Erst-Formular-UX-Baseline:** EIN gebündeltes, eigenes Szenario: Pflichtfeld-Affordance (Markierung) + Fokus-auf-**erstes**-Fehlerfeld (cross-cutting Formular-Mechanismen, je ein Code-Pfad, ein Test treibt+bewacht — **nicht** in jedes Error-Szenario retrofitten). **Grund der Vorziehung:** „Fokus aufs *erste* Fehlerfeld" ist erst bei **mehreren** gleichzeitigen Fehlern beobachtbar; diese Voraussetzung („beide Pflichtfelder leer") ist mit S093 erfüllt. Baseline jetzt am ersten Formular etablieren, bevor weitere Formulare das Muster vervielfachen (Retrofit-Vermeidung). UX-Guideline-Regel + `gherkin-workshop`-„Formular-UX-Baseline"-Checkliste landen **mit** dem Code. Zeichenlimits nur gegen Abuse (keine Max-Length-Hints). **Done, wenn** Affordance- + Fokus-Szenario implementiert + Guideline/Checkliste ergänzt.
-  - **Danach Feature-Reihenfolge** – nächstes laut Feature-Datei: {{NEXT_SCENARIO}}. Offene/erledigte Szenarien: `python3 .claude/scripts/next_scenario.py --open|--done`.
+  - **Zutaten-Dialog: Formular-UX-Baseline (Prinzip 8) vervollständigen** → **TD-S094-1** (Fokus-aufs-Fehlerfeld, Enter-Submit) + **TD-S077-1** (Escape); mit den nächsten Baseline-Szenarien am selben Dialog miterledigen.
+  - **Nächstes Szenario laut Feature-Datei:** {{NEXT_SCENARIO}}. Offene/erledigte: `python3 .claude/scripts/next_scenario.py --open|--done`.
   - **Roadmap-Kontext** (nicht an „nächstes" gebunden): „sortiert" führt `OrderBy(name)` ein → aktiviert den S084-ETag real (TD-S084-2; Stryker-killbar weil Insertion-Order ≠ alphabetisch); „Speichern-Button deaktiviert" = pending-State (behebt Cold-Start-Race TD-S083-3). `user.type`/`fireEvent.click` (TS-Guideline).
 
 - **gherkin-workshop US-904 V1:** Separater Schritt vor V1-Implementierung: Feature-Datei und Szenarien ergänzen, die erst in V1 umgesetzt werden (Funktionalität über MVP hinaus: Update einer Zutat + Tags für Zutaten).
