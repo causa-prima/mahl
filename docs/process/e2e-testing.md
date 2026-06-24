@@ -103,6 +103,10 @@ E2E-Tests prüfen **beobachtbares Verhalten**, nicht Implementierungsdetails:
 
 Vollständige Full-State-Assertion-Regeln: `docs/process/tdd-process.md` Abschnitt "Pflicht: Full State Assertion".
 
+### Rollen-Queries bei offenem Dialog/Overlay
+
+Ein offener MUI-`Dialog` setzt `aria-hidden` auf den restlichen DOM-Baum. Playwrights rollenbasierte Locators ignorieren versteckte Elemente per Default und finden Hintergrund-Inhalt dann **scheinbar grundlos** nicht. Müssen bei offenem Dialog/Overlay Hintergrund-Elemente über ihre Rolle abgefragt werden (z.B. die Liste hinter einem „Anlegen"-Dialog), `{ includeHidden: true }` setzen: `page.getByRole('listitem', { includeHidden: true })`. (Pendant für Komponententests: `coding-guideline-typescript.md`, `{ hidden: true }`.)
+
 ---
 
 ## Traceability

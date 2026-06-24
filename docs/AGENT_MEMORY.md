@@ -4,7 +4,7 @@
 > Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process, observations)
 > Technische Schuld: `docs/tech-debt.md` | Offene Fragen: `docs/open-questions.md`
 
-**Letzte Aktualisierung:** 2026-06-24 (Formular-/Dialog-UX-Baseline als Spec+Prozess etabliert; Umsetzung am Zutaten-Dialog offen → siehe Prioritäten)
+**Letzte Aktualisierung:** 2026-06-24 (Kaizen-Retro S085–094)
 **Phase:** SKELETON 🔄
 **Aktuelle Story:** US-904 (Zutaten)
 
@@ -12,7 +12,9 @@
 
 ## Nächste Prioritäten
 
-**Retro fällig (Jenga-Score ≤ 0):** Nächste Session mit Skill `kaizen` beginnen.
+- **Aus Retro S095:**
+  - **OBS-Backlog-Prozess (OBS-S095-1): eigene Session** – Design-Thema (Auflösung aus der Retro herauslösen, leichte Triage beim Erfassen); Diagnose im OBS festgehalten.
+  - **Wrapper-Output-Fixes vor dem nächsten Szenario** (Retro-Entscheid, nicht beobachten): `dotnet-test.py` zeigt bei RED die fehlgeschlagene Assertion (Expected/Actual) → OBS-S091-1; `vitest-run.py --filter` weist gematchte/übersprungene Testzahl aus → OBS-S091-3.
 
 - **US-904 weiter:**
   - **Zutaten-Dialog: Formular-UX-Baseline (Prinzip 8) vervollständigen** → **TD-S094-1** (Fokus-aufs-Fehlerfeld, Enter-Submit) + **TD-S077-1** (Escape); mit den nächsten Baseline-Szenarien am selben Dialog miterledigen.
@@ -25,4 +27,3 @@
 
 - **Visuelle Konsistenz-Guideline:** `docs/guidelines/coding-guideline-ux.md` um Spacing/Hierarchie/Farbe erweitern, sobald >3 Komponenten dieselben visuellen Entscheidungen treffen.
 
-- **Offene Maßnahmen** (`docs/kaizen/countermeasures.md`, OFFEN): CM-S078-2 (HOCH→CM-Härtung, closing-session-Prüfung weich).

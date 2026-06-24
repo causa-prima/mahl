@@ -84,7 +84,7 @@ Jede Retro trefiert das **gesamte offene** OBS-Backlog: umsetzen / weiter beobac
 
 **ID für neue LL-Einträge:** `LL-S<NNN>-<n>` (3-stellige Session-Nummer, laufende Nummer innerhalb der Session). Platziert **HINTER den Tags** im Titel: `- **[HOCH] [PROZESS] [TDD] LL-S084-1 – Kurztitel**`. Vor `**[` würde die ID die Parsing-Regexes der Scripts brechen – daher zwingend hinter die Tags.
 
-**Quelle-Markierung:** Bei user-gemeldeten Einträgen optionale Zeile `Quelle: User` (KEINE Session – die steckt in der ID). Keine Noise-Filter-Ausnahme: der 3-Fragen-Test gilt auch für user-gemeldete Einträge.
+**Quelle-Markierung:** Pflicht-Zeile `Quelle: User | Subagent | Orchestrator` – Herkunft des Eintrags (KEINE Session – die steckt in der ID); `Subagent`/`Orchestrator` machen die Feedback-Quelle beobachtbar (z.B. ob Schicht-Implementer-Feedback ankommt). Keine Noise-Filter-Ausnahme: der 3-Fragen-Test gilt auch für user-gemeldete Einträge.
 
 **Keine retroaktiven IDs:** Bestands-Einträge bekommen NICHT nachträglich IDs (bewusste Entscheidung).
 
@@ -240,3 +240,5 @@ Ein Eintrag ist obsolet wenn:
 - Das betroffene Tool oder die Technologie nicht mehr genutzt wird
 - Der zugrundeliegende Prozess so fundamental umgebaut wurde, dass das Problem strukturell nicht mehr entstehen kann
 - Es sich um eine einmalige Situation handelte, die grundsätzlich nicht wiederkehren kann
+
+**Wohin mit VERWORFEN/OBSOLET-CMs:** Wie BEWÄHRT-Einträge **in `countermeasures.md` belassen** (Abschnitt „Verworfene / Obsolete Maßnahmen"), **nicht** in ein Archiv – damit die Verwerf-/Obsolet-Begründung beim Regressions-Scan auffindbar bleibt und der Eintrag bei Wiederauftreten zurück nach „Aktive Maßnahmen" kann. (Ein CM-Archiv existiert bewusst nicht; nur OBS und lessons_learned werden archiviert.)

@@ -2,7 +2,7 @@
 name: frontend-layer-implementer
 description: Implementiert beide TypeScript/React-Frontend-Schichten (Komponente mit Service-Mock, dann Service-Client mit MSW) für ein freigegebenes Gherkin-Szenario via TDD. Wird vom implementing-scenario-Skill einmal pro Frontend-Szenario aufgerufen.
 tools: Read, Edit, Write, Bash
-model: inherit
+model: sonnet
 permissionMode: acceptEdits
 ---
 

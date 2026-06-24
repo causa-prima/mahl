@@ -9,7 +9,7 @@ Eintrag-Format:
   ## Session NNN – YYYY-MM-DD
 
   - **[SCHWERE] [KATEGORIE] [KONTEXT] LL-S<NNN>-<n> – Kurztitel**
-    Quelle: User   (optionale Zeile, nur bei user-gemeldeten Einträgen)
+    Quelle: User | Subagent | Orchestrator   (Herkunft des Eintrags)
     Was: Ein Satz – was ist passiert?
     Warum: Ein Satz – Ursache.
     Regel: Die destillierte Erkenntnis (imperative Form).

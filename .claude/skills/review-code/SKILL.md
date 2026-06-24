@@ -81,7 +81,7 @@ Scope bestimmt welche Agenten nötig sind:
 
 Jeden Agenten via Agent-Tool mit `subagent_type: "<name>"` spawnen (z.B. `subagent_type: "code-quality-auditor"`) – die Namen entsprechen der Tabelle (es sind registrierte Agenten in `.claude/agents/`, read-only).
 
-**Modellwahl vor Spawn (OBS-S085-8):** Auditoren laufen per Default auf `model: sonnet` (Frontmatter). Den `model`-Parameter des Agent-Tools nur dann setzen, wenn die Änderung erhöhte Tiefe verlangt (z.B. subtile Nebenläufigkeit, nicht-triviale Sicherheits-Edge-Cases) → gezielt `opus` für den betroffenen Auditor; Routine-Reviews bleiben auf `sonnet`. Vor jedem Spawn kurz prüfen: reicht der Default?
+**Modellwahl vor Spawn:** Auditoren laufen per Default auf `model: sonnet` (Frontmatter). Den `model`-Parameter des Agent-Tools nur dann setzen, wenn die Änderung erhöhte Tiefe verlangt (z.B. subtile Nebenläufigkeit, nicht-triviale Sicherheits-Edge-Cases) → gezielt `opus` für den betroffenen Auditor; Routine-Reviews bleiben auf `sonnet`. Vor jedem Spawn kurz prüfen: reicht der Default?
 
 Alle zutreffenden Agenten parallel spawnen – sie reviewen denselben Diff und haben keine gegenseitigen Abhängigkeiten. Bei Unsicherheit über den Scope: `git diff` selbst auswerten; bei genuiner Ambiguität User fragen.
 

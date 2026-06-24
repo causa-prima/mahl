@@ -66,9 +66,9 @@ TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
 
    **Andon-Cord:** KRITISCH-Findings wurden bereits behandelt – trotzdem dokumentieren.
 
-   **IDs & Quelle für neue Einträge:** Jeder neue Eintrag bekommt eine ID `LL-S<NNN>-<n>`,
+   **IDs für neue Einträge:** Jeder neue Eintrag bekommt eine ID `LL-S<NNN>-<n>`,
    platziert **HINTER den Tags**: `- **[HOCH] [PROZESS] [TDD] LL-S<NNN>-<n> – Kurztitel**` (vor `[` würde
-   sie die Script-Regexes brechen). User-gemeldete Einträge zusätzlich mit optionaler Zeile `Quelle: User`.
+   sie die Script-Regexes brechen).
 
    **Nur konkrete schlechte Ausgänge hierher.** Vorausschauende Beobachtungen gehören nach
    `docs/kaizen/observations.md` (billiger Erfassungs-Test: „vorausschauende Notiz, wie das System besser

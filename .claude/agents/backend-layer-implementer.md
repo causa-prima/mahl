@@ -2,7 +2,7 @@
 name: backend-layer-implementer
 description: Implementiert eine C#-Backend-Schicht (API-Endpoint, Domain-Typen, Service/Repository) für ein freigegebenes Gherkin-Szenario via TDD. Wird vom implementing-scenario-Skill für jede Backend-Schicht aufgerufen – eine Schicht pro Aufruf.
 tools: Read, Edit, Write, Bash
-model: inherit
+model: sonnet
 permissionMode: acceptEdits
 ---
 

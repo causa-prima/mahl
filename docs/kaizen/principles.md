@@ -56,3 +56,10 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   erst verifizieren. Gesichert ist eine Aussage über externes Tool-Verhalten nur, wenn sie auf
   einem konkreten Tool-Call dieser Session basiert – alles andere proaktiv als unverified
   kennzeichnen und Verifizierung anbieten, nicht warten bis der User nachfragt.
+
+- **Vollständige Zerlegung vor Schluss/Empfehlung.**
+  Bevor ein Schluss, eine Empfehlung oder eine abgeleitete Anforderung steht, den relevanten
+  Raum **explizit zerlegen** und jede Dimension prüfen – nicht den auffälligsten Teil für das
+  Ganze nehmen. Konkrete Auslöser: Quantoren in Akzeptanzkriterien („alle", „jeder") sind eine
+  **eigene** Prüfdimension; bei Kosten-/Trade-off-Vergleichen **alle** Pfade aufzählen
+  (z.B. Injektion + Lesen + Schreiben), bevor eine Empfehlung steht.

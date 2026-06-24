@@ -97,7 +97,9 @@ Fragen:
    Falls neue Architekturentscheidung nötig: User fragen. Selbst Entschiedenes in `docs/history/adr.md` dokumentieren.
    Mechanische-Suche-Ergebnisse (`--full`) inklusive der verwendeten Befehle in die Subagenten-Message aufnehmen.
 
-Schriftliche Antwort auf alle vier Punkte.
+5. **Modell-Eignung je geplanter Schicht:** Die Komplexitätseinschätzung liegt nach Punkt 2–4 ohnehin vor (YAGNI-Scope, Domain-Typen, ADR-Berührung). Halte pro erwarteter Schicht fest, welches Modell genügt: **`sonnet` ist der Default** und trägt die normale schichtweise TDD-Arbeit. Im Zweifel beim `sonnet`-Default bleiben. Nur eine Schicht, die klar überdurchschnittlich anspruchsvoll ist (offener Entwurfsraum, mehrschichtig verschränkte Logik), gezielt auf Opus eskalieren (`model`-Parameter beim Spawn). Beim Spawn (Schritt 1–3) wird diese Vorab-Einschätzung nur noch bestätigt.
+
+Schriftliche Antwort auf alle fünf Punkte.
 Dieser Schritt ist reine Analyse – noch kein Produktionscode schreiben. Domain-Typen und
 Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 
@@ -160,7 +162,7 @@ Bereits ausgeführt (nicht nochmal ausführen):
 
 Spawn-Regeln:
 - EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin). Ausnahme: der Frontend-Subagent implementiert Komponente und Service-Client sequenziell in einem Aufruf (siehe Schicht-Reihenfolge oben).
-- **Modellwahl vor Spawn (OBS-S085-8):** Die Layer-Implementer haben `model: inherit` (kein Deckel) – anspruchsvolle TDD-Schichten laufen damit auf dem starken Default. Nur für eine klar einfache Schicht (triviales Mapping/Boilerplate) den `model`-Parameter gezielt auf `sonnet` setzen, um Token zu sparen; im Zweifel Default.
+- **Modellwahl vor Spawn:** Die in Schritt 0 Punkt 5 festgehaltene Modell-Eignung bestätigen. Default ist `sonnet` (Frontmatter); nur eine klar überdurchschnittlich anspruchsvolle Schicht per `model`-Parameter auf Opus eskalieren. Im Zweifel beim `sonnet`-Default bleiben.
 - **Subagent benennen:** `name: "backend-<schicht>"` bzw. `"frontend-<schicht>"` – nötig damit der Haupt-Thread via `SendMessage` für das Test-Review antworten kann.
 - **KEIN `run_in_background: true`** – andernfalls werden Berechtigungsanfragen des Subagenten automatisch abgelehnt; er kann keine Dateien schreiben oder Befehle ausführen.
 - **Subagent-Lebenszyklus:** Subagenten terminieren nach ihrer Ausgabe nicht – sie schlafen und bleiben via `SendMessage` erreichbar. Das ist das Kernverhalten von `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`. `permissionMode: acceptEdits` in den Subagenten-Definitionen stellt sicher, dass Datei-Edits nicht geblockt werden.
@@ -273,7 +275,7 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
 → TaskUpdate "Schritt 5: Review-Loop": completed | TaskUpdate "Schritt 6: Abschluss (Session-Abschluss & Commit)": in_progress
 
 1. **Offene Punkte mit dem User triagieren (bevor committed wird):** Sammle aus dem gesamten Ablauf alles, was nicht in den Szenario-Code eingeflossen ist – nichts darf nur in der Konversation hängen bleiben oder ungefragt irgendwo eingetragen werden:
-   - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende oft einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return darauf durchsehen.
+   - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return durchsehen und **pro Subagent explizit ausweisen**, ob er Feedback gab (Inhalt) oder nicht („keine"). Wird daraus ein OBS/LL erfasst, die **Quelle präzise** eintragen (`Subagent` vs. `Orchestrator`), damit später beobachtbar bleibt, woher das Feedback stammt.
    - **Zurückgestellte ⚠️-Findings** aus dem Review-Loop (Schritt 5).
    - **Während des Ablaufs entdeckte technische Schuld / Tooling-Reibung.**
 
