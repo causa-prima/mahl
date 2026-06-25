@@ -217,12 +217,12 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 
 ## OBS-S091-1 – `dotnet-test.py` zeigt bei RED keine Assertion-Details (MTP-Runner)
 - Quelle: Agent
-- Status: NEU
+- Status: UMGESETZT (S096)
 - Impact: MITTEL    Häufigkeit: jeder Backend-RED
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: `dotnet-test.py` gibt bei Fehlschlag (Default **und** `--verbose`) nur `Failed: N, Passed: M` + einen Verweis auf eine UTF-16-`.log` aus — **keine** Assertion-Message/Expected-Actual. Empirisch verifiziert (S091, gezielt gebrochene Assertion, voller ungefilterter Output): der MTP-Runner (xunit.v3, TD-S089-1) schreibt Fehlerdetails nur in `TestResults/*.log`, nicht auf stdout im Format, das das `_RELEVANT`-Regex (`Error Message`/`at mahl.`) erwartet. Beim RED-Debugging fehlt damit genau die Info, die man braucht (der Backend-Subagent musste die UTF-16-Datei manuell lesen).
 - Kandidaten: — (Retro; u.a.: Wrapper extrahiert die fehlgeschlagene Assertion aus der `.log` vs. MTP auf stdout-Ausgabe konfigurieren)
-- Entscheidung/Maßnahme: **Direkt fixen vor dem nächsten Szenario (S095-Entscheid):** wiederkehrendes Problem, Beobachten lohnt nicht — `dotnet-test.py` muss bei RED die fehlgeschlagene Assertion (Expected/Actual) auf stdout zeigen. Teil des Wrapper-Output-Fix-Batches (mit OBS-S091-3). Verschärft den OBS-S085-3-Workaround.
+- Entscheidung/Maßnahme: **Umgesetzt S096** (war: Direktfix vor nächstem Szenario, S095-Entscheid, Batch mit OBS-S091-3): `dotnet-test.py` gibt bei RED die fehlgeschlagene Assertion aus den MTP-Failure-Logs auf stdout aus (Default + `--verbose`), empirisch verifiziert. Details/Rationale beim Code (`dotnet-test.py`).
 - Bezug: TD-S089-1 (MTP-Migration); OBS-S085-3 (Wrapper-Output-Filtern)
 
 ## OBS-S091-2 – Wrapper-Aufrufpfad cwd-relativ, kollidiert mit Projekt-Tooling-cwd
@@ -237,12 +237,12 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 
 ## OBS-S091-3 – `vitest-run.py --filter` Substring-Semantik nicht offensichtlich
 - Quelle: Agent
-- Status: NEU
+- Status: UMGESETZT (S096)
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: `vitest-run.py --filter X` matcht X als Substring über den **voll-qualifizierten** Testnamen (inkl. `describe`-Block). Ein neuer describe-Block „…(leere Einheit)" wurde dadurch zunächst übersprungen → irreführendes „N passed" statt der erwarteten Gesamtzahl (der FE-Subagent zog ungefiltert nach). Verbesserung: Filter-Semantik dokumentieren oder die Zahl gematchter/übersprungener Tests ausweisen.
 - Kandidaten: — (Retro)
-- Entscheidung/Maßnahme: **Direkt fixen vor dem nächsten Szenario (S095-Entscheid):** Teil des Wrapper-Output-Fix-Batches (mit OBS-S091-1) — `vitest-run.py` weist die Zahl gematchter/übersprungener Tests aus (und/oder dokumentiert die Substring-Semantik).
+- Entscheidung/Maßnahme: **Umgesetzt S096** (war: Direktfix vor nächstem Szenario, S095-Entscheid, Batch mit OBS-S091-1): `vitest-run.py` weist bei aktivem `--filter` ausgeführte/übersprungene Tests samt Substring-Semantik aus und wertet 0 gematchte Tests fail-closed als Fehler (Exit 1 statt vitests grünem 0); empirisch verifiziert. Details/Rationale beim Code (`vitest-run.py`).
 - Bezug: OBS-S085-3 (Filter-/Output-Familie); OBS-S091-1
 
 ## OBS-S091-4 – Suppressions systematisch tracken (Script)
@@ -331,7 +331,7 @@ Grooming/Eskalation, Quer-Bewegung LL↔OBS: docs/kaizen/process.md
 - Kategorie: PROZESS    Kontext: Skill-Nutzung
 - Beobachtung: Observations speisen den Jenga-Score bewusst nicht (kein Problemdruck) und werden nur in der Retro getrefiert. Folge: Das offene OBS-Backlog wächst monoton zwischen den Retros (aktuell ~25 offene Einträge), und Schritt 4 (Backlog-Grooming) bläht die Retro auf — viele Punkte auf einmal, kognitiv anstrengend (vgl. OBS-S086-3). Es fehlt ein Mechanismus, der das Backlog zwischen Retros abbaut oder die Grooming-Last begrenzt (z.B. Priorisierung/Stapelung, Sofort-Erledigung trivialer OBS außerhalb der Retro, OBS-Budget pro Retro).
 - Kandidaten: — (gemeinsame Discovery in eigener Session)
-- Entscheidung/Maßnahme: **Eigene Session (S095 vertagt – Design-Thema, braucht Platz).** Erarbeitete Diagnose als Startpunkt: Das Backlog wächst nicht wegen zu hoher *Erfassungs*-, sondern zu niedriger *Auflösungsrate* (Auflösung ist retro-gegated; früher wurden OBS zwischen Sessions erledigt – Gewohnheit ging beim Formalisieren verloren). Hebel = Auflösung aus der Retro herauslösen für alles ohne Diskussionsbedarf. Zentrale Spannung: Triage-beim-Erfassen vs. OBS-S086-1 (keine Vorab-Kandidaten) → Auflösungsidee: nur *leichte Triage-Klassifikation* beim Erfassen (trivial+risikolos / hoher Impact / braucht Diskussion), keine Kandidaten-Entwicklung. Zu betrachtende User-Punkte: (a) Wachstum bremsen; (b) was sofort erledigen (trivial-risikolos vs. hoher Impact); (c) Maßnahmen-Analyse beim Erfassen nötig zum Bewerten? grill-me zum Aufdecken von Ziel/Weg nutzen.
+- Entscheidung/Maßnahme: **Eigene Session (S095 vertagt – Design-Thema, braucht Platz).** Früher wurden OBS zwischen Sessions erledigt – Gewohnheit ging beim Formalisieren verloren). Zu betrachtende User-Punkte: (a) Wachstum bremsen; (b) was sofort erledigen (trivial-risikolos vs. hoher Impact); (c) Maßnahmen-Analyse beim Erfassen nötig zum Bewerten? grill-me zum Aufdecken von Ziel/Weg nutzen.
 - Bezug: OBS-S086-3 (blockweise Findings), OBS-S086-1 (keine Vorab-Kandidaten), OBS-S085-12 (Noise-Review-Skalierung)
 
 ---

@@ -4,7 +4,7 @@ dotnet test (nativ).
 
 Verwendung:
   python3 .claude/scripts/dotnet-test.py
-  python3 .claude/scripts/dotnet-test.py --filter TestMethodName
+  python3 .claude/scripts/dotnet-test.py --filter TestMethodName   # Substring der FQN (Klasse/Methode)
   python3 .claude/scripts/dotnet-test.py --verbose
 
 Branch-Coverage wird automatisch gemessen, wenn kein --filter gesetzt ist.
@@ -26,6 +26,11 @@ _RELEVANT = re.compile(
     r"|\s+at mahl\.)",
     re.MULTILINE,
 )
+
+# MTP/xunit.v3 schreibt Fehlerdetails (Expected/Actual + Stacktrace) NICHT auf stdout,
+# sondern in eine UTF-16-Logdatei, deren Pfad stdout nennt. Wir extrahieren diese Pfade
+# und parsen daraus die fehlgeschlagenen Test-Blöcke.
+_FAIL_LOG_PATH = re.compile(r"Tests failed:\s*'([^']+\.log)'")
 
 _RESULTS_DIR = REPO_ROOT / "TestResults" / "coverage"
 # Deterministischer Output-Pfad (kein rglob/latest → kein Stale-Masking).
@@ -109,6 +114,62 @@ def _parse_coverage(path: Path) -> tuple[dict[str, float], list[FileGap]]:
     return totals, gaps
 
 
+def _decode_log(path: Path) -> str:
+    """Decodet die MTP-Failure-Log (UTF-16 mit BOM; Fallback UTF-8)."""
+    raw = path.read_bytes()
+    for enc in ("utf-16", "utf-8"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
+def _extract_failure_blocks(log_text: str) -> list[str]:
+    """
+    Zieht aus dem Failure-Log die 'failed …'-Blöcke (Assertion-Message + Quell-Stackframe).
+    Ein Block beginnt mit 'failed <Name> (…)' und umfasst die folgenden eingerückten Zeilen
+    bis zur nächsten nicht-eingerückten Zeile. Framework-Frames (AwesomeAssertions/Reflection)
+    werden ausgefiltert; nur 'at mahl.'-Frames (der Quellort) bleiben erhalten.
+    """
+    lines = log_text.splitlines()
+    blocks: list[str] = []
+    i, n = 0, len(lines)
+    while i < n:
+        if lines[i].startswith("failed "):
+            kept = [lines[i]]
+            i += 1
+            while i < n and lines[i][:1].isspace():
+                stripped = lines[i].strip()
+                if not stripped.startswith("at ") or stripped.startswith("at mahl."):
+                    kept.append(lines[i])
+                i += 1
+            blocks.append("\n".join(kept))
+        else:
+            i += 1
+    return blocks
+
+
+def _report_failures(output: str) -> None:
+    """Gibt bei RED die fehlgeschlagenen Assertions aus den MTP-Logs auf stdout aus."""
+    seen: set[str] = set()
+    blocks: list[str] = []
+    for match in _FAIL_LOG_PATH.finditer(output):
+        log_path = Path(match.group(1))
+        key = str(log_path)
+        if key in seen or not log_path.exists():
+            continue
+        seen.add(key)
+        blocks.extend(_extract_failure_blocks(_decode_log(log_path)))
+    if blocks:
+        sep = "─" * 60
+        print(f"\n{sep}")
+        print("  Fehlgeschlagene Tests")
+        print(sep)
+        print("\n\n".join(blocks))
+        print(sep)
+
+
 def _report_coverage(totals: dict[str, float], gaps: list[FileGap]) -> bool:
     sep = "─" * 60
     print(f"\n{sep}")
@@ -142,7 +203,8 @@ def main() -> None:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--filter", dest="filter_name", help="Test-Filter (FullyQualifiedName~...)")
+    parser.add_argument("--filter", dest="filter_name",
+                        help="Substring des voll-qualifizierten Testnamens (Namespace.Klasse.Methode)")
     parser.add_argument("--verbose", action="store_true", help="Vollständigen Output anzeigen")
     args = parser.parse_args()
 
@@ -154,7 +216,11 @@ def main() -> None:
 
     dotnet_args = ["test"]
     if args.filter_name:
-        dotnet_args.extend(["--filter", args.filter_name])
+        # MTP/xunit.v3 ignoriert die VSTest-Option --filter (warning MTP0001, läuft still die
+        # volle Suite). Der Runner filtert über --filter-method gegen den voll-qualifizierten
+        # Namen (Namespace.Klasse.Methode); *…* macht das Pattern zur Substring-Suche.
+        # 0 Treffer → MTP failt fail-closed (Exit 1), kein eigener Guard nötig.
+        dotnet_args.extend(["--", "--filter-method", f"*{args.filter_name}*"])
 
     output, exit_code = run_dotnet(dotnet_args)
 
@@ -168,6 +234,11 @@ def main() -> None:
         else:
             # Kein Match → vollständigen Output zeigen (z.B. unerwarteter Fehler)
             print(output)
+
+    # Bei RED die Assertion-Details (Expected/Actual) aus den MTP-Logs nachreichen –
+    # in beiden Modi, da diese Details nie auf stdout stehen.
+    if exit_code != 0:
+        _report_failures(output)
 
     if collect_coverage:
         # Fail-closed: keine cobertura = kein bestandenes Gate (nie wieder still durchwinken).
