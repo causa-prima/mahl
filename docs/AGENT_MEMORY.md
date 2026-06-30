@@ -13,7 +13,6 @@
 ## Nächste Prioritäten
 
 - **Aus Retro S095:**
-  - **OBS-Backlog-Prozess (OBS-S095-1): eigene Session** – Design-Thema (Auflösung aus der Retro herauslösen, leichte Triage beim Erfassen); Diagnose im OBS festgehalten.
   - **Wrapper-Output-Fixes vor dem nächsten Szenario** (Retro-Entscheid, nicht beobachten): `dotnet-test.py` zeigt bei RED die fehlgeschlagene Assertion (Expected/Actual) → OBS-S091-1; `vitest-run.py --filter` weist gematchte/übersprungene Testzahl aus → OBS-S091-3.
 
 - **US-904 weiter:**

@@ -47,15 +47,7 @@ Das Kaizen-System hat zwei Tracks, **keine Partition** – dieselbe Sache kann a
 
 ## observations.md – Beobachtungs-Backlog
 
-Der proaktive Track für System-Design-Beobachtungen. Vollständiger Header & Eintrags-Format: `docs/kaizen/observations.md`.
-
-- **Zweck:** vorausschauende Optimierungen/Reibungen festhalten, bevor sie zu konkreten schlechten Ausgängen werden.
-- **Eintrag-Format:** siehe Header von `observations.md` (`## OBS-S<NNN>-<n> – Titel`, dann `Quelle / Status / Impact+Häufigkeit / Kategorie+Kontext / Beobachtung / Kandidaten / Entscheidung-Maßnahme / Bezug`).
-- **ID-Schema (ADR-Stil):** `OBS-S<NNN>-<n>` – 3-stellige Session-Nummer, laufende Nummer innerhalb der Session (wie `ADR-S041-1`).
-- **Impact:** dieselben vier Werte wie die LL-**Schwere** (geteiltes Vokabular – in dieser Datei „Impact" genannt, in `lessons_learned` vorerst weiter „Schwere"; dasselbe Konzept).
-- **Häufigkeit:** „einmalig" wird praktisch kaum erfasst (siehe Erfassungs-Regel), faktisch bleiben *gelegentlich* / *häufig*. **Impact × Häufigkeit = Prioritäts-Matrix.**
-- **Erfassungs-Regel (wann Eintrag?):** Eine **sofort und problemlos umsetzbare** Einmal-Optimierung → einfach machen, **kein Eintrag**. Wird sie **aufgeschoben** (bündeln, blockiert, erst Evaluierung abwarten) → Eintrag, damit sie nicht verloren geht.
-- **Kein Jenga-Einfluss:** Kein Script liest diese Datei (Stand jetzt); Observations erzeugen keinen Problemdruck-Abzug.
+Der proaktive Track für System-Design-Beobachtungen. **Eintrags-Format, ID-Schema, Impact/Häufigkeit-Werte und Erfassungs-Regel stehen kanonisch im Header von `docs/kaizen/observations.md`** (dort werden Einträge geschrieben) – hier nicht duplizieren.
 
 ---
 
@@ -64,17 +56,37 @@ Der proaktive Track für System-Design-Beobachtungen. Vollständiger Header & Ei
 **Gefahr ist eine Eigenschaft eines KANDIDATEN** (der geplanten Änderung), **nicht der Beobachtung/des Findings.** Sie ist daher kein Header-Feld in `observations.md`, sondern wird bei der **Kandidaten-Auswahl** abgewogen. Dieselbe Disziplin gilt beim Wählen einer **CM** für ein LL-Muster.
 
 - **Sorgfalt UND Beweisbarkeit skalieren mit Gefahr:** Je höher die Gefahr eines Kandidaten, desto wichtiger der nachträgliche **Beweis**, dass durch die Änderung **kein neues/anderes Problem** entstanden ist (Verifikation / Pilot / Vorher-Nachher).
-- **Evaluierungs-Gate:** Nicht-triviale oder höher-Gefahr-Antworten werden **NICHT sofort** umgesetzt → Kandidaten notieren, abwägen (meist in der Retro), dann begründet committen. Trivial / niedrige Gefahr → sofort umsetzen + Einzeiler.
-- Gilt für **OBS-Antworten UND CM-Wahl** gleichermaßen.
+- **Evaluierungs-Gate:** Nicht-triviale oder höher-Gefahr-Antworten werden **NICHT sofort** umgesetzt → Kandidaten erarbeiten, abwägen (für OBS beim **Drain**, für ein LL-Muster bei der **CM-Wahl**), dann begründet committen. Trivial / niedrige Gefahr → sofort umsetzen + Einzeiler.
 
 ---
 
-## Backlog-Grooming & Eskalation
+## Backlog-Abbau: kontinuierlicher Drain (nicht Retro)
 
-Jede Retro trefiert das **gesamte offene** OBS-Backlog: umsetzen / weiter beobachten / verwerfen.
+Offene OBS (Status `NEU`) werden **kontinuierlich pro Session** abgebaut, **nicht** in der Retro. Grund: OBS-Verarbeitung ist *generatives Design* (Reibung → Kandidaten → lohnt-sich-Entscheidung), die Retro ist *diagnostisch* (Symptom → Muster → Root Cause). Design in den Diagnose-Container zu zwingen, lässt die Retro mit OBS-Themen volllaufen (OBS-S095-1).
 
-- **Lange offene Einträge** erzwingen eine Entscheidung – analog zur CM-Regel „nach 2 Retros OFFEN → eskalieren" (s.u.): priorisieren oder mit Begründung verwerfen (Status `VERWORFEN (Grund)`).
-- **Aufgelöste Einträge** (Status `UMGESETZT` oder `VERWORFEN`) → nach `docs/kaizen/archive/observations_archive.md` verschieben, damit die Live-`observations.md` scannbar bleibt.
+**Trigger:** Der SessionStart-Hook schlägt jede Session einen Drain-Satz vor (un-vergessbar – Disziplin allein scheiterte). Orchestrator schlägt vor, User bestätigt/vertagt. Der Zustand ist **sichtbar** („N vorgeschlagen, Backlog bei M, gesund ≤ 8"), aber **ohne Strafscore** – OBS speisen Jenga nicht.
+
+**Wie viele pro Session** (B = offenes `NEU`-Backlog): `clamp(round(0.4·B), 3, 7)`. Untergrenze 3 (matcht den Inflow ~3/Session), Obergrenze 7 (Session-Schutz bei Überlast), Gleichgewicht ~8. Zahlen aus dem realen Backlog kalibriert (S085–S095); später anpassbar. Steigt B über **12** (1,5× Gleichgewicht), markiert der Drain-Satz das Backlog sichtbar als *überfüllt* und mahnt, die Drain-Ausführung zu priorisieren (advisory, kein Strafscore).
+
+**Lanes des Drain-Satzes:**
+- **Wert-Lane:** Top nach Impact × Häufigkeit (Hauptbudget).
+- **Alters-Lane:** das **älteste** `NEU`-Item (1 Slot), gezwungen zur Entscheidung → Anti-Starvation (reine Prioritäts-Ordnung verhungert das Tail sonst dauerhaft). Alter = aktuelle Session − Erfassungs-Session (aus der OBS-ID). Max. Verweildauer ≈ B Sessions.
+- **Wiedervorlage-Lane:** fällige geparkte Items (s. „Drei Ausgänge"), garantiert und außerhalb des Rate-Budgets.
+
+**Same-Artefakt-Kolokation:** Berührt ein anderes offenes OBS dieselbe Datei (Skript/Hook *oder* Skill/Doc), Mitnahme erwägen – spart Kontext-Laden, vermeidet Konflikt-Fixes über Sessions, bündelt teure Doc-QA.
+
+**Drei Ausgänge je Item:** umsetzen / **verwerfen** (mit Grund → Archiv) / **aufschieben** → `IN BEOBACHTUNG bis S<NNN>` (mit Grund + **Pflicht-Wiedervorlage**: ab dieser Session kommt das Item automatisch zurück in den Drain). Geparkte Items fallen bis dahin aus dem Pool; zum Termin injiziert `obs-drain.py` sie als fällige Wiedervorlage. Fehlt das `bis S<NNN>`, gilt das Item **sofort** als fällig (+ Warnung) – so kann ein geparktes Item nie still liegenbleiben. Für event-basierte Reaktivierung („wieder aktiv wenn X") zusätzlich eine Re-Trigger-Notiz; der Termin bleibt der verlässliche Backstop.
+
+**Bias-Auslöschung (Relevanz wird zweimal beurteilt):** heiß bei der Erfassung (Bias *für* Aufnahme), kalt bei der Behandlung (Bias *zur* Abwertung) – entgegengesetzt, daher kalibrierter zusammen. Damit die kalte Abwertung nichts Wertvolles killt, wendet der Drain (Skill `draining-observations`, Schritt 5) den **Kalt-Abwertungs-Prüfsatz** an.
+
+**Durchführung:** Skill `draining-observations` (guardrailed Discovery + Entscheidung).
+
+**Aufgelöste Einträge** (Status `UMGESETZT` oder `VERWORFEN`) → nach `docs/kaizen/archive/observations_archive.md` verschieben, damit die Live-`observations.md` scannbar bleibt. Das übernimmt **mechanisch** `python3 .claude/scripts/obs-archive.py` (kein Hand-Cut/Paste); solange es aussteht, listet der Drain-Satz sie als **Hygiene-Reminder**.
+
+### Rolle in der Retro
+
+Die Retro behandelt OBS nicht (das macht der Drain), berührt sie aber an einer Stelle:
+- **Verlinkte OBS als LL-Input:** Beim Root-Causing eines LLs die per `Bezug: LL-…` daran hängenden OBS als **Design-Input** mitdenken (Zwei-Brillen-Quer-Bewegung). Die Suche ist **ID-gezielt** (`Bezug: LL-<diese-ID>`), daher auch im Archiv (`docs/kaizen/archive/observations_archive.md`) eindeutig – kein Relevanz-Scan über alle Einträge, nur die Treffer auf genau dieses LL.
 
 ---
 

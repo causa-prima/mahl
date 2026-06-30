@@ -20,7 +20,7 @@ Lege zu Beginn folgende Task-Liste an:
 → TaskCreate "1. User-/Meta-Beobachtungen abfragen"
 → TaskCreate "2. retro_report.py ausführen"
 → TaskCreate "3. countermeasures.md reviewen"
-→ TaskCreate "4. Backlog-Review & Grooming (observations.md)"
+→ TaskCreate "4. OBS-Retro-Berührung (verlinkt)"
 → TaskCreate "5. Findings präsentieren & Freigabe"
 → TaskCreate "6. Änderungen umsetzen"
 → TaskCreate "7. lessons_learned.md archivieren"
@@ -145,23 +145,17 @@ Ergebnis intern festhalten für Schritt 5.
 
 ---
 
-## 4. Backlog-Review & Grooming (observations.md)
+## 4. OBS-Retro-Berührung (verlinkt)
 
-→ TaskUpdate "3. countermeasures.md reviewen": completed | TaskUpdate "4. Backlog-Review & Grooming (observations.md)": in_progress
+→ TaskUpdate "3. countermeasures.md reviewen": completed | TaskUpdate "4. OBS-Retro-Berührung (verlinkt)": in_progress
 
-Lies `docs/kaizen/observations.md`. Hier wird das **gesamte offene** Beobachtungs-Backlog getrefiert (Definitionen & Regeln: `docs/kaizen/process.md`, Abschnitte „observations.md – Beobachtungs-Backlog", „Gefahr & Kandidaten-Bewertung", „Backlog-Grooming & Eskalation").
+Das **Voll-Grooming passiert nicht hier**, sondern via Drain (Skill `draining-observations`); geparkte OBS holt ihre Pflicht-Wiedervorlage selbst zurück. Die Retro berührt OBS nur an einer Stelle (Mechanismus & Begründung: `docs/kaizen/process.md`, Abschnitt „Rolle in der Retro"):
 
-1. **Übersicht:** Alle unbehandelten OBS (Status ≠ UMGESETZT/VERWORFEN) als Liste **ID + Titel** präsentieren.
-2. **Je offenem OBS evaluieren:** Nicht-triviale durchdenken – Kandidaten abwägen, Antwort mit **Gefahr & Beweisbarkeit** wählen (Evaluierungs-Gate: höher-Gefahr/nicht-trivial nicht reflexartig umsetzen). Status pflegen (NEU → IN BEOBACHTUNG / UMGESETZT / VERWORFEN).
-3. **Quer-Bewegung LL ↔ Backlog** mit Gesamt-Prozess-Blick: Steckt hinter einem Backlog-Punkt ein konkreter schlechter Ausgang (→ auch LL/CM)? Steckt hinter einem LL-Muster eine vorausschauende Design-Antwort (→ OBS)? Per `Bezug:` verlinken.
-4. **Themen-Scan über das Backlog:** Häufungen über mehrere OBS hinweg (z.B. „Token-Effizienz", „Doku-Stale") als Cluster benennen.
-5. **OBS-Antworten durch das CM-Eingangs-Gate** (`process.md`, „Wann gehört etwas wohin?"): stehende, verifizierbare Änderung → CM (`Bezug: → CM-…`); Einmal-Änderung → inline `Maßnahme:`, Status UMGESETZT.
-6. **Lange offene Einträge → Eskalations-Entscheidung:** analog zur CM-Regel (nach 2 Retros OFFEN) priorisieren oder begründet verwerfen.
-7. **Aufgelöste** Einträge (UMGESETZT / VERWORFEN) nach `docs/kaizen/archive/observations_archive.md` **verschieben** (nicht kopieren).
+- **Verlinkte OBS als LL-Input:** Beim Root-Causing eines LLs die per `Bezug: LL-<diese-ID>` verlinkten OBS als Design-Input mitdenken; umgekehrt hinter einem LL-Muster ggf. ein neues OBS anlegen (per `Bezug:` verlinkt). Vorgehen + ID-Suche (auch im Archiv): s. process.md.
 
 Ergebnis intern festhalten für Schritt 5 (Backlog-Block in der Findings-Übersicht).
 
-→ TaskUpdate "4. Backlog-Review & Grooming (observations.md)": completed | TaskUpdate "5. Findings präsentieren & Freigabe": in_progress
+→ TaskUpdate "4. OBS-Retro-Berührung (verlinkt)": completed | TaskUpdate "5. Findings präsentieren & Freigabe": in_progress
 
 ---
 

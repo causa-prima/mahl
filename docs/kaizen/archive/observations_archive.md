@@ -1,13 +1,13 @@
 # Observations – Archiv
 
 <!--
-Zweck: Aufgelöste Beobachtungen aus docs/kaizen/observations.md. Beim Backlog-Grooming in der Retro
-       werden Einträge mit Status UMGESETZT oder VERWORFEN hierher VERSCHOBEN (nicht kopiert), damit
-       die Live-observations.md scannbar bleibt.
+Zweck: Aufgelöste Beobachtungen aus docs/kaizen/observations.md. Beim Drain (Skill draining-observations)
+       werden Einträge mit Status UMGESETZT oder VERWORFEN hierher VERSCHOBEN (nicht kopiert), damit die
+       Live-observations.md scannbar bleibt. obs-drain.py erinnert am Session-Start an noch nicht
+       verschobene aufgelöste Einträge (Hygiene-Reminder).
 
-Format der Einträge: identisch zu observations.md (Eintrag-Format dort im Header / docs/kaizen/process.md).
-
-Speist Jenga NICHT (kein Script liest diese Datei).
+Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – ältere Einträge können
+                     entfallene Felder (z.B. das frühere `Kandidaten:`) tragen.
 -->
 
 > **Quelle:** `docs/kaizen/observations.md`
@@ -140,3 +140,42 @@ Speist Jenga NICHT (kein Script liest diese Datei).
 - Bezug: OBS-S085-8 (Modellwahl vor Spawn)
 
 ---
+
+## OBS-S086-1 – OBS-Kandidaten gemeinsam erarbeiten statt eigenmächtig vorab festlegen
+- Quelle: User
+- Status: UMGESETZT (S096)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Skill-Nutzung
+- Beobachtung: Kandidaten in OBS-Einträgen wurden bisher vom Agenten eigenmächtig vorformuliert → teils unpassende/unvollständige Vorschläge, gemeinsam-umzusetzende Optionen oder fehlende Möglichkeiten; das gemeinsame Nachdenken wird übersprungen. Erfassung sollte billig bleiben (nur Beobachtung + ggf. *als roh markierte* Idee); Kandidaten-Discovery + Bewertung gehören in den Retro-Evaluierungsschritt.
+- Entscheidung/Maßnahme: **UMGESETZT (S096)** – Kandidaten-Feld aus dem OBS-Schema entfernt (poka-yoke: in ein nicht existierendes Feld lässt sich nichts vorab nudgen). Kandidaten-Discovery entsteht frisch beim Drain (Skill `draining-observations`), nicht bei der Erfassung.
+- Bezug: OBS-S086-2, OBS-S086-3, OBS-S085-13
+
+## OBS-S091-1 – `dotnet-test.py` zeigt bei RED keine Assertion-Details (MTP-Runner)
+- Quelle: Agent
+- Status: UMGESETZT (S096)
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: `dotnet-test.py` gibt bei Fehlschlag (Default **und** `--verbose`) nur `Failed: N, Passed: M` + einen Verweis auf eine UTF-16-`.log` aus — **keine** Assertion-Message/Expected-Actual. Empirisch verifiziert (S091, gezielt gebrochene Assertion, voller ungefilterter Output): der MTP-Runner (xunit.v3, TD-S089-1) schreibt Fehlerdetails nur in `TestResults/*.log`, nicht auf stdout im Format, das das `_RELEVANT`-Regex (`Error Message`/`at mahl.`) erwartet. Beim RED-Debugging fehlt damit genau die Info, die man braucht (der Backend-Subagent musste die UTF-16-Datei manuell lesen).
+- Entscheidung/Maßnahme: **Umgesetzt S096** (war: Direktfix vor nächstem Szenario, S095-Entscheid, Batch mit OBS-S091-3): `dotnet-test.py` gibt bei RED die fehlgeschlagene Assertion aus den MTP-Failure-Logs auf stdout aus (Default + `--verbose`), empirisch verifiziert. Details/Rationale beim Code (`dotnet-test.py`).
+- Bezug: TD-S089-1 (MTP-Migration); OBS-S085-3 (Wrapper-Output-Filtern)
+
+## OBS-S091-3 – `vitest-run.py --filter` Substring-Semantik nicht offensichtlich
+- Quelle: Agent
+- Status: UMGESETZT (S096)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: `vitest-run.py --filter X` matcht X als Substring über den **voll-qualifizierten** Testnamen (inkl. `describe`-Block). Ein neuer describe-Block „…(leere Einheit)" wurde dadurch zunächst übersprungen → irreführendes „N passed" statt der erwarteten Gesamtzahl (der FE-Subagent zog ungefiltert nach). Verbesserung: Filter-Semantik dokumentieren oder die Zahl gematchter/übersprungener Tests ausweisen.
+- Entscheidung/Maßnahme: **Umgesetzt S096** (war: Direktfix vor nächstem Szenario, S095-Entscheid, Batch mit OBS-S091-1): `vitest-run.py` weist bei aktivem `--filter` ausgeführte/übersprungene Tests samt Substring-Semantik aus und wertet 0 gematchte Tests fail-closed als Fehler (Exit 1 statt vitests grünem 0); empirisch verifiziert. Details/Rationale beim Code (`vitest-run.py`).
+- Bezug: OBS-S085-3 (Filter-/Output-Familie); OBS-S091-1
+
+## OBS-S095-1 – OBS speisen Jenga nicht → Retro droht mit OBS-Themen vollzulaufen und lang zu werden
+- Quelle: User
+- Status: UMGESETZT (S096)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Skill-Nutzung
+- Beobachtung: Observations speisen den Jenga-Score bewusst nicht (kein Problemdruck) und werden nur in der Retro getrefiert. Folge: Das offene OBS-Backlog wächst monoton zwischen den Retros (aktuell ~25 offene Einträge), und Schritt 4 (Backlog-Grooming) bläht die Retro auf — viele Punkte auf einmal, kognitiv anstrengend (vgl. OBS-S086-3). Es fehlt ein Mechanismus, der das Backlog zwischen Retros abbaut oder die Grooming-Last begrenzt (z.B. Priorisierung/Stapelung, Sofort-Erledigung trivialer OBS außerhalb der Retro, OBS-Budget pro Retro).
+- Entscheidung/Maßnahme: **UMGESETZT (S096)** – kontinuierlicher Drain ersetzt Retro-Voll-Grooming: SessionStart-Hook (`obs-drain.py`) schlägt jede Session einen Wert-/Alters-Lane-Satz vor (Rate `clamp(round(0.4·B),3,7)`, Gleichgewicht ~8), Skill `draining-observations` behandelt ihn (umsetzen/verwerfen/aufschieben). Mechanismus: `docs/kaizen/process.md` „Backlog-Abbau: kontinuierlicher Drain". Adressiert (a) Wachstum bremsen (Drain jede Session), (b) Hochwertiges sofort (Prioritäts-Lane statt Retro-Wartezeit), (c) Kandidaten-Discovery beim Drain statt Erfassung.
+- Bezug: OBS-S086-3 (blockweise Findings), OBS-S086-1 (keine Vorab-Kandidaten), OBS-S085-12 (Noise-Review-Skalierung)
+
+---
+

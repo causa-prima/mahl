@@ -655,14 +655,21 @@ def render_trend(all_sessions: list[SessionData]) -> str:
     return "\n".join(lines)
 
 
-def render_escalated(cms: list[Countermeasure], archive_dir: str) -> str:
-    lines = [section("9. Eskalierte Maßnahmen (≥ 2 Retros OFFEN)")]
-    archive_starts: list[int] = []
+def archive_start_sessions(archive_dir: str) -> list[int]:
+    """Start-Session-Nummern aller Retro-Archive (session_<X>_to_<Y>.md → X).
+    Anzahl Starts > Bezugs-Session = wie viele Retros seitdem stattfanden."""
+    starts: list[int] = []
     if os.path.isdir(archive_dir):
-        for fname in sorted(os.listdir(archive_dir)):
+        for fname in os.listdir(archive_dir):
             m = re.match(r"session_(\d+)_to_\d+\.md$", fname)
             if m:
-                archive_starts.append(int(m.group(1)))
+                starts.append(int(m.group(1)))
+    return starts
+
+
+def render_escalated(cms: list[Countermeasure], archive_dir: str) -> str:
+    lines = [section("9. Eskalierte Maßnahmen (≥ 2 Retros OFFEN)")]
+    archive_starts = archive_start_sessions(archive_dir)
 
     offen = [cm for cm in cms if cm.status == 'OFFEN']
     if not offen:

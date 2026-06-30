@@ -30,3 +30,11 @@ if [ -f "$BASHHOOK" ]; then
 else
   echo "WARNUNG: .claude/hooks/check-bash-permission.py wurde nicht gefunden – Bash-Allow-Liste konnte nicht geladen werden."
 fi
+# OBS-Drain: jede Session den vorgeschlagenen Drain-Satz einblenden (un-vergessbarer Trigger;
+# Mechanismus: docs/kaizen/process.md "Backlog-Abbau: kontinuierlicher Drain"). Fehler nicht
+# fatal – der Session-Start soll nie an diesem Block scheitern; aber ein Crash wird sichtbar
+# gemeldet (nicht still verschluckt), sonst ist "kein Block" von "leerem Backlog" ununterscheidbar.
+OBSDRAIN="$REPO/.claude/scripts/obs-drain.py"
+if [ -f "$OBSDRAIN" ]; then
+  python3 "$OBSDRAIN" || echo "WARNUNG: obs-drain.py fehlgeschlagen – OBS-Drain diese Session übersprungen (obs-drain.py prüfen)."
+fi

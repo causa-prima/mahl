@@ -133,3 +133,14 @@ def test_load_cm_parses_status_across_sections(tmp_path):
     cms = rr.load_cm(_write_cm(tmp_path))
     offen = next(c for c in cms if c.cm_id == "CM-S078-2")
     assert offen.status == "OFFEN"
+
+
+# --- archive_start_sessions: speist die CM-Eskalation (Section 9) -------------
+
+def test_archive_start_sessions(tmp_path):
+    d = tmp_path / "archive"
+    d.mkdir()
+    for s in (70, 78, 85):
+        (d / f"session_{s:03d}_to_{s + 8:03d}.md").write_text("x", encoding="utf-8")
+    (d / "README.md").write_text("x", encoding="utf-8")  # Nicht-Pattern-Datei wird ignoriert
+    assert sorted(rr.archive_start_sessions(str(d))) == [70, 78, 85]
