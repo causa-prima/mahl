@@ -42,8 +42,10 @@ eine kurze Task-Liste an (ein Task pro OBS; Regeln: `docs/process/task-system.md
 
 Jedes Item bekommt in dieser Behandlung eine Entscheidung – **umsetzen, verwerfen oder aufschieben**. Auch
 aufschieben ist eine vollwertige Wahl (mit Grund und Re-Trigger), keine Vertagung der Entscheidung selbst.
-Arbeite die Items einzeln durch, bei vielen in Blöcken (2–3 nacheinander, dann die nächsten) – alles am
-Stück ist kognitiv anstrengend. Für jedes Item:
+Leg die Items in **sinnvoll gruppierten, kleinen Blöcken** vor (z.B. 2–3 thematisch/nach Datei
+zusammengehörige, dann die nächsten) und nur **wenige auf einmal** – schon wenige Items gleichzeitig
+sind für den User kognitiv anstrengend (Kontext-Switch), erst recht wenn über sie in mehreren Runden
+diskutiert wird. Für jedes Item:
 
 1. **Verstehen zuerst.** Sorge dafür, dass Ziel/Problem der Beobachtung wirklich klar ist. Bei Unklarheit
    nutze `grill-me`, bevor Kandidaten entstehen – eine falsch verstandene OBS produziert plausible, aber

@@ -1,19 +1,11 @@
 # Agent Memory – Mahl
 
-> Session-Logs: `docs/history/sessions/` | Entscheidungen: `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`)
-> Kaizen: `docs/kaizen/` (lessons_learned, principles, countermeasures, process, observations)
-> Technische Schuld: `docs/tech-debt.md` | Offene Fragen: `docs/open-questions.md`
-
-**Letzte Aktualisierung:** 2026-06-24 (Kaizen-Retro S085–094)
 **Phase:** SKELETON 🔄
 **Aktuelle Story:** US-904 (Zutaten)
 
 ---
 
 ## Nächste Prioritäten
-
-- **Aus Retro S095:**
-  - **Wrapper-Output-Fixes vor dem nächsten Szenario** (Retro-Entscheid, nicht beobachten): `dotnet-test.py` zeigt bei RED die fehlgeschlagene Assertion (Expected/Actual) → OBS-S091-1; `vitest-run.py --filter` weist gematchte/übersprungene Testzahl aus → OBS-S091-3.
 
 - **US-904 weiter:**
   - **Zutaten-Dialog: Formular-UX-Baseline (Prinzip 8) vervollständigen** → **TD-S094-1** (Fokus-aufs-Fehlerfeld, Enter-Submit) + **TD-S077-1** (Escape); mit den nächsten Baseline-Szenarien am selben Dialog miterledigen.

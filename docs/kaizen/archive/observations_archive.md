@@ -179,3 +179,61 @@ Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – äl
 
 ---
 
+## OBS-S091-4 – Suppressions systematisch tracken (Script)
+- Quelle: User
+- Status: VERWORFEN (S096)
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Suppressions (Stryker + Analyzer/`.editorconfig`) systematisch tracken, vermutlich per Script. Zwei Ziele: **(1)** Suppressions, die ein nachfolgendes Szenario beheben soll, nicht aus den Augen verlieren — S091 hing das an manueller Erinnerung (die FE-`:53`-Suppression wurde planmäßig im „leere Einheit"-Szenario aufgelöst; ADR-S000-4 war eine solche Vertagung, die obsolet wurde und lingerte). **(2)** Suppressions ohne Szenario-Bezug periodisch, **nach Klasse gruppiert** reviewen — ändert sich etwas, das eine Klasse überflüssig macht (z.B. löste `noUncheckedIndexedAccess` den `Partial<…>`-Workaround), will man wissen, wo diese Suppressions sitzen.
+- Entscheidung/Maßnahme: Großteils redundant: Suppressions tragen ihre Regel-ID im Marker (Stryker-Mutator / `#pragma warning SXXXX` / eslint-rule / editorconfig-Key) → schon klassenweise grepbar (Ziel 2); co-lokierte Suppressions sieht man beim Edit an der Stelle (Ziel 1, User-Pushback bestätigt); klassenweite Prinzip-/Config-Changes macht man ohnehin bewusst. Einzige reale Lücke = vertagte/lingernde Suppressions (ADR-S000-4) → gehört zu OBS-S090-5.
+- Bezug: ADR-S000-4 (gelöschte Suppression-Vertagung), OBS-S090-5 (TD-Grooming-Lücke)
+
+---
+
+## OBS-S093-3 – „Nächste Prioritäten" brauchen pro Vorzieh-Item Scope + Begründung + Done-Zustand
+- Quelle: User
+- Status: UMGESETZT (S096)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: In `AGENT_MEMORY.md` → „Nächste Prioritäten" wurde ein vorgezogenes Item zu weit gefasst notiert („`@US-904-error`-Block vorziehen") und ohne dauerhaft sichtbare Begründung. Folge: Der Vorzieh-Grund (S091 feld-keyed-422-Bug) wurde inertial weitergeschleppt, obwohl er längst erledigt war; ein Agent konnte weder erkennen, woraus das Vorgezogene besteht, noch wann es fertig ist. „Error-Szenarien vorziehen" ist zu weit; „Error-Szenario leerer Name + leere Einheit vorziehen, weil <Grund>" ist eng genug. Gilt auch für andere Vorzieh-Items (z.B. „Erst-Formular-UX-Baseline vor dem Feature-Fluss" braucht ebenfalls einen notierten Grund).
+- Entscheidung/Maßnahme: Schreib-Hinweis in `closing-session` Schritt 7 (Projekt-Status/AGENT_MEMORY) ergänzt: jedes Vorzieh-/Prioritäts-Item eng fassen + sichtbaren Grund + Done-Zustand notieren (`<enge Aktion> — Grund: … — Done: …`), sonst wird ein erledigter Grund inertial weitergeschleppt.
+
+---
+
+## OBS-S094-1 – AGENT_MEMORY auf Skill-Scope eindampfen (Cruft dupliziert auto-geladene Quellen)
+- Quelle: User
+- Status: UMGESETZT (S096)
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: `AGENT_MEMORY.md` wird bei jedem Session-Start voll injiziert (jede Zeile kostet Token), enthält aber Inhalte, die **andere ebenfalls auto-geladene Quellen** duplizieren: (a) die „Letzte Aktualisierung"-Zeile (Datum aus git/Index/Harness ableitbar, Änderungs-Summary ↔ Session-Index-Zeile); (b) der Navigations-Header (Session-Logs, adr via `decisions.py`, Kaizen, tech-debt, open-questions) ↔ CLAUDE.md-Navigationstabelle (die „Navigationszentrale", ebenfalls beim Start geladen). Der `closing-session`-Skill (Schritt 8) scoped die Datei ohnehin auf **Phase + Aktuelle Story + Nächste Prioritäten** – Header/Changelog stehen quer dazu.
+- Entscheidung/Maßnahme: AGENT_MEMORY auf das Nötige eingedampft: Navi-Header (Dup der CLAUDE.md-Navigationszentrale) + „Letzte Aktualisierung"-Zeile entfernt; es bleiben Phase, Aktuelle Story (Input für `next_scenario.py` – muss bleiben) und Nächste Prioritäten. Retro-Trigger nicht mehr hand-gepflegt: `session-start.sh` injiziert ihn bei Jenga-Score ≤ 0 automatisch (`jenga_score.py`-grep). Folge: `closing-session`-Jenga-Schritt entfernt und kaizen-Skill vereinfacht (kein manuelles Trigger-Entfernen – nach der Retro resettet das `lessons_learned`-Archiv den Score, der Trigger klärt sich selbst).
+
+---
+
+## OBS-S086-2 – Verständnis vor Erfassung sichern (ggf. grill-me)
+- Quelle: User
+- Status: UMGESETZT (S096)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Skill-Nutzung
+- Beobachtung: OBS wurden teils falsch erfasst – Negativbeispiel OBS-S085-4 („languageServer buggy" meinte eigentlich „wir nutzen gar keinen Language-Server"). Vor dem Festhalten sicherstellen, dass Ziel/Problem richtig verstanden ist; bei Unklarheit `grill-me` nutzen.
+- Entscheidung/Maßnahme: `closing-session` Schritt 2 (Erfassung) um einen Check ergänzt: beim Festhalten Ziel/Problem korrekt benennen (nicht eine vermutete Lösung), bei echter Unklarheit kurz rückfragen – die zum Verständnis nötigen Details sind beim späteren Drain oft nicht mehr ableitbar.
+- Bezug: OBS-S086-1; LL-S086-2
+
+## OBS-S086-3 – Viele Findings nicht alle auf einmal – kategorie-/blockweise
+- Quelle: User
+- Status: UMGESETZT (S096)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Kommunikation
+- Beobachtung: Alle OBS in einem Rutsch zu besprechen ist token-effizient, aber kognitiv anstrengend (ständiges gedankliches Hin-/Herspringen). Bei vielen Punkten kategorieweise (wie A/B/C) und/oder blockweise (nur x Beobachtungen auf einmal, dann die nächsten).
+- Entscheidung/Maßnahme: `draining-observations` Schritt 2 verschärft: Items in sinnvoll gruppierten, kleinen Blöcken und nur wenige auf einmal vorlegen – schon wenige gleichzeitig sind kognitiv anstrengend (Kontext-Switch), erst recht bei Mehrrunden-Diskussion. (Ursprünglich aus der Retro-Ära mit Voll-Behandlung; gilt für den Drain genauso.)
+- Bezug: OBS-S085-13
+
+## OBS-S086-4 – `--allow-once`: Notwendigkeits- und Gefahr-Hinweise
+- Quelle: User
+- Status: UMGESETZT (S096)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Bash/Permission
+- Beobachtung: Drei Ideen für `check-bash-permission.py` bei `# --allow-once`-Befehlen: (a) prüfen, ob `--allow-once` überhaupt nötig ist (Befehl evtl. ohnehin allow-listed) → Hinweis zurückgeben; (b) den Deny-Grund / das Gefährliche aufbereitet bei der User-Freigabe mitgeben (highlighten, damit der User es nicht übersieht); (c) den Agenten anweisen, bei `--allow-once` zu beschreiben, was der Befehl Gefährliches tut und warum es nicht ohne geht (entfällt, wenn der User vorab manuell `--allow-once` angeordnet hat).
+- Entscheidung/Maßnahme: `check-bash-permission.py` umstrukturiert: bei `# --allow-once` wird der nackte Befehl klassifiziert – (a) wäre er ohnehin erlaubt → direkt allow + Agent-Hinweis „Marker unnötig" (macht (c), den Nudge gegen inflationären Gebrauch, überflüssig); (b) wäre er deny → ask mit dem Deny-Grund/der Gefahr als `permissionDecisionReason` am Freigabe-Prompt. (b) empirisch verifiziert (S096): der Destruktiv-Grund erschien im Dialog. TDD in test-bash-permission.py.
+- Bezug: OBS-S085-1
+

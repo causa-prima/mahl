@@ -12,6 +12,16 @@ if [ -f "$MEMORY" ]; then
 else
   echo "WARNUNG: docs/AGENT_MEMORY.md wurde nicht gefunden. Informiere den Nutzer: Die Datei fehlt oder wurde verschoben – bitte prüfen ob das beabsichtigt war und ggf. session-start.sh anpassen."
 fi
+# Retro-Trigger: Jenga-Score am Start prüfen und NUR bei fälliger Retro eine Trigger-Nachricht
+# fürs Skill `kaizen` injizieren (statt sie hand-gepflegt in AGENT_MEMORY zu halten). Der Score
+# lebt mechanisch in lessons_learned.md; nach einer Retro wird die Datei archiviert → Score
+# resettet → der Trigger klärt sich von selbst (kein manuelles Entfernen mehr nötig).
+JENGA="$REPO/.claude/scripts/jenga_score.py"
+if [ -f "$JENGA" ] && python3 "$JENGA" 2>/dev/null | grep -q "RETRO FÄLLIG"; then
+  echo "=== Retro fällig ==="
+  echo "Retro fällig (Jenga-Score ≤ 0): Nächste Session mit Skill \`kaizen\` beginnen."
+  echo "==================="
+fi
 PRINCIPLES="$REPO/docs/kaizen/principles.md"
 if [ -f "$PRINCIPLES" ]; then
   echo "=== principles.md ==="

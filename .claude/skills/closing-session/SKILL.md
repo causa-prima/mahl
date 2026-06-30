@@ -16,8 +16,7 @@ TaskCreate: "2. Dokumentations-Änderungsbedarf prüfen"
 TaskCreate: "3. Session-Datei anlegen"
 TaskCreate: "4. lessons_learned.md aktualisieren"
 TaskCreate: "5. index.md aktualisieren"
-TaskCreate: "6. Jenga-Score berechnen"
-TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
+TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
 ```
 
 1. Session intern reflektieren
@@ -43,6 +42,7 @@ TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
    Abschnitt „Zwei Brillen"): konkreter schlechter Ausgang → `lessons_learned.md` (Schritt 5); vorausschauende
    Beobachtung → `observations.md` (Format §`observations.md`, Status NEU, `Quelle: User`). Beides wahr → beide,
    per `Bezug:` verlinkt. Noise-Filter gilt für ALLE Einträge.
+   - **Beim Erfassen Ziel/Problem korrekt benennen** (nicht eine vermutete Lösung): die zum Verständnis nötigen Details sind *jetzt* präsent, beim späteren Drain oft nicht mehr ableitbar. Bei echter Unklarheit kurz rückfragen statt zu raten – eine falsch erfasste Beobachtung verleitet den Drain zu plausiblen, aber falschen Kandidaten.
 
    - Falls Doku-Vorschläge oder Beobachtungen vorliegen: konkret formulieren und dem User **JETZT** präsentieren. **Warten auf Antwort.**
    - Falls nichts anzupassen / keine Beobachtung: direkt mit Schritt 4 weitermachen.
@@ -87,26 +87,15 @@ TaskCreate: "7. AGENT_MEMORY.md aktualisieren"
    python3 .claude/scripts/check-index-length.py
    ```
 
-7. Jenga-Score berechnen:
-→ TaskUpdate "5. index.md aktualisieren": completed | TaskUpdate "6. Jenga-Score berechnen": in_progress
-   - Script ausführen: `python3 .claude/scripts/jenga_score.py`
-   - Jenga-Score intern festhalten für Schritt 8.
-
-8. Projekt-Status aktualisieren:
-→ TaskUpdate "6. Jenga-Score berechnen": completed | TaskUpdate "7. AGENT_MEMORY.md aktualisieren": in_progress
+7. Projekt-Status aktualisieren:
+→ TaskUpdate "5. index.md aktualisieren": completed | TaskUpdate "6. AGENT_MEMORY.md aktualisieren": in_progress
    - **`docs/AGENT_MEMORY.md` schlank halten** – wird bei jedem Session-Start voll injiziert (jede Zeile kostet Token). Leitfrage: „Welche Info braucht JEDER Agent beim Start, um den Projektstatus einzuordnen?" Nur: **Phase**, **Aktuelle Story**, **Nächste Prioritäten**.
      - **Nächstes Szenario nicht von Hand pflegen:** Der Platzhalter `{{NEXT_SCENARIO}}` in der Prioritätenliste wird beim Session-Start automatisch zum nächsten unimplementierten Szenario aufgelöst (`next_scenario.py`; Mechanik: ADR-S041-7) – stehen lassen.
      - **Szenario außer der Reihe** (Priorität überschreibt die Feature-Reihenfolge, z.B. error vor sortiert): als Anstrich **über** den Platzhalter setzen, nach Umsetzung entfernen.
+     - **Vorzieh-/Prioritäts-Items eng + begründet:** Jedes Item eng fassen und mit **sichtbarem Grund + Done-Zustand** notieren (`<enge Aktion> — Grund: … — Done: <woran als fertig erkennbar>`), sonst wird ein längst erledigter Grund inertial weitergeschleppt und niemand erkennt Bestandteile/Fertigstellung.
    - **Ausgelagert (nicht in AGENT_MEMORY, eigene Datei pflegen):** Technische Schuld → `docs/tech-debt.md`; offene Fragen/geparkte Diskussionen → `docs/open-questions.md`. Beide haben eigene Eintrag-Formate (Header der jeweiligen Datei).
    - **Bei Phasen-Abschluss (z.B. SKELETON → MVP):** Als erste Zeile unter "Nächste Prioritäten" eintragen:
      ```
      **Phasen-Review ausstehend:** Skill `review-code` über gesamtes Phase-Delta starten.
      ```
-   - **Bei Jenga-Score ≤ 0:** Unter "Nächste Prioritäten" als erste Zeile eintragen (exakter Text):
-     ```
-     **Retro fällig (Jenga-Score ≤ 0):** Nächste Session mit Skill `kaizen` beginnen.
-     ```
-   - Score **nicht** in AGENT_MEMORY schreiben (außer bei ≤ 0 als Trigger-Zeile oben).
-→ TaskUpdate "7. AGENT_MEMORY.md aktualisieren": completed
-
-Score dem User mitteilen (nach TaskUpdate).
+→ TaskUpdate "6. AGENT_MEMORY.md aktualisieren": completed

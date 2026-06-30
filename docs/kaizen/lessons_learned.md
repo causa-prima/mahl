@@ -43,6 +43,14 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 096 – 2026-06-30
+
+- **[GERING] [AGENT] [Review] LL-S096-1 – Reviewer-/eigene Behauptungen ungeprüft weitergereicht**
+  Quelle: User
+  Was: FlowReview5s „P1 ≈ 1 Zeile"-Kostenschätzung als billigen Fix präsentiert (der Re-Park-Trail existiert gar nicht) und eine konstruierte OBS-Überschneidung (S092-2↔S094-1) behauptet – beides vom User korrigiert.
+  Warum: Behauptung nicht am echten Datenmodell/Sachverhalt verifiziert, bevor sie weitergereicht wurde.
+  Regel: Reviewer-Aussagen UND eigene Querbezüge vor dem Weiterreichen am konkreten Artefakt prüfen (Datenmodell/Format/Inhalt), nicht plausibilitäts-halber übernehmen.
+
 ## Session 095 – 2026-06-24
 
 - **[MITTEL] [PROZESS] [Doku] LL-S095-1 – Zustandswechsel nur als Prosa-Notiz, nicht im geparsten Status-Feld**

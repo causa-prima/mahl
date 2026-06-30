@@ -1,8 +1,8 @@
 ---
 name: kaizen
 description: >
-  Wird ausgelöst wenn der Jenga-Score ≤ 0 ist (Trigger-Text in AGENT_MEMORY.md unter "Nächste
-  Prioritäten": "Retro fällig (Jenga-Score ≤ 0)") oder wenn der User "Retro", "Kaizen",
+  Wird ausgelöst wenn der Jenga-Score ≤ 0 ist (der Trigger "Retro fällig (Jenga-Score ≤ 0)"
+  wird am Session-Start automatisch injiziert) oder wenn der User "Retro", "Kaizen",
   "Rückschau" oder "Retrospektive" anfordert. Analysiert lessons_learned.md, deckt Muster auf,
   bewertet und aktualisiert Countermeasures, archiviert lessons_learned.md.
 user-invocable: true
@@ -242,12 +242,10 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
 
 → TaskUpdate "7. lessons_learned.md archivieren": completed | TaskUpdate "8. Session-Abschluss anbieten": in_progress
 
-Die Retro hat den `"Retro fällig (Jenga-Score ≤ 0)"`-Trigger erfüllt. Dem User die **Wahl** anbieten:
+Die Retro ist durch – `lessons_learned.md` ist archiviert, der Jenga-Score resettet, der Trigger erscheint am nächsten Session-Start nicht mehr (kein manuelles Entfernen nötig). Dem User die **Wahl** anbieten:
 
-- **A) Session abschließen** (empfohlen): den Trigger aus „Nächste Prioritäten" entfernen, dann Skill `closing-session` starten – der pflegt AGENT_MEMORY voll, legt die Session-Datei an und berechnet den Jenga-Score.
-- **B) Nur aufräumen:** nur den `"Retro fällig (Jenga-Score ≤ 0)"`-Eintrag aus „Nächste Prioritäten" in `docs/AGENT_MEMORY.md` entfernen, kein voller Abschluss.
+- **A) Session abschließen** (empfohlen): Skill `closing-session` starten – pflegt AGENT_MEMORY voll und legt die Session-Datei an.
+- **B) Weiterarbeiten:** Retro abgeschlossen, Session-Abschluss später via `closing-session`.
 - **C) Etwas anderes** – nach User-Wunsch.
-
-In A und B wird der Trigger entfernt – AGENT_MEMORY bleibt in keinem Fall mit erfülltem Trigger zurück. (Die volle AGENT_MEMORY-Pflege bleibt `closing-session` vorbehalten.)
 
 → TaskUpdate "8. Session-Abschluss anbieten": completed

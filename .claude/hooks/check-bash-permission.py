@@ -489,6 +489,12 @@ _NO_HINT_MESSAGE = (
 
 _ALLOW_REASON = "Auto-approved by bash permission hook"
 
+_ONE_TIME_UNNEEDED_HINT = (
+    "Hinweis: '# --allow-once' war nicht nötig – dieser Befehl steht ohnehin auf der Allow-Liste "
+    "und wurde direkt ausgeführt. Künftig ohne Marker aufrufen; der Marker ist nur für echte "
+    "Deny-Fälle gedacht (sonst inflationär)."
+)
+
 _UNSAFE_REDIRECT_DENY_REASON = (
     "Output-Redirect auf nicht erlaubtes Ziel.\n"
     "Bevorzugte Alternative: Output in Variable capturen (kein Datei-Müll):\n"
@@ -651,7 +657,7 @@ def check_command(command: str) -> tuple[str, str, str]:
     """Prüft einen Befehl und gibt (decision, reason, log_type) zurück.
 
     Reihenfolge:
-      1. ONE_TIME_MARKER → ask (übersteuert alles)
+      1. ONE_TIME_MARKER → nackten Befehl klassifizieren (erlaubt → allow+Hinweis, sonst ask+Grund)
       2. Repo-Pfad-Normalisierung (absolute Repo-Pfade → relativ)
       3. WRONG_APPROACH  → deny (auf Gesamtbefehl, vor Split)
       4. Compound-Split  → check_simple_command je Segment
@@ -659,9 +665,16 @@ def check_command(command: str) -> tuple[str, str, str]:
 
     decision: 'allow' | 'deny' | 'ask'
     """
-    # 1. ONE_TIME_MARKER übersteuert alles inkl. WRONG_APPROACH (vor Normalisierung)
+    # 1. ONE_TIME_MARKER (# --allow-once): nicht blind fragen, sondern den NACKTEN Befehl klassifizieren.
+    #    - wäre er ohnehin erlaubt → Marker war unnötig: direkt erlauben + Agent-Hinweis (kein Prompt).
+    #    - wäre er deny            → legitimer Einzelfall: ask, und der Deny-Grund/die Gefahr wird dem
+    #      User am Freigabe-Prompt als Reason mitgegeben (statt eines kontextlosen „erlauben?").
     if ONE_TIME_MARKER in command:
-        return ("ask", "", "ONE_TIME")
+        bare = command.replace(ONE_TIME_MARKER, "").strip()
+        decision, reason, _ = check_command(bare)  # bare hat keinen Marker → terminiert
+        if decision == "allow":
+            return ("allow", _ONE_TIME_UNNEEDED_HINT, "ONE_TIME_UNNEEDED")
+        return ("ask", reason, "ONE_TIME")
 
     # 2. Repo-Pfad-Normalisierung: absolute Repo-Pfade → relativ, dann auf dem
     #    normalisierten Befehl weiterprüfen (so wird z.B. python3 <absoluter Pfad>
@@ -818,17 +831,18 @@ def main() -> None:
     # _build_allow_output ergänzt bei normalisiertem Repo-Pfad updatedInput + Hinweis.
     if decision == "allow":
         _log_command(command, "ALLOW", _ALLOWED_LOG_FILE)
-        print(json.dumps({"hookSpecificOutput": _build_allow_output(command)}))
+        hso = _build_allow_output(command)
+        if log_type == "ONE_TIME_UNNEEDED":  # # --allow-once war unnötig → Agenten nudgen
+            hso["additionalContext"] = _ONE_TIME_UNNEEDED_HINT
+        print(json.dumps({"hookSpecificOutput": hso}))
         sys.exit(0)
 
     if decision == "ask":
         _log_command(command, "ONE_TIME")
-        print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "ask",
-            }
-        }))
+        hso = {"hookEventName": "PreToolUse", "permissionDecision": "ask"}
+        if reason:  # Deny-Grund/Gefahr des nackten Befehls am User-Prompt zeigen (statt kontextlos)
+            hso["permissionDecisionReason"] = reason
+        print(json.dumps({"hookSpecificOutput": hso}))
         sys.exit(0)
 
     # deny: loggen + blockieren mit Hinweis

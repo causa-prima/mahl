@@ -437,6 +437,28 @@ def test_one_time_marker() -> int:
         if not assert_decision(command, "ask", f"{desc}: {command}"):
             failures += 1
 
+    # (a) Marker UNNÖTIG: nackter Befehl ist ohnehin erlaubt → allow (kein sinnloser Prompt).
+    allow_cases = [
+        ('git status # --allow-once', "git status (allow-listed) + Marker → allow"),
+        ('python3 .claude/scripts/x.py # --allow-once', "erlaubtes Script + Marker → allow"),
+    ]
+    for command, desc in allow_cases:
+        if not assert_decision(command, "allow", f"{desc}: {command}"):
+            failures += 1
+
+    # (a) der allow-Fall trägt den 'unnötig'-Hinweis + eigenen log_type (für den Agent-Nudge).
+    _, r_unneeded, lt_unneeded = check_command('git status # --allow-once')
+    if "nicht nötig" not in r_unneeded or lt_unneeded != "ONE_TIME_UNNEEDED":
+        print(f"  FAIL: --allow-once-unnötig-Hinweis fehlt (reason={r_unneeded!r}, log_type={lt_unneeded!r})")
+        failures += 1
+
+    # (b) legitimer Override (nackter Befehl deny): ask trägt den Deny-Grund/die Gefahr als Reason
+    #     (sonst bekäme der User-Freigabe-Prompt keinen Kontext).
+    _, r_danger, _ = check_command('rm -rf Client/dist/ # --allow-once')
+    if not r_danger:
+        print("  FAIL: ask-Reason (Gefahr) ist leer – User-Prompt ohne Kontext")
+        failures += 1
+
     return failures
 
 
@@ -558,9 +580,10 @@ def test_path_normalization() -> int:
         if not assert_decision(command, expected, desc):
             failures += 1
 
-    # # --allow-once bleibt unangetastet (ONE_TIME-Check zuerst → ask, keine Normalisierung)
-    if not assert_decision(f"python3 {R}/.claude/scripts/x.py # --allow-once", "ask",
-                           "# --allow-once: ONE_TIME vor Normalisierung"):
+    # # --allow-once auf einem ohnehin erlaubten Befehl (absoluter Repo-Pfad → normalisiert allow):
+    # Marker war unnötig → allow (kein sinnloser Prompt), nicht ask.
+    if not assert_decision(f"python3 {R}/.claude/scripts/x.py # --allow-once", "allow",
+                           "# --allow-once unnötig (Befehl ohnehin erlaubt) → allow"):
         failures += 1
 
     # _build_allow_output: bei Änderung updatedInput + additionalContext, sonst nicht

@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 96 | 2026-06-30 | SKELETON (Erster OBS-Drain + Tooling) | Erster OBS-Drain (7 Items): S091-4 verworfen, S093-3/S094-1/S086-2/-3/-4 umgesetzt, S092-2/S085-2 geparkt; neu obs-archive.py (TDD); Retro-Trigger auto-injiziert + AGENT_MEMORY eingedampft; --allow-once-Hinweise; 3 neue OBS. |
 | 95 | 2026-06-24 | SKELETON (Kaizen-Retro S085–094) | CM-S095-1/-2 + Prinzip; Implementer-Default→sonnet + Schritt-0-Modellcheck; CM-S070-2/S084-1 BEWÄHRT, CM-S078-2 verworfen; LL/OBS-Quelle Pflicht; 6 OBS archiviert; OBS-S095-1→eigene Session. |
 | 94 | 2026-06-24 | SKELETON (US-904 Formular-UX-Baseline – Spec) | Formular-/Dialog-UX-Baseline (Spec/Prozess, keine Impl): Szenarien B1 Affordance + B2 Autofokus + B3 Fokus-Asserts; UX-Guideline Prinzip 8; gherkin-workshop-Checklisten-Lücke geschlossen + Review-Enforcement; ADR-S090-1 geschärft (Client-Val YAGNI). |
 | 93 | 2026-06-23 | SKELETON (US-904 Szenario – Validierung) | `@US-904-error` „beide Pflichtfelder leer": Backend-`ToDomain` von kurzschließend auf collect-all umgestellt (feld-keyed 422 mit beiden Keys), löst TD-S090-1; Frontend unverändert (emergent). `csharp-rop.md`-Helper-Verweis korrigiert. |
