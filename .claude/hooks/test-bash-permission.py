@@ -249,6 +249,13 @@ def test_allow_patterns() -> int:
         ("python3 .claude/scripts/jenga_score.py", "jenga_score.py"),
         ("python3 .claude/scripts/jenga_score.py --file docs/kaizen/lessons_learned.md", "jenga_score.py mit --file"),
         ("python3 .claude/hooks/check-code-quality-blocking.py", "python3 .claude/hooks/"),
+        # Globales session-recall-Script (read-only, außerhalb des Repos → absoluter Pfad erlaubt)
+        ("python3 /home/kieritz/.claude/skills/session-recall/scripts/recall.py sessions --limit 5",
+         "recall.py (absoluter Pfad)"),
+        ('python3 ~/.claude/skills/session-recall/scripts/recall.py search "review"',
+         "recall.py (~-Pfad)"),
+        ("python3 /home/kieritz/.claude/skills/session-recall/scripts/recall.py extract --session last | head -50",
+         "recall.py | head (Compound, read-only)"),
         # Redirects auf erlaubte Ziele
         ("echo 'output' > .claude/tmp/debug.txt", "echo > .claude/tmp/"),
         ("grep errors log > .claude/tmp/errors.txt", "grep > .claude/tmp/"),
@@ -323,6 +330,12 @@ def test_deny() -> int:
         ("python3 ./one_off_analysis.py", "python3 relative path (nicht .claude/)"),
         ("python3 -c 'print(1)'", "python3 -c"),
         ("python3 -c 'import os; os.system(\"rm -rf /\")'", "python3 -c mit rm -rf (Obfuskation → deny)"),
+        # recall.py-Ausnahme greift NUR exakt diesen Pfad – andere absolute python3-Pfade bleiben deny
+        ("python3 /home/kieritz/.claude/skills/other/scripts/recall.py", "absoluter python3-Pfad ≠ session-recall → deny"),
+        ("python3 /home/kieritz/evil.py", "fremder absoluter python3-Pfad → deny"),
+        # recall.py read-only, aber destruktives Segment im Compound bleibt deny (Per-Segment-Check)
+        ("python3 /home/kieritz/.claude/skills/session-recall/scripts/recall.py search x | rm -rf foo",
+         "recall.py | rm -rf (destruktives Segment → deny)"),
         # dotnet ef database drop → deny
         ("dotnet ef database drop", "dotnet ef database drop"),
         # dotnet: andere Subcommands nicht erlaubt

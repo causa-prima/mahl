@@ -193,9 +193,10 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         'jscpd immer via Script aufrufen:\n'
         '  python3 .claude/scripts/jscpd-run.py [--verbose]',
     ),
-    # python3 mit absolutem Pfad
+    # python3 mit absolutem Pfad (Ausnahme: globales session-recall-Script, s.
+    # ALLOW_PATTERNS – read-only Session-Log-Analyse, liegt außerhalb des Repos)
     (
-        re.compile(r'\bpython3\s+[/~]'),
+        re.compile(r'\bpython3\s+(?!\S*\.claude/skills/session-recall/scripts/recall\.py)[/~]'),
         'python3 mit absolutem Pfad ist nicht erlaubt.\n'
         'Projekt-Scripts immer mit relativem Pfad aufrufen:\n'
         '  python3 .claude/scripts/dotnet-test.py\n'
@@ -379,6 +380,15 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         re.compile(r'^python3\s+(?!-)\.claude/'),
         None,
         'python3 .claude/scripts/<script>.py  /  python3 .claude/hooks/<hook>.py',
+    ),
+    # Globales session-recall-Script (read-only Session-Log-Analyse, liegt unter
+    # ~/.claude/skills/ außerhalb des Repos). Absoluter Pfad ist hier erlaubt –
+    # die WRONG_APPROACH-Regel für absolute python3-Pfade nimmt es explizit aus.
+    # Per-Segment-Check bleibt: in Compounds wird jeder andere Teil weiter geprüft.
+    (
+        re.compile(r'^python3\s+\S*\.claude/skills/session-recall/scripts/recall\.py\b'),
+        None,
+        'python3 ~/.claude/skills/session-recall/scripts/recall.py <befehl>  (read-only Session-Log-Analyse)',
     ),
     # git read-only (optional mit -C <pfad>, um in anderem Repo/Worktree zu lesen)
     (
