@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>US-904 · Szenario-Clustering</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 30px;
+            color: #222;
+        }
+
+        .info-panel {
+            background: white;
+            border-left: 4px solid #2563eb;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .info-panel h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: #222;
+        }
+
+        .info-panel .crit {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-panel .why {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #555;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #f0f0f0;
+            border-color: #999;
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .stage-display {
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+        }
+
+        .stage-tabs {
+            display: flex;
+            gap: 5px;
+        }
+
+        .stage-tab {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .stage-tab.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        .stage-tab:hover:not(.active) {
+            border-color: #2563eb;
+        }
+
+        .groups-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .group-box {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            min-width: 280px;
+            flex: 1;
+            min(calc(50% - 10px), 600px);
+        }
+
+        @media (max-width: 1200px) {
+            .group-box {
+                flex-basis: calc(50% - 10px);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .group-box {
+                flex-basis: 100%;
+            }
+        }
+
+        .group-header {
+            border-bottom: 2px solid #e5e5e5;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .group-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #222;
+            margin-bottom: 5px;
+        }
+
+        .group-count {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .scenario-card {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+            background: #fafafa;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.4;
+            cursor: default;
+            transition: background 0.2s;
+        }
+
+        .scenario-card:hover {
+            background: #f0f0f0;
+        }
+
+        .scenario-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .badges-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-order {
+            background: #e5e7eb;
+            color: #222;
+            min-width: 30px;
+            text-align: center;
+            font-size: 13px;
+            padding: 4px 6px;
+        }
+
+        .badge-layer-fe {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-layer-fs {
+            background: #bfdbfe;
+            color: #1e40af;
+        }
+
+        .badge-singleton {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>US-904 · Szenario-Clustering (CB-E) — 31 Szenarien → 11 Läufe</h1>
+
+        <div class="info-panel">
+            <h2 id="stage-title">Ausgangslage</h2>
+            <div class="crit" id="stage-crit">—</div>
+            <div class="why" id="stage-why">Alle 31 Szenarien der User Story US-904, noch ungeteilt. Ziel: in möglichst homogene Cluster aufteilen — je Cluster = ein implementing-scenario-Lauf.</div>
+        </div>
+
+        <div class="controls">
+            <button id="btn-prev">← Zurück</button>
+            <span class="stage-display"><span id="stage-num">0</span> / 4</span>
+            <button id="btn-next">Weiter →</button>
+            <div class="stage-tabs">
+                <button class="stage-tab active" data-stage="0">0</button>
+                <button class="stage-tab" data-stage="1">1</button>
+                <button class="stage-tab" data-stage="2">2</button>
+                <button class="stage-tab" data-stage="3">3</button>
+                <button class="stage-tab" data-stage="4">4</button>
+            </div>
+        </div>
+
+        <div class="groups-container" id="groups-container"></div>
+    </div>
+
+    <script>
+        const stagesMeta = [
+            {
+                title: "Ausgangslage",
+                crit: "—",
+                why: "Alle 31 Szenarien der User Story US-904, noch ungeteilt. Ziel: in möglichst homogene Cluster aufteilen — je Cluster = ein implementing-scenario-Lauf."
+            },
+            {
+                title: "Schritt 1 — nach Capability",
+                crit: "Domänen-Operation aus dem »When«",
+                why: "Jede Operation wird ein eigener Strang: Liste, Anlegen, Löschen, Reaktivierung. Reaktivierung steht eigenständig, weil »Restore eines Soft-Deletes« eine andere Operation ist als »Anlegen«."
+            },
+            {
+                title: "Schritt 2 — Mutations-Capabilities nach Ergebnisklasse",
+                crit: "Validierung (abgelehnter Input) vs. Success/Verhalten",
+                why: "Anlegen und Löschen spalten sich in erfolgreiche/Verhaltens-Pfade und abgelehnte Eingaben bzw. Konflikte. Liste (reine Lesepfade) und Reaktivierung bleiben unverändert."
+            },
+            {
+                title: "Schritt 3 — Validierung nach Form & Feld",
+                crit: "stateless (kein Seed) vs. state-driven (Seed nötig); stateless weiter nach Eingabefeld",
+                why: "Stateless-Input-Regeln (leer/Whitespace/Länge) haben anderes Setup als Eindeutigkeit (braucht eine geseedete Zutat, prüft Konflikt). Stateless wird nach Feld getrennt (Name/Einheit); der Mehrfeld-Fall ist eigen. Valide Grenzwerte (»genau 30/20«) bleiben beim jeweiligen Feld — Boundary-Paar mit dem Reject-Fall."
+            },
+            {
+                title: "Schritt 4 — Success/Verhalten nach Schicht",
+                crit: "frontend-only vs. full-stack",
+                why: "Reines Dialog-/Pending-Verhalten braucht keinen Backend-Subagenten (frontend-only); persistierende Pfade sind full-stack. Sichtbar bei Löschen: »Löschen + Undo« (full-stack) trennt sich vom »Button-Pending« (frontend-only). Ergebnis: 11 Cluster = 11 Läufe."
+            }
+        ];
+
+        const clusters = {
+            C1: {label: "Liste", order: 7, layer: "FS", singleton: false, color: "#2563eb"},
+            C2: {label: "Anlegen · Dialog-Verhalten", order: 2, layer: "FE", singleton: false, color: "#16a34a"},
+            C3: {label: "Anlegen · Success", order: 1, layer: "FS", singleton: false, color: "#0891b2"},
+            C4: {label: "Anlegen · Name (stateless)", order: 3, layer: "FS", singleton: false, color: "#9333ea"},
+            C5: {label: "Anlegen · Einheit (stateless)", order: 4, layer: "FS", singleton: false, color: "#c026d3"},
+            C6: {label: "Anlegen · Mehrfeld", order: 5, layer: "FS", singleton: true, color: "#dc2626"},
+            C7: {label: "Anlegen · Name-Eindeutigkeit", order: 6, layer: "FS", singleton: false, color: "#7c3aed"},
+            C8: {label: "Löschen · Success", order: 8, layer: "FS", singleton: false, color: "#ea580c"},
+            C9: {label: "Löschen · Pending", order: 9, layer: "FE", singleton: true, color: "#db2777"},
+            C10: {label: "Löschen · Konflikt", order: 10, layer: "FS", singleton: true, color: "#ca8a04"},
+            C11: {label: "Reaktivierung", order: 11, layer: "FS", singleton: false, color: "#059669"}
+        };
+
+        const scenarios = [
+            {title: "Zutaten-Liste ist leer wenn keine Zutaten vorhanden sind", tag: "happy", cluster: "C1", stages: ["Alle 31 Szenarien", "Liste", "Liste", "Liste", "Liste"]},
+            {title: "Felder sind beim Öffnen des Dialogs leer", tag: "happy", cluster: "C2", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten"]},
+            {title: "Pflichtfelder im Dialog sind als solche markiert", tag: "happy", cluster: "C2", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten"]},
+            {title: "Beim Öffnen des Dialogs liegt der Fokus auf dem ersten Feld", tag: "happy", cluster: "C2", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten"]},
+            {title: "Felder sind nach Abbrechen beim erneuten Öffnen wieder leer", tag: "happy", cluster: "C2", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten"]},
+            {title: "Abbrechen schließt Dialog und verwirft Eingaben", tag: "happy", cluster: "C2", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten"]},
+            {title: "Zutat anlegen", tag: "happy", cluster: "C3", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Success", "Anlegen · Success", "Anlegen · Success"]},
+            {title: "Mehrere Zutaten erscheinen alphabetisch sortiert", tag: "happy", cluster: "C1", stages: ["Alle 31 Szenarien", "Liste", "Liste", "Liste", "Liste"]},
+            {title: "Zutat löschen", tag: "happy", cluster: "C8", stages: ["Alle 31 Szenarien", "Löschen", "Löschen · Success/Verhalten", "Löschen · Success/Verhalten", "Löschen · Success"]},
+            {title: "Löschen rückgängig machen via Toast", tag: "happy", cluster: "C8", stages: ["Alle 31 Szenarien", "Löschen", "Löschen · Success/Verhalten", "Löschen · Success/Verhalten", "Löschen · Success"]},
+            {title: "Speichern-Button ist während des Speicherns deaktiviert", tag: "happy", cluster: "C2", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten", "Anlegen · Dialog-Verhalten"]},
+            {title: "Löschen-Button ist während des Löschens deaktiviert", tag: "happy", cluster: "C9", stages: ["Alle 31 Szenarien", "Löschen", "Löschen · Success/Verhalten", "Löschen · Success/Verhalten", "Löschen · Pending"]},
+            {title: "Zutat mit leerem Namen anlegen schlägt fehl", tag: "error", cluster: "C4", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Name (stateless)", "Anlegen · Name (stateless)"]},
+            {title: "Zutat mit Namen aus nur Leerzeichen anlegen schlägt fehl", tag: "error", cluster: "C4", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Name (stateless)", "Anlegen · Name (stateless)"]},
+            {title: "Zutat mit leerer Einheit anlegen schlägt fehl", tag: "error", cluster: "C5", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Einheit (stateless)", "Anlegen · Einheit (stateless)"]},
+            {title: "Zutat mit Einheit aus nur Leerzeichen anlegen schlägt fehl", tag: "error", cluster: "C5", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Einheit (stateless)", "Anlegen · Einheit (stateless)"]},
+            {title: "Beide Pflichtfelder leer – beide Fehlermeldungen erscheinen gleichzeitig", tag: "error", cluster: "C6", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Mehrfeld", "Anlegen · Mehrfeld"]},
+            {title: "Zutat mit zu langem Namen anlegen schlägt fehl", tag: "error", cluster: "C4", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Name (stateless)", "Anlegen · Name (stateless)"]},
+            {title: "Zutat mit zu langer Einheit anlegen schlägt fehl", tag: "error", cluster: "C5", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Einheit (stateless)", "Anlegen · Einheit (stateless)"]},
+            {title: "Zutat mit bereits vorhandenem Namen anlegen schlägt fehl", tag: "error", cluster: "C7", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Name-Eindeutigkeit", "Anlegen · Name-Eindeutigkeit"]},
+            {title: "Zutat mit vorhandenem Namen in abweichender Schreibweise anlegen schlägt fehl", tag: "error", cluster: "C7", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Name-Eindeutigkeit", "Anlegen · Name-Eindeutigkeit"]},
+            {title: "Fehlermeldung bei Duplikat zeigt getrimmten Namen", tag: "error", cluster: "C7", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Name-Eindeutigkeit", "Anlegen · Name-Eindeutigkeit"]},
+            {title: "Bereits gelöschte Zutat erneut löschen schlägt fehl", tag: "edge", cluster: "C10", stages: ["Alle 31 Szenarien", "Löschen", "Löschen · Konflikt", "Löschen · Konflikt", "Löschen · Konflikt"]},
+            {title: "Soft-deleted Zutat erscheint nicht in der Zutaten-Liste", tag: "edge", cluster: "C1", stages: ["Alle 31 Szenarien", "Liste", "Liste", "Liste", "Liste"]},
+            {title: "Führende und nachfolgende Leerzeichen werden beim Speichern entfernt", tag: "edge", cluster: "C3", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Success", "Anlegen · Success", "Anlegen · Success"]},
+            {title: "Name mit exakt 30 Zeichen wird akzeptiert", tag: "edge", cluster: "C4", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Name (stateless)", "Anlegen · Name (stateless)"]},
+            {title: "Einheit mit exakt 20 Zeichen wird akzeptiert", tag: "edge", cluster: "C5", stages: ["Alle 31 Szenarien", "Anlegen", "Anlegen · Validierung", "Anlegen · Einheit (stateless)", "Anlegen · Einheit (stateless)"]},
+            {title: "Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese", tag: "edge", cluster: "C11", stages: ["Alle 31 Szenarien", "Reaktivierung", "Reaktivierung", "Reaktivierung", "Reaktivierung"]},
+            {title: "Reaktivierung übernimmt neue Einheit", tag: "edge", cluster: "C11", stages: ["Alle 31 Szenarien", "Reaktivierung", "Reaktivierung", "Reaktivierung", "Reaktivierung"]},
+            {title: "Reaktivierung übernimmt neuen Namen bei abweichender Schreibweise", tag: "edge", cluster: "C11", stages: ["Alle 31 Szenarien", "Reaktivierung", "Reaktivierung", "Reaktivierung", "Reaktivierung"]},
+            {title: "Reaktivierung gelingt auch wenn Zutat parallel bereits wiederhergestellt wurde", tag: "edge", cluster: "C11", stages: ["Alle 31 Szenarien", "Reaktivierung", "Reaktivierung", "Reaktivierung", "Reaktivierung"]}
+        ];
+
+        let currentStage = 0;
+
+        function updateInfo() {
+            const meta = stagesMeta[currentStage];
+            document.getElementById('stage-title').textContent = meta.title;
+            document.getElementById('stage-crit').textContent = meta.crit;
+            document.getElementById('stage-why').textContent = meta.why;
+        }
+
+        function renderGroups() {
+            const container = document.getElementById('groups-container');
+            container.innerHTML = '';
+
+            let groups;
+            if (currentStage === 4) {
+                groups = {};
+                scenarios.forEach(s => {
+                    const cid = s.cluster;
+                    if (!groups[cid]) groups[cid] = [];
+                    groups[cid].push(s);
+                });
+                const sortedClusterIds = Object.keys(groups).sort((a, b) => clusters[a].order - clusters[b].order);
+                sortedClusterIds.forEach(cid => {
+                    const clusterInfo = clusters[cid];
+                    const items = groups[cid];
+                    renderGroupBox(clusterInfo.label, items, cid, clusterInfo);
+                });
+            } else {
+                groups = {};
+                const groupOrder = [];
+                scenarios.forEach(s => {
+                    const groupLabel = s.stages[currentStage];
+                    if (!groups[groupLabel]) {
+                        groups[groupLabel] = [];
+                        groupOrder.push(groupLabel);
+                    }
+                    groups[groupLabel].push(s);
+                });
+                groupOrder.forEach(label => {
+                    renderGroupBox(label, groups[label], null, null);
+                });
+            }
+        }
+
+        function renderGroupBox(title, items, clusterId, clusterInfo) {
+            const container = document.getElementById('groups-container');
+            const box = document.createElement('div');
+            box.className = 'group-box';
+
+            let html = `<div class="group-header">
+                <div class="group-title">${escapeHtml(title)}</div>
+                <div class="group-count">${items.length} Szenario${items.length !== 1 ? 'n' : ''}</div>
+            </div>`;
+
+            items.forEach(s => {
+                const color = clusters[s.cluster].color;
+                html += `<div class="scenario-card" style="border-left-color: ${color};" title="${escapeHtml(s.tag)}">
+                    ${escapeHtml(s.title)}`;
+
+                if (currentStage === 4 && clusterInfo) {
+                    html += `<div class="badges-row">
+                        <div class="badge badge-order">${clusterInfo.order}</div>
+                        <div class="badge badge-layer-${clusterInfo.layer === 'FE' ? 'fe' : 'fs'}">
+                            ${clusterInfo.layer === 'FE' ? 'Frontend' : 'Full-Stack'}
+                        </div>`;
+                    if (clusterInfo.singleton) {
+                        html += `<div class="badge badge-singleton">Singleton</div>`;
+                    }
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
+            });
+
+            box.innerHTML = html;
+            container.appendChild(box);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateControls() {
+            document.getElementById('stage-num').textContent = currentStage;
+            document.getElementById('btn-prev').disabled = currentStage === 0;
+            document.getElementById('btn-next').disabled = currentStage === 4;
+
+            document.querySelectorAll('.stage-tab').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.stage) === currentStage);
+            });
+        }
+
+        function setStage(stage) {
+            if (stage >= 0 && stage <= 4) {
+                currentStage = stage;
+                updateInfo();
+                renderGroups();
+                updateControls();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        document.getElementById('btn-prev').addEventListener('click', () => setStage(currentStage - 1));
+        document.getElementById('btn-next').addEventListener('click', () => setStage(currentStage + 1));
+        document.querySelectorAll('.stage-tab').forEach(btn => {
+            btn.addEventListener('click', (e) => setStage(parseInt(e.target.dataset.stage)));
+        });
+
+        setStage(0);
+    </script>
+</body>
+</html>

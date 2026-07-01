@@ -12,30 +12,35 @@ Feature: Zutaten verwalten
     Given die Anwendung ist gestartet
     And ich navigiere zur Zutaten-Seite
 
+  # @run-7 · Liste · Full-Stack
   @US-904-happy-path
   Scenario: Zutaten-Liste ist leer wenn keine Zutaten vorhanden sind
     Given es sind keine Zutaten vorhanden
     Then sehe ich den Hinweis "Noch keine Zutaten angelegt."
     And sehe ich den Button "Zutat anlegen"
 
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
   @US-904-happy-path
   Scenario: Felder sind beim Öffnen des Dialogs leer
     When ich auf "Zutat anlegen" klicke
     Then ist das Name-Feld leer
     And ist das Einheit-Feld leer
 
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
   @US-904-happy-path
   Scenario: Pflichtfelder im Dialog sind als solche markiert
     When ich auf "Zutat anlegen" klicke
     Then ist das Name-Feld als Pflichtfeld markiert
     And ist das Einheit-Feld als Pflichtfeld markiert
 
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
   @US-904-happy-path
   Scenario: Beim Öffnen des Dialogs liegt der Fokus auf dem ersten Feld
     When ich auf "Zutat anlegen" klicke
     Then ist das Name-Feld das erste Eingabefeld im Dialog
     And hat das Name-Feld den Fokus
 
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
   @US-904-happy-path
   Scenario: Felder sind nach Abbrechen beim erneuten Öffnen wieder leer
     When ich auf "Zutat anlegen" klicke
@@ -46,6 +51,7 @@ Feature: Zutaten verwalten
     Then ist das Name-Feld leer
     And ist das Einheit-Feld leer
 
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
   @US-904-happy-path
   Scenario: Abbrechen schließt Dialog und verwirft Eingaben
     When ich auf "Zutat anlegen" klicke
@@ -54,6 +60,7 @@ Feature: Zutaten verwalten
     Then ist der "Zutat anlegen"-Dialog geschlossen
     And ist "Oregano" nicht in der Zutaten-Liste
 
+  # @run-1 · Anlegen·Success · Full-Stack
   @US-904-happy-path
   Scenario: Zutat anlegen
     When ich auf "Zutat anlegen" klicke
@@ -63,6 +70,7 @@ Feature: Zutaten verwalten
     Then sehe ich "Tomaten" in der Zutaten-Liste mit Einheit "Stück"
     And ist der "Zutat anlegen"-Dialog geschlossen
 
+  # @run-7 · Liste · Full-Stack
   @US-904-happy-path
   Scenario: Mehrere Zutaten erscheinen alphabetisch sortiert
     Given die Zutat "Zwiebel" mit Einheit "Stück" existiert
@@ -73,6 +81,7 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then zeigt die Zutaten-Liste in dieser Reihenfolge: "Apfel", "Mehl", "Zwiebel"
 
+  # @run-8 · Löschen·Success · Full-Stack
   @US-904-happy-path
   Scenario: Zutat löschen
     Given nur die Zutat "Mehl" mit Einheit "g" existiert
@@ -80,6 +89,7 @@ Feature: Zutaten verwalten
     Then ist die Zutaten-Liste leer
     And sehe ich den Toast "Mehl gelöscht" mit "Rückgängig"-Aktion
 
+  # @run-8 · Löschen·Success · Full-Stack
   @US-904-happy-path
   Scenario: Löschen rückgängig machen via Toast
     Given nur die Zutat "Mehl" mit Einheit "g" existiert
@@ -87,6 +97,7 @@ Feature: Zutaten verwalten
     And ich im Toast auf "Rückgängig" klicke
     Then sehe ich "Mehl" in der Zutaten-Liste mit Einheit "g"
 
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
   @US-904-happy-path
   Scenario: Speichern-Button ist während des Speicherns deaktiviert
     When ich auf "Zutat anlegen" klicke
@@ -95,12 +106,14 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then ist der "Speichern"-Button deaktiviert solange die Antwort aussteht
 
+  # @run-9 · Löschen·Pending · Frontend-only · Singleton
   @US-904-happy-path
   Scenario: Löschen-Button ist während des Löschens deaktiviert
     Given nur die Zutat "Mehl" mit Einheit "g" existiert
     When ich bei "Mehl" auf Löschen klicke
     Then ist der Löschen-Button für "Mehl" deaktiviert solange die Antwort aussteht
 
+  # @run-3 · Anlegen·Name-Validierung · Full-Stack
   @US-904-error
   Scenario: Zutat mit leerem Namen anlegen schlägt fehl
     When ich auf "Zutat anlegen" klicke
@@ -110,6 +123,7 @@ Feature: Zutaten verwalten
     Then sehe ich die Fehlermeldung "Name darf nicht leer sein."
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-3 · Anlegen·Name-Validierung · Full-Stack
   @US-904-error
   Scenario: Zutat mit Namen aus nur Leerzeichen anlegen schlägt fehl
     When ich auf "Zutat anlegen" klicke
@@ -119,6 +133,7 @@ Feature: Zutaten verwalten
     Then sehe ich die Fehlermeldung "Name darf nicht leer sein."
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-4 · Anlegen·Einheit-Validierung · Full-Stack
   @US-904-error
   Scenario: Zutat mit leerer Einheit anlegen schlägt fehl
     When ich auf "Zutat anlegen" klicke
@@ -129,6 +144,7 @@ Feature: Zutaten verwalten
     And hat das Einheit-Feld den Fokus
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-4 · Anlegen·Einheit-Validierung · Full-Stack
   @US-904-error
   Scenario: Zutat mit Einheit aus nur Leerzeichen anlegen schlägt fehl
     When ich auf "Zutat anlegen" klicke
@@ -138,6 +154,7 @@ Feature: Zutaten verwalten
     Then sehe ich die Fehlermeldung "Einheit darf nicht leer sein."
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-5 · Anlegen·Mehrfeld-Validierung · Full-Stack · Singleton
   @US-904-error
   Scenario: Beide Pflichtfelder leer – beide Fehlermeldungen erscheinen gleichzeitig
     When ich auf "Zutat anlegen" klicke
@@ -149,6 +166,7 @@ Feature: Zutaten verwalten
     And hat das Name-Feld den Fokus
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-3 · Anlegen·Name-Validierung · Full-Stack
   @US-904-error
   Scenario: Zutat mit zu langem Namen anlegen schlägt fehl
     When ich auf "Zutat anlegen" klicke
@@ -158,6 +176,7 @@ Feature: Zutaten verwalten
     Then sehe ich die Fehlermeldung "Name darf maximal 30 Zeichen lang sein."
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-4 · Anlegen·Einheit-Validierung · Full-Stack
   @US-904-error
   Scenario: Zutat mit zu langer Einheit anlegen schlägt fehl
     When ich auf "Zutat anlegen" klicke
@@ -167,6 +186,7 @@ Feature: Zutaten verwalten
     Then sehe ich die Fehlermeldung "Einheit darf maximal 20 Zeichen lang sein."
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-6 · Anlegen·Name-Eindeutigkeit · Full-Stack
   @US-904-error
   Scenario: Zutat mit bereits vorhandenem Namen anlegen schlägt fehl
     Given die Zutat "Zucker" mit Einheit "g" existiert
@@ -177,6 +197,7 @@ Feature: Zutaten verwalten
     Then sehe ich die Fehlermeldung "Eine Zutat mit dem Namen 'Zucker' existiert bereits."
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-6 · Anlegen·Name-Eindeutigkeit · Full-Stack
   @US-904-error
   Scenario: Zutat mit vorhandenem Namen in abweichender Schreibweise anlegen schlägt fehl
     Given die Zutat "Tomaten" mit Einheit "Stück" existiert
@@ -187,6 +208,7 @@ Feature: Zutaten verwalten
     Then sehe ich die Fehlermeldung "Eine Zutat mit dem Namen 'tomaten' existiert bereits."
     And die Zutaten-Liste bleibt unverändert
 
+  # @run-6 · Anlegen·Name-Eindeutigkeit · Full-Stack
   @US-904-error
   Scenario: Fehlermeldung bei Duplikat zeigt getrimmten Namen
     Given die Zutat "Tomaten" mit Einheit "Stück" existiert
@@ -198,18 +220,21 @@ Feature: Zutaten verwalten
     And die Zutaten-Liste bleibt unverändert
 
   # Race-Condition-Szenario: kein UI-Pfad erreichbar; Step mappt auf direkten DELETE /api/ingredients/{id}-Call.
+  # @run-10 · Löschen·Konflikt · Full-Stack · Singleton
   @US-904-edge-case
   Scenario: Bereits gelöschte Zutat erneut löschen schlägt fehl
     Given die Zutat "Pfeffer" mit Einheit "g" existiert und gelöscht wurde
     When ich den Lösch-Befehl für "Pfeffer" erneut absende
     Then sehe ich die Fehlermeldung "Zutat wurde nicht gefunden."
 
+  # @run-7 · Liste · Full-Stack
   @US-904-edge-case
   Scenario: Soft-deleted Zutat erscheint nicht in der Zutaten-Liste
     Given die Zutat "Basilikum" mit Einheit "Bund" existiert und gelöscht wurde
     When ich die Zutaten-Liste betrachte
     Then ist "Basilikum" nicht in der Zutaten-Liste sichtbar
 
+  # @run-1 · Anlegen·Success · Full-Stack
   @US-904-edge-case
   Scenario: Führende und nachfolgende Leerzeichen werden beim Speichern entfernt
     When ich auf "Zutat anlegen" klicke
@@ -218,6 +243,7 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then sehe ich "Oregano" in der Zutaten-Liste mit Einheit "g"
 
+  # @run-3 · Anlegen·Name-Validierung · Full-Stack
   @US-904-edge-case
   Scenario: Name mit exakt 30 Zeichen wird akzeptiert
     When ich auf "Zutat anlegen" klicke
@@ -226,6 +252,7 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then sehe ich die neue Zutat in der Zutaten-Liste
 
+  # @run-4 · Anlegen·Einheit-Validierung · Full-Stack
   @US-904-edge-case
   Scenario: Einheit mit exakt 20 Zeichen wird akzeptiert
     When ich auf "Zutat anlegen" klicke
@@ -234,6 +261,7 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then sehe ich "Salz" in der Zutaten-Liste
 
+  # @run-11 · Reaktivierung · Full-Stack
   @US-904-edge-case
   Scenario: Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese
     Given die Zutat "Butter" mit Einheit "g" existiert und gelöscht wurde
@@ -243,6 +271,7 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then sehe ich "Butter" in der Zutaten-Liste mit Einheit "g"
 
+  # @run-11 · Reaktivierung · Full-Stack
   @US-904-edge-case
   Scenario: Reaktivierung übernimmt neue Einheit
     Given die Zutat "Butter" mit Einheit "Würfel" existiert und gelöscht wurde
@@ -252,6 +281,7 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then sehe ich "Butter" in der Zutaten-Liste mit Einheit "g"
 
+  # @run-11 · Reaktivierung · Full-Stack
   @US-904-edge-case
   Scenario: Reaktivierung übernimmt neuen Namen bei abweichender Schreibweise
     Given die Zutat "mehl" mit Einheit "g" existiert und gelöscht wurde
@@ -264,6 +294,7 @@ Feature: Zutaten verwalten
   # Einheit im Then bewusst nicht spezifiziert: im Parallelfall ist die Einheit der bereits
   # aktiven Zutat nicht durch diesen Request kontrollierbar (hängt vom parallelen Restore ab).
   # Given "parallel bereits wiederhergestellt": Step mappt auf direkten POST /api/ingredients um Parallelzustand zu simulieren.
+  # @run-11 · Reaktivierung · Full-Stack
   @US-904-edge-case
   Scenario: Reaktivierung gelingt auch wenn Zutat parallel bereits wiederhergestellt wurde
     Given die Zutat "Koriander" mit Einheit "Bund" existiert und gelöscht wurde

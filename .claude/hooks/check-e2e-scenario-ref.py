@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PreToolUse-Poka-Yoke (blockierend): E2E-Szenario-Verweise (ADR-S041-7).
 
-Hält Feature-Szenario-Titel und E2E-`// Szenario:`-Kommentare titelgleich, damit next_scenario.py
+Hält Feature-Szenario-Titel und E2E-`// Szenario:`-Kommentare titelgleich, damit next_run.py
 nie auf ein nicht existierendes Szenario zeigt. Beide Richtungen:
 - Edit an `Client/e2e/**/*.spec.ts`: jeder Testfall braucht einen `// Szenario:`-Kommentar (Präsenz),
   jeder Kommentar matcht ein Feature-Szenario (Gültigkeit) und ist über Specs hinweg eindeutig.
@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-from next_scenario import scenario_comment_titles, parse_scenarios  # noqa: E402
+from next_run import scenario_comment_titles, parse_scenarios  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _FEATURES_DIR = _REPO_ROOT / "features"

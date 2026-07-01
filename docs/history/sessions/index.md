@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 97 | 2026-07-01 | SKELETON (Tooling) | Szenario-Clustering Teil (b): `implementing-scenario` auf Lauf-Konsum (`@US-NNN run-N`) umgebaut; `next_scenario.py`→`next_run.py` (Sortierung nach Run-Nummer, `--story`-Filter, Format-/Metadaten-Checks); Sibling-Läufe-Vorschau gg. Gold-Plating; 207 Tests. |
 | 96 | 2026-06-30 | SKELETON (Erster OBS-Drain + Tooling) | Erster OBS-Drain (7 Items): S091-4 verworfen, S093-3/S094-1/S086-2/-3/-4 umgesetzt, S092-2/S085-2 geparkt; neu obs-archive.py (TDD); Retro-Trigger auto-injiziert + AGENT_MEMORY eingedampft; --allow-once-Hinweise; 3 neue OBS. |
 | 95 | 2026-06-24 | SKELETON (Kaizen-Retro S085–094) | CM-S095-1/-2 + Prinzip; Implementer-Default→sonnet + Schritt-0-Modellcheck; CM-S070-2/S084-1 BEWÄHRT, CM-S078-2 verworfen; LL/OBS-Quelle Pflicht; 6 OBS archiviert; OBS-S095-1→eigene Session. |
 | 94 | 2026-06-24 | SKELETON (US-904 Formular-UX-Baseline – Spec) | Formular-/Dialog-UX-Baseline (Spec/Prozess, keine Impl): Szenarien B1 Affordance + B2 Autofokus + B3 Fokus-Asserts; UX-Guideline Prinzip 8; gherkin-workshop-Checklisten-Lücke geschlossen + Review-Enforcement; ADR-S090-1 geschärft (Client-Val YAGNI). |

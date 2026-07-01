@@ -42,6 +42,7 @@ Lege folgende Tasks mit dem TaskCreate-Tool an:
 - „3. Synthese"
 - „4. Review-Loop"
 - „5. Feature-File & Freigabe"
+- „6. Szenario-Clustering"
 
 ---
 
@@ -362,8 +363,24 @@ oder die Regel aktualisiert werden soll. Business-Logic-Entscheidungen gehören 
 
 ---
 
+## Schritt 6: Szenario-Clustering
+→ TaskUpdate „6. Szenario-Clustering": in_progress
+
+Erst möglich, wenn die Szenarien vollständig und freigegeben sind (Schritt 5).
+
+Die freigegebenen Szenarien in Implementierungs-Läufe gruppieren – ein Lauf bündelt die
+Szenarien, die zusammen umgesetzt werden. Folge dem Algorithmus in
+`references/scenario-clustering.md` und schreibe für jedes Szenario den dort beschriebenen
+Lauf-Kommentar-Tag in die Feature-Datei.
+
+Dem User das Ergebnis kurz vorlegen (Anzahl Läufe, grobe Gruppierung) und freigeben lassen.
+Kommt später doch ein Szenario hinzu, diesen Schritt für die betroffenen Läufe erneut anwenden.
+
+→ TaskUpdate „6. Szenario-Clustering": completed
+
+---
+
 ## Nach dem Workshop
 
-Das Feature-File ist implementierungsbereit.
-Nächster Schritt: `implementing-scenario` für das erste Szenario – beginne mit dem ersten
-happy-path-Szenario.
+Das Feature-File ist implementierungsbereit und in Läufe gruppiert (`# @run-N`).
+Nächster Schritt: `implementing-scenario` in Lauf-Reihenfolge – beginne mit `# @run-1`.

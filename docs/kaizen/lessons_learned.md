@@ -43,6 +43,14 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 097 – 2026-07-01
+
+- **[MITTEL] [QUALITÄT] [TDD] LL-S097-1 – Regressionstest mit zufällig deckungsgleicher Reihenfolge maskierte echten Sortier-Bug**
+  Quelle: User
+  Was: `group_runs()` (next_run.py) sortierte Läufe nach Datei-Position des ersten Auftretens statt nach Run-Nummer → das reale `ingredients.feature` (run-7 steht als erstes Szenario in der Datei, hat aber eine höhere Nummer/spätere Build-Priorität als run-1) hätte fälschlich `run-7` als „nächsten Lauf" empfohlen. Die eigene Testfixture hatte Run-Nummern zufällig in Datei-Reihenfolge vergeben, sodass kein Test den Bug zeigte – der User bemerkte ihn erst beim Ausprobieren des echten Outputs.
+  Warum: Beim Schreiben der Regressionstests für Sortierlogik mit zwei Kandidaten-Ordnungen (Position im Quelltext vs. deklarierte Sequenznummer) wurde nur eine „normale" Fixture gebaut, keine mit absichtlich divergierenden Ordnungen.
+  Regel: Tests für Sortier-/Reihenfolge-Logik mit mehreren möglichen Ordnungskriterien immer mit einer Fixture absichern, in der die Kriterien **auseinanderfallen** – eine Fixture, die zufällig beide Ordnungen erfüllt, beweist nichts.
+
 ## Session 096 – 2026-06-30
 
 - **[GERING] [AGENT] [Review] LL-S096-1 – Reviewer-/eigene Behauptungen ungeprüft weitergereicht**

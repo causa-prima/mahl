@@ -1,22 +1,27 @@
 ---
 name: implementing-scenario
 description: >
-  Implementiert ein einzelnes freigegebenes Gherkin-Szenario end-to-end: Architektur-Check,
-  Double-Loop TDD mit Subagenten pro Schicht, Orchestrator-Check, Review-Loop und Commit.
-  Voraussetzung: das Szenario muss bereits via /gherkin-workshop freigegeben sein – fehlt es
-  in features/, stoppt der Skill sofort. Verwende diesen Skill immer wenn ein @US-NNN-Szenario
-  implementiert werden soll. Typische Trigger: „implementiere Szenario X", „fang mit dem ersten
-  Szenario an", „nächstes Szenario", „happy-path implementieren", direkter Aufruf via /implementing-scenario.
+  Implementiert einen freigegebenen Szenario-Lauf (ein oder mehrere Gherkin-Szenarien desselben
+  Clusters) end-to-end: Architektur-Check, Double-Loop TDD mit Subagenten pro Schicht,
+  Orchestrator-Check, Review-Loop und Commit. Voraussetzung: der Lauf muss bereits via
+  /gherkin-workshop (Schritt 6: Szenario-Clustering) freigegeben sein – fehlt er in features/,
+  stoppt der Skill sofort. Verwende diesen Skill immer wenn ein @US-NNN-Lauf implementiert werden
+  soll. Typische Trigger: „implementiere Lauf X", „fang mit dem ersten Lauf an", „nächster Lauf",
+  „happy-path implementieren", direkter Aufruf via /implementing-scenario.
 user-invocable: true
 ---
 
-# Szenario implementieren
+# Lauf implementieren
 
-Implementiere Szenario $ARGUMENTS.
-Fehlen `$ARGUMENTS` → User nach Tag (`@US-NNN-tag`) und Szenario-Titel fragen, bevor weitergegangen wird.
+Implementiere Lauf $ARGUMENTS.
+Fehlen `$ARGUMENTS` → User nach Story-Tag (`@US-NNN`) und Lauf-Nummer (`run-N`) fragen, bevor weitergegangen wird.
 
-Aufruf: `/implementing-scenario @US-NNN-tag "Szenario-Titel"`
-Beispiel: `/implementing-scenario @US-904-happy-path "Neue Zutat anlegen"`
+Aufruf: `/implementing-scenario @US-NNN run-N`
+Beispiel: `/implementing-scenario @US-904 run-3`
+
+Ein Lauf bündelt einen oder mehrere Szenarien desselben Clusters (Algorithmus + Tag-Format:
+`.claude/skills/gherkin-workshop/references/scenario-clustering.md`). Ein Singleton-Lauf enthält
+genau ein Szenario – der restliche Ablauf ist identisch, nur ohne Mehrfach-Parametrisierung.
 
 Der Ablauf ist bewusst outside-in strukturiert: Der E2E-Test definiert zuerst das gewünschte
 Verhalten von außen – erst danach entsteht Produktionscode, der dieses Verhalten erfüllt. So
@@ -53,25 +58,39 @@ einmal Code da, ist die Versuchung groß, die Entscheidung an den Code anzupasse
 - Akzeptanzkriterien: `docs/stories/szenario_N_*.md` (N = US-Präfix, z.B. US-904 → szenario_9_datenpflege.md; Mapping-Tabelle: `docs/stories/user-stories.md`)
 - Architektur-Patterns: `docs/reference/architecture.md` – TOC lesen, dann nur relevante Sektionen
 - Phasen-Spec: Phase aus `docs/AGENT_MEMORY.md` → `docs/reference/skeleton-spec.md` oder `docs/reference/mvp-spec.md` (nur API+DB-Sektion der Story)
-- Feature-Datei: `features/<story>.feature` – nur das Szenario mit Tag `$ARGUMENTS` vollständig lesen
+- Feature-Datei: `features/<story>.feature` – nur die Szenarien des Laufs `$ARGUMENTS` vollständig lesen
 
 Fragen:
 
-1. **ATDD-Gate:** Szenario `$ARGUMENTS` in `features/` vorhanden?
+1. **ATDD-Gate:** Lauf `$ARGUMENTS` in `features/` vorhanden?
    ```
-   python3 .claude/scripts/check-atdd-gate.py <TAG> "<TITEL>"
+   python3 .claude/scripts/check-atdd-gate.py <STORY-TAG> <run-N>
    ```
-   - Exit 1? → STOP. Erst `gherkin-workshop` für die User Story ausführen,
-     dann zurückkommen. Ohne freigegebenes Gherkin-Szenario fehlt die objektive
-     Fertigstellungsbedingung – der Code kann nicht als "Done" gelten.
-   - Exit 0: Der Script-Output enthält Background + Given/When/Then – das ist die exakte Spec.
-2. **YAGNI/KISS-Scope:** Was ist das Minimal-Notwendige für genau dieses Szenario?
+   Beispiel: `python3 .claude/scripts/check-atdd-gate.py @US-904 run-3`
+   - Exit 1? → STOP. Erst `gherkin-workshop` (inkl. Schritt 6: Szenario-Clustering) für
+     die User Story ausführen, dann zurückkommen. Ohne freigegebenen und geclusterten
+     Szenario-Satz fehlt die objektive Fertigstellungsbedingung – der Code kann nicht als
+     "Done" gelten.
+   - Exit 0: Der Script-Output enthält Background + Given/When/Then **aller** Szenarien
+     des Laufs (Lauf-Label, Schicht, Singleton-Flag im Kopf) – das ist die exakte Spec für
+     den gesamten Lauf. Bei einem Frontend-only-Lauf (Schicht-Label im Output) entfällt
+     der Backend-Subagent in Schritt 1–3 vollständig.
+   - **Sibling-Läufe überfliegen (Titel, keine Details):** `python3 .claude/scripts/next_run.py --open --story <US-NNN>` zeigt nur für diese Story alle noch **offenen** Lauf-Labels **mit Szenario-Titeln** – mechanisch, günstig, ohne Given/When/Then anderer Läufe lesen zu müssen (das widerspräche der Lese-Sparsamkeits-Regel oben) und ohne Rauschen aus anderen Storys/NFR-Features. Bewusst nur `--open`: ein bereits `--done`-Lauf hat seine Capability schon gebaut, dort gibt es nichts vorwegzunehmen. Dient ausschließlich Punkt 2.
+2. **YAGNI/KISS-Scope:** Was ist das Minimal-Notwendige für genau diese Szenarien des Laufs?
    Was wäre Gold-Plating (= kein Test dafür existiert, kein Akzeptanzkriterium fordert es)?
    Notiere explizit: *"Folgendes implementiere ich NICHT: ..."*
+   Deutet ein **späterer** Sibling-Lauf (Titel aus der Übersicht oben) erkennbar auf dieselbe
+   UI-Fläche/denselben Endpoint hin, den der aktuelle Lauf bereits berührt (z.B. der aktuelle
+   Lauf zeigt schon Daten in einer Liste, ein späterer Szenario-Titel spricht von Sortierung/
+   Leerzustand/Filterung derselben Liste) → dessen Capability **explizit** in die NICHT-Liste
+   aufnehmen, mit Verweis auf den Sibling-Lauf (z.B. *„NICHT: Sortierung, Leerzustand-Hinweis,
+   Soft-Delete-Filterung (→ run-7 „Mehrere Zutaten erscheinen alphabetisch sortiert" u.a.);
+   Anzeige des gerade angelegten Items aber JA"*). Macht die YAGNI-Grenze auditierbar statt vom
+   Zufall abhängig, ob der Implementer sie selbst errät.
 
 3. **Domain-Typen & Architektur:** Brauche ich neue Domain-Typen? Falls ja: grob skizzieren (welche Konzepte, welche Schicht). Konkrete Typ-Entscheidungen (Struktur, Fehler-Modellierung, Sichtbarkeit) fallen im TDD-Zyklus – der Layer-Implementer liest dafür die Coding-Guidelines.
 
-4. **ADR-Check:** Berührt das Szenario eine bestehende Entscheidung?
+4. **ADR-Check:** Berühren die Szenarien des Laufs eine bestehende Entscheidung?
 
    `decisions.py`-Kurzreferenz:
    - `list --tag X` → Header-Zeile + Tags aller passenden ADRs (kompakt, zum Scannen)
@@ -106,22 +125,22 @@ Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 ── SCHRITT 1–3: TDD-ZYKLUS (DOUBLE-LOOP) ───────────────────────────────────
 → TaskUpdate "Schritt 0: Architektur-Check": completed | TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": in_progress
 
-Ziel: genau das Szenario aus $ARGUMENTS vollständig grün bekommen – nicht mehr, nicht weniger.
+Ziel: genau die Szenarien des Laufs aus $ARGUMENTS vollständig grün bekommen – nicht mehr, nicht weniger.
 
 **Vorabanalyse: Spec-Ambiguitäten klären (Haupt-Thread):**
 
-Bevor der E2E-Test geschrieben wird, das Szenario auf offene Entscheidungen scannen – schichtübergreifend:
+Bevor die E2E-Tests geschrieben werden, alle Szenarien des Laufs auf offene Entscheidungen scannen – schichtübergreifend:
 - **Verhaltensentscheidungen:** Was passiert nach einer Aktion? Dialog-Verhalten nach Erfolg/Fehler, Feldinitialisierung, Reihenfolge von Elementen, exakter Fehlermeldungstext.
 - **Backend-Entscheidungen:** HTTP-Statuscodes, Header-Format (z.B. `Location`), DB-Schema-Details (Constraints, Datentypen, Default-Werte).
 
 Gefundene Ambiguitäten mit dem User klären, bevor der E2E-Test entsteht.
 Reine Design-Entscheidungen (CSS, Fonts, Abstände) sind kein Klärungsbedarf – diese liegen in den UX-Guidelines und brauchen keine Spec-Anpassung.
 
-**Äußerer Loop – E2E-Test (Haupt-Thread):**
+**Äußerer Loop – E2E-Test(s) (Haupt-Thread):**
 
-Schreibe selbst den Playwright-Test für das Szenario (Given/When/Then 1:1) – bevor der erste Subagent gespawnt wird. Führe ihn aus und zeige die Fehlermeldung. Das beweist, dass der Test echtes Verhalten misst und noch nicht durch bestehende Implementierung zufällig grün werden kann. Referenz: `docs/process/e2e-testing.md` (TOC zuerst).
+Schreibe selbst die Playwright-Test(s) für **alle** Szenarien des Laufs (je Szenario Given/When/Then 1:1) – bevor der erste Subagent gespawnt wird. Ein homogener Cluster (gleiches Setup, gleiche Assertion-Form, nur der Input variiert – das ist per Definition des Clustering-Algorithmus der Regelfall) kollabiert dabei zu **einem** parametrisierten Test (`[TestCase]`/`test.each` o.ä.), jede Zeile = ein Szenario. Führe die Test(s) aus und zeige die Fehlermeldung(en). Das beweist, dass sie echtes Verhalten messen und noch nicht durch bestehende Implementierung zufällig grün werden können. Referenz: `docs/process/e2e-testing.md` (TOC zuerst).
 
-Dieser Test bleibt rot, bis alle inneren Loops abgeschlossen sind – das ist gewollt. Der Haupt-Thread ändert den E2E-Test während der inneren Loops nicht.
+Diese Tests bleiben rot, bis alle inneren Loops abgeschlossen sind – das ist gewollt. Der Haupt-Thread ändert sie während der inneren Loops nicht.
 
 **Innerer Loop – Subagent pro Schicht (Delegation ist Pflicht):**
 
@@ -130,28 +149,37 @@ Dieser Test bleibt rot, bis alle inneren Loops abgeschlossen sind – das ist ge
 Für jede Schicht einen Subagenten spawnen. Haupt-Thread lädt KEINE Coding-Guidelines – der
 Subagent tut das selbst.
 
-**Schicht-Reihenfolge (outside-in):**
-- Frontend-Szenario: ein Frontend-Subagent implementiert beide Frontend-Schichten sequenziell (Komponente mit Service-Mock zuerst, dann Service-Client mit MSW)
-- Full-Stack-Szenario: E2E → Frontend-Subagent (oben) → Backend-Subagent *(Frontend zuerst: implementiert gegen MSW-Mocks; Backend ersetzt diese Mocks danach)*
-- Frontend-only (z.B. Dialog-Verhalten ohne HTTP-Calls): Frontend-Subagent ohne Service-Client-Schicht, kein Backend-Subagent. Backend-only-Szenarien sind aktuell nicht vorgesehen.
+**Schicht-Reihenfolge (outside-in):** Die Schicht des Laufs steht bereits im `# @run-N`-Tag
+(Ausgabe von `check-atdd-gate.py` in Schritt 0) – kein erneutes Beurteilen pro Szenario nötig,
+alle Szenarien eines Laufs teilen dieselbe Schicht (Konsequenz des Clustering-Algorithmus,
+Achse „Schicht" in Schritt 4).
+- **Full-Stack:** ein Frontend-Subagent implementiert beide Frontend-Schichten sequenziell (Komponente mit Service-Mock zuerst, dann Service-Client mit MSW) → danach ein Backend-Subagent *(Frontend zuerst: implementiert gegen MSW-Mocks; Backend ersetzt diese Mocks danach)*.
+- **Frontend-only:** nur der Frontend-Subagent (Komponente mit Service-Mock, ohne Service-Client-Schicht) – **kein Backend-Subagent**. Backend-only-Läufe sind aktuell nicht vorgesehen.
 
-**Schicht-Subagenten (EINE Schicht pro Aufruf):**
+**Schicht-Subagenten (EINE Schicht pro Aufruf, alle Szenarien des Laufs in einem Batch):**
 
 - Backend-Schicht: `subagent_type: "backend-layer-implementer"`
 - Frontend-Schicht: `subagent_type: "frontend-layer-implementer"`
 
-Befülle die Message mit den konkreten Werten aus Schritt 0:
+Befülle die Message mit den konkreten Werten aus Schritt 0 – **für alle Szenarien des Laufs gemeinsam**:
 
 ```
-Szenario: <TAG> "<TITEL>"
+Lauf: <run-N> „<Cluster-Label>" (<Schicht>[, Singleton])
 
-Akzeptanzkriterien:
-<Given/When/Then aus Schritt 0>
+Szenarien (Tag + Titel + Akzeptanzkriterien bleiben je Szenario zusammen – Grundlage
+für die `// Szenario: <Titel>`-Traceability-Kommentare je Test):
+
+<TAG> "<TITEL 1>"
+<Given/When/Then von Szenario 1 aus Schritt 0>
+
+<TAG> "<TITEL 2>"
+<Given/When/Then von Szenario 2 aus Schritt 0>
+...
 
 Scope-Grenzen (nicht implementieren):
 <YAGNI-Liste aus Schritt 0>
 
-Failing E2E-Test: <Pfad zur spec.ts>
+Failing E2E-Test(s): <Pfad(e) zur spec.ts>
 
 Relevante ADRs:
 Bereits ausgeführt (nicht nochmal ausführen):
@@ -176,7 +204,7 @@ Spawn-Regeln:
 
 **Batch-Test-Review nach RED im Inneren Loop (Haupt-Thread):**
 
-Der Subagent schreibt den **gesamten Test-Batch der Schicht** (alle Tests, die das Szenario auf dieser Schicht fordert), bestätigt den **kollektiven** Fehlschlag und sendet **einmal** das Signal `TEST-REVIEW: <Testname1, Testname2, ...>` mit allen Tests des Batches. Der Haupt-Thread liest den Test-Code via `git diff`, prüft den **ganzen Batch** anhand der folgenden Kriterien, stagt danach die Test-Dateien (`git add <test-files>`) und antwortet mit Freigabe oder konkreter Korrektur-Anforderung. Setup-Änderungen (Mock-Handler, Testdaten), die der Subagent nach der Freigabe noch vornimmt, sind im abschließenden Return beschrieben – diese danach ebenfalls stagen.
+Der Subagent schreibt den **gesamten Test-Batch der Schicht** (alle Tests, die die Szenarien des Laufs auf dieser Schicht fordern – bei einem homogenen Cluster typischerweise ein einziger parametrisierter Test), bestätigt den **kollektiven** Fehlschlag und sendet **einmal** das Signal `TEST-REVIEW: <Testname1, Testname2, ...>` mit allen Tests des Batches. Der Haupt-Thread liest den Test-Code via `git diff`, prüft den **ganzen Batch** anhand der folgenden Kriterien, stagt danach die Test-Dateien (`git add <test-files>`) und antwortet mit Freigabe oder konkreter Korrektur-Anforderung. Setup-Änderungen (Mock-Handler, Testdaten), die der Subagent nach der Freigabe noch vornimmt, sind im abschließenden Return beschrieben – diese danach ebenfalls stagen.
 
 - **Per-Assertion-Pflicht (inkl. Given/When):** Für jede neue oder geänderte Assertion und signifikante Given/When-Schritte: Welches Gherkin-Kriterium erzwingt sie? Falls keines vorhanden – drei Diagnosen, der Haupt-Thread entscheidet:
   - a) **Gold-Plating** → Subagent löscht Assertion und ggf. zugehörigen Produktionscode.
@@ -253,7 +281,7 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
 **Pro Runde:**
 
 1. `.claude/skills/review-code/SKILL.md` laden und den darin beschriebenen Prozess ausführen.
-   Eingaben übergeben: Szenario-Tag + Given/When/Then (aus Schritt 0), YAGNI-Liste (aus Schritt 0), geänderte Dateien (git diff), Check-2-Output (Suppressionen) aus dem Schritt-4-qa-check, gemeinsam ermittelte ADRs (Schritt 0 + Subagenten-PLANUNG).
+   Eingaben übergeben: Szenario-Tags + Given/When/Then aller Szenarien des Laufs (aus Schritt 0), YAGNI-Liste (aus Schritt 0), geänderte Dateien (git diff), Check-2-Output (Suppressionen) aus dem Schritt-4-qa-check, gemeinsam ermittelte ADRs (Schritt 0 + Subagenten-PLANUNG).
    Keine neue Task-Liste anlegen – review-code läuft eingebettet in den implementing-scenario-Ablauf.
    Die von review-code gespawnten spezialisierten Agenten erhalten **kein Iterations-Wissen** –
    weder Findings aus früheren Runden noch Hinweise auf bereits abgelehnte false positives.
@@ -289,7 +317,7 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
 2. **Vorgehen mit dem User klären** – frage per `AskUserQuestion`, was als nächstes passieren soll, damit der Commit i.d.R. die Session-Abschluss-Dateien mit enthält. Optionen:
    - **Session-Abschluss, dann Commit** (Empfehlung) → erst `closing-session` ausführen, dann committen, sodass die Session-Abschluss-Dateien (Session-Log, AGENT_MEMORY-Phasenzeile, `lessons_learned`, Index) im **selben** Commit liegen.
    - **Nur Session-Abschluss** → `closing-session` ausführen, **kein** Commit.
-   - **Nur Commit** → jetzt committen, ohne Session-Abschluss; davor `docs/AGENT_MEMORY.md` selbst aktualisieren (Phase/Story/**Nächstes Szenario**: erledigtes markieren, nächstes benennen); technische Schuld → `docs/tech-debt.md`, offene Fragen → `docs/open-questions.md`.
+   - **Nur Commit** → jetzt committen, ohne Session-Abschluss; davor `docs/AGENT_MEMORY.md` selbst aktualisieren (Phase/Story/**Nächster Lauf**: erledigten Lauf markieren, nächsten benennen); technische Schuld → `docs/tech-debt.md`, offene Fragen → `docs/open-questions.md`.
    - **Etwas anderes** (Freitext) → der Anweisung des Users folgen.
 
 3. **Session-Abschluss** (falls gewählt): `closing-session`-Skill laden und ausführen. Die dort entstandenen/geänderten Dateien fließen in den nachfolgenden Commit ein.
@@ -298,14 +326,15 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
    `git status` prüfen – alle noch unstaged Änderungen stagen (`git add <dateien>`), **inklusive** der Dateien aus dem Session-Abschluss.
    ```
    git commit -m "$(cat <<'EOF'
-   US-XXX: [Szenario-Titel]
+   US-XXX: Lauf N – [Cluster-Label]
 
    Co-Authored-By: <MODELLNAME> <noreply@anthropic.com>
    EOF
    )"  # --allow-once
    ```
-   Mapping: `@US-904-happy-path` → `US-904` (@ entfernen, alles nach dem zweiten Bindestrich abschneiden). Titel direkt übernehmen.
-   Beispiel: `$ARGUMENTS = @US-904-happy-path "Neue Zutat anlegen"` → `"US-904: Neue Zutat anlegen"`
+   Mapping: Story-Tag ohne `@`, Lauf-Nummer und Cluster-Label aus dem `check-atdd-gate.py`-Output
+   von Schritt 0 übernehmen.
+   Beispiel: `$ARGUMENTS = @US-904 run-3` (Label „Anlegen·Name-Validierung") → `"US-904: Lauf 3 – Anlegen·Name-Validierung"`
    Co-Authored-By: Modellname aus dem System-Kontext einsetzen.
 
 → TaskUpdate "Schritt 6: Abschluss (Session-Abschluss & Commit)": completed
