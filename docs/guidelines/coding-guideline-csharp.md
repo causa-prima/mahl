@@ -50,6 +50,7 @@ Verwende den richtigen Typ je nach Rolle:
 - `Infrastructure/DatabaseTypes/**` – EF-Entities als `class` mit `private set;` erlaubt
 - `Infrastructure/Migrations/**` – generierter Code, keine Kontrolle
 - `**/*Options.cs`, `**/*Settings.cs` – ASP.NET Options-Pattern erfordert `class`
+- Reine **E2E-/Test-Support-Endpoints** (nur in der E2E-Umgebung gemappt, z.B. `E2ETestSupport.cs`; ADR-S084-4 Addendum) – dürfen direkt auf `MahlDbContext` zugreifen und sind von den Domain-Typ-/DTO-/Mapping-Pflichten (auch Sektion 5, „Endpoints") ausgenommen; sie tragen keine Domänenlogik. **Nicht** als Vorlage für produktive Endpoints verwenden.
 
 2. Vermeidung von "Primitive Obsession":
 

@@ -71,6 +71,33 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
             [new IngredientResponse(Id: created.Id, Name: "Tomaten", DefaultUnit: "Stück")]);
     }
 
+    // @US-904-edge-case: Führende und nachfolgende Leerzeichen werden beim Speichern entfernt.
+    // Pinnt die Trim-KORREKTHEIT (ADR-S051-1: vor der Validierung trimmen, den getrimmten Wert speichern)
+    // am Backend-Grenzwert. Auf E2E-Ebene ist die exakte Whitespace-Entfernung nur mühsam (Regex gegen den
+    // Roh-DOM-Text) beobachtbar; die byte-genaue Prüfung von Response-Body UND DB-State gehört hierher
+    // (ADR-S041-5-Addendum). Nur leading/trailing – inneres Whitespace ist nicht Teil des Szenarios.
+    [Fact]
+    public async Task US904_EdgeCase_CreateIngredient_WhitespacePaddedInput_TrimsAndPersistsTrimmedValue()
+    {
+        // Given: name and unit padded with leading and trailing whitespace
+        var request = new CreateIngredientRequest(Name: "  Oregano  ", DefaultUnit: "  g  ");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 201 Created and the response body carries the TRIMMED values (no surrounding whitespace)
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Name.Should().Be("Oregano");
+        body.DefaultUnit.Should().Be("g");
+
+        // Then: the persisted row stores the trimmed values (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = body.Id, Name = "Oregano", DefaultUnit = "g" }]);
+    }
+
     // Same invariant ("Pflichtfeld leer oder nur Whitespace -> 422 feld-keyed"), nur Input variiert
     // -> ein parametrisierter Test (docs/process/tdd-process.md "Parametrisierte Tests").
     // ADR-S051-1: Strings werden vor der Validierung getrimmt -> "   " ist nach Trimming leer.

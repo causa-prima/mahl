@@ -67,13 +67,6 @@ Eintrag-Format:
 
 ---
 
-## TD-S083-5 — E2E-Test: `EmptyDb`-Test ohne DB-Reset
-**Priorität:** Mittel (hochgestuft S090; **2. Rezidiv S091** – Muster, kein Einzelfall)
-**Problem:** Die E2E-Postgres hat **kein** Per-Run-Reset (persistentes Volume `mahl_postgres_data`, kein globalSetup/teardown, kein TRUNCATE/EnsureDeleted). **S090 bestätigt:** beim „leerer Name"-Lauf lagen 2 Residual-Zutaten in der DB; der `EmptyDb`-Happy-Path-Test („Noch keine Zutaten angelegt.") schlägt gegen eine befüllte DB fehl. **S091 Rezidiv:** beim „leere Einheit"-Lauf schlug der Happy-Path `CreateIngredient_ValidData` mit Playwright-`strict mode violation: 'Tomaten' resolved to 2 elements` fehl — ein „Tomaten" aus einem früheren Lauf lag noch in der DB, der Test legt jedes Mal ein weiteres an. (Abgegrenzt: die **Backend-Integrationstests** sind via `InMemoryDatabaseRoot`/ADR-S000-11 isoliert – nur die **E2E** gegen echtes Postgres nicht.)
-**Behebung/Trigger:** DB-Reset/Isolation im E2E-Setup (z.B. Truncate vor jedem Lauf via globalSetup, oder tmpfs-Volume + Migration je Lauf). Sollte vor weiteren E2E-abhängigen Szenarien erfolgen.
-
----
-
 ## TD-S084-1 — HTTP/ETag-Middleware (BE): vollständige Response-Pufferung
 **Priorität:** Niedrig jetzt / Hoch vor File-Serving bzw. Auth
 **Problem:** `ETagMiddleware` puffert **jede** GET-Response komplett in einen `MemoryStream` (+`ToArray()`-Kopie) → (a) DoS-/Speicher-Risiko sobald große/paginierungsfreie Collections oder File-/Image-GETs dazukommen (Buffering+Hash zwingt Nicht-Streaming); (b) `next()` ist nicht in try/finally → bei Endpoint-Exception wird `Response.Body` nicht auf den Original-Stream zurückgesetzt (heute folgenlos – keine Error-Handling-Middleware); (c) 304 setzt kein `Cache-Control: private`/`Vary` → ab MVP-Auth + Reverse-Proxy Cross-User-Leak über Shared-Caches.

@@ -1016,6 +1016,17 @@ Kein einzelner DB-Wert bildet den Collection-Zustand korrekt ab. `MAX(xmin)` ist
 
 **Kosten:** wenige Sekunden Mehraufwand pro E2E-Lauf (Build/Start/Warmup); kein paralleles eigenes Backend auf 5059 während E2E; Postgres muss laufen.
 
+**Addendum (S098) – E2E-DB-Isolation (per-Test) & eigene E2E-Datenbank (löst die vormalige Tech-Debt „E2E-Postgres ohne Per-Run-Reset"):** Der hier etablierte E2E-`webServer` bekommt zusätzlich `ASPNETCORE_ENVIRONMENT: 'E2E'`. Damit:
+- **Eigene DB:** `appsettings.E2E.json` → `Database=mahl_e2e` – die E2E fasst die dev/prod-DB `mahl` nie an.
+- **Schema pro Lauf:** In der E2E-Umgebung führt `Program.cs` beim Start `MigrateAsync()` aus (provisioniert `mahl_e2e` bei Bedarf) und mappt einen **nur dann existierenden** Test-Support-Endpoint `POST /api/test/reset` (`E2ETestSupport.cs`). Außerhalb E2E existieren beide nicht → kein dev/prod-Runtime-Risiko.
+- **Per-Test-Isolation:** Ein Playwright-`beforeEach` ruft den Reset vor **jedem** Test. Der Reset **TRUNCATEt alle Tabellen generisch aus dem EF-Modell** (`db.Model` – kein Pflegeaufwand bei neuen Entitäten). TRUNCATE statt DROP+Recreate, weil die laufende App eine offene Verbindung zu `mahl_e2e` hält (DROP scheitert an aktiven Connections) und TRUNCATE keinen Schema-Rebuild pro Test braucht. `RESTART IDENTITY` ist bei UUIDv7-PKs (ADR-S030-1) folgenlos, aber future-proof; `CASCADE` löst die FK-Reihenfolge.
+
+**Warum echtes Postgres statt EF-InMemory (Kontrast zu ADR-S000-11):** Die Backend-Integrationstests dürfen EF-InMemory nutzen (In-Process-Logikprüfung, ADR-S000-11). E2E lebt dagegen von Produktions-Fidelity: EF-InMemory ist keine relationale DB und würde Unique-Constraints (US-904 „Name-Eindeutigkeit"), `xmin`-basierte ETags (ADR-S058-3), `maxlength` und die Migrations-Korrektheit **nicht** abdecken. Der Reset läuft bewusst über einen HTTP-Port (ADR-S041-1: Tests sprechen die App über ihre Ports an), nicht über einen direkten DB-Client.
+
+**Mutation-Testing:** `E2ETestSupport.cs` ist aus der Backend-Stryker-`mutate`-Liste ausgeschlossen (analog `Program.cs`-Bootstrap) – E2E-only-Scaffolding, das von den Backend-Unit-Tests nicht ausgeführt wird und keine Domänen-/Applikationslogik trägt; seine Korrektheit wird von der E2E-Suite selbst belegt (die loud `expect(status).toBe(204)`-Reset-Assertion im `beforeEach`).
+
+**Grenze / offen:** Reset ist per-Test bei Single-Worker (aktuelle Config). Seed-Daten (später): idempotenter Insert nach dem Truncate im Reset-Endpoint.
+
 ---
 
 ## Offline-Sync-Strategie (US-306)

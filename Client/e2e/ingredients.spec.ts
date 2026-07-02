@@ -11,6 +11,17 @@ async function captureIngredientList(page: Readonly<Page>) {
   return { listItems, itemsBefore: await listItems.count() }
 }
 
+// ADR-S084-4 Addendum: per-Test-DB-Isolation. Vor JEDEM Test die E2E-DB leeren (E2E-only Reset-Endpoint,
+// nur bei ASPNETCORE_ENVIRONMENT=E2E gemappt) -> jeder Test startet gegen eine leere DB, keine
+// Residual-Akkumulation über Läufe/Tests hinweg. Auf Datei-Ebene registriert -> läuft vor den
+// describe-eigenen beforeEach (page.goto), also VOR dem initialen GET. (Bei einem zweiten Spec-File
+// nach `e2e/fixtures.ts` als geteilte Auto-Fixture ziehen, damit kein Spec den Reset vergessen kann.)
+test.beforeEach(async ({ request }) => {
+  const res = await request.post('http://localhost:5059/api/test/reset')
+  // Laut scheitern, falls der Reset-Endpoint nicht existiert (falsche Umgebung) statt still zu no-op'en.
+  expect(res.status(), 'Reset-Endpoint muss in der E2E-Umgebung 204 liefern').toBe(204)
+})
+
 // @US-904-happy-path
 test.describe('US904_HappyPath: Zutaten verwalten', () => {
   test.beforeEach(async ({ page }) => {
@@ -73,6 +84,35 @@ test.describe('US904_HappyPath: Zutaten verwalten', () => {
     // Then: "Tomaten" mit Einheit "Stück" erscheint in der Zutaten-Liste
     await expect(page.getByTestId('ingredient-list').getByText('Tomaten')).toBeVisible()
     await expect(page.getByTestId('ingredient-list').getByText('Stück')).toBeVisible()
+    // Then: der "Zutat anlegen"-Dialog ist geschlossen
+    await expect(page.getByRole('dialog')).toBeHidden()
+  })
+})
+
+// @US-904-edge-case
+test.describe('US904_EdgeCase: Zutaten verwalten', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/ingredients')
+  })
+
+  // Szenario: Führende und nachfolgende Leerzeichen werden beim Speichern entfernt
+  test('US904_EdgeCase_CreateIngredient_WhitespacePaddedInput_TrimmedValueAppearsInList', async ({ page }) => {
+    // When: Dialog öffnen, Name + Einheit mit umgebenden Leerzeichen eingeben, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('  Oregano  ')
+    await page.getByLabel('Einheit').fill('  g  ')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: der GETRIMMTE Name "Oregano" / die getrimmte Einheit "g" erscheinen in der Liste –
+    // exakt, OHNE die gesendeten umgebenden Leerzeichen. Assertion-Technik: Regex statt String.
+    // Playwrights String-Matcher (getByText / toHaveText('x')) normalisieren Whitespace IMMER
+    // (auch exact:true trimmt) und könnten getrimmt/ungetrimmt nicht unterscheiden; eine Regex
+    // matcht den rohen DOM-Text "as is" -> /^Oregano$/ schlägt bei "  Oregano  " fehl. exact:true
+    // dient nur dem Lokalisieren der Zeile (normalisiert; "g" ist Substring von "Oregano" ->
+    // sonst Strict-Mode-Kollision), die Regex prüft dann den ungetrimmten Rohtext.
+    const list = page.getByTestId('ingredient-list')
+    await expect(list.getByText('Oregano', { exact: true })).toHaveText(/^Oregano$/)
+    await expect(list.getByText('g', { exact: true })).toHaveText(/^g$/)
     // Then: der "Zutat anlegen"-Dialog ist geschlossen
     await expect(page.getByRole('dialog')).toBeHidden()
   })

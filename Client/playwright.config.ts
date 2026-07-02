@@ -2,6 +2,10 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
+  // workers: 1 – harte Serialisierung. Die E2E-DB-Isolation (ADR-S084-4 Addendum) teilt sich EINE
+  // mahl_e2e-DB und leert sie per-Test; parallele Worker (Playwright-Default über Dateien hinweg) würden
+  // sich gegenseitig die Daten wegtrunken. Bis eine per-Worker-DB existiert, bleibt der Lauf single-worker.
+  workers: 1,
   use: {
     baseURL: 'http://localhost:5173',
   },
@@ -21,9 +25,13 @@ export default defineConfig({
   // Vite darf reused werden (wird nie stale: Hot-Reload).
   webServer: [
     {
-      command: 'dotnet run --project ../Server',
+      // --no-launch-profile: launchSettings.json würde sonst ASPNETCORE_ENVIRONMENT=Development erzwingen
+      // und die hier gesetzte E2E-Umgebung überschreiben. Ohne Profil greift die inherited env unten.
+      command: 'dotnet run --project ../Server --no-launch-profile',
       url: 'http://localhost:5059/api/ingredients',
-      env: { ASPNETCORE_URLS: 'http://localhost:5059' },
+      // ASPNETCORE_ENVIRONMENT=E2E (ADR-S084-4 Addendum): eigene DB mahl_e2e (appsettings.E2E.json), Schema-Migrate
+      // + Reset-Endpoint beim Start (Program.cs-Guard) -> per-Test-DB-Isolation, dev/prod unberührt.
+      env: { ASPNETCORE_URLS: 'http://localhost:5059', ASPNETCORE_ENVIRONMENT: 'E2E' },
       reuseExistingServer: false,
       timeout: 120_000,
     },

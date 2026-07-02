@@ -43,6 +43,27 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 098 – 2026-07-02
+
+- **[MITTEL] [TOOLING] [Sonstiges] LL-S098-1 – Prozess-Env für gespawnte Tools kann still überschrieben werden**
+  Quelle: User
+  Was: In der Playwright-`webServer.env` gesetztes `ASPNETCORE_ENVIRONMENT=E2E` wurde von `launchSettings.json` (`dotnet run` nutzt per Default das Launch-Profil) still auf `Development` überschrieben → der E2E-Reset-Endpoint war nie gemappt (404) → verwirrende Akkumulations-Debuggerei (ich konnte anfangs nicht erklären, warum ein Empty-State-Test grün war). Fix: `--no-launch-profile`.
+  Warum: Angenommen, das im Runner gesetzte Env erreiche die App 1:1 – ohne zu prüfen, dass eine gelagerte Konfigurationsquelle (Launch-Profil) Vorrang hat.
+  Regel: Hängt ein Mechanismus daran, dass eine Env-Variable/Config einen gespawnten Prozess erreicht, empirisch mit einer **lauten** Laufzeit-Assertion absichern, dass sie wirklich griff – nicht auf Propagierung vertrauen (gelagerte Config/Profile können lautlos gewinnen).
+
+- **[MITTEL] [QUALITÄT] [C#-Code] LL-S098-2 – Provider-spezifische API direkt in Program.Main bricht den InMemory-Test-Host**
+  Quelle: Orchestrator
+  Was: Ein `MigrateAsync()`-Aufruf (EF-Relational) direkt in `Program.<Main>$` – hinter einem `if E2E`-Guard, der in Tests nie läuft – ließ **alle** 15 Backend-Integrationstests mit `FileNotFoundException` (Relational-Assembly) scheitern, weil der Test-Host (WebApplicationFactory, InMemory-Provider) beim JIT von `Main` alle Methodrefs auflösen muss, auch die des ungenommenen Zweigs.
+  Warum: JIT ist per-Methode lazy, aber innerhalb einer Methode werden alle referenzierten Assemblies beim Kompilieren aufgelöst – ein untaken Branch schützt nicht.
+  Regel: Provider-/Assembly-spezifische Aufrufe (Relational, Npgsql o.ä.), die nur unter einer bestimmten Umgebung laufen, nicht inline in `Program.Main` setzen, sondern in eine eigene Methode auslagern – deren Body JITtet erst beim tatsächlichen Aufruf, sodass Test-Hosts mit anderem Provider nicht am fehlenden Assembly scheitern.
+
+- **[MITTEL] [PROZESS] [Skill-Nutzung] LL-S098-3 – Fällige Infra-Schuld im Architektur-Check nicht proaktiv gefunden**
+  Quelle: User
+  Bezug: OBS-S090-5 (Materialisierung der dort vorhergesagten Lücke)
+  Was: TD-S083-5 (E2E-DB-Reset) war laut eigenem Trigger („vor weiteren E2E-abhängigen Szenarien") fällig, wurde im Schritt-0-Architektur-Check aber nicht gefunden – erst reaktiv, als der E2E-Test an DB-Residuen scheiterte (Debugging-Kosten). Obwohl run-1 erkennbar E2E-lastig war, habe ich `tech-debt.md` in Schritt 0 nie geöffnet; AGENT_MEMORY listete andere TDs (S094-1/S077-1), nicht dieses.
+  Warum: Schritt 0 hat keinen formalen `tech-debt.md`-Scan; das TD-Surfacing hing allein an AGENT_MEMORY, das dieses Infra-TD nicht trug – exakt der von OBS-S090-5 beschriebene Fall (Schuld ohne Szenario-Bezug fällt durchs Raster).
+  Regel: Im Architektur-Check bei szenario-relevantem Kontext (z.B. E2E-lastiger Lauf) aktiv `tech-debt.md` nach fälliger Schuld durchsuchen (Trigger-Text lesen), statt sich allein auf die AGENT_MEMORY-Prioritätenliste zu verlassen. (Formalisierung offen → Retro, OBS-S090-5.)
+
 ## Session 097 – 2026-07-01
 
 - **[MITTEL] [QUALITÄT] [TDD] LL-S097-1 – Regressionstest mit zufällig deckungsgleicher Reihenfolge maskierte echten Sortier-Bug**
