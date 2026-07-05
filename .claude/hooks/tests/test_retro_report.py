@@ -7,43 +7,43 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"
 import retro_report as rr  # noqa: E402
 
 
-def _cm(schwere="HOCH", kategorie="AGENT", kontexte=None, status="AKTIV"):
+def _cm(impact="HOCH", kategorie="AGENT", kontexte=None, status="AKTIV"):
     return rr.Countermeasure(
-        problem="x", schwere=schwere, kategorie=kategorie,
+        problem="x", impact=impact, kategorie=kategorie,
         kontexte=kontexte if kontexte is not None else [], status=status,
     )
 
 
-# --- cm_matches: Match auf das volle Tripel (Schwere exakt) -------------------
+# --- cm_matches: Match auf das volle Tripel (Impact exakt) -------------------
 def test_cm_matches_full_tuple():
-    cm = _cm(schwere="HOCH", kategorie="AGENT", kontexte=["Review"])
+    cm = _cm(impact="HOCH", kategorie="AGENT", kontexte=["Review"])
     assert rr.cm_matches(cm, "HOCH", "AGENT", "Review")
 
 
 def test_cm_matches_requires_exact_severity():
-    cm = _cm(schwere="HOCH", kategorie="AGENT", kontexte=["Review"])
+    cm = _cm(impact="HOCH", kategorie="AGENT", kontexte=["Review"])
     # MITTEL ≠ HOCH → bewusst kein Match (severity-agnostisch über-maskiert, s. Kommentar im Script)
     assert not rr.cm_matches(cm, "MITTEL", "AGENT", "Review")
 
 
 def test_cm_matches_requires_kategorie():
-    cm = _cm(schwere="HOCH", kategorie="AGENT", kontexte=["Review"])
+    cm = _cm(impact="HOCH", kategorie="AGENT", kontexte=["Review"])
     assert not rr.cm_matches(cm, "HOCH", "PROZESS", "Review")
 
 
 def test_cm_matches_wildcard_kontext_matches_any_kontext():
-    cm = _cm(schwere="MITTEL", kategorie="PROZESS", kontexte=[])
+    cm = _cm(impact="MITTEL", kategorie="PROZESS", kontexte=[])
     assert rr.cm_matches(cm, "MITTEL", "PROZESS", "Tooling")
     assert rr.cm_matches(cm, "MITTEL", "PROZESS", "Gherkin")
 
 
 def test_cm_matches_kontext_not_in_list():
-    cm = _cm(schwere="HOCH", kategorie="AGENT", kontexte=["Review"])
+    cm = _cm(impact="HOCH", kategorie="AGENT", kontexte=["Review"])
     assert not rr.cm_matches(cm, "HOCH", "AGENT", "Tooling")
 
 
 def test_has_cm_matches_full_tuple():
-    cm = _cm(schwere="HOCH", kategorie="AGENT", kontexte=["Review"])
+    cm = _cm(impact="HOCH", kategorie="AGENT", kontexte=["Review"])
     assert rr.has_cm("HOCH", "AGENT", "Review", [cm])
     assert not rr.has_cm("MITTEL", "AGENT", "Review", [cm])
 
@@ -53,7 +53,7 @@ def test_finding_re_parses_title_with_asterisk():
     line = "- **[GERING] [TOOLING] [Tooling] StrykerJS JSX-`{/* x */}`-Kommentar**\n"
     m = rr.FINDING_RE.match(line)
     assert m is not None
-    assert m.group("schwere") == "GERING"
+    assert m.group("impact") == "GERING"
     assert "JSX" in m.group("titel")
 
 
@@ -78,19 +78,19 @@ _CM_SAMPLE = textwrap.dedent("""\
     ## Aktive Maßnahmen
 
     ### CM-S070-3 – Multi-Kontext-Maßnahme
-    **Schwere:** HOCH | **Kategorie:** TOOLING | **Kontext:** Bash/Permission, Mutation-Testing | **Status:** AKTIV | **Seit:** S070
+    **Impact:** HOCH | **Kategorie:** TOOLING | **Kontext:** Bash/Permission, Mutation-Testing | **Status:** AKTIV | **Seit:** S070
     **Problem:** Tatsächlicher Problemtext, nicht der Titel
     **Maßnahme:** irgendwas
 
     ### CM-S047-1 – Wildcard-Kontext
-    **Schwere:** HOCH | **Kategorie:** PROZESS | **Kontext:** – | **Status:** AKTIV | **Seit:** S047
+    **Impact:** HOCH | **Kategorie:** PROZESS | **Kontext:** – | **Status:** AKTIV | **Seit:** S047
     **Problem:** P
     **Maßnahme:** M
 
     ## Bewährte Maßnahmen
 
     ### CM-S078-2 – Offene Maßnahme
-    **Schwere:** MITTEL | **Kategorie:** PROZESS | **Kontext:** Skill-Nutzung | **Status:** OFFEN | **Seit:** S078
+    **Impact:** MITTEL | **Kategorie:** PROZESS | **Kontext:** Skill-Nutzung | **Status:** OFFEN | **Seit:** S078
     **Problem:** P2
     **Maßnahme:** M2
     """)
@@ -106,7 +106,7 @@ def test_load_cm_parses_ids_and_fields(tmp_path):
     cms = rr.load_cm(_write_cm(tmp_path))
     assert [c.cm_id for c in cms] == ["CM-S070-3", "CM-S047-1", "CM-S078-2"]
     first = cms[0]
-    assert first.schwere == "HOCH"
+    assert first.impact == "HOCH"
     assert first.kategorie == "TOOLING"
     assert first.status == "AKTIV"
     assert first.seit_session == 70

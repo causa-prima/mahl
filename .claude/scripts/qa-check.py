@@ -8,9 +8,15 @@ Gibt alle Findings strukturiert aus und berechnet einen SHA-256-Hash als
 Übergabe-Attestierung.
 
 Der Hash ist manipulationsresistent: er ist über den Report-Inhalt des gerade
-ausgeführten Stryker-Laufs und den gestagten Code-Zustand berechnet. Der Subagent
-muss qa-check.py ausführen – er kann weder `touch` noch manuelle Score-Angaben nutzen,
-um ihn zu fälschen.
+ausgeführten Stryker-Laufs und den Working-Tree-Code-Zustand (Datei-INHALT, nicht der
+git-Index) berechnet. Der Subagent muss qa-check.py ausführen – er kann weder `touch`
+noch manuelle Score-Angaben nutzen, um ihn zu fälschen.
+
+Bewusst index-unabhängig: Der Subagent muss NICHT `git add` ausführen, um einen
+Hash zu erzeugen – der Hash hängt am Datei-Inhalt, nicht am Index. Damit ist der echte
+Gate „Orchestrator reviewt den ungestageten Test-Diff, staged *dann*, committet". Späteres
+Stagen einer freigegebenen Änderung ändert den Content-Hash nicht → kein erneuter
+(teurer) Stryker-Lauf nur zur Neu-Attestierung (OBS-S090-2/-4).
 
 Verwendung (Subagent – führt Stryker aus):
   python3 .claude/scripts/qa-check.py --layer backend
@@ -30,7 +36,9 @@ import sys
 import time
 from pathlib import Path
 
-_SCRIPTS = Path(__file__).parent
+_SCRIPTS   = Path(__file__).parent
+_REPO_ROOT = _SCRIPTS.parent.parent
+_CLIENT_DIR = _REPO_ROOT / "Client"
 
 # Dateipfad-Präfixe die zu welcher Schicht gehören
 _LAYER_PATHS = {
@@ -45,10 +53,71 @@ def _git(*args: str) -> str:
     return subprocess.run(["git"] + list(args), capture_output=True, text=True).stdout
 
 
-def _staged_tree_fingerprint() -> str:
-    """SHA-256 von 'git ls-files --stage': Fingerabdruck des gestagten Zustands."""
-    out = _git("ls-files", "--stage")
-    return hashlib.sha256(out.encode()).hexdigest()[:16]
+def _porcelain_path(line: str) -> str:
+    """Pfad aus einer `git status --porcelain`-Zeile (XY<space>PATH); Rename/Copy → Ziel."""
+    if len(line) < 4:
+        return ""
+    path = line[3:]
+    if " -> " in path:               # Rename/Copy: „alt -> neu" → das neue Ziel zählt
+        path = path.split(" -> ", 1)[1]
+    return path.strip('"')
+
+
+def _changed_paths(prefix: str) -> list[str]:
+    """Sortierte Liste geänderter (modifiziert + neu/untracked) Working-Tree-Pfade unter prefix.
+
+    Index-unabhängig: `git status --porcelain -uall` listet eine geänderte Datei unabhängig
+    davon, ob sie gestaged (`M `/`A `) oder ungestaged (` M`/`??`) ist – Stagen ändert die
+    Pfad-Menge nicht.
+    """
+    out = _git("status", "--porcelain", "-uall", "--", prefix)
+    paths = (_porcelain_path(line) for line in out.splitlines())
+    return sorted(p for p in paths if p and p.startswith(prefix))
+
+
+def _file_in_head(path: str) -> bool:
+    """True wenn der Pfad in HEAD existiert (index-unabhängig – entscheidet neu vs. modifiziert)."""
+    r = subprocess.run(["git", "cat-file", "-e", f"HEAD:{path}"], capture_output=True, text=True)
+    return r.returncode == 0
+
+
+def _worktree_content_fingerprint(layer: str) -> str:
+    """SHA-256 über den INHALT aller geänderten Working-Tree-Dateien der Schicht.
+
+    Bewusst über den Datei-Inhalt statt den git-Index: Stagen (`git add`) ändert den
+    Fingerabdruck NICHT – nur eine echte Inhaltsänderung tut es. Das entkoppelt den
+    Übergabe-Hash vom Index und macht Subagent-Stagen für die Attestierung wirkungslos.
+    """
+    h = hashlib.sha256()
+    for path in _changed_paths(_LAYER_PATHS[layer]):
+        h.update(path.encode() + b"\0")
+        try:
+            h.update(Path(path).read_bytes())   # CWD-relativ – wie alle git-Aufrufe (CWD == Repo-Root)
+        except OSError:
+            h.update(b"<deleted>")   # gelöschte Datei: Pfad zählt, Inhalt entfällt
+        h.update(b"\0")
+    return h.hexdigest()[:16]
+
+
+def _worktree_diff(prefix: str, unified: int) -> str:
+    """Unified-Diff des Working-Tree gegen HEAD unter prefix, inkl. neuer (untracked) Dateien.
+
+    Ersetzt das frühere `git diff --staged`: erfasst Änderungen index-unabhängig, damit der
+    Subagent NICHT stagen muss. Für in HEAD existierende Dateien liefert `git diff HEAD`
+    (Working-Tree gegen HEAD) ein staging-invariantes Ergebnis; neue Dateien werden über
+    `git diff --no-index /dev/null <datei>` als vollständig hinzugefügt dargestellt – beide
+    Formen erzeugen identische `+++ b/…`- und `+`-Zeilen, ob die Datei gestaged ist oder nicht.
+    """
+    u = f"-U{unified}"
+    parts: list[str] = []
+    for path in _changed_paths(prefix):
+        if _file_in_head(path):
+            parts.append(_git("diff", "HEAD", u, "--", path))
+        else:
+            parts.append(subprocess.run(
+                ["git", "diff", "--no-index", u, "/dev/null", path],
+                capture_output=True, text=True).stdout)
+    return "\n".join(p for p in parts if p)
 
 
 # ── Stryker-Lauf ─────────────────────────────────────────────────────────────
@@ -114,15 +183,14 @@ def _is_test_file(path: str) -> bool:
     return bool(re.search(r'(\.spec\.ts|Tests\.cs|Test\.cs)$', path))
 
 
-def check_staged_test_files(layer: str) -> list[str]:
+def check_changed_test_files(layer: str) -> list[str]:
     prefix = _LAYER_PATHS[layer]
-    out = _git("diff", "--name-only", "--cached")
-    return [f for f in out.splitlines() if f.startswith(prefix) and _is_test_file(f)]
+    return [f for f in _changed_paths(prefix) if _is_test_file(f)]
 
 
 def check_new_suppressions(layer: str) -> list[tuple[str, str]]:
     prefix = _LAYER_PATHS[layer]
-    out = _git("diff", "--staged", "-U0")
+    out = _worktree_diff(prefix, 0)
     findings: list[tuple[str, str]] = []
     current_file = ""
     for line in out.splitlines():
@@ -137,7 +205,7 @@ def check_new_suppressions(layer: str) -> list[tuple[str, str]]:
 def check_unit_test_patterns(layer: str) -> list[tuple[str, str]]:
     """Verdächtige Unit-Test-Muster die nicht dem erlaubten Test-Typ entsprechen."""
     prefix = _LAYER_PATHS[layer]
-    out = _git("diff", "--staged", "-U8")
+    out = _worktree_diff(prefix, 8)
     findings: list[tuple[str, str]] = []
     current_file = ""
     context: list[str] = []
@@ -174,7 +242,7 @@ def check_unit_test_patterns(layer: str) -> list[tuple[str, str]]:
 def check_test_structure(layer: str) -> list[tuple[str, str]]:
     """Prüft ob neue Test-Methoden // Given / // When / // Then Kommentare enthalten."""
     prefix = _LAYER_PATHS[layer]
-    out = _git("diff", "--staged", "-U40")
+    out = _worktree_diff(prefix, 40)
     findings: list[tuple[str, str]] = []
     current_file = ""
     # Collect added lines per test block: (file, trigger_line, [added_lines_in_block])
@@ -216,6 +284,42 @@ def check_test_structure(layer: str) -> list[tuple[str, str]]:
     return findings
 
 
+# ── Test-Freigabe-Audit ──────────────────────────────────────────────────────
+
+def audit_approved_tests(layer: str, approved: dict[str, str]) -> tuple[int, list[str]]:
+    """Vergleicht die aktuellen Test-Datei-Blobs gegen die vom Orchestrator freigegebenen SHAs.
+
+    `approved`: Test-Pfad → git-Blob-SHA aus `git hash-object -w` beim RED-Review (nachdem der
+    Orchestrator die Tests inhaltlich freigegeben hat). Der Blob ist content-addressed und
+    immutable → gegen Subagent-`git add` immun: der Vergleich greift auch dann, wenn der
+    Subagent die Tests nach der Freigabe selbst gestaged hat.
+
+    Kein hartes Gate: Setup-Änderungen an Tests sind nach Freigabe erlaubt, und das Script kann
+    Setup ≠ Assertion nicht entscheiden. Es zwingt aber jede Abweichung als Diff ins Sichtfeld,
+    damit der Orchestrator urteilt. Rückgabe: (Anzahl Auffälligkeiten, Ausgabe-Zeilen).
+    """
+    changed = set(check_changed_test_files(layer))
+    findings = 0
+    lines: list[str] = []
+    for f in sorted(changed):
+        current = _git("hash-object", f).strip()
+        expected = approved.get(f)
+        if expected is None:
+            findings += 1
+            lines.append(f"⚠️  {f}: geändert, aber KEINE Freigabe-SHA übergeben – nie im Test-Review freigegeben?")
+        elif current == expected:
+            lines.append(f"✅ {f}: unverändert seit Freigabe.")
+        else:
+            findings += 1
+            lines.append(f"⚠️  {f}: seit Freigabe GEÄNDERT – nur Setup (erlaubt) oder auch Assertions (verboten)? "
+                         f"Diff freigegeben→aktuell:")
+            lines.append(_git("diff", expected, "--", f).rstrip())
+    for f in sorted(set(approved) - changed):
+        lines.append(f"ℹ️  {f}: freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf "
+                     f"(committet/zurückgesetzt?).")
+    return findings, lines
+
+
 # ── ADR-Referenzen ───────────────────────────────────────────────────────────
 
 def check_adr_refs() -> tuple[str, int]:
@@ -230,10 +334,21 @@ def check_adr_refs() -> tuple[str, int]:
 
 # ── Linting ──────────────────────────────────────────────────────────────────
 
-def check_eslint() -> tuple[str, int]:
-    staged = _git("diff", "--name-only", "--cached")
-    if not any(f.endswith((".ts", ".tsx")) for f in staged.splitlines()):
-        return "übersprungen (keine .ts/.tsx Dateien staged)", -1
+def check_tsc() -> int:
+    """`tsc -b` über das ganze Client-Projekt (npm-Script `typecheck`). Gibt Exit-Code zurück.
+
+    Fast-Fail-Gate als ERSTER Frontend-Schritt: liefert bei einem Typfehler eine klare
+    tsc-Diagnose, statt dass der Fehler erst im Stryker-Lauf als kryptisches „kein frischer
+    Report" auftaucht. Die *harte* Garantie sitzt weiter bei Stryker (`checkers: typescript`);
+    dieser Schritt bringt nur schnelleres, klareres Feedback davor.
+    """
+    return subprocess.run(["npm", "run", "typecheck"], cwd=str(_CLIENT_DIR)).returncode
+
+
+def check_eslint(layer: str) -> tuple[str, int]:
+    changed = _changed_paths(_LAYER_PATHS[layer])
+    if not any(f.endswith((".ts", ".tsx")) for f in changed):
+        return "übersprungen (keine .ts/.tsx Dateien geändert)", -1
     script = _SCRIPTS / "eslint-run.py"
     r = subprocess.run([sys.executable, str(script)], capture_output=True, text=True)
     if r.returncode == 0:
@@ -246,7 +361,7 @@ def check_eslint() -> tuple[str, int]:
 
 def compute_hash(*, layer: str, tree: str, report_hash: str, test_files, suppressions,
                  unit_tests, lint_code, test_structure, adr_code) -> str:
-    """Kanonischer Übergabe-Hash. Bindet Report-Inhalt, gestagten Code-Zustand und alle Checks.
+    """Kanonischer Übergabe-Hash. Bindet Report-Inhalt, Working-Tree-Code-Inhalt und alle Checks.
 
     Es gibt nur DIESE eine Hash-Form. --skip-stryker gibt bewusst keinen Hash aus, daher ist
     jeder existierende Übergabe-Hash per Konstruktion ein Frisch-Lauf-Hash.
@@ -282,10 +397,31 @@ def main() -> None:
     parser.add_argument("--verify", metavar="HASH",
                         help="Übergabe-Hash gegen den aktuellen Zustand prüfen (kein Stryker-Lauf). "
                              "Schlägt fehl, wenn der Hash kein frischer Lauf war oder Code/Report sich änderte.")
+    parser.add_argument("--approved-tests", nargs="*", default=[], metavar="PFAD=SHA",
+                        help="Vom Orchestrator im Test-Review freigegebene Test-Dateien als "
+                             "`pfad=blob-sha` (aus `git hash-object -w <datei>`). qa-check zeigt jede "
+                             "Abweichung als Diff freigegeben→aktuell, damit der Orchestrator prüfen "
+                             "kann, dass nach der Freigabe nur Setup (erlaubt), keine Assertions geändert "
+                             "wurden. Typisch zusammen mit --verify.")
     args = parser.parse_args()
+
+    approved_tests: dict[str, str] = {}
+    for token in args.approved_tests:
+        path, _, sha = token.partition("=")
+        if not sha:
+            parser.error(f"--approved-tests erwartet `pfad=sha`, bekam: {token!r}")
+        approved_tests[path] = sha
 
     # verify impliziert keinen frischen Stryker-Lauf (reine Verifikation des bestehenden Reports)
     run_stryker_now = not (args.skip_stryker or args.verify)
+
+    # ── tsc-Gate (Frontend, Fast-Fail vor Stryker) ────────────────────────────
+    if run_stryker_now and args.layer == "frontend":
+        print("[qa-check] tsc -b (Typecheck) …")
+        if check_tsc() != 0:
+            print("[qa-check] ❌ tsc -b fehlgeschlagen – Typfehler zuerst beheben. "
+                  "Kein Übergabe-Hash (Fast-Fail vor Stryker).", file=sys.stderr)
+            sys.exit(1)
 
     # ── Stryker ──────────────────────────────────────────────────────────────
     stryker_gate_failed = False
@@ -337,12 +473,12 @@ def main() -> None:
     score, report_hash = _parse_report(report_path)
 
     # ── Checks ───────────────────────────────────────────────────────────────
-    tree           = _staged_tree_fingerprint()
-    test_files     = check_staged_test_files(args.layer)
+    tree           = _worktree_content_fingerprint(args.layer)
+    test_files     = check_changed_test_files(args.layer)
     suppressions   = check_new_suppressions(args.layer)
     unit_tests     = check_unit_test_patterns(args.layer)
     test_structure = check_test_structure(args.layer)
-    lint_status, lint_code = check_eslint() if args.layer == "frontend" else ("n/a (backend)", -1)
+    lint_status, lint_code = check_eslint(args.layer) if args.layer == "frontend" else ("n/a (backend)", -1)
     adr_status, adr_code   = check_adr_refs()
 
     # ── Ausgabe ──────────────────────────────────────────────────────────────
@@ -350,7 +486,7 @@ def main() -> None:
     print(f"Score:  {score}")
     print(f"Report: {report_path}")
 
-    print("\n=== CHECK 1: STAGED TEST-DATEIEN ===")
+    print("\n=== CHECK 1: GEÄNDERTE TEST-DATEIEN ===")
     print("\n".join(test_files) if test_files else "keine")
 
     print("\n=== CHECK 2: NEUE SUPPRESSIONEN ===")
@@ -382,8 +518,8 @@ def main() -> None:
     print(adr_status)
 
     # ── Hash ─────────────────────────────────────────────────────────────────
-    # Bindet Findings an: Report-Inhalt (C3_HASH), gestagten Code-Zustand (TREE)
-    # und alle git-basierten Checks (fälschungssicher via SHA-256).
+    # Bindet Findings an: Report-Inhalt (C3_HASH), Working-Tree-Code-Inhalt (TREE,
+    # index-unabhängig) und alle git-basierten Checks (fälschungssicher via SHA-256).
     hash_kwargs = dict(
         layer=args.layer, tree=tree, report_hash=report_hash,
         test_files=test_files, suppressions=suppressions, unit_tests=unit_tests,
@@ -391,6 +527,16 @@ def main() -> None:
     )
 
     if args.verify:
+        # Vergessens-Schutz: Sobald ein Verify-Lauf überhaupt Test-Dateien berührt (im TDD-Flow
+        # praktisch immer), müssen die im Test-Review freigegebenen Blobs mitkommen – sonst bleibt
+        # unbeobachtbar, ob nach der Freigabe Assertions geändert wurden (OBS-S090-4).
+        if test_files and not approved_tests:
+            print("❌ --verify ohne --approved-tests, obwohl dieser Lauf Test-Dateien ändert. "
+                  "Übergib die im Test-Review freigegebenen Blobs (`git hash-object -w <datei>`) via "
+                  "--approved-tests <pfad=sha …>, damit prüfbar bleibt, dass nach der Freigabe nur "
+                  "Setup (erlaubt) und keine Assertions geändert wurden.", file=sys.stderr)
+            sys.exit(1)
+
         ok = verify_hash(args.verify, **hash_kwargs)
         print(f"\n=== VERIFY ===")
         if not ok:
@@ -399,8 +545,18 @@ def main() -> None:
                   "ungültiger Hash).", file=sys.stderr)
             sys.exit(1)
         print("✅ Hash verifiziert – frischer Lauf, Code/Report-Zustand stimmt überein.")
+
+        # Test-Freigabe-Audit: zeigt jede Test-Änderung seit der Freigabe als Diff (WAS geändert
+        # wurde), damit der Orchestrator Setup (erlaubt) von Assertion-Änderungen (verboten) trennt.
+        audit_findings, audit_lines = audit_approved_tests(args.layer, approved_tests)
+        print("\n=== TEST-FREIGABE-AUDIT ===")
+        print("\n".join(audit_lines) if audit_lines else "keine geänderten Test-Dateien")
+        if audit_findings:
+            print(f"\n⚠️  {audit_findings} Test-Datei(en) seit Freigabe geändert bzw. ohne Freigabe – "
+                  f"obige Diffs prüfen (nur Setup erlaubt).", file=sys.stderr)
         # KEIN early exit: der Score-Gate unten gilt auch hier – ein verifizierter Hash mit
-        # Score < 100 % ist trotzdem keine gültige Übergabe.
+        # Score < 100 % ist trotzdem keine gültige Übergabe. Der Audit ist bewusst kein Exit-Gate
+        # (Setup-Änderungen sind erlaubt; nur der Orchestrator kann Setup ≠ Assertion entscheiden).
     else:
         print(f"\n=== VERIFIKATIONS-HASH ===")
         if args.skip_stryker:

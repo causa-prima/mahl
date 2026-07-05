@@ -1,7 +1,7 @@
 # Kaizen-Prozess
 
 <!--
-wann-lesen: Beim Schreiben eines lessons_learned-Eintrags (Schwere/Kategorie/Kontext bestimmen),
+wann-lesen: Beim Schreiben eines lessons_learned-Eintrags (Impact/Kategorie/Kontext bestimmen),
             beim Starten einer Retro, beim Bewerten einer Maßnahme.
 -->
 
@@ -35,7 +35,7 @@ Das Kaizen-System hat zwei Tracks, **keine Partition** – dieselbe Sache kann a
 - `observations.md` = **vorausschauende System-Design-Beobachtungen** (Optimierungen, Reibung, „so wäre es besser"). Speisen Jenga **nicht**.
 
 **Billige Erfassungs-Tests (gelten bei `closing-session`, auch für user-gemeldete Punkte):**
-- LL: „Ist diese Session ein **konkreter schlechter Ausgang** aufgetreten – Rework, Fehler, verschwendeter Aufwand, ein Defekt?" → ja → `lessons_learned.md` (mit Schwere/Impact). Der Noise-Filter (die 3 Fragen oben) gilt für ALLE Einträge.
+- LL: „Ist diese Session ein **konkreter schlechter Ausgang** aufgetreten – Rework, Fehler, verschwendeter Aufwand, ein Defekt?" → ja → `lessons_learned.md` (mit Impact). Der Noise-Filter (die 3 Fragen oben) gilt für ALLE Einträge.
 - Observations: „Eine **vorausschauende** Notiz, wie das System besser wäre?" → `observations.md`.
 - **Beides wahr → beides**, per `Bezug:` verlinkt.
 
@@ -102,9 +102,9 @@ Die Retro behandelt OBS nicht (das macht der Drain), berührt sie aber an einer 
 
 ---
 
-## Schwere-Kategorien
+## Impact-Kategorien
 
-| Schwere | Definition | Sofortreaktion | Maßnahmen-Anspruch |
+| Impact | Definition | Sofortreaktion | Maßnahmen-Anspruch |
 |---------|-----------|----------------|-------------------|
 | **KRITISCH** | Verursacht signifikanten Rework oder Qualitätsverlust; darf unter keinen Umständen wiederholt werden | **Andon-Cord:** Arbeit sofort stoppen, Ursache analysieren, Gegenmaßnahme definieren – erst dann weitermachen | Poka-yoke **Pflicht** – schwächere Maßnahmen reichen nicht |
 | **HOCH** | Verzögert die Arbeit spürbar oder gefährdet Qualität | In derselben Session: Eintrag in `lessons_learned.md` + `countermeasures.md` | Poka-yoke anstreben wenn verhältnismäßig; sonst expliziter Schritt in Guideline oder Skill |
@@ -169,7 +169,7 @@ Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
 - *Stehende, verifizierbare* Änderung (wiederkehrende Klasse, dauerhafte Leitplanke) → **CM** anlegen; das OBS schließt mit `Bezug: → CM-…` und Status `UMGESETZT`.
 - *Einmal-Änderung ohne Tracking* → inline als `Maßnahme:` im OBS festgehalten, Status `UMGESETZT` (keine CM – sie wäre sofort obsolet).
 
-**principles.md ⇄ countermeasures.md:** Ein Prinzip in `principles.md` ist die **Fließtext-Leitplanke** (wird jede Session geladen, keine Tags). Jedes Prinzip hat **zusätzlich** einen Tracking-Eintrag in `countermeasures.md` (Tupel Schwere/Kategorie/Kontext + Status) – nur so bleibt es **evaluierbar** (BEWÄHRT/Rückfall) und wird von `retro_report.py` als „abgedeckt" erkannt. Die CM-Maßnahme verweist aufs Prinzip („Regel in principles.md dokumentiert"). BEWÄHRT-CMs bleiben in der Datei (Abschnitt „Bewährte Maßnahmen", Regressionserkennung). Konsequenz: Ein neu angelegtes Prinzip **immer** mit einem CM-Eintrag spiegeln – sonst ist es unsichtbar fürs Script und nicht bewertbar.
+**principles.md ⇄ countermeasures.md:** Ein Prinzip in `principles.md` ist die **Fließtext-Leitplanke** (wird jede Session geladen, keine Tags). Jedes Prinzip hat **zusätzlich** einen Tracking-Eintrag in `countermeasures.md` (Tupel Impact/Kategorie/Kontext + Status) – nur so bleibt es **evaluierbar** (BEWÄHRT/Rückfall) und wird von `retro_report.py` als „abgedeckt" erkannt. Die CM-Maßnahme verweist aufs Prinzip („Regel in principles.md dokumentiert"). BEWÄHRT-CMs bleiben in der Datei (Abschnitt „Bewährte Maßnahmen", Regressionserkennung). Konsequenz: Ein neu angelegtes Prinzip **immer** mit einem CM-Eintrag spiegeln – sonst ist es unsichtbar fürs Script und nicht bewertbar.
 
 **CM-Eingangs-Gate (vor dem Anlegen einer Countermeasure):** Dieselbe Recurrence-Frage wie beim lessons-Eintrag, aber auf Maßnahmen-Ebene und vorgelagert (damit nicht Aufwand in eine Maßnahme fließt, die sofort obsolet wäre):
 
@@ -208,7 +208,7 @@ Nach einer Retro wird `lessons_learned.md` archiviert → Jenga-Score startet ne
 ### jenga_score.py
 Läuft nach jeder Session (im `closing-session`-Skill).
 Input: `docs/kaizen/lessons_learned.md`
-Output: Jenga-Score + Zähltabelle (Schwere × Kategorie × Kontext)
+Output: Jenga-Score + Zähltabelle (Impact × Kategorie × Kontext)
 
 ### retro_report.py
 Läuft zu Beginn jeder Retro (im `kaizen`-Skill).

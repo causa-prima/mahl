@@ -237,3 +237,86 @@ Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – äl
 - Entscheidung/Maßnahme: `check-bash-permission.py` umstrukturiert: bei `# --allow-once` wird der nackte Befehl klassifiziert – (a) wäre er ohnehin erlaubt → direkt allow + Agent-Hinweis „Marker unnötig" (macht (c), den Nudge gegen inflationären Gebrauch, überflüssig); (b) wäre er deny → ask mit dem Deny-Grund/der Gefahr als `permissionDecisionReason` am Freigabe-Prompt. (b) empirisch verifiziert (S096): der Destruktiv-Grund erschien im Dialog. TDD in test-bash-permission.py.
 - Bezug: OBS-S085-1
 
+## OBS-S097-1 – `implementing-scenario` setzte ein Szenario pro Lauf um: zu langsam und tokenintensiv
+- Quelle: User
+- Status: UMGESETZT (S097)
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: gherkin-workshop / implementing-scenario
+- Beobachtung: `implementing-scenario` implementierte bisher genau ein Gherkin-Szenario pro Durchlauf. Der fixe Overhead jedes Durchlaufs (Architektur-Check, TEST-REVIEW-Handshake, Review-Loop, Commit) amortisiert sich über einen winzigen Slice kaum – bei US-904 wären das 31 Einzelläufe für 31 Szenarien gewesen. Entwicklung entsprechend langsam und tokenintensiv.
+- Entscheidung/Maßnahme: Mehrere Szenarien pro Lauf bündeln, aber **Homogenität vor Durchsatz** – ein homogenes Bündel (gleiches Setup, gleiche Assertion-Form, nur der Input variiert) kollabiert ohnehin zu einem parametrisierten Test (triviales 1:1-Mapping Assertion↔Szenario); ein heterogenes Bündel gleicher Größe zwingt N unabhängige Mappings gleichzeitig ins Working Memory und begünstigt Gold-Plating. Verworfene Alternativen und Gründe:
+  - **Nach Dialog/Endpoint schneiden:** ein Cluster verschluckt fast die ganze Story (bei US-904 ~24 von 31 Szenarien in einem „Anlegen"-Cluster) → maximal heterogen trotz weniger Läufe.
+  - **Nach Gherkin-Tag schneiden (happy/error/edge):** asymmetrisch – der error-Lauf wäre ideal homogen, der happy-path-Lauf bündelt aber Dialog-Verhalten, Anlegen, Sortierung, Löschen, Undo etc. = das heterogenste Bündel überhaupt.
+  - **Nach Domänen-Capability/CRUD-Operation schneiden (ohne weitere Achse):** die Anlegen-Capability bleibt mit ~20 Szenarien weiterhin zu groß/heterogen.
+  - **Capability + weicher Größendeckel (bei „zu groß" an geeigneter Stelle splitten):** führt ein Ermessenskriterium ein, das je nach Agent unterschiedlich ausfallen kann; widerspricht zudem der eigenen Prämisse – ein wirklich homogener Cluster kann nicht gleichzeitig „zu groß" sein, „zu groß" ist nur ein Signal, dass eine Homogenitäts-Achse übersprungen wurde, kein Splitkriterium für sich.
+  - **Erster (intuitiver) Vier-Achsen-Schnitt:** ergab 7 Läufe, aber Gegenprobe deckte Inkonsistenzen auf (state-driven Duplikat-Tests fälschlich mit stateless Validierung verschmolzen; ein Mehrfeld-Fehlerfall stillschweigend mitgemergt) – die 7er-Zahl war Intuition + nachträgliche Rationalisierung, nicht konsequent aus der eigenen Regel abgeleitet.
+  - **Umgesetzt:** vier Achsen in fester Reihenfolge – Capability (aus dem `When`) → bei Mutationen Ergebnisklasse (Validierung vs. Success/Verhalten) → Validierung weiter nach Form (stateless vs. state-driven mit Seed) dann Eingabefeld → Success/Verhalten nach Schicht (frontend-only vs. full-stack). Konsequent angewandt ergab das bei US-904 11 statt 7 Läufe, weil manche Formen (ein Mehrfeld-Fehlerfall, ein Lösch-Pending-Fall, ein Lösch-Konflikt-Fall) nur je ein Exemplar haben. Solche Singleton-Cluster bleiben bewusst eigene Läufe statt sie in einen unähnlichen Cluster zu zwingen (das schleppte genau die vermiedene Heterogenität wieder ein) – Merge in einen bestehenden Cluster ist nur zulässig, wenn Setup *und* Assertion-Form identisch sind (dann ohnehin nur eine weitere Test-Case-Zeile). Algorithmus, Hinweise und Tag-Format stehen vollständig in `.claude/skills/gherkin-workshop/references/scenario-clustering.md`. Zweiter Teil (S097): `implementing-scenario` auf Lauf- statt Einzelszenario-Konsum umgebaut (Aufruf `@US-NNN run-N`, Architektur-Check/TEST-REVIEW/Commit über alle Szenarien des Laufs, Frontend-only-Läufe ohne Backend-Subagent); `_feature.py`/`check-atdd-gate.py` um Run-Tag-Parsing erweitert, `next_scenario.py` zu `next_run.py` umgebaut (löst den nächsten offenen **Lauf** statt Einzel-Szenarios auf, ADR-S041-7-Addendum).
+- Bezug: `.claude/skills/gherkin-workshop/references/scenario-clustering.md`; `.claude/skills/implementing-scenario/SKILL.md`; ADR-S041-7
+
+## OBS-S085-10 – „Schwere" → „Impact" umbenennen (deferred Meta-Änderung)
+- Quelle: Agent
+- Status: UMGESETZT (S099)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: „Impact" ist treffender als „Schwere" und schlägt die Brücke zu observations.md.
+- Entscheidung/Maßnahme: **Umgesetzt (S099)** – vollständiger Rename Schwere→Impact (Feld-Key, Labels, Doku, interne Bezeichner). Entrisikt durch den Befund: Feld-Key `**Schwere:**` nur in `countermeasures.md` (Live), **nicht** in LL-Archiven (die nutzen `[HOCH]`-Tags) → keine Archiv-Migration. Ausgenommen: `review-code`-„Schweregrad" (anderes Konzept). Validiert (Tests + Scripts grün). Details: git-Diff S099.
+
+## OBS-S092-1 – Doppelte LL/OBS-Erfassung: implementing-scenario Schritt 6.1 vs. closing-session
+- Quelle: User
+- Status: UMGESETZT (S099)
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: implementing-scenario / closing-session
+- Beobachtung: `implementing-scenario` Schritt 6.1 („Offene Punkte triagieren") erfasst LLs/OBSs/Tech-Debt, und `closing-session` (Schritt 2/3/5) erfasst dieselbe Klasse von Punkten erneut. Bei direktem Übergang Szenario → Abschluss ist die Vorab-Triage in 6.1 redundant – sie ist nur nötig, wenn die Session **nicht** abgeschlossen wird (Szenario fertig, Session läuft weiter). In dieser Session führte das zu doppeltem Abfragen.
+- Entscheidung/Maßnahme: **Nur LL/OBS-Dedup** (Commit-Aspekt verworfen: `closing-session` committet nicht selbst – der einzige Commit sitzt in `implementing-scenario` 6.4 und staged die Abschluss-Dateien mit, also kein Doppel-Commit). Präzisierung: 6.1 leistet *mehr* als closing-session (systematisches Surfacen von Subagenten-Vorschlägen + zurückgestellten Findings) – nur das *Schreiben* der LL/OBS überschneidet sich. Umgesetzt: 6.1 surfacet + triagiert weiterhin und erledigt „direkt umsetzen"-Punkte vor dem Commit, delegiert aber das *Schreiben* der als „vermerken" entschiedenen LL/OBS an den direkt folgenden `closing-session`-Lauf (kein Doppel-Prompt); reziproke Notiz in closing-session Schritt 2 (dort nur ergänzen, was 6.1 nicht abdeckte). Kein volatiler ID-Verweis in den stabilen Skills (principles.md „Referenzen volatil→stabil").
+
+---
+
+## OBS-S090-1 – Vitest ist typ-blind; Typfehler erst im Stryker-Dry-Run sichtbar
+- Quelle: Agent
+- Status: UMGESETZT (S099)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: frontend-tdd
+- Beobachtung: `vitest` (esbuild, transpile-only) prüft **keine** Typen. Echte TS-Fehler (z.B. `ResultAsync` ≠ `Promise`; `errAsync`-`kind`-Widening) blieben bis zum Stryker-typescript-checker-Dry-Run unsichtbar (~1 Zyklus Verzögerung). Kein `tsc --noEmit`-Wrapper auf der Bash-Allow-Liste → der Layer-Implementer konnte Typen nicht isoliert **vor** dem teuren Stryker-Lauf prüfen.
+- Entscheidung/Maßnahme: **Umgesetzt (S099)** – `typecheck`-npm-Script (`tsc -b`) + Exit-Gate-Schritt im `frontend-layer-implementer` (nach GREEN, vor Stryker) + Diagnose-Hinweis bei verwirrenden Testfehlern. Kein Wrapper/Allow-List-Change nötig (`npm run` bereits erlaubt).
+- Bezug: OBS-S085-4 (LSP-Pilot – wenn bewährt, prüfen ob der Flow-Schritt noch nötig ist)
+
+---
+
+## OBS-S090-3 – Alt-Hooks überprüfen/entschlacken
+- Quelle: User
+- Status: UMGESETZT (S099)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Hook/Script
+- Beobachtung: Die Hook-Scripte (`check-memory.sh`, `pre-compact.sh`, `session-start.sh`, `session-end.sh`, `task-completed.sh`) stammen aus einer frühen Projektphase mit noch geringem Claude-Code-Verständnis. Mehrere tragen evtl. veraltete Annahmen (z.B. der jetzt korrigierte `/mnt/c`-Hardcode, S090). Ungeprüft, ob einzelne Hooks heute noch ihren Zweck erfüllen, redundant sind oder angepasst/entfernt gehören.
+- Entscheidung/Maßnahme: **Umgesetzt (S099)** – gründlicher Audit via Fable-Subagent. Kernbefund: 4 der 5 Hooks nahmen fälschlich an, `echo`+Exit-0-stdout erreiche Claude (gilt nur bei SessionStart) → waren von Anfang an wirkungslos, dazu tote Command-Refs (`/close-session`, `/feature`) + Logikbug in session-end. Entfernt: `check-memory.sh` (Stop), `pre-compact.sh` (PreCompact), `session-end.sh` (SessionEnd), `task-completed.sh` (TaskCompleted) + ihre settings.json-Registrierungen; `session-start.sh` behalten (Mechanik korrekt). Neubau-Ideen (DoD-Gate via TaskCompleted-Exit-2 etc.) bewusst nicht verfolgt. **Teil 2 (vorausschauend, Fable-Audit):** Hook-Setup nutzt seine Möglichkeiten nach der Bereinigung weitgehend aus; **eine** hochwertige ungenutzte Chance → OBS-S095-3 (dort mit Umsetzungs-Empfehlung angereichert); übrige Schmerzpunkte (OBS-S090-4/-5) nicht hook-förmig. Details: git-Diff S099.
+- Bezug: OBS-S088-1 (Dispatcher – für die verbliebenen Shell-Hooks entbehrlich, aber als reload-freier Enabler für OBS-S095-3 relevant); OBS-S095-3 (die identifizierte Hook-Chance)
+
+## OBS-S090-5 – TD-Grooming-Lücke: Infra-Schuld fällt durchs Raster
+- Quelle: User
+- Status: UMGESETZT (S099)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Sonstiges
+- Beobachtung: Technische Schuld wird heute nur **opportunistisch** gegroomt (Architektur-Check in `implementing-scenario`: passende TD zum aktuellen Szenario mitnehmen). Schuld ohne Szenario-Bezug — typisch Infrastruktur, z.B. das erst in S098 (opportunistisch beim run-1-E2E) behobene **TD-S083-5** (dirty-Postgres, kein Reset zwischen E2E-Läufen) — mappt auf kein Szenario und wird so **fast nie** angefasst. Zusätzlich fehlt am Session-Ende ein Check, ob TD unbewusst miterledigt wurde (dann Eintrag schließen).
+- Entscheidung/Maßnahme: **Umgesetzt (S099)** – TD-Grooming in `implementing-scenario` verankert (beide Checks dort, *nicht* in der Prozess-Retro): Schritt 0 Punkt 5 „TD-Sichtung & -Entscheidung" (vor Umsetzung je berührter TD entscheiden + begründen: mit-erledigen vs. aufschieben) + Schritt 6.1 „TD-Abgleich" (bewusst/unbewusst behobene TD schließen). Systematisiert den area-basierten opportunistischen Fang. **Rest-Lücke** (Waisen-Infra-TD, den kein Lauf je berührt) bewusst nicht hier gelöst → OBS-S099-1.
+- Bezug: OBS-S087-1 (TD relevanz-filterbar); OBS-S099-1 (Rest-Lücke Waisen-TD)
+
+---
+
+## OBS-S090-2 – qa-check-Übergabe-Hash erzwingt Extra-Stryker-Lauf bei Re-Stage
+- Quelle: Agent (Orchestrator-Beobachtung)
+- Status: UMGESETZT (S099)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: implementing-scenario / qa-check
+- Beobachtung: Der `qa-check.py`-Übergabe-Hash rechnet über den **gestageten** Zustand. Stagt der Orchestrator nach der Subagent-Hash-Berechnung noch eine freigegebene Test-Änderung, mismatcht `--verify` → ein **erneuter** (teurer) Stryker-Lauf nur, um einen frischen Hash über den finalen Index zu erzeugen. In dieser Session 2× passiert (Frontend Option-A-Restage; variant-c).
+- Entscheidung/Maßnahme: **Umgesetzt (S099):** qa-check-Hash rechnet jetzt über den **Working-Tree-Content** (`_worktree_content_fingerprint`) statt den git-Index; alle Checks lesen index-unabhängig (`git diff HEAD` + `--no-index` für untracked). Stagen ändert den Hash nicht mehr → kein Doppel-Stryker. Real gegen das Repo validiert (Hash invariant über `git add`). Gemeinsam mit OBS-S090-4 gelöst.
+
+---
+
+## OBS-S090-4 – Subagent-`git add` umgeht den Test-Review-Gate
+- Quelle: User
+- Status: UMGESETZT (S099)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: TDD
+- Beobachtung: Die Layer-Implementer haben das `Bash`-Tool und die Allow-Liste erlaubt `git add <datei>` → ein Subagent kann (und tat es in S090) Dateien selbst stagen. Der `qa-check`-Übergabe-Hash rechnet über den **gestageten** Zustand, weshalb der Subagent sogar stagen *muss*. Damit ist der dokumentierte Gate „Haupt-Thread reviewt Tests, *dann* staged er" faktisch nicht erzwungen: Ein Subagent könnte ungeprüfte Assertions stagen und trotzdem einen grünen 100%-Hash erzeugen. **Mutation-Score + Hash beweisen „getestet+gemutet", nicht „vom Orchestrator inhaltlich freigegeben".** Kein konkreter Schaden in S090 (Review fand statt) — Integritäts-Risiko, kein Fehlausgang.
+- Entscheidung/Maßnahme: **Umgesetzt (S099):** Zwei-Teile-Lösung. (1) Der Übergabe-Hash ist jetzt index-unabhängig (Working-Tree-Content) → Stagen bringt dem Subagenten nichts mehr, der Anreiz entfällt. (2) Der eigentliche Gate ist ein **Blob-Anker**: der Orchestrator friert die freigegebenen Tests nach dem Review als immutable git-Blob ein (`git hash-object -w`), und `qa-check --verify --approved-tests` vergleicht mechanisch die aktuellen Test-Blobs gegen die Freigabe – zeigt jede Änderung seit Freigabe als Diff (Setup erlaubt, Assertions verboten). Content-addressed → immun gegen Subagent-`git add`. `--verify` erzwingt `--approved-tests` bei geänderten Tests (Vergessens-Schutz). Attack-Szenario real validiert: valider Hash + nachträglich geänderte Assertion → Hash verifiziert, Audit deckt Diff auf. Siehe CM-S070-1. Der Fable-Befund „nicht per Hook lösbar" bleibt gültig – die Lösung ist Script-basiert, kein Hook.
+- Bezug: OBS-S090-2 (qa-check-Hash/Staging-Reihenfolge; gemeinsam gelöst); CM-S070-1
+

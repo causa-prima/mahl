@@ -8,7 +8,7 @@ Technische Schuld gehört in docs/tech-debt.md, nicht hierher.
 Eintrag-Format:
   ## Session NNN – YYYY-MM-DD
 
-  - **[SCHWERE] [KATEGORIE] [KONTEXT] LL-S<NNN>-<n> – Kurztitel**
+  - **[IMPACT] [KATEGORIE] [KONTEXT] LL-S<NNN>-<n> – Kurztitel**
     Quelle: User | Subagent | Orchestrator   (Herkunft des Eintrags)
     Was: Ein Satz – was ist passiert?
     Warum: Ein Satz – Ursache.
@@ -23,7 +23,7 @@ Eintrag-Format:
   ID (neue Einträge): LL-S<NNN>-<n>, HINTER den Tags – vor [ würde es die Script-Regexes brechen.
   Vorausschauende Beobachtungen → docs/kaizen/observations.md.
 
-Schwere:    KRITISCH | HOCH | MITTEL | GERING
+Impact:     KRITISCH | HOCH | MITTEL | GERING
 Kategorien: PROZESS | AGENT | QUALITÄT | TOOLING
 Kontext:    TDD | C#-Code | TS-Code | Bash/Permission | Mutation-Testing |
             Hook/Script | Review | Agent-Prompt | Skill-Nutzung | Gherkin |
@@ -38,10 +38,24 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 -->
 
 > **Dieser Header ist die kanonische Format-Quelle** (Eintrag-Format, IDs, Erfassungs-Test).
-> **Definitionen** (Schwere/Kategorie/Kontext) + Reaktionsregeln: `docs/kaizen/process.md`
+> **Definitionen** (Impact/Kategorie/Kontext) + Reaktionsregeln: `docs/kaizen/process.md`
 > **Archiv:** `docs/kaizen/archive/`
 
 ---
+
+## Session 099 – 2026-07-04
+
+- **[MITTEL] [PROZESS] [Doku] LL-S099-2 – Mechanismus nur über seinen Fehler dokumentiert → Ersatz droht valide Zweitfunktion zu verlieren**
+  Quelle: User
+  Was: Beim qa-check-Redesign (Task #35) hätte mein erster Entwurf den Staging-Schritt ersatzlos entfernt. Das S099-Handoff beschrieb das Stagen ausschließlich als Bug („Test-Review-Gate faktisch nicht erzwungen") – nicht als Träger einer zweiten, validen Funktion (nachträgliche Test-Änderungen gegen den Freigabe-Stand sichtbar machen). Erst die User-Nachfrage stellte diese Funktion (jetzt als immutabler Blob-Anker) wieder her.
+  Warum: Das Handoff framte den Mechanismus rein über seinen Mangel; ich übernahm das Framing, ohne zu prüfen, welche Funktion das Stagen sonst noch erfüllte.
+  Regel: Bevor ein Mechanismus, der in einer Beobachtung/im Handoff nur über seinen Fehler beschrieben ist, ersetzt oder entfernt wird: seine ursprünglichen Funktionen explizit auflisten und jede beim Neuentwurf bewusst erhalten oder verwerfen – ein Fehler-Framing beweist nicht, dass der Mangel die einzige Funktion war.
+
+- **[MITTEL] [PROZESS] [Kaizen] LL-S099-1 – Rename-Scope auf unverifizierter Struktur-Annahme verankert**
+  Quelle: User
+  Was: Bei OBS-S085-10 (Schwere→Impact) empfahl ich zunächst „verwerfen bzw. riskanter Cross-Parser-Rename inkl. Archiv-Migration", weil ich annahm, der Feld-Key `**Schwere:**` läge in den geparsten LL-Archiven. Tatsächlich lebt er nur in `countermeasures.md`; LL-Einträge nutzen `[HOCH]`-Bracket-Tags. Erst die User-Nachfrage („was spricht gegen Archiv-Rename?") löste den Grep aus, der es korrigierte – danach war der Rename klein und sicher.
+  Warum: Kosten/Risiko/Empfehlung standen, bevor die tatsächlichen Token-Formen über den Baum gegreppt waren – die Struktur-Annahme wurde für Empirie gehalten.
+  Regel: Vor dem Scoping (Kosten/Risiko/Empfehlung) eines Rename/Refactors zuerst die tatsächlichen Token-Formen über den Baum grepen – nicht auf eine angenommene Verteilung stützen.
 
 ## Session 098 – 2026-07-02
 

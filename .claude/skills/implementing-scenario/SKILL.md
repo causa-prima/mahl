@@ -116,9 +116,15 @@ Fragen:
    Falls neue Architekturentscheidung nötig: User fragen. Selbst Entschiedenes in `docs/history/adr.md` dokumentieren.
    Mechanische-Suche-Ergebnisse (`--full`) inklusive der verwendeten Befehle in die Subagenten-Message aufnehmen.
 
-5. **Modell-Eignung je geplanter Schicht:** Die Komplexitätseinschätzung liegt nach Punkt 2–4 ohnehin vor (YAGNI-Scope, Domain-Typen, ADR-Berührung). Halte pro erwarteter Schicht fest, welches Modell genügt: **`sonnet` ist der Default** und trägt die normale schichtweise TDD-Arbeit. Im Zweifel beim `sonnet`-Default bleiben. Nur eine Schicht, die klar überdurchschnittlich anspruchsvoll ist (offener Entwurfsraum, mehrschichtig verschränkte Logik), gezielt auf Opus eskalieren (`model`-Parameter beim Spawn). Beim Spawn (Schritt 1–3) wird diese Vorab-Einschätzung nur noch bestätigt.
+5. **TD-Sichtung & -Entscheidung:** Sieh in `docs/tech-debt.md` nach technischer Schuld, die die von diesem Lauf berührten Code-Bereiche/Dateien betrifft (aus Punkt 2–4: welcher Endpoint/welche UI-Fläche/welche Domain-Typen). Für **jeden** so getroffenen TD-Eintrag *vor* der Umsetzung entscheiden **und schriftlich begründen**:
+   - **Mit-erledigen** – nur wenn der Lauf den Code ohnehin anfasst *und* die Behebung kohäsiv + günstig ist (Boy-Scout-Regel, **kein** Gold-Plating; steht im Spannungsfeld zu Punkt 2 – im Zweifel aufschieben). Dann Scope + betroffene TD-ID notieren und im TDD-Zyklus mit umsetzen.
+   - **Aufschieben** – mit **Grund** (außerhalb des berührten Codes / zu groß / eigener fokussierter Schritt nötig).
 
-Schriftliche Antwort auf alle fünf Punkte.
+   Macht die TD-Mitnahme **bewusst und auditierbar** statt zufällig – verhindert beide Fehler: stilles Übergehen *und* ungebremstes Mitnehmen. TD **ohne** Bezug zu den berührten Bereichen bleibt bewusst außen vor (wird erst angefasst, wenn ein Lauf real dorthin kommt).
+
+6. **Modell-Eignung je geplanter Schicht:** Die Komplexitätseinschätzung liegt nach Punkt 2–5 ohnehin vor (YAGNI-Scope, Domain-Typen, ADR-Berührung, TD-Mitnahme). Halte pro erwarteter Schicht fest, welches Modell genügt: **`sonnet` ist der Default** und trägt die normale schichtweise TDD-Arbeit. Im Zweifel beim `sonnet`-Default bleiben. Nur eine Schicht, die klar überdurchschnittlich anspruchsvoll ist (offener Entwurfsraum, mehrschichtig verschränkte Logik), gezielt auf Opus eskalieren (`model`-Parameter beim Spawn). Beim Spawn (Schritt 1–3) wird diese Vorab-Einschätzung nur noch bestätigt.
+
+Schriftliche Antwort auf alle sechs Punkte.
 Dieser Schritt ist reine Analyse – noch kein Produktionscode schreiben. Domain-Typen und
 Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 
@@ -204,7 +210,13 @@ Spawn-Regeln:
 
 **Batch-Test-Review nach RED im Inneren Loop (Haupt-Thread):**
 
-Der Subagent schreibt den **gesamten Test-Batch der Schicht** (alle Tests, die die Szenarien des Laufs auf dieser Schicht fordern – bei einem homogenen Cluster typischerweise ein einziger parametrisierter Test), bestätigt den **kollektiven** Fehlschlag und sendet **einmal** das Signal `TEST-REVIEW: <Testname1, Testname2, ...>` mit allen Tests des Batches. Der Haupt-Thread liest den Test-Code via `git diff`, prüft den **ganzen Batch** anhand der folgenden Kriterien, stagt danach die Test-Dateien (`git add <test-files>`) und antwortet mit Freigabe oder konkreter Korrektur-Anforderung. Setup-Änderungen (Mock-Handler, Testdaten), die der Subagent nach der Freigabe noch vornimmt, sind im abschließenden Return beschrieben – diese danach ebenfalls stagen.
+Der Subagent schreibt den **gesamten Test-Batch der Schicht** (alle Tests, die die Szenarien des Laufs auf dieser Schicht fordern – bei einem homogenen Cluster typischerweise ein einziger parametrisierter Test), bestätigt den **kollektiven** Fehlschlag und sendet **einmal** das Signal `TEST-REVIEW: <Testname1, Testname2, ...>` mit allen Tests des Batches. Der Haupt-Thread liest den Test-Code via `git diff` (die Tests sind **nicht** gestaged; neue Dateien via `git diff --no-index /dev/null <datei>` oder direktes Lesen) und prüft den **ganzen Batch** anhand der folgenden Kriterien.
+
+**Freigabe-Anker setzen (erst NACH inhaltlicher Freigabe):** Ist der Batch in Ordnung, friert der Haupt-Thread jede freigegebene Test-Datei als git-Blob ein und **merkt sich die `pfad=sha`-Paare** für Schritt 4:
+```
+git hash-object -w <test-datei-1> <test-datei-2> …    # gibt je Datei einen Blob-SHA aus
+```
+Gegen diesen Anker prüft Schritt 4, dass nach der Freigabe **nur Setup** (Mock-Handler, Testdaten), **keine Assertions** geändert wurden – auch wenn der Subagent die Tests selbst staged (der Blob hängt am Inhalt, nicht am Index). Wird der Batch **nicht** freigegeben: konkrete Korrektur-Anforderung, **kein** Blob. Setup-Änderungen nach Freigabe beschreibt der Subagent im Return; Schritt 4 zeigt sie als Diff.
 
 - **Per-Assertion-Pflicht (inkl. Given/When):** Für jede neue oder geänderte Assertion und signifikante Given/When-Schritte: Welches Gherkin-Kriterium erzwingt sie? Falls keines vorhanden – drei Diagnosen, der Haupt-Thread entscheidet:
   - a) **Gold-Plating** → Subagent löscht Assertion und ggf. zugehörigen Produktionscode.
@@ -228,10 +240,10 @@ Playwright-Test erneut ausführen. Noch rot? Ursache identifizieren (Routing? AP
 
 **Mechanische Verifikation (Script):**
 
-Der Subagent hat in seinem Return einen `=== VERIFIKATIONS-HASH ===`-Block aus einem **frischen** `qa-check.py`-Lauf geliefert. Verifiziere ihn mechanisch – das Script führt **keinen** neuen Stryker-Lauf aus und meldet pass/fail:
+Der Subagent hat in seinem Return einen `=== VERIFIKATIONS-HASH ===`-Block aus einem **frischen** `qa-check.py`-Lauf geliefert. Verifiziere ihn mechanisch – das Script führt **keinen** neuen Stryker-Lauf aus und meldet pass/fail. Übergib dabei die im Test-Review gemerkten Freigabe-Anker (`pfad=sha`-Paare aus Schritt 1–3) via `--approved-tests` – das ist bei geänderten Test-Dateien **Pflicht** (sonst bricht qa-check ab):
 ```
-python3 .claude/scripts/qa-check.py --layer backend  --verify <hash-aus-subagent-return>
-python3 .claude/scripts/qa-check.py --layer frontend --verify <hash-aus-subagent-return>
+python3 .claude/scripts/qa-check.py --layer backend  --verify <hash-aus-return> --approved-tests <pfad1=sha1> <pfad2=sha2> …
+python3 .claude/scripts/qa-check.py --layer frontend --verify <hash-aus-return> --approved-tests <pfad1=sha1> <pfad2=sha2> …
 ```
 
 - `✅` (Exit 0) → Hash stimmt überein UND Score == 100 % → frischer, gültiger Übergabe-Lauf, mechanische Findings vertrauenswürdig.
@@ -241,14 +253,18 @@ python3 .claude/scripts/qa-check.py --layer frontend --verify <hash-aus-subagent
 
 `--verify`/`--skip-stryker` geben zusätzlich den vollständigen Check-Block aus (auch bei zu niedrigem Score – qa-check bricht nicht mehr früh ab, sondern zeigt alle Checks und gated am Ende per Exit-Code).
 
-Der Script-Output enthält: staged Test-Dateien (Check 1), neue Suppressionen (Check 2),
+Der Script-Output enthält: geänderte Test-Dateien (Check 1), neue Suppressionen (Check 2),
 Unit-Test-Muster (Check 3), ESLint-Status (Check 4, Frontend),
-Test-Struktur/Given-When-Then (Check 5), Stryker-Score.
+Test-Struktur/Given-When-Then (Check 5), Stryker-Score sowie den **TEST-FREIGABE-AUDIT**.
 
 **Inhaltliche Bewertung (Haupt-Thread):**
 
-1. **Staged-Test-Check:** Enthält Check 1 Test-Dateien? Falls ja → Assertions dürfen nach
-   Freigabe im Inneren Loop nicht geändert worden sein.
+1. **Test-Freigabe-Audit:** Der `=== TEST-FREIGABE-AUDIT ===`-Block vergleicht jede geänderte
+   Test-Datei gegen ihren Freigabe-Anker. `✅ unverändert` → ok. Meldet er eine Datei als
+   `GEÄNDERT` (mit Diff freigegeben→aktuell) oder `KEINE Freigabe-SHA`, den gezeigten Diff prüfen:
+   nur Setup (Mock-Handler, Testdaten) → erlaubt; Assertion-Änderung oder nie freigegebene
+   Test-Datei → ❌ zurück an den Schicht-Subagenten. (Kein Exit-Gate – nur der Haupt-Thread kann
+   Setup ≠ Assertion entscheiden.)
 
 2. **Suppression-Validität:** Für jede Suppression aus Check 2: Beweist die Begründung
    echte Äquivalenz / Nichttestbarkeit, oder klingt sie nur plausibel? (Maßstab:
@@ -306,6 +322,7 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
    - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return durchsehen und **pro Subagent explizit ausweisen**, ob er Feedback gab (Inhalt) oder nicht („keine"). Wird daraus ein OBS/LL erfasst, die **Quelle präzise** eintragen (`Subagent` vs. `Orchestrator`), damit später beobachtbar bleibt, woher das Feedback stammt.
    - **Zurückgestellte ⚠️-Findings** aus dem Review-Loop (Schritt 5).
    - **Während des Ablaufs entdeckte technische Schuld / Tooling-Reibung.**
+   - **TD-Abgleich:** Prüfe, ob ein bestehender `docs/tech-debt.md`-Eintrag durch diesen Lauf behoben wurde – bewusst mit-erledigt (Schritt 0, Punkt 5) **oder** unbewusst nebenbei → den Eintrag schließen. Verhindert, dass `tech-debt.md` längst erledigte Posten weiterschleppt.
 
    Lege dem User **jeden** Punkt vor – mit genug **Kontext** zum Entscheiden und einer **begründeten Empfehlung**. Der User entscheidet pro Punkt:
    1. **Direkt umsetzen** → jetzt erledigen (ggf. eigener TDD-Zyklus / Schicht-Subagent).
@@ -313,6 +330,8 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
    3. **Ignorieren** → bewusst verwerfen.
 
    Erst eintragen/umsetzen, NACHDEM der User entschieden hat. Kein stilles Eintragen, kein stilles Vergessen.
+
+   **Doppel-Erfassung vermeiden:** Folgt direkt ein Session-Abschluss (Schritt 6.3 → `closing-session`), besitzt dieser die *Aufnahme* der Beobachtungen/Learnings (dortiger Schritt 2/5). Dann hier nur **surfacen + triagieren** und „direkt umsetzen"-Punkte **vor dem Commit** erledigen; die als „vermerken" entschiedenen LL/OBS **im `closing-session`-Lauf gebündelt schreiben** – nicht jetzt schreiben und dort erneut abfragen. Läuft die Session **ohne** Abschluss weiter (Szenario fertig, kein `closing-session`), hier vermerken.
 
 2. **Vorgehen mit dem User klären** – frage per `AskUserQuestion`, was als nächstes passieren soll, damit der Commit i.d.R. die Session-Abschluss-Dateien mit enthält. Optionen:
    - **Session-Abschluss, dann Commit** (Empfehlung) → erst `closing-session` ausführen, dann committen, sodass die Session-Abschluss-Dateien (Session-Log, AGENT_MEMORY-Phasenzeile, `lessons_learned`, Index) im **selben** Commit liegen.

@@ -43,6 +43,7 @@ TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
    Beobachtung → `observations.md` (Format §`observations.md`, Status NEU, `Quelle: User`). Beides wahr → beide,
    per `Bezug:` verlinkt. Noise-Filter gilt für ALLE Einträge.
    - **Beim Erfassen Ziel/Problem korrekt benennen** (nicht eine vermutete Lösung): die zum Verständnis nötigen Details sind *jetzt* präsent, beim späteren Drain oft nicht mehr ableitbar. Bei echter Unklarheit kurz rückfragen statt zu raten – eine falsch erfasste Beobachtung verleitet den Drain zu plausiblen, aber falschen Kandidaten.
+   - **Lief unmittelbar zuvor `implementing-scenario` Schritt 6.1** (Szenario → direkter Abschluss): Die offenen Punkte wurden dort schon mit dem User surfacet + triagiert. Dann die als „vermerken" entschiedenen LL/OBS **hier** schreiben (gebündelt) und den obigen Prompt nur **ergänzend** stellen (was 6.1 nicht abdeckte) – nicht dieselbe Frage voll wiederholen.
 
    - Falls Doku-Vorschläge oder Beobachtungen vorliegen: konkret formulieren und dem User **JETZT** präsentieren. **Warten auf Antwort.**
    - Falls nichts anzupassen / keine Beobachtung: direkt mit Schritt 4 weitermachen.
@@ -62,7 +63,7 @@ TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
 5. `docs/kaizen/lessons_learned.md` – Einträge schreiben:
 → TaskUpdate "3. Session-Datei anlegen": completed | TaskUpdate "4. lessons_learned.md aktualisieren": in_progress
 
-   Eintrag-Format + Erfassungs-Test + Beispiel: **Header von `docs/kaizen/lessons_learned.md`** (steht beim Schreiben direkt vor dir – kein separates Einlesen nötig). Schwere/Kategorie-Definitionen + Reaktionsregeln: `docs/kaizen/process.md`
+   Eintrag-Format + Erfassungs-Test + Beispiel: **Header von `docs/kaizen/lessons_learned.md`** (steht beim Schreiben direkt vor dir – kein separates Einlesen nötig). Impact/Kategorie-Definitionen + Reaktionsregeln: `docs/kaizen/process.md`
 
    **Andon-Cord:** KRITISCH-Findings wurden bereits behandelt – trotzdem dokumentieren.
 

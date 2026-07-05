@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 99 | 2026-07-04 | SKELETON (OBS-Drain + Task #35) | OBS-Drain (Backlog 20→13). Drain: OBS-S092-1, S085-10 (Schwere→Impact), S090-1 (typecheck), S090-3 (Alt-Hooks/Fable), S090-5 (TD-Grooming). Task #35: qa-check-Hash index-unabhängig + Blob-Anker-Test-Freigabe-Gate + tsc-Gate (OBS-S090-2/-4 archiviert; LL-S099-2). |
 | 98 | 2026-07-02 | SKELETON (US-904 run-1 + E2E-Infra) | US-904 run-1 „Anlegen·Success" (Trim-Szenario, E2E+Backend). TD-S083-5 behoben: E2E-DB per-Test-Isolation (eigene mahl_e2e via ASPNETCORE_ENVIRONMENT=E2E + Reset-Endpoint, workers:1; ADR-S084-4 Addendum). LL-S098-1..3. |
 | 97 | 2026-07-01 | SKELETON (Tooling) | Szenario-Clustering Teil (b): `implementing-scenario` auf Lauf-Konsum (`@US-NNN run-N`) umgebaut; `next_scenario.py`→`next_run.py` (Sortierung nach Run-Nummer, `--story`-Filter, Format-/Metadaten-Checks); Sibling-Läufe-Vorschau gg. Gold-Plating; 207 Tests. |
 | 96 | 2026-06-30 | SKELETON (Erster OBS-Drain + Tooling) | Erster OBS-Drain (7 Items): S091-4 verworfen, S093-3/S094-1/S086-2/-3/-4 umgesetzt, S092-2/S085-2 geparkt; neu obs-archive.py (TDD); Retro-Trigger auto-injiziert + AGENT_MEMORY eingedampft; --allow-once-Hinweise; 3 neue OBS. |

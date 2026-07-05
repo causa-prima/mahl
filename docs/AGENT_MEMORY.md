@@ -18,3 +18,5 @@
 
 - **Visuelle Konsistenz-Guideline:** `docs/guidelines/coding-guideline-ux.md` um Spacing/Hierarchie/Farbe erweitern, sobald >3 Komponenten dieselben visuellen Entscheidungen treffen.
 
+- **Nächste Kaizen-Retro – Auftakt-Sonde (OBS-S092-3):** Zu Beginn der Retro mehrere Subagenten ein LL-Sample **blind** re-raten lassen (v.a. Impact) — Grund: LL-Metadaten-Fehler verzerren Jenga/Prioritäts-Matrix; Nutzen eines festen Workshop-Schritts erst so verifizieren. Done: Abweichungen ausgewertet + Entscheidung über festen Schritt getroffen (OBS-S092-3 dann schließen).
+

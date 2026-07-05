@@ -1,7 +1,7 @@
 """Berechnet den Jenga-Score aus docs/kaizen/lessons_learned.md.
 
 Aufruf: python .claude/scripts/jenga_score.py [--file <pfad>]
-Output: Jenga-Score + Zähltabelle (Schwere × Kategorie × Kontext)
+Output: Jenga-Score + Zähltabelle (Impact × Kategorie × Kontext)
 
 Formel (Start 100):
   -5  pro Session
@@ -18,16 +18,16 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from kaizen_constants import SCHWERE_WEIGHTS
+from kaizen_constants import IMPACT_WEIGHTS
 from _util import REPO_ROOT
 
 DEFAULT_FILE = os.path.join(REPO_ROOT, "docs", "kaizen", "lessons_learned.md")
 SESSION_DEDUCTION = 5
 START_SCORE = 100
 
-# Passt auf: - **[SCHWERE] [KATEGORIE] [KONTEXT] Kurztitel**
+# Passt auf: - **[IMPACT] [KATEGORIE] [KONTEXT] Kurztitel**
 FINDING_RE = re.compile(
-    r"^\s*-\s+\*\*\[(?P<schwere>KRITISCH|HOCH|MITTEL|GERING)\]\s*"
+    r"^\s*-\s+\*\*\[(?P<impact>KRITISCH|HOCH|MITTEL|GERING)\]\s*"
     r"\[(?P<kategorie>\w+(?:-\w+)*)\]\s*"
     r"\[(?P<kontext>[\w/-]+)\]"
 )
@@ -47,7 +47,7 @@ def parse(path: str) -> tuple[int, list[dict]]:
             m = FINDING_RE.match(line)
             if m:
                 findings.append({
-                    "schwere": m.group("schwere"),
+                    "impact": m.group("impact"),
                     "kategorie": m.group("kategorie"),
                     "kontext": m.group("kontext"),
                 })
@@ -59,33 +59,33 @@ def compute_score(sessions: int, findings: list[dict]) -> int:
     score = START_SCORE
     score -= sessions * SESSION_DEDUCTION
     for f in findings:
-        score -= SCHWERE_WEIGHTS[f["schwere"]]
+        score -= IMPACT_WEIGHTS[f["impact"]]
     return score
 
 
 def render_table(findings: list[dict]) -> str:
-    """Zähltabelle: Schwere × Kategorie × Kontext."""
+    """Zähltabelle: Impact × Kategorie × Kontext."""
     if not findings:
         return "  (keine Findings)\n"
 
     # Zählen
-    by_schwere: dict[str, int] = defaultdict(int)
+    by_impact: dict[str, int] = defaultdict(int)
     by_kategorie: dict[str, int] = defaultdict(int)
     by_kontext: dict[str, int] = defaultdict(int)
-    cross: dict[tuple, int] = defaultdict(int)  # (schwere, kontext)
+    cross: dict[tuple, int] = defaultdict(int)  # (impact, kontext)
 
     for f in findings:
-        by_schwere[f["schwere"]] += 1
+        by_impact[f["impact"]] += 1
         by_kategorie[f["kategorie"]] += 1
         by_kontext[f["kontext"]] += 1
-        cross[(f["schwere"], f["kontext"])] += 1
+        cross[(f["impact"], f["kontext"])] += 1
 
     lines = []
 
-    # Zeile 1: Schwere-Zusammenfassung
-    schwere_order = ["KRITISCH", "HOCH", "MITTEL", "GERING"]
-    parts = [f"{s}: {by_schwere[s]}" for s in schwere_order if by_schwere[s]]
-    lines.append("  Schwere:   " + "  |  ".join(parts))
+    # Zeile 1: Impact-Zusammenfassung
+    impact_order = ["KRITISCH", "HOCH", "MITTEL", "GERING"]
+    parts = [f"{s}: {by_impact[s]}" for s in impact_order if by_impact[s]]
+    lines.append("  Impact:    " + "  |  ".join(parts))
 
     # Zeile 2: Kategorie-Zusammenfassung
     kat_parts = sorted(by_kategorie.items(), key=lambda x: -x[1])
@@ -95,15 +95,15 @@ def render_table(findings: list[dict]) -> str:
     ctx_parts = sorted(by_kontext.items(), key=lambda x: -x[1])
     lines.append("  Kontext:   " + "  |  ".join(f"{k}: {v}" for k, v in ctx_parts))
 
-    # Kreuz-Tabelle wenn > 1 Schwere-Stufe vorhanden
-    active_schwere = [s for s in schwere_order if by_schwere[s]]
+    # Kreuz-Tabelle wenn > 1 Impact-Stufe vorhanden
+    active_impact = [s for s in impact_order if by_impact[s]]
     active_kontext = sorted(by_kontext.keys())
-    if len(active_schwere) > 1 and len(active_kontext) > 1:
+    if len(active_impact) > 1 and len(active_kontext) > 1:
         lines.append("")
         col_w = max(len(k) for k in active_kontext) + 2
         header = "  " + " " * 10 + "".join(k.ljust(col_w) for k in active_kontext)
         lines.append(header)
-        for s in active_schwere:
+        for s in active_impact:
             row = f"  {s:<10}" + "".join(
                 str(cross.get((s, k), 0)).ljust(col_w) for k in active_kontext
             )

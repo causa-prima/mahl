@@ -8,7 +8,7 @@ Technische Schuld gehört in docs/tech-debt.md, nicht hierher.
 Eintrag-Format:
   ## Session NNN – YYYY-MM-DD
 
-  - **[SCHWERE] [KATEGORIE] [KONTEXT] LL-S<NNN>-<n> – Kurztitel**
+  - **[IMPACT] [KATEGORIE] [KONTEXT] LL-S<NNN>-<n> – Kurztitel**
     Quelle: User | Subagent | Orchestrator   (Herkunft des Eintrags)
     Was: Ein Satz – was ist passiert?
     Warum: Ein Satz – Ursache.
@@ -23,7 +23,7 @@ Eintrag-Format:
   ID (neue Einträge): LL-S<NNN>-<n>, HINTER den Tags – vor [ würde es die Script-Regexes brechen.
   Vorausschauende Beobachtungen → docs/kaizen/observations.md.
 
-Schwere:    KRITISCH | HOCH | MITTEL | GERING
+Impact:     KRITISCH | HOCH | MITTEL | GERING
 Kategorien: PROZESS | AGENT | QUALITÄT | TOOLING
 Kontext:    TDD | C#-Code | TS-Code | Bash/Permission | Mutation-Testing |
             Hook/Script | Review | Agent-Prompt | Skill-Nutzung | Gherkin |
@@ -38,7 +38,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 -->
 
 > **Dieser Header ist die kanonische Format-Quelle** (Eintrag-Format, IDs, Erfassungs-Test).
-> **Definitionen** (Schwere/Kategorie/Kontext) + Reaktionsregeln: `docs/kaizen/process.md`
+> **Definitionen** (Impact/Kategorie/Kontext) + Reaktionsregeln: `docs/kaizen/process.md`
 > **Archiv:** `docs/kaizen/archive/`
 
 ---

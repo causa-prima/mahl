@@ -10,7 +10,7 @@ user-invocable: true
 
 # Kaizen-Retro
 
-Definitionen für Schwere, Kategorien, Kontext-Tags, BEWÄHRT- und Obsolet-Kriterien: `docs/kaizen/process.md`
+Definitionen für Impact, Kategorien, Kontext-Tags, BEWÄHRT- und Obsolet-Kriterien: `docs/kaizen/process.md`
 
 → Task-System: `docs/process/task-system.md`
 
@@ -94,10 +94,10 @@ Falls `docs/kaizen/archive/` leer ist:
 - Wenn `docs/kaizen/countermeasures.md` AKTIV/OFFEN-Einträge enthält: User bestätigen lassen dass das Archiv tatsächlich leer ist (Archiv-Dateien könnten verschoben oder versehentlich gelöscht worden sein). Erst nach Bestätigung mit Schritt 3 weitermachen.
 - Wenn `countermeasures.md` ebenfalls keine AKTIV/OFFEN-Einträge enthält: User bestätigen lassen dass dies tatsächlich die erste Retro ist (auch CMs könnten versehentlich fehlen). Nach Bestätigung: Erster Lauf – kein historischer Vergleich möglich, Script liefert nur aktuelle Statistik. In Schritt 5 darauf hinweisen.
 
-Das Script gibt einen beschrifteten Abschnitt "Pattern-Kandidaten" aus – Tag-Tripel (Schwere/Kategorie/Kontext), die ≥2× im **Pattern-Fenster** auftreten und nicht durch eine bestehende Countermeasure (OFFEN/AKTIV/IN UMSETZUNG/BEWÄHRT) abgedeckt sind. Das **Pattern-Fenster** = aktuelle Periode + die letzten 3 Archiv-Perioden. Perioden sind die Spannen zwischen Retros, durch den Jenga-Score begrenzt – also **unterschiedlich lang** (die „Sessions gesamt"-Zahl im Header ist nur der aktuelle Wert, keine feste Fenstergröße).
+Das Script gibt einen beschrifteten Abschnitt "Pattern-Kandidaten" aus – Tag-Tripel (Impact/Kategorie/Kontext), die ≥2× im **Pattern-Fenster** auftreten und nicht durch eine bestehende Countermeasure (OFFEN/AKTIV/IN UMSETZUNG/BEWÄHRT) abgedeckt sind. Das **Pattern-Fenster** = aktuelle Periode + die letzten 3 Archiv-Perioden. Perioden sind die Spannen zwischen Retros, durch den Jenga-Score begrenzt – also **unterschiedlich lang** (die „Sessions gesamt"-Zahl im Header ist nur der aktuelle Wert, keine feste Fenstergröße).
 
 **Drei Dinge beim Lesen der Kandidaten:**
-- **Grobe Erstfilterung:** Das Tripel ist nur ein grober Proxy für „dasselbe Problem", und der CM-Abgleich ist severity-exakt. Jeden NEU-Kandidaten **manuell gegen `countermeasures.md` UND `principles.md`** gegenprüfen – ein anders getaggtes oder schwereres CM kann denselben Sachverhalt meinen (Prinzipien sind als CM-Schatten getrackt, s. `process.md`).
+- **Grobe Erstfilterung:** Das Tripel ist nur ein grober Proxy für „dasselbe Problem", und der CM-Abgleich ist impact-exakt. Jeden NEU-Kandidaten **manuell gegen `countermeasures.md` UND `principles.md`** gegenprüfen – ein anders getaggtes oder höher eingestuftes CM kann denselben Sachverhalt meinen (Prinzipien sind als CM-Schatten getrackt, s. `process.md`).
 - **Priorisierung:** Der Anker „Neue Sessions ab: NNN" markiert die erste Session der aktuellen Periode. Muster mit mindestens einem Mitglied aus der aktuellen Periode priorisieren – reine Alt-Archiv-Muster lagen bereits früheren Retros vor.
 - **Einzel-Einträge lesen:** Cluster sind Tag-Kombinationen, keine semantischen Gruppen – vor jedem Vorschlag die konkreten Einträge prüfen.
 

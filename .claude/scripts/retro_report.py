@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from kaizen_constants import SCHWERE_WEIGHTS
+from kaizen_constants import IMPACT_WEIGHTS
 from _util import REPO_ROOT
 
 try:
@@ -68,7 +68,7 @@ DEFAULT_CURRENT = os.path.join(REPO_ROOT, "docs", "kaizen", "lessons_learned.md"
 DEFAULT_ARCHIVE = os.path.join(REPO_ROOT, "docs", "kaizen", "archive")
 DEFAULT_CM      = os.path.join(REPO_ROOT, "docs", "kaizen", "countermeasures.md")
 
-SCHWERE_ORDER  = ["KRITISCH", "HOCH", "MITTEL", "GERING"]
+IMPACT_ORDER  = ["KRITISCH", "HOCH", "MITTEL", "GERING"]
 BAND_WIDTH     = 35    # Spalten pro Band
 N_BANDS        = 4
 MIN_HEIGHT     = 4
@@ -85,7 +85,7 @@ HSEP = '═' * 64
 @dataclass
 class Finding:
     session_num: int
-    schwere: str
+    impact: str
     kategorie: str
     kontext: str
     titel: str
@@ -103,7 +103,7 @@ class SessionData:
 @dataclass
 class Countermeasure:
     problem: str
-    schwere: str
+    impact: str
     kategorie: str
     kontexte: list          # leer = Wildcard
     status: str             # OFFEN | AKTIV | BEWÄHRT | IN UMSETZUNG
@@ -116,7 +116,7 @@ class Countermeasure:
 # ---------------------------------------------------------------------------
 SESSION_RE = re.compile(r"^##\s+Session\s+(\d+)\s+[–\-]\s+(\d{4}-\d{2}-\d{2})")
 FINDING_RE = re.compile(
-    r"^\s*-\s+\*\*\[(?P<schwere>KRITISCH|HOCH|MITTEL|GERING)\]\s*"
+    r"^\s*-\s+\*\*\[(?P<impact>KRITISCH|HOCH|MITTEL|GERING)\]\s*"
     r"\[(?P<kategorie>[\w-]+)\]\s*"
     r"\[(?P<kontext>[\w/-]+)\]\s*(?P<titel>.+?)\*\*\s*$"
 )
@@ -125,11 +125,11 @@ WARUM_RE = re.compile(r"^\s+Warum:\s+(.+)")
 
 # --- Countermeasure-Parser (Fließtext-Format, OBS-S085-14) ---
 # Header:    ### CM-S<NNN>-<n> – Kurztitel
-# Metadaten: **Schwere:** … | **Kategorie:** … | **Kontext:** … | **Status:** … | **Seit:** S<NNN>
+# Metadaten: **Impact:** … | **Kategorie:** … | **Kontext:** … | **Status:** … | **Seit:** S<NNN>
 # Problem:   **Problem:** <Text>
 CM_HEADER_RE = re.compile(r"^###\s+(?P<id>CM-S\d+-\d+)\s+[–\-]\s+(?P<titel>.+?)\s*$")
 CM_META_RE = re.compile(
-    r"^\*\*Schwere:\*\*\s*(?P<schwere>KRITISCH|HOCH|MITTEL|GERING)\s*\|\s*"
+    r"^\*\*Impact:\*\*\s*(?P<impact>KRITISCH|HOCH|MITTEL|GERING)\s*\|\s*"
     r"\*\*Kategorie:\*\*\s*(?P<kategorie>[\w-]+)\s*\|\s*"
     r"\*\*Kontext:\*\*\s*(?P<kontext>.*?)\s*\|\s*"
     r"\*\*Status:\*\*\s*(?P<status>OFFEN|IN UMSETZUNG|AKTIV|BEWÄHRT)\s*\|\s*"
@@ -155,7 +155,7 @@ def parse_file(path: str) -> list[SessionData]:
             m = FINDING_RE.match(line)
             if m:
                 cur_f = Finding(
-                    session_num=cur.num, schwere=m.group("schwere"),
+                    session_num=cur.num, impact=m.group("impact"),
                     kategorie=m.group("kategorie"), kontext=m.group("kontext"),
                     titel=m.group("titel").strip(),
                 )
@@ -237,7 +237,7 @@ def load_cm(path: str) -> list[Countermeasure]:
                 ]
                 cms.append(Countermeasure(
                     cm_id=cur_id, problem=cur_titel,
-                    schwere=m.group("schwere"), kategorie=m.group("kategorie"),
+                    impact=m.group("impact"), kategorie=m.group("kategorie"),
                     kontexte=kontexte, status=m.group("status"),
                     seit_session=int(m.group("seit")),
                 ))
@@ -251,18 +251,18 @@ def load_cm(path: str) -> list[Countermeasure]:
 # ---------------------------------------------------------------------------
 # Countermeasure-Matching
 # ---------------------------------------------------------------------------
-def cm_matches(cm: Countermeasure, schwere: str, kategorie: str, kontext: str) -> bool:
-    if cm.schwere != schwere or cm.kategorie != kategorie:
+def cm_matches(cm: Countermeasure, impact: str, kategorie: str, kontext: str) -> bool:
+    if cm.impact != impact or cm.kategorie != kategorie:
         return False
     return not cm.kontexte or kontext in cm.kontexte
 
 
 def is_bewährt(f: Finding, cms: list[Countermeasure]) -> bool:
-    return any(cm.status == 'BEWÄHRT' and cm_matches(cm, f.schwere, f.kategorie, f.kontext) for cm in cms)
+    return any(cm.status == 'BEWÄHRT' and cm_matches(cm, f.impact, f.kategorie, f.kontext) for cm in cms)
 
 
-def has_cm(schwere: str, kategorie: str, kontext: str, cms: list[Countermeasure]) -> bool:
-    return any(cm_matches(cm, schwere, kategorie, kontext) for cm in cms)
+def has_cm(impact: str, kategorie: str, kontext: str, cms: list[Countermeasure]) -> bool:
+    return any(cm_matches(cm, impact, kategorie, kontext) for cm in cms)
 
 
 # ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ def render_gesamt_chart(
     bands: list[tuple[int, int]],
     title: str,
 ) -> list[str]:
-    totals = [float(sum(SCHWERE_WEIGHTS.get(f.schwere, 0) for f in s.findings)) for s in sessions]
+    totals = [float(sum(IMPACT_WEIGHTS.get(f.impact, 0) for f in s.findings)) for s in sessions]
     band_data = col_avgs(totals, bands)
     max_h = max(MIN_HEIGHT, int(max((v for cols in band_data for v in cols), default=0)) + 1)
     lines = [b(f"  {title}"), ""]
@@ -367,7 +367,7 @@ def render_stack_chart(
     title: str,
 ) -> list[str]:
     cat_counts = [
-        {c: sum(SCHWERE_WEIGHTS.get(f.schwere, 0) for f in s.findings if f.kategorie == c) for c in CATS}
+        {c: sum(IMPACT_WEIGHTS.get(f.impact, 0) for f in s.findings if f.kategorie == c) for c in CATS}
         for s in sessions
     ]
     band_data = col_cat_avgs(cat_counts, bands)
@@ -432,12 +432,12 @@ def render_aggregation(sessions: list[SessionData]) -> str:
     by_k: dict[str, int] = defaultdict(int)
     by_c: dict[str, int] = defaultdict(int)
     for f in findings:
-        by_s[f.schwere] += 1
+        by_s[f.impact] += 1
         by_k[f.kategorie] += 1
         by_c[f.kontext] += 1
 
     lines.append(f"  Sessions: {len(sessions)}  |  Findings: {len(findings)}")
-    lines.append("  Schwere:   " + "  |  ".join(f"{s}: {by_s[s]}" for s in SCHWERE_ORDER if by_s[s]))
+    lines.append("  Impact:    " + "  |  ".join(f"{s}: {by_s[s]}" for s in IMPACT_ORDER if by_s[s]))
     lines.append("  Kategorie: " + "  |  ".join(f"{k}: {v}" for k, v in sorted(by_k.items(), key=lambda x: -x[1])))
     lines.append("  Kontext:   " + "  |  ".join(f"{k}: {v}" for k, v in sorted(by_c.items(), key=lambda x: -x[1])))
     return "\n".join(lines)
@@ -451,7 +451,7 @@ def render_sonstiges(sessions: list[SessionData]) -> str:
         return "\n".join(lines)
     lines.append(f"  {len(hits)} Einträge – fehlende Tags ableiten:\n")
     for f in hits:
-        lines.append(f"  [{f.schwere}] S{f.session_num}: {f.titel}")
+        lines.append(f"  [{f.impact}] S{f.session_num}: {f.titel}")
         if f.was:   lines.append(f"    Was:   {f.was}")
         if f.warum: lines.append(f"    Warum: {f.warum}")
         lines.append("")
@@ -464,7 +464,7 @@ def render_zeitreihen(all_sessions: list[SessionData]) -> str:
         lines.append(f"  Zu wenig Sessions ({len(all_sessions)}). Minimum: 2.")
         return "\n".join(lines)
     bands = compute_bands(len(all_sessions))
-    lines += render_gesamt_chart(all_sessions, bands, "Schwere-Score/Session (Gesamt)")
+    lines += render_gesamt_chart(all_sessions, bands, "Impact-Score/Session (Gesamt)")
     return "\n".join(lines)
 
 
@@ -474,7 +474,7 @@ def render_stack(all_sessions: list[SessionData]) -> str:
         lines.append(f"  Zu wenig Sessions ({len(all_sessions)}). Minimum: 2.")
         return "\n".join(lines)
     bands = compute_bands(len(all_sessions))
-    lines += render_stack_chart(all_sessions, bands, "Schwere-Score/Session (nach Kategorie)")
+    lines += render_stack_chart(all_sessions, bands, "Impact-Score/Session (nach Kategorie)")
     return "\n".join(lines)
 
 
@@ -518,7 +518,7 @@ def render_pattern(current_sessions: list[SessionData], archive_periods: list[li
     triplet_count: dict[tuple, int] = defaultdict(int)
     triplet_ex: dict[tuple, list[str]] = defaultdict(list)
     for f in findings:
-        key = (f.schwere, f.kategorie, f.kontext)
+        key = (f.impact, f.kategorie, f.kontext)
         triplet_count[key] += 1
         if len(triplet_ex[key]) < 2:
             triplet_ex[key].append(f"S{f.session_num}: {f.titel}")
@@ -531,12 +531,12 @@ def render_pattern(current_sessions: list[SessionData], archive_periods: list[li
         return "\n".join(lines)
 
     new_found = False
-    for (schwere, kategorie, kontext), count in candidates:
-        covered = has_cm(schwere, kategorie, kontext, cms)
+    for (impact, kategorie, kontext), count in candidates:
+        covered = has_cm(impact, kategorie, kontext, cms)
         if not covered:
             new_found = True
-            lines.append(f"  {clr('NEU', RED+BOLD)} [{schwere}] [{kategorie}] [{kontext}] – {count}×")
-            for ex in triplet_ex[(schwere, kategorie, kontext)]:
+            lines.append(f"  {clr('NEU', RED+BOLD)} [{impact}] [{kategorie}] [{kontext}] – {count}×")
+            for ex in triplet_ex[(impact, kategorie, kontext)]:
                 lines.append(f"    · {ex}")
             lines.append("")
 
@@ -546,8 +546,8 @@ def render_pattern(current_sessions: list[SessionData], archive_periods: list[li
     covered_list = [(k, v) for k, v in candidates if has_cm(k[0], k[1], k[2], cms)]
     if covered_list:
         lines.append("  Bereits abgedeckt:")
-        for (schwere, kategorie, kontext), count in covered_list:
-            lines.append(f"    [{schwere}] [{kategorie}] [{kontext}] – {count}×")
+        for (impact, kategorie, kontext), count in covered_list:
+            lines.append(f"    [{impact}] [{kategorie}] [{kontext}] – {count}×")
 
     return "\n".join(lines)
 
@@ -581,7 +581,7 @@ def render_clustering(all_sessions: list[SessionData], cms: list[Countermeasure]
     for cid, members in sorted(clusters.items(), key=lambda x: -len(x[1])):
         lines.append(f"  Cluster {cid + 1} ({len(members)} Findings):")
         for f in members[:5]:
-            lines.append(f"    S{f.session_num} [{f.schwere}] {f.titel}")
+            lines.append(f"    S{f.session_num} [{f.impact}] {f.titel}")
         if len(members) > 5:
             lines.append(f"    … +{len(members) - 5} weitere")
         lines.append("")
@@ -636,20 +636,20 @@ def render_trend(all_sessions: list[SessionData]) -> str:
     header = indent + "".join(lbl.rjust(TREND_VALUE_W) for lbl in band_labels) + "  Δ zuletzt"
     sep    = "  " + "─" * (LABEL_W + 2 + TREND_VALUE_W * len(bands) + 11)
 
-    lines.append("  Ø Schwere-Score/Session pro Band (logarithmisch).")
+    lines.append("  Ø Impact-Score/Session pro Band (logarithmisch).")
     lines.append("  Score = Summe der Gewichte (KRITISCH=25, HOCH=10, MITTEL=3, GERING=1).")
     lines.append("  Farbe: grün = weniger als Vorband (besser), rot = mehr (schlechter).")
     lines.append("  Δ zuletzt = Änderung letztes Band vs. vorletztes Band.\n")
     lines.append(header)
     lines.append(sep)
 
-    ys_total = [float(sum(SCHWERE_WEIGHTS.get(f.schwere, 0) for f in s.findings)) for s in all_sessions]
+    ys_total = [float(sum(IMPACT_WEIGHTS.get(f.impact, 0) for f in s.findings)) for s in all_sessions]
     lines.append(trend_line("GESAMT", ys_total))
     lines.append("")
 
     kategorien = sorted({f.kategorie for s in all_sessions for f in s.findings})
     for kat in kategorien:
-        ys = [float(sum(SCHWERE_WEIGHTS.get(f.schwere, 0) for f in s.findings if f.kategorie == kat)) for s in all_sessions]
+        ys = [float(sum(IMPACT_WEIGHTS.get(f.impact, 0) for f in s.findings if f.kategorie == kat)) for s in all_sessions]
         lines.append(trend_line(kat, ys, CAT_COLOR.get(kat, "")))
 
     return "\n".join(lines)

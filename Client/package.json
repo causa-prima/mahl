@@ -11,7 +11,8 @@
         "test": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:e2e": "playwright test",
-        "lint:duplicates": "jscpd --config ../jscpd.config.json"
+        "lint:duplicates": "jscpd --config ../jscpd.config.json",
+        "typecheck": "tsc -b"
     },
     "dependencies": {
         "@emotion/react": "^11.14.0",
