@@ -634,14 +634,14 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 ## Frontend & TypeScript
 
-### ADR-S001-1: Frontend-Framework: React 18+ mit Material UI v7
+### ADR-S001-1: Frontend-Framework: React 18+ mit Material UI (MD3)
 
 **Status:** Accepted
 **Tags:** scope:cross-cutting, frontend:react, frontend:typescript, tooling:dependencies
 
-**Entscheidung:** React 18+ mit MUI v7 (Material Design 3).
+**Entscheidung:** React 18+ mit MUI v9 (Material Design 3). Ursprünglich v7 (S001), in S067 bewusst auf **v9** angehoben (kein v8; Alignment mit MUI X, „Foundations"-Release ohne Design-Redesign, MD3-Support bleibt); Slots-API (`slotProps`/`slots` statt deprecatetem `PaperProps`) ist Teil dieses Stands.
 
-**Begründung:** MUI v7 bietet vollständigen MD3-Support (stabil). Offline-Support (US-306) ist MVP – React-Ökosystem überlegen (Workbox, React Query). Mutation Testing mit Stryker-JS etabliert.
+**Begründung:** MUI bietet vollständigen MD3-Support (stabil). Offline-Support (US-306) ist MVP – React-Ökosystem überlegen (Workbox, React Query). Mutation Testing mit Stryker-JS etabliert.
 
 **Verworfen:** Blazor WebAssembly. Vue 3 + Vuetify. Svelte – kein MUI-Äquivalent (Svelte Material UI implementiert MD2, nicht MD3); Svelte 5 Runes sind explizit mutationsbasiert, Immutability-Kernprinzip würde gegen das Framework laufen.
 
@@ -692,6 +692,8 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 **Bekannte Konsequenzen (technische Schuld bis zur Erweiterung):** (1) Name-Kollision mit den kanonischen Wrappern – ein Leser der Guideline erwartet das `MutationState`-Tupel. (2) `onSuccess` feuert auch bei einem `Err`-Result, da `Promise.resolve(ResultAsync)` den `Err` nicht wirft – im success-only-Happy-Path harmlos, aber vor dem Error-Szenario auf `result.match(onSuccess, onError)` umzustellen. (3) Fehlendes `throwOnError` → bei Netzwerkfehler bliebe `query.data` undefined und der Empty-State würde fälschlich gerendert.
 
 **Verworfen:** Volle 4er-Union jetzt – erzeugt unausgeübte Zweige + Suppressions vor dem treibenden Szenario (widerspricht der Suppression-Minimierung).
+
+**Addendum (run-2, "Speichern-Button deaktiviert während des Speicherns"):** Der `pending`-Teil der oben aufgeschobenen Erweiterung wird **minimal** eingelöst: `useResultMutation` liefert neu ein 3-Tupel `[mutate, error, isPending]`, wobei `isPending = mutation.isPending` (React Query). **Keine** volle `MutationState`-Union, **kein** `matchState`, **kein** `throwOnError` – die Begründung von oben gilt unverändert für diese Teile, weil `throwOnError` weiterhin `QueryCache.onError` voraussetzt (existiert noch nicht, TD-S090-2) und die volle Union weiterhin unausgeübte `idle`/`error`-Zweige erzeugen würde. Die volle Union + `matchState` + `throwOnError` bleiben mit den @US-904-error/resilience-Szenarien aufgeschoben.
 
 **Begründung:** Bring! ist im Familienshopping-Kontext etabliert und auf Touch-Geräten gut bedienbar. US-304 (Visuelle Darstellung & Varianten) wurde aufgelöst, weil das Layout kein Feature-Increment ist, sondern ein Designprinzip – die Kachel-Entscheidung fällt einmalig und ist kein eigenständiges Implementierungsticket.
 
@@ -1073,3 +1075,20 @@ Kein einzelner DB-Wert bildet den Collection-Zustand korrekt ab. `MAX(xmin)` ist
 **Status der Pakete:** Beide aus der Testing-Library-Org (gleiche Maintainer wie das bereits genutzte `@testing-library/react`), aktiv gepflegt, kein `deprecated`-Flag, keine bekannte CVE (Snyk). jest-dom `6.9.1`, user-event `14.6.1`.
 
 **Verworfen:** Status quo (Cast + `.value`, `fireEvent` für Eingaben) – dokumentierte Testschuld, schwache Fehlermeldungen, maskierte Handler-Bugs. Eigen-Matcher – Aufwand/Nutzen schlecht.
+
+---
+
+### ADR-S100-1: Autofokus im Dialog via `onEntered` – Fokus-Steal-Guard verworfen (nicht deterministisch testbar)
+
+**Status:** Accepted
+**Tags:** scope:feature, story:us-904, frontend:react, testing:stryker
+
+**Kontext:** Der „Zutat anlegen"-Dialog soll beim Öffnen den Fokus aufs Name-Feld setzen (UX-Guideline Prinzip 8). `autoFocus` am TextField wird von echten Browsern ignoriert, weil MUIs Öffnen-Transition das Paper anfangs auf `visibility: hidden` setzt; der Fokus wird daher erst nach Transition-Ende via `slotProps.transition.onEntered` gesetzt.
+
+**Entscheidung:** Der `onEntered`-Fokus wird **bedingungslos** gesetzt. Ein Guard „Fokus nur setzen, wenn der Nutzer nicht bereits ein Feld fokussiert hat" (gegen den theoretischen Race, dass extrem schnelles Tippen ins zweite Feld vor Transition-Ende durch den verzögerten Fokus zurückgerissen wird) wird **bewusst nicht** implementiert.
+
+**Begründung:** Der Race ist real, aber (a) praktisch nicht auslösbar — beim Öffnen ist nichts fokussiert; um vor der ~225 ms-Transition ins zweite Feld zu tippen, müsste der Nutzer es erst fokussieren (Klick/Tab), was die Transition ohnehin überdauert; (b) der einzige bekannte Guard ist **nicht deterministisch testbar** — der „Guard-aus"-Mutant überlebt Stryker deterministisch (der Race ist timing-abhängig, kein Test zwingt das Verhalten reproduzierbar), was die 100%-Mutation-Disziplin (ADR-S041-8) bräche. Ungetesteter Band-Aid-Code über einem Timing-Race ist schlechter als die dokumentierte Akzeptanz.
+
+**Verworfen:** Fokus-Steal-Guard (`if (document.activeElement?.tagName === 'INPUT') return`) — in Session 100 testweise gebaut und wieder entfernt: unerreichbarer `TEXTAREA`-Arm + deterministisch überlebender „Guard-aus"-Mutant. Wer ihn „hilfreich" wieder einbaut, bricht die 100%-Mutation-Disziplin.
+
+**Testfolge:** Damit der verzögerte Autofokus die keystroke-basierten Komponenten-Tests nicht stört, warten diese vor dem ersten `user.type` auf den abgeschlossenen Autofokus (Helper `awaitDialogAutofocus` in `IngredientsPage.test.tsx`).

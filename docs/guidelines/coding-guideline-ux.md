@@ -71,6 +71,8 @@ sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müsse
 
 **Ladezeiten:** Jede Aktion, die auf eine Server-Antwort wartet, zeigt einen Ladezustand (Spinner, deaktivierter Button o.ä.) — nie eine eingefrorene UI ohne Reaktion.
 
+**Sperren während Pending:** Während einer laufenden mutierenden Aktion werden **alle konfliktträchtigen Bedienelemente gesperrt** — nicht nur der auslösende Button, sondern auch die Schließ-Pfade (Abbrechen, Escape, Backdrop-Klick). Sonst kann der Nutzer den Kontext wechseln (Dialog schließen + neu öffnen), während die alte Aktion noch läuft; deren spätes Ergebnis wirkt dann auf den neuen Kontext (schließt den frischen Dialog, verwirft neue Eingaben). Faustregel: Was den Kontext der laufenden Aktion verändern oder sie verwaisen lassen könnte, bleibt bis zu ihrem Abschluss gesperrt.
+
 ---
 
 ## 4. Fehlermeldungen als Hilfe
@@ -172,7 +174,7 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 
 | Mechanismus | Verhalten | Geliefert von / zu erzwingen |
 |---|---|---|
-| **Enter sendet ab** | Enter in einem **einzeiligen** Feld sendet das Formular ab; in einem **mehrzeiligen** Feld (`textarea`) erzeugt Enter einen Zeilenumbruch (kein Submit). Submit aus mehrzeiligem Feld optional via Cmd/Ctrl+Enter. | Natives `<form>` + Submit-Button. **Review:** echtes `<form>` mit `type="submit"`-Button — **keine** manuellen `keydown→submit`-Handler an Feldern (die brechen den Textarea-Zeilenumbruch). |
+| **Enter sendet ab** | Enter in einem **einzeiligen** Feld sendet das Formular ab; in einem **mehrzeiligen** Feld (`textarea`) erzeugt Enter einen Zeilenumbruch (kein Submit). Submit aus mehrzeiligem Feld optional via Cmd/Ctrl+Enter. | Natives `<form>` + Submit-Button. **Review:** echtes `<form>` mit `type="submit"`-Button — **keine** manuellen `keydown→submit`-Handler an Feldern (die brechen den Textarea-Zeilenumbruch). **`formNoValidate` am Submit-Button setzen, sobald Pflichtfelder (`required`) mit server-only-Validierung (ADR-S090-1) kombiniert werden** — sonst kappt die HTML5-Constraint-Validation den Submit, *bevor* `onSubmit` feuert, und die Leerwert-Error-Szenarien erreichen den Server nie; `required` bleibt als A11y-/UX-Affordance bestehen. |
 | **Escape schließt** | Escape schließt den Dialog / bricht ab. | MUI `Dialog` (`onClose` feuert auf `escapeKeyDown`). **Review:** `onClose` ist ans tatsächliche Schließen verdrahtet. |
 | **Fokus-Falle** | Tab/Shift+Tab zyklen innerhalb des Dialogs. | MUI `Dialog` (`disableEnforceFocus=false`, Default). Nicht abschalten. |
 | **Fokus-Rückkehr** | Beim Schließen kehrt der Fokus zum auslösenden Element zurück. | MUI `Dialog` (`disableRestoreFocus=false`, Default). Nicht abschalten. |

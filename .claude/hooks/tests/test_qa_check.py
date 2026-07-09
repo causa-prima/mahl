@@ -277,6 +277,40 @@ def test_audit_approved_tests_flags_unapproved(tmp_path, monkeypatch):
     assert any("KEINE Freigabe" in l for l in lines)
 
 
+def test_is_test_file_recognizes_repo_conventions():
+    # // Given die realen Test-Namenskonventionen des Repos
+    # // Then erkennt _is_test_file Vitest-Unit-Tests (.test.ts/.test.tsx),
+    #        Playwright-E2E (.spec.ts) und Backend-xUnit (…Tests.cs)
+    assert qa._is_test_file("Client/src/pages/IngredientsPage.test.tsx")
+    assert qa._is_test_file("Client/src/services/conditionalGet.test.ts")
+    assert qa._is_test_file("Client/e2e/ingredients.spec.ts")
+    assert qa._is_test_file("Server.Tests/IngredientsEndpointsTests.cs")
+    # // And behandelt Nicht-Test-Quelldateien NICHT als Test
+    assert not qa._is_test_file("Client/src/pages/IngredientsPage.tsx")
+    assert not qa._is_test_file("Client/src/services/conditionalGet.ts")
+
+
+def test_audit_approved_tests_recognizes_test_tsx(tmp_path, monkeypatch):
+    # // Given eine freigegebene .test.tsx (echte Vitest-Konvention), danach in einer
+    #        Assertion geändert und vom Subagent gestaged. Regression: früher war
+    #        _is_test_file blind für .test.tsx → der Anker-Audit lief für Frontend-Runs
+    #        ins Leere ("taucht nicht unter geänderten Test-Dateien auf").
+    g = _init_repo(tmp_path)
+    _write(tmp_path, "Client/src/app.ts", "x\n")
+    g("add", ".")
+    g("commit", "-qm", "init")
+    _write(tmp_path, "Client/src/pages/Foo.test.tsx", "it('a', () => { expect(x).toBe(1) })\n")
+    monkeypatch.chdir(tmp_path)
+    sha = _hash_object(tmp_path, "Client/src/pages/Foo.test.tsx")
+    _write(tmp_path, "Client/src/pages/Foo.test.tsx", "it('a', () => { expect(x).toBe(999) })\n")
+    g("add", "Client/src/pages/Foo.test.tsx")
+    # // When gegen die Freigabe-SHA geprüft wird
+    findings, lines = qa.audit_approved_tests("frontend", {"Client/src/pages/Foo.test.tsx": sha})
+    # // Then greift der Anker-Audit auch für .test.tsx (Abweichung samt Diff gemeldet)
+    assert findings == 1
+    assert "999" in "\n".join(lines)
+
+
 # --- tsc-Gate (OBS-S090-1-Follow-up: Fast-Fail vor Stryker) ---
 
 def test_tsc_gate_runs_typecheck(monkeypatch):

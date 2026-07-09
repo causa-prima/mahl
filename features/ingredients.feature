@@ -106,6 +106,25 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then ist der "Speichern"-Button deaktiviert solange die Antwort aussteht
 
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
+  @US-904-happy-path
+  Scenario: Abbrechen ist während des Speicherns deaktiviert
+    When ich auf "Zutat anlegen" klicke
+    And ich "Tomaten" als Name eingebe
+    And ich "Stück" als Einheit eingebe
+    And ich auf "Speichern" klicke
+    Then ist der "Abbrechen"-Button deaktiviert solange die Antwort aussteht
+
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
+  @US-904-happy-path
+  Scenario: Der Dialog lässt sich während des Speicherns nicht per Escape schließen
+    When ich auf "Zutat anlegen" klicke
+    And ich "Tomaten" als Name eingebe
+    And ich "Stück" als Einheit eingebe
+    And ich auf "Speichern" klicke
+    And ich Escape drücke
+    Then ist der "Zutat anlegen"-Dialog weiterhin geöffnet solange die Antwort aussteht
+
   # @run-9 · Löschen·Pending · Frontend-only · Singleton
   @US-904-happy-path
   Scenario: Löschen-Button ist während des Löschens deaktiviert
@@ -233,6 +252,18 @@ Feature: Zutaten verwalten
     Given die Zutat "Basilikum" mit Einheit "Bund" existiert und gelöscht wurde
     When ich die Zutaten-Liste betrachte
     Then ist "Basilikum" nicht in der Zutaten-Liste sichtbar
+
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
+  @US-904-edge-case
+  Scenario: Nach fehlgeschlagenem Speichern und Abbrechen ist der Dialog beim erneuten Öffnen fehlerfrei
+    When ich auf "Zutat anlegen" klicke
+    And ich "g" als Einheit eingebe
+    And ich auf "Speichern" klicke
+    And die Fehlermeldung "Name darf nicht leer sein." erscheint
+    And ich auf "Abbrechen" klicke
+    And ich auf "Zutat anlegen" klicke
+    Then ist keine Fehlermeldung sichtbar
+    And ist das Name-Feld nicht als ungültig markiert
 
   # @run-1 · Anlegen·Success · Full-Stack
   @US-904-edge-case

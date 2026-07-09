@@ -50,6 +50,39 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
+## OBS-S100-1 – Zustandsdokumente sammeln Erledigtes / Verweise auf gelöschte Artefakte
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Doku-Hygiene
+- Beobachtung: Agenten halten wiederkehrend **bereits Erledigtes** an Stellen fest, die nur den *offenen/aktuellen* Zustand tragen sollten (Changelog-artig; diese Session „erledigt in run-2" in TD-S077-1, vom User korrigiert – laut User ein Muster über viele Sessions). Allgemeiner: **Verweise zeigen auf Artefakte, die beim Erledigen gelöscht werden** – z.B. „siehe TD-SXXX" auf ein TD, das beim Abschluss entfernt wird → toter Verweis, die referenzierte Info existiert danach nur noch in der git-Historie. Ergebnis: aufgeblähte Zustandsdokumente + dangling references / Informationsverlust. Betrifft nicht nur umgesetzten Code, sondern jede Referenz auf inzwischen irrelevante/gelöschte Dinge. **Aktuell kein akuter Schaden, weil der User beim Mitlesen manuell abfängt – aber das ist ein fehlerträchtiger, nicht garantierter, ermüdender *menschlicher* Guard, kein struktureller; der scheinbar geringe Impact ruht also auf User-Aufwand (Verstärker: OBS-S100-2).**
+- Entscheidung/Maßnahme: offen – beim Drain entscheiden. Mögliche Richtungen (nicht vorgreifen): Leitplanke „Zustandsdokumente tragen nur offenen Zustand" + „Verweise robust gegen Löschung des Ziels" (nötige Info am Verweisort inlinen statt nur verweisen, oder nur auf stabile Artefakte wie ADR verweisen). Vor Umsetzung Häufigkeit/Impact prüfen.
+- Bezug: —
+
+---
+
+## OBS-S100-2 – Agent-Auffälligkeiten erodieren User-Vertrauen → mehr Kontrolle → Ermüdung (Verstärker)
+- Quelle: User
+- Status: NEU
+- Impact: HOCH    Häufigkeit: dauerhaft
+- Kategorie: AGENT    Kontext: Mensch-Agent-Zusammenarbeit
+- Beobachtung: Jede Auffälligkeit (nicht nur OBS-S100-1) hat neben dem lokalen Defekt einen versteckten Zweitschaden: sie erodiert das Vertrauen des Users in die Agenten, woraufhin er *alles* genauer prüft – anstrengend, ermüdend, ein sich selbst verstärkender Kreislauf. Der wahre Kostenfaktor einer Auffälligkeit ist damit größer als der lokale Defekt; scheinbar „geringe" Auffälligkeiten summieren sich über diesen Kanal.
+- Entscheidung/Maßnahme: offen – beim Drain entscheiden. Richtung (nicht vorgreifen): **strukturelle/mechanische Guards (Poka-Yoke), die nicht auf User-Wachsamkeit angewiesen sind, höher priorisieren** als „der Agent passt besser auf"; Auffälligkeits-Reduktion trägt Zusatznutzen über den Vertrauens-/Ermüdungs-Multiplikator. Meta-Beobachtung – als Priorisierungs-Linse für andere OBS/CM nutzen, nicht als Einzel-Fix.
+- Bezug: OBS-S100-1
+
+---
+
+## OBS-S100-3 – `qa-check` gibt bei <100 % nur den Score aus, nicht die Survivor-Zeilen
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: Meldet `qa-check` einen Stryker-Score < 100 %, nennt es nur die Prozentzahl, nicht *welche* Zeilen überlebten. Man muss danach separat `stryker-frontend.py` (bzw. den Backend-Pendant) bemühen, um die Survivor-Stellen zu sehen – ein zusätzlicher Lauf für Information, die der eben abgeschlossene Lauf bereits hatte. Konkret in dieser Session beim 98,1-%-Survivor (Fokus-Guard) aufgetreten.
+- Entscheidung/Maßnahme: offen – beim Drain entscheiden. Kandidat: `qa-check` gibt bei < 100 % die `[Survived]`-Zeilen direkt mit aus (aus dem bereits vorliegenden Stryker-Report), damit kein Zweitlauf nötig ist. Vor Umsetzung Häufigkeit/Reibung prüfen (Impact gering).
+- Bezug: OBS-S085-3
+
+---
+
 ## OBS-S085-2 – Zu verbose Kommunikation (Orchestrator↔Subagenten) verschwendet Token
 - Quelle: User
 - Status: IN BEOBACHTUNG bis S105

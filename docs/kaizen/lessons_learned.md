@@ -43,6 +43,28 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 100 – 2026-07-06
+
+- **[MITTEL] [TOOLING] [Mutation-Testing] LL-S100-1 – Parallele/gekillte Stryker-Läufe korrumpieren die geteilte `.stryker-tmp`-Sandbox**
+  Quelle: Orchestrator
+  Was: Gleichzeitige qa-check/Stryker-Läufe (mehrere Orchestrator- + Subagent-Läufe) teilten dieselbe `.stryker-tmp`-Sandbox → ENOENT-copyfile-Crash + schwankende Scores (94–98 %); gekillte Läufe ließen Sandboxes liegen → 100 falsche ESLint-Fehler.
+  Warum: `RunLock` prüfte-dann-schrieb (TOCTOU, nicht atomar), niemand pre-cleante die Sandbox, und `.stryker-tmp` war weder gitignored noch ESLint-ignoriert.
+  Regel: Werkzeuge mit geteilter Sandbox strukturell gegen Parallellauf absichern (atomarer Lock), die Sandbox vor jedem Lauf frisch herstellen und Build-Artefakte aus Lint/VCS ausschließen – nicht auf serielle Disziplin verlassen.
+
+- **[MITTEL] [PROZESS] [Gherkin] LL-S100-2 – Review fand reale, aber szenariolose Bugs → Discovery enumerierte Reset-nach-Fehler + Aktion-während-Pending nicht**
+  Quelle: Orchestrator
+  Was: Der Review-Loop deckte zwei reale user-facing Bugs auf (Stale-Fehler nach Fehler→Abbrechen→Reopen; Datenverlust-Race bei Abbrechen während des Speicherns), für die kein Szenario existierte.
+  Warum: Die gherkin-workshop-Discovery spielt „Rest-Zustand nach Schließen ohne Erfolg" und „Sperren *aller* Kontrollen während Pending" nicht systematisch durch – nur der auslösende Button bekam ein Pending-Szenario.
+  Regel: Bei Dialogen/Formularen in der Discovery pro Kontrolle „während Pending gesperrt?" und „welcher Zustand überlebt Schließen-ohne-Erfolg?" durchspielen und Cross-Szenario-Interaktionen (Fehler×Abbrechen, Pending×Abbrechen) explizit enumerieren.
+
+- **[MITTEL] [TOOLING] [Hook/Script] LL-S100-3 – Test-Datei-Erkennung blind für echte `.test.tsx`-Konvention, verdeckt durch Fixtures mit Fake-Konvention**
+  Quelle: Orchestrator
+  Was: `qa-check._is_test_file` erkannte `.test.tsx` nicht → der Test-Freigabe-Audit lief für jeden Frontend-Run leer (griff nie), unbemerkt.
+  Warum: Die Regex kannte nur `.spec.ts`/`Tests.cs`; die Script-Fixtures benutzten `Client/src/*.spec.ts` – eine im Repo real nicht existierende Konvention (echte Frontend-Tests sind `.test.tsx`) – und trafen so zufällig die kaputte Regex.
+  Regel: Test-Fixtures an den realen Namenskonventionen des Repos ausrichten, nicht an erfundenen – sonst verdecken sie genau den Bug, den sie fangen sollen (grüne Tests über totem Code-Pfad).
+
+---
+
 ## Session 099 – 2026-07-04
 
 - **[MITTEL] [PROZESS] [Doku] LL-S099-2 – Mechanismus nur über seinen Fehler dokumentiert → Ersatz droht valide Zweitfunktion zu verlieren**

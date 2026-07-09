@@ -73,6 +73,57 @@ test.describe('US904_HappyPath: Zutaten verwalten', () => {
     await expect(page.getByText('Oregano')).toHaveCount(0)
   })
 
+  // Szenario: Pflichtfelder im Dialog sind als solche markiert
+  test('US904_HappyPath_OpenCreateDialog_RequiredFieldsAreMarked', async ({ page }) => {
+    // When: ich auf "Zutat anlegen" klicke
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+
+    // Then: Name-Feld und Einheit-Feld sind als Pflichtfeld markiert. Geprüft wird das
+    //   USER-SICHTBARE Signal – der Asterisk im Label – als maßgebliche Beobachtung von
+    //   "markiert" (UX-Guideline Prinzip 8). Zusätzlich die native `required`-Property, die
+    //   die semantische/a11y-Zuschreibung absichert (aria-required) und den Mutanten
+    //   "required-Prop entfernt" tötet. getByLabel matcht per Substring weiter "Name"/"Einheit".
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.locator('label').filter({ hasText: /^Name/ })).toContainText('*')
+    await expect(dialog.locator('label').filter({ hasText: /^Einheit/ })).toContainText('*')
+    await expect(page.getByLabel('Name')).toHaveJSProperty('required', true)
+    await expect(page.getByLabel('Einheit')).toHaveJSProperty('required', true)
+  })
+
+  // Szenario: Beim Öffnen des Dialogs liegt der Fokus auf dem ersten Feld
+  test('US904_HappyPath_OpenCreateDialog_FocusOnFirstField', async ({ page }) => {
+    // When: ich auf "Zutat anlegen" klicke
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+
+    // Then: das Name-Feld ist das erste Eingabefeld im Dialog (DOM-Reihenfolge == visuelle
+    //   Reihenfolge, UX-Guideline: Felder nicht per CSS umsortieren). Regex /Name/ ist robust,
+    //   falls der Pflicht-Asterisk in den Accessible Name einfließt ("Name *").
+    const inputs = page.getByRole('dialog').getByRole('textbox')
+    await expect(inputs.first()).toHaveAccessibleName(/Name/)
+    // Then: das Name-Feld hat den Fokus
+    await expect(page.getByLabel('Name')).toBeFocused()
+  })
+
+  // Szenario: Speichern-Button ist während des Speicherns deaktiviert
+  test('US904_HappyPath_SaveInFlight_SaveButtonIsDisabled', async ({ page }) => {
+    // Given: der POST wird künstlich verzögert, damit der Pending-Zustand beobachtbar ist,
+    //   bevor die Antwort eintrifft (ohne Verzögerung wäre das Fenster nicht messbar).
+    await page.route('**/api/ingredients', async (route) => {
+      if (route.request().method() !== 'POST') { await route.continue(); return }
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await route.continue()
+    })
+
+    // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Tomaten')
+    await page.getByLabel('Einheit').fill('Stück')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: der "Speichern"-Button ist deaktiviert, solange die Antwort aussteht
+    await expect(page.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+  })
+
   // Szenario: Zutat anlegen
   test('US904_HappyPath_CreateIngredient_ValidData_IngredientAppearsInList', async ({ page }) => {
     // When: Dialog öffnen, Name + Einheit eingeben, speichern

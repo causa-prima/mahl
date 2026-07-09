@@ -180,7 +180,9 @@ def _parse_report(report_path: Path) -> tuple[str, str]:
 # ── Git-Checks (layer-scoped) ─────────────────────────────────────────────────
 
 def _is_test_file(path: str) -> bool:
-    return bool(re.search(r'(\.spec\.ts|Tests\.cs|Test\.cs)$', path))
+    # Vitest-Unit-Tests (.test.ts/.test.tsx, Frontend-Regelfall unter Client/src/),
+    # Playwright-E2E (.spec.ts/.spec.tsx) und Backend-xUnit (…Tests.cs/…Test.cs).
+    return bool(re.search(r'(\.test\.tsx?|\.spec\.tsx?|Tests\.cs|Test\.cs)$', path))
 
 
 def check_changed_test_files(layer: str) -> list[str]:

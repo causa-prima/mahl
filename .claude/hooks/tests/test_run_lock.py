@@ -62,3 +62,17 @@ def test_corrupt_lock_reclaimed(tmp_path):
     # // When / // Then der Lock wird übernommen statt zu blockieren
     with rl.RunLock(target):
         assert lock_file.read_text(encoding="utf-8").strip() == str(os.getpid())
+
+
+def test_live_lock_not_clobbered_on_abort(tmp_path):
+    # // Given ein Lockfile einer lebenden fremden PID (1 = init)
+    target = tmp_path / "stryker_out.txt"
+    lock_file = tmp_path / "stryker_out.txt.lock"
+    lock_file.write_text("1", encoding="utf-8")
+    # // When ein konkurrierender Lauf abbricht (atomare O_EXCL-Erzeugung schlägt fehl)
+    with pytest.raises(SystemExit):
+        with rl.RunLock(target):
+            pass
+    # // Then bleibt der fremde Lock-Inhalt unangetastet – kein Schreiben vor bestätigtem
+    #        Ownership (das TOCTOU-Fenster der read-then-write-Variante ist geschlossen).
+    assert lock_file.read_text(encoding="utf-8").strip() == "1"

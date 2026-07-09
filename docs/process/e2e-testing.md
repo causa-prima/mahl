@@ -103,6 +103,16 @@ E2E-Tests prüfen **beobachtbares Verhalten**, nicht Implementierungsdetails:
 
 Vollständige Full-State-Assertion-Regeln: `docs/process/tdd-process.md` Abschnitt "Pflicht: Full State Assertion".
 
+### Sichtbares Signal statt Proxy-Attribut
+
+Fordert ein Szenario ein **user-sichtbares** Signal („markiert", „hervorgehoben", „ausgegraut"),
+prüfe das sichtbare Signal selbst – nicht nur das zugrunde liegende Attribut, das es *technisch*
+erzeugt. Beispiel: „Pflichtfeld ist markiert" → den sichtbaren Asterisk im Label prüfen
+(`toContainText('*')`), nicht allein die `required`-Property. Die Attribut-Assertion darf als
+**Zusatz** die Semantik/a11y absichern (und tötet den „Attribut-entfernt"-Mutanten), ersetzt aber
+nicht die Prüfung dessen, was der Nutzer tatsächlich sieht: entkoppelt ein Refactor Attribut und
+Anzeige (z.B. CSS-Klasse statt Framework-Default), fiele eine reine Attribut-Assertion nicht auf.
+
 ### Rollen-Queries bei offenem Dialog/Overlay
 
 Ein offener MUI-`Dialog` setzt `aria-hidden` auf den restlichen DOM-Baum. Playwrights rollenbasierte Locators ignorieren versteckte Elemente per Default und finden Hintergrund-Inhalt dann **scheinbar grundlos** nicht. Müssen bei offenem Dialog/Overlay Hintergrund-Elemente über ihre Rolle abgefragt werden (z.B. die Liste hinter einem „Anlegen"-Dialog), `{ includeHidden: true }` setzen: `page.getByRole('listitem', { includeHidden: true })`. (Pendant für Komponententests: `coding-guideline-typescript.md`, `{ hidden: true }`.)

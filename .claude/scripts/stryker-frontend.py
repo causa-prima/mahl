@@ -25,6 +25,7 @@ _SCRIPTS_DIR  = Path(__file__).parent
 _REPO_ROOT    = _SCRIPTS_DIR.parent.parent
 _TMP_FILE     = _SCRIPTS_DIR.parent / "tmp" / "stryker_frontend_out.txt"
 _CLIENT_DIR   = _REPO_ROOT / "Client"
+_STRYKER_TMP  = _CLIENT_DIR / ".stryker-tmp"
 _STRYKER_SRC  = _CLIENT_DIR / "reports" / "mutation"
 _OUTPUT_BASE  = _REPO_ROOT / "StrykerOutput" / "Frontend"
 
@@ -65,6 +66,11 @@ def main() -> None:
     print(f"Output → {_TMP_FILE}")
 
     with RunLock(_TMP_FILE), open(_TMP_FILE, "w", encoding="utf-8") as out:
+        # Pre-Clean innerhalb des Locks: liegengebliebene Sandboxes aus gekillten/gecrashten
+        # Läufen entfernen. Stryker räumt .stryker-tmp/sandbox-XXX nur bei sauberem Abschluss
+        # weg; ein Rest poisont den nächsten Lauf (ENOENT beim copyfile) und verfälscht ESLint.
+        # Im Lock ausgeführt → kein Wettlauf mit einem Parallellauf (den weist der Lock ohnehin ab).
+        shutil.rmtree(_STRYKER_TMP, ignore_errors=True)
         result = subprocess.run(stryker_args, cwd=str(_CLIENT_DIR), stdout=out, stderr=subprocess.STDOUT)
 
     if _TMP_FILE.exists():

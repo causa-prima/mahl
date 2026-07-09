@@ -20,6 +20,14 @@ async function renderEmptyIngredientsPage() {
   return screen.findByRole('button', { name: 'Zutat anlegen' })
 }
 
+// Der Dialog setzt den Autofokus verzögert (erst nach der Öffnen-Transition, via
+// onEntered). Wer unmittelbar nach dem Öffnen tippt, riskiert, dass der Fokus mitten
+// im Tippen zurück aufs Name-Feld springt und Zeichen im falschen Feld landen. Daher
+// vor dem ersten user.type auf den abgeschlossenen Autofokus warten.
+async function awaitDialogAutofocus() {
+  await waitFor(() => { expect(screen.getByLabelText(/^Name/)).toHaveFocus() })
+}
+
 const tomaten = { id: '1', name: 'Tomaten', defaultUnit: 'Stück' } as const
 
 const salz = { id: '7', name: 'Salz', defaultUnit: 'g' } as const
@@ -87,12 +95,12 @@ describe('IngredientsPage', () => {
     fireEvent.click(openButton)
 
     // Then: Name-Feld ist leer
-    expect(await screen.findByLabelText('Name')).toHaveValue('')
+    expect(await screen.findByLabelText(/^Name/)).toHaveValue('')
     // Then: Einheit-Feld ist leer
-    expect(screen.getByLabelText('Einheit')).toHaveValue('')
+    expect(screen.getByLabelText(/^Einheit/)).toHaveValue('')
     // Then: ohne Fehler ist das Name-Feld NICHT als ungültig markiert
     //   (killt den Dauer-error={true}-Mutanten am Name-Feld)
-    expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
   })
 
   it('US904_HappyPath_OpenCreateDialog_ClosedInitially_FieldsAbsent', async () => {
@@ -102,8 +110,8 @@ describe('IngredientsPage', () => {
     await renderEmptyIngredientsPage()
 
     // Then: Dialog noch nicht geöffnet -> Felder nicht im DOM
-    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Einheit')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Name/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Einheit/)).not.toBeInTheDocument()
   })
 
   it('US904_HappyPath_ReopenDialogAfterCancel_FieldsAreEmpty', async () => {
@@ -113,13 +121,14 @@ describe('IngredientsPage', () => {
 
     // When: ich auf "Zutat anlegen" klicke und beide Felder befülle
     fireEvent.click(openButton)
-    await user.type(await screen.findByLabelText('Name'), 'Knoblauch')
-    await user.type(screen.getByLabelText('Einheit'), 'Zehen')
+    await awaitDialogAutofocus()
+    await user.type(screen.getByLabelText(/^Name/), 'Knoblauch')
+    await user.type(screen.getByLabelText(/^Einheit/), 'Zehen')
 
     // Then (Zwischenzustand): Eingaben sind angekommen
     //   (Voraussetzung dafür, dass "Abbrechen" sie überhaupt verwerfen kann)
-    expect(screen.getByLabelText('Name')).toHaveValue('Knoblauch')
-    expect(screen.getByLabelText('Einheit')).toHaveValue('Zehen')
+    expect(screen.getByLabelText(/^Name/)).toHaveValue('Knoblauch')
+    expect(screen.getByLabelText(/^Einheit/)).toHaveValue('Zehen')
 
     // When: ich auf "Abbrechen" klicke
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
@@ -134,9 +143,39 @@ describe('IngredientsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Zutat anlegen' }))
 
     // Then: Name-Feld ist leer
-    expect(await screen.findByLabelText('Name')).toHaveValue('')
+    expect(await screen.findByLabelText(/^Name/)).toHaveValue('')
     // Then: Einheit-Feld ist leer
-    expect(screen.getByLabelText('Einheit')).toHaveValue('')
+    expect(screen.getByLabelText(/^Einheit/)).toHaveValue('')
+  })
+
+  // Szenario: Pflichtfelder im Dialog sind als solche markiert
+  it('US904_HappyPath_OpenCreateDialog_RequiredFieldsAreMarked', async () => {
+    // Given: leere Zutaten-Seite (Background: Anwendung gestartet, Zutaten-Seite)
+    const openButton = await renderEmptyIngredientsPage()
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(openButton)
+
+    // Then: das Name-Feld ist als Pflichtfeld markiert
+    expect(await screen.findByLabelText(/^Name/)).toBeRequired()
+    // Then: das Einheit-Feld ist als Pflichtfeld markiert
+    expect(screen.getByLabelText(/^Einheit/)).toBeRequired()
+  })
+
+  // Szenario: Beim Öffnen des Dialogs liegt der Fokus auf dem ersten Feld
+  it('US904_HappyPath_OpenCreateDialog_FocusOnFirstField', async () => {
+    // Given: leere Zutaten-Seite (Background: Anwendung gestartet, Zutaten-Seite)
+    const openButton = await renderEmptyIngredientsPage()
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(openButton)
+
+    // Then: das Name-Feld ist das erste Eingabefeld im Dialog
+    const nameField = await screen.findByLabelText(/^Name/)
+    const dialogTextboxes = within(screen.getByRole('dialog')).getAllByRole('textbox')
+    expect(dialogTextboxes[0]).toBe(nameField)
+    // Then: das Name-Feld hat den Fokus
+    await waitFor(() => { expect(nameField).toHaveFocus() })
   })
 
   it('US904_HappyPath_CancelDialog_ClosesDialogAndDiscardsInput', async () => {
@@ -146,8 +185,9 @@ describe('IngredientsPage', () => {
 
     // When: ich auf "Zutat anlegen" klicke
     fireEvent.click(openButton)
+    await awaitDialogAutofocus()
     // When: ich "Oregano" als Name eingebe
-    await user.type(await screen.findByLabelText('Name'), 'Oregano')
+    await user.type(screen.getByLabelText(/^Name/), 'Oregano')
     // When: ich auf "Abbrechen" klicke
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
 
@@ -192,10 +232,11 @@ describe('IngredientsPage – Zutat anlegen', () => {
 
     // When: ich auf "Zutat anlegen" klicke
     fireEvent.click(openButton)
+    await awaitDialogAutofocus()
     // When: ich "Tomaten" als Name eingebe
-    await user.type(await screen.findByLabelText('Name'), 'Tomaten')
+    await user.type(screen.getByLabelText(/^Name/), 'Tomaten')
     // When: ich "Stück" als Einheit eingebe
-    await user.type(screen.getByLabelText('Einheit'), 'Stück')
+    await user.type(screen.getByLabelText(/^Einheit/), 'Stück')
     // When: ich auf "Speichern" klicke
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
 
@@ -214,6 +255,46 @@ describe('IngredientsPage – Zutat anlegen', () => {
     // Then: der POST sendete JSON (Content-Type), damit das Backend den Body bindet
     expect(captured.current?.contentType).toBe('application/json')
   })
+
+  // Szenario: Speichern-Button ist während des Speicherns deaktiviert
+  it('US904_HappyPath_SaveInFlight_SaveButtonIsDisabled', async () => {
+    // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst – so ist das
+    //   Pending-Fenster deterministisch beobachtbar (kein Timer-Race).
+    // eslint-disable-next-line functional/no-let -- Resolver wird im POST-Handler befuellt
+    let resolvePost: () => void = () => {}
+    const postPending = new Promise<void>((resolve) => { resolvePost = resolve })
+    server.use(
+      http.get('/api/ingredients', () => HttpResponse.json([])),
+      http.post('/api/ingredients', async () => {
+        await postPending
+        return HttpResponse.json(tomaten, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<IngredientsPage />)
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    // When: ich "Tomaten" als Name eingebe
+    await user.type(screen.getByLabelText(/^Name/), 'Tomaten')
+    // When: ich "Stück" als Einheit eingebe
+    await user.type(screen.getByLabelText(/^Einheit/), 'Stück')
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: der "Speichern"-Button ist deaktiviert, solange die Antwort aussteht
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+    })
+
+    // Cleanup (kein Szenario-Assert, reine Test-Infrastruktur): POST auflösen und das
+    //   Schließen des Dialogs abwarten, damit kein hängender Handler in den nächsten Test läuft.
+    resolvePost()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
 })
 
 describe('IngredientsPage – Zutat anlegen schlägt fehl (leerer Name)', () => {
@@ -223,9 +304,10 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leerer Name)', () => 
     const user = userEvent.setup()
     renderWithProviders(<IngredientsPage />)
     fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
     // When: ich keinen Namen eingebe (Name-Feld bleibt leer)
     // When: ich "g" als Einheit eingebe
-    await user.type(await screen.findByLabelText('Einheit'), 'g')
+    await user.type(screen.getByLabelText(/^Einheit/), 'g')
     // When: ich auf "Speichern" klicke
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
   }
@@ -240,7 +322,7 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leerer Name)', () => 
     // Then: ich sehe die Fehlermeldung "Name darf nicht leer sein."
     expect(await screen.findByText('Name darf nicht leer sein.')).toBeInTheDocument()
     // Then: das Name-Feld ist als ungültig markiert (a11y-Fehlerzustand, UX-Guideline §4)
-    expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('US904_Error_CreateIngredient_EmptyName_KeepsDialogOpen', async () => {
@@ -299,8 +381,9 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
     const user = userEvent.setup()
     renderWithProviders(<IngredientsPage />)
     fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
     // When: ich "Salz" als Name eingebe
-    await user.type(await screen.findByLabelText('Name'), 'Salz')
+    await user.type(screen.getByLabelText(/^Name/), 'Salz')
     // When: ich keine Einheit eingebe (Einheit-Feld bleibt leer)
     // When: ich auf "Speichern" klicke
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
@@ -316,7 +399,7 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
     // Then: ich sehe die Fehlermeldung "Einheit darf nicht leer sein."
     expect(await screen.findByText('Einheit darf nicht leer sein.')).toBeInTheDocument()
     // Then: das Einheit-Feld ist als ungültig markiert (a11y-Fehlerzustand, UX-Guideline §4)
-    expect(screen.getByLabelText('Einheit')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/^Einheit/)).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('US904_Error_CreateIngredient_EmptyUnit_MarksOnlyUnitField', async () => {
@@ -327,10 +410,10 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
     await submitEmptyUnitWithNameSalz()
 
     // Then: das Einheit-Feld ist als ungültig markiert (der defaultUnit-Fehler landet dort)
-    expect(await screen.findByLabelText('Einheit')).toHaveAttribute('aria-invalid', 'true')
+    expect(await screen.findByLabelText(/^Einheit/)).toHaveAttribute('aria-invalid', 'true')
     // Then: das Name-Feld ist NICHT als ungültig markiert (der Fehler betrifft nur die
     //   Einheit) — killt den Mutanten "es wird immer dasselbe Feld markiert" und treibt
     //   den name-absent-Zweig (FieldErrors ohne name-Key).
-    expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
   })
 })

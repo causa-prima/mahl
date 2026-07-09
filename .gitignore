@@ -397,3 +397,5 @@ playwright-report/
 # Stryker mutation reports
 Client/reports/
 StrykerOutput/
+# Stryker-Sandbox (bei Crash liegen geblieben; regenerierbar) – nicht committen/linten
+.stryker-tmp/

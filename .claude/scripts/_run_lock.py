@@ -41,18 +41,41 @@ class RunLock:
 
     def __enter__(self) -> "RunLock":
         self._lock_path.parent.mkdir(parents=True, exist_ok=True)
-        existing = self._read_existing_pid()
-        if existing is not None and existing != os.getpid() and _pid_alive(existing):
-            print(
-                f"⛔ Konkurrierender Stryker-Lauf aktiv (PID {existing}, Lock {self._lock_path}).\n"
-                f"   Erst beenden lassen – paralleles Schreiben würde Report/Output korrumpieren.\n"
-                f"   Verwaister Lock? Datei manuell löschen: {self._lock_path}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        # Lock übernehmen (eigene PID eintragen; überschreibt verwaisten Lock).
-        self._lock_path.write_text(str(os.getpid()), encoding="utf-8")
-        return self
+        # Zwei Versuche: erster akquiriert oder trifft auf Bestand; bei verwaistem Lock
+        # wird er entfernt und der zweite Versuch akquiriert atomar. Mehr als ein Retry
+        # ist nicht nötig – hält beim zweiten Mal ein *lebender* Fremdlauf den Lock,
+        # brechen wir ab (kein Endlos-Loop).
+        for _ in range(2):
+            try:
+                # Atomare Erzeugung (O_EXCL): schlägt fehl, wenn die Datei existiert. Kein
+                # TOCTOU-Fenster wie bei read-then-write – zwei quasi-gleichzeitig gestartete
+                # Läufe können NICHT beide akquirieren (nur einer gewinnt das exklusive create),
+                # womit sie sich nicht mehr dieselbe .stryker-tmp-Sandbox teilen (ENOENT/Contention).
+                fd = os.open(self._lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            except FileExistsError:
+                existing = self._read_existing_pid()
+                if existing is not None and existing != os.getpid() and _pid_alive(existing):
+                    self._abort(existing)
+                # Verwaister Lock (Prozess tot / nicht parsebar) → entfernen, erneut versuchen.
+                try:
+                    self._lock_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                continue
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(str(os.getpid()))
+            return self
+        # Zweiter Versuch scheiterte ebenfalls (ein Fremdlauf hat den Lock inzwischen belegt).
+        self._abort(self._read_existing_pid())
+
+    def _abort(self, pid: int | None) -> "RunLock":
+        print(
+            f"⛔ Konkurrierender Stryker-Lauf aktiv (PID {pid}, Lock {self._lock_path}).\n"
+            f"   Erst beenden lassen – paralleles Schreiben würde Report/Output korrumpieren.\n"
+            f"   Verwaister Lock? Datei manuell löschen: {self._lock_path}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     def __exit__(self, *_exc) -> None:
         try:

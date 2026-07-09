@@ -25,9 +25,9 @@ Eintrag-Format:
 
 ---
 
-## TD-S077-1 — Frontend Komponente: Dialog ohne `onClose`, manuelles State-Sync
+## TD-S077-1 — Frontend Komponente: manuelles State-Sync + UX-Politur
 **Priorität:** Niedrig
-**Problem:** Dialog ohne `onClose` (kein Esc/Backdrop). `isDialogOpen` + `closeDialog` synct 3 `useState`-Slices manuell. UX-Politur offen: `<p>`→`Typography`, TextFields `fullWidth`/`margin`, Layout-Container/Heading.
+**Problem:** `isDialogOpen` + `closeDialog` synct 3 `useState`-Slices manuell. UX-Politur offen: `<p>`→`Typography`, TextFields `fullWidth`/`margin`, Layout-Container/Heading.
 **Behebung/Trigger:** Eigenes Mini-Szenario; bei Speichern/Validierung auf Discriminated Union umstellen.
 
 ---
@@ -56,7 +56,7 @@ Eintrag-Format:
 ## TD-S083-3 — Frontend: Cold-Start-Race beim ersten GET
 **Priorität:** Niedrig
 **Problem:** Feuert der POST/`invalidateQueries`, während der initiale Listen-GET noch in-flight ist, koalesziert react-query und nutzt das stale leere Ergebnis (kein zweiter GET) → gerade angelegte Zutat erscheint nicht. Nur bei kaltem Server / langsamem erstem GET (warm: unkritisch).
-**Behebung/Trigger:** pending-State-Szenario („Speichern-Button deaktiviert") sperrt den Save bis zum Settle der Query.
+**Behebung/Trigger:** Save (bzw. den POST) sperren, bis der initiale Listen-GET **gesettled** ist – z.B. Speichern-Button `disabled`, solange die Ingredients-Query `isPending`/`isLoading`. **Achtung:** run-2's `disabled={isPending}` löst das *nicht* – dessen `isPending` ist der Pending-State der *POST-Mutation* (sperrt während des Speicherns, nachdem der POST schon feuerte), nicht der des initialen GET.
 
 ---
 
@@ -109,7 +109,7 @@ Eintrag-Format:
 
 ---
 
-## TD-S094-1 — Zutaten-Dialog: Formular-UX-Baseline (Prinzip 8) unvollständig
-**Priorität:** Mittel – mit den nächsten Baseline-Szenarien am selben Dialog
-**Problem:** Der Zutaten-Dialog erfüllt UX-Guideline Prinzip 8 noch nicht: (1) **Fokus aufs erste fehlerhafte Feld** ist in den Error-Szenarien „leere Einheit" (→ Fokus Einheit) und „beide leer" (→ Fokus Name) bereits als Assert spezifiziert, aber nicht implementiert — und **unsichtbar für `next_run.py`**, weil die Szenarien schon „done" sind (Asserts nachträglich ergänzt); (2) **Enter sendet nicht ab** — der Dialog nutzt einen `onClick`-Button statt eines echten `<form>` mit `type="submit"`. Escape/`onClose` ist separat als **TD-S077-1** erfasst.
-**Behebung/Trigger:** Gemeinsam mit den nächsten Baseline-Szenarien (Pflichtfeld-Markierung, Autofokus) am Zutaten-Dialog umsetzen; per Review (Prinzip 8) erzwungen.
+## TD-S094-1 — Zutaten-Dialog: Fokus aufs erste fehlerhafte Feld fehlt (Prinzip 8)
+**Priorität:** Mittel – passend zu run-4 „Anlegen·Einheit-Validierung"
+**Problem:** Nach einem Validierungsfehler springt der Fokus nicht aufs erste fehlerhafte Feld (UX-Guideline Prinzip 8); die Error-Tests prüfen nur `aria-invalid`, nicht den Fokus. Der Fehlerpfad wird erst von den @US-904-error-Läufen getrieben – run-2 (Dialog-Verhalten, Happy-Path) enthält kein Szenario, das Fokus-nach-Fehler beobachtbar macht.
+**Behebung/Trigger:** Braucht ein Szenario (spec-first), das den Fokus-nach-Fehler fordert – passend zu run-4 „Einheit-Validierung", wo der Fehlerpfad das treibende Szenario ist; per Review (Prinzip 8) erzwungen.
