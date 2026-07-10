@@ -11,6 +11,28 @@ async function captureIngredientList(page: Readonly<Page>) {
   return { listItems, itemsBefore: await listItems.count() }
 }
 
+// > MUI theme.transitions.duration.leavingScreen (225ms, MUI-Default) + Marge. Settle-Fenster
+// VOR Assertions, die sich auf "Dialog noch sichtbar" verlassen: eine (fälschliche) Close-
+// Transition bräuchte diese Zeit, um zu greifen – ohne das Fenster wäre die Assertion ein
+// Transition-Artefakt statt echtes Verhalten.
+const DIALOG_EXIT_SETTLE_MS = 400
+
+// Rule-of-Three: die 3 Pending-Tests unten (Speichern-/Abbrechen-Button disabled, Escape
+// schließt nicht) teilen dieses Setup – künstlich verzögerter POST (damit der Pending-Zustand
+// vor der Antwort beobachtbar ist) + Dialog öffnen/befüllen/Speichern-Klick.
+async function submitWithDelayedPost(page: Readonly<Page>): Promise<void> {
+  await page.route('**/api/ingredients', async (route) => {
+    if (route.request().method() !== 'POST') { await route.continue(); return }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await route.continue()
+  })
+
+  await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+  await page.getByLabel('Name').fill('Tomaten')
+  await page.getByLabel('Einheit').fill('Stück')
+  await page.getByRole('button', { name: 'Speichern' }).click()
+}
+
 // ADR-S084-4 Addendum: per-Test-DB-Isolation. Vor JEDEM Test die E2E-DB leeren (E2E-only Reset-Endpoint,
 // nur bei ASPNETCORE_ENVIRONMENT=E2E gemappt) -> jeder Test startet gegen eine leere DB, keine
 // Residual-Akkumulation über Läufe/Tests hinweg. Auf Datei-Ebene registriert -> läuft vor den
@@ -106,22 +128,69 @@ test.describe('US904_HappyPath: Zutaten verwalten', () => {
 
   // Szenario: Speichern-Button ist während des Speicherns deaktiviert
   test('US904_HappyPath_SaveInFlight_SaveButtonIsDisabled', async ({ page }) => {
-    // Given: der POST wird künstlich verzögert, damit der Pending-Zustand beobachtbar ist,
-    //   bevor die Antwort eintrifft (ohne Verzögerung wäre das Fenster nicht messbar).
-    await page.route('**/api/ingredients', async (route) => {
-      if (route.request().method() !== 'POST') { await route.continue(); return }
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      await route.continue()
-    })
-
-    // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken
-    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
-    await page.getByLabel('Name').fill('Tomaten')
-    await page.getByLabel('Einheit').fill('Stück')
-    await page.getByRole('button', { name: 'Speichern' }).click()
+    // Given + When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper) –
+    //   der POST bleibt künstlich verzögert, das Pending-Fenster ist so beobachtbar.
+    await submitWithDelayedPost(page)
 
     // Then: der "Speichern"-Button ist deaktiviert, solange die Antwort aussteht
     await expect(page.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+  })
+
+  // Szenario: Abbrechen ist während des Speicherns deaktiviert
+  test('US904_HappyPath_SaveInFlight_CancelButtonIsDisabled', async ({ page }) => {
+    // Given + When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
+    await submitWithDelayedPost(page)
+
+    // Then: der "Abbrechen"-Button ist deaktiviert, solange die Antwort aussteht
+    await expect(page.getByRole('button', { name: 'Abbrechen' })).toBeDisabled()
+  })
+
+  // Szenario: Der Dialog lässt sich während des Speicherns nicht per Escape schließen
+  test('US904_HappyPath_SaveInFlight_EscapeDoesNotCloseDialog', async ({ page }) => {
+    // Given + When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
+    await submitWithDelayedPost(page)
+    // When (Zwischenzustand, Parität zum Component-Test): Pending-Zustand ist erreicht,
+    //   bevor Escape gedrückt wird – schließt den Race, in dem Escape vor dem Pending-Zustand
+    //   feuert und der Guard das Fenster verpasst.
+    await expect(page.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+    // When: ich Escape drücke – aus dem noch aktiven Name-Feld heraus (Fokus IM Dialog): sonst
+    //   fiele der Fokus vom deaktivierten Speichern-Button auf <body> außerhalb des Modals, und
+    //   der MUI-Escape-Handler würde gar nicht erst erreicht -> der Test wäre ohne echten Guard
+    //   grün (Fokus-Artefakt statt Verhalten). So schlägt Escape ohne Guard tatsächlich bis zum
+    //   onClose durch.
+    await page.getByLabel('Name').press('Escape')
+
+    // Then: der "Zutat anlegen"-Dialog ist weiterhin geöffnet, solange die Antwort aussteht.
+    //   Settle-Fenster VOR der Assertion (s. DIALOG_EXIT_SETTLE_MS): eine (fälschliche) Escape-
+    //   getriebene Close-Transition hätte damit Zeit zu greifen – sonst sähe toBeVisible den
+    //   Dialog während des Ausblendens noch fälschlich als sichtbar. DIALOG_EXIT_SETTLE_MS
+    //   liegt sicher im 1000-ms-Pending-Fenster, der POST ist also noch offen: das Einzige, was
+    //   den Dialog schließen könnte, wäre ein fehlender Escape-Guard.
+    await page.waitForTimeout(DIALOG_EXIT_SETTLE_MS)
+    await expect(page.getByRole('dialog')).toBeVisible()
+  })
+
+  // Szenario: Der Dialog lässt sich während des Speicherns nicht per Backdrop-Klick schließen
+  test('US904_HappyPath_SaveInFlight_BackdropClickDoesNotCloseDialog', async ({ page }) => {
+    // Given + When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
+    await submitWithDelayedPost(page)
+    // When (Zwischenzustand, Parität zum Escape-Test): Pending-Zustand ist erreicht, bevor
+    //   der Backdrop-Klick erfolgt – schließt den Race, in dem der Klick vor dem Pending-Zustand
+    //   feuert und der Guard das Fenster verpasst.
+    await expect(page.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+    // When: ich neben den Dialog klicke. MUI löst den Backdrop-Klick über den Klick auf den
+    //   `.MuiDialog-container` (role=presentation, füllt den Viewport, liegt ÜBER dem Backdrop)
+    //   aus: nur ein Klick, dessen target === currentTarget (also der Container selbst, nicht das
+    //   Paper), zählt als backdropClick. Position nahe der Ecke -> trifft den Container, nicht das
+    //   zentrierte Paper. Ohne Guard triggert das MUIs onClose(reason='backdropClick').
+    await page.locator('.MuiDialog-container').click({ position: { x: 5, y: 5 } })
+
+    // Then: der "Zutat anlegen"-Dialog ist weiterhin geöffnet, solange die Antwort aussteht.
+    //   Settle-Fenster VOR der Assertion (s. DIALOG_EXIT_SETTLE_MS, analog Escape-Test): eine
+    //   (fälschliche) Close-Transition hätte damit Zeit zu greifen. Der POST ist im Pending-
+    //   Fenster noch offen: das Einzige, was den Dialog schließen könnte, wäre ein fehlender Guard.
+    await page.waitForTimeout(DIALOG_EXIT_SETTLE_MS)
+    await expect(page.getByRole('dialog')).toBeVisible()
   })
 
   // Szenario: Zutat anlegen
@@ -166,6 +235,29 @@ test.describe('US904_EdgeCase: Zutaten verwalten', () => {
     await expect(list.getByText('g', { exact: true })).toHaveText(/^g$/)
     // Then: der "Zutat anlegen"-Dialog ist geschlossen
     await expect(page.getByRole('dialog')).toBeHidden()
+  })
+
+  // Szenario: Nach fehlgeschlagenem Speichern und Abbrechen ist der Dialog beim erneuten Öffnen fehlerfrei
+  test('US904_EdgeCase_ReopenDialogAfterFailedSaveAndCancel_IsErrorFree', async ({ page }) => {
+    // When: Dialog öffnen, nur Einheit "g" eingeben (Name bleibt leer), speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // When: die Fehlermeldung "Name darf nicht leer sein." erscheint (realer 422 vom Backend)
+    await expect(page.getByText('Name darf nicht leer sein.')).toBeVisible()
+
+    // When: ich auf "Abbrechen" klicke -> Dialog schließt (Close-Transition abwarten)
+    await page.getByRole('button', { name: 'Abbrechen' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    // When: ich erneut auf "Zutat anlegen" klicke
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+
+    // Then: keine Fehlermeldung sichtbar (der alte Fehlerzustand ist zurückgesetzt)
+    await expect(page.getByText('Name darf nicht leer sein.')).toHaveCount(0)
+    // Then: das Name-Feld ist nicht als ungültig markiert (aria-invalid zurückgesetzt)
+    await expect(page.getByLabel('Name')).toHaveAttribute('aria-invalid', 'false')
   })
 })
 

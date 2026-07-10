@@ -36,6 +36,11 @@ Reaktionsregeln je Impact: docs/kaizen/process.md
 
 ## Aktive Maßnahmen
 
+### CM-S101-1 – Vakuöse Negativ-/Guard-Tests (grün trotz fehlendem Guard)
+**Impact:** MITTEL | **Kategorie:** QUALITÄT | **Kontext:** TS-Code, TDD | **Status:** AKTIV | **Seit:** S101
+**Problem:** Tests, die prüfen dass etwas NICHT passiert (Dialog schließt nicht bei Escape/Backdrop während Pending), waren vakuös grün – auch ohne den Guard (Escape aus `<body>` erreicht MUIs Handler nie; Backdrop-`fireEvent.click` ohne `mousedown` lässt MUIs zweistufige Erkennung leer; fehlendes Settle-Fenster sieht den Dialog während der Schließ-Transition fälschlich noch im DOM). Bei retroaktivem Spezifizieren emergenten Verhaltens fehlt zudem die RED-Phase, die die Vakuität aufdecken würde (LL-S101-1).
+**Maßnahme:** Regel in `coding-guideline-typescript.md` §6 ergänzt: Negativ-/Guard-Assertions faithful absichern – bei emergentem/retroaktivem Verhalten Guard temporär entfernen → rot bestätigen; bei RED-first ein grün-statt-rot beim ersten Lauf als Vakuität behandeln; MUI-Dialog-Gotchas (Escape aus dem Modal feuern, `mouseDown`+`click` für Backdrop, Settle-Fenster > Exit-Transition). **Wirksamkeit prüfen:** nächste Dialog-Guard-/emergent-Verhalten-Tests auf vakuöse Passes scannen (BEWÄHRT, wenn kein neuer vakuöser Negativ-Test auftritt; Regression → zurück auf AKTIV). Bezug: LL-S101-1.
+
 ### CM-S056-1 – Ad-hoc-Bash statt erlaubter Befehle
 **Impact:** MITTEL | **Kategorie:** TOOLING | **Kontext:** Bash/Permission | **Status:** AKTIV | **Seit:** S056
 **Problem:** Ad-hoc-Bash-Befehle statt erlaubter Befehle aus docs/process/dev-workflow.md (S53: `npx playwright test`)

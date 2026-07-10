@@ -43,6 +43,16 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 101 – 2026-07-10
+
+- **[MITTEL] [QUALITÄT] [TS-Code] LL-S101-1 – Negativ-Assertions sind vakuös-anfällig, brauchen einen Faithfulness-Beweis**
+  Quelle: Orchestrator
+  Was: Zwei Tests („Dialog schließt nicht bei Escape/Backdrop während Pending") waren zunächst vakuös grün – Escape aus `<body>` erreichte MUIs Handler nie; Backdrop-`fireEvent.click` ohne vorheriges `mousedown` ließ MUIs zweistufige Erkennung leer; beide auch ohne den Guard grün.
+  Warum: Negativ-Assertions („X passiert nicht") passen bereits, wenn gar nichts verdrahtet ist; beim retroaktiven Spezifizieren emergenten Verhaltens (Backdrop) fehlt zudem die RED-Phase, die die Vakuität aufdecken würde.
+  Regel: Negativ-/Guard-Assertions faithful absichern – bei retroaktivem/emergentem Verhalten den Guard temporär entfernen und den Test rot sehen; bei RED-first ein grün-statt-rot beim ersten Lauf als Vakuität behandeln (nicht „schon implementiert"). MUI-Dialog-Close-Tests: Escape aus dem Modal feuern, `mouseDown`+`click` für Backdrop, Settle-Fenster > Exit-Transition. (→ coding-guideline-typescript.md §6.)
+
+---
+
 ## Session 100 – 2026-07-06
 
 - **[MITTEL] [TOOLING] [Mutation-Testing] LL-S100-1 – Parallele/gekillte Stryker-Läufe korrumpieren die geteilte `.stryker-tmp`-Sandbox**

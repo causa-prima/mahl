@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 101 | 2026-07-10 | SKELETON (US-904 run-2) | run-2 „Dialog-Verhalten" abgeschlossen: Escape/Backdrop-Sperre + Abbrechen-disabled + Fehler-Reset während Pending (useResultMutation→4-Tupel); Backdrop spec-first + gherkin-workshop-Pending-Policy; LSP für Implementer/Auditoren; LL/CM-S101-1. |
 | 100 | 2026-07-06 | SKELETON (US-904 run-2) | US-904 run-2 „Dialog-Verhalten" (FE-only): required-Asterisk, Autofokus (onEntered), disabled-Save, `<form>`/Escape; useResultMutation→3-Tupel. Guard verworfen (ADR-S100-1). Tooling: `.stryker-tmp` gitignore/pre-clean + atomarer RunLock. 3 Szenarien spec-first. LL-S100-1..3. |
 | 99 | 2026-07-04 | SKELETON (OBS-Drain + Task #35) | OBS-Drain (Backlog 20→13). Drain: OBS-S092-1, S085-10 (Schwere→Impact), S090-1 (typecheck), S090-3 (Alt-Hooks/Fable), S090-5 (TD-Grooming). Task #35: qa-check-Hash index-unabhängig + Blob-Anker-Test-Freigabe-Gate + tsc-Gate (OBS-S090-2/-4 archiviert; LL-S099-2). |
 | 98 | 2026-07-02 | SKELETON (US-904 run-1 + E2E-Infra) | US-904 run-1 „Anlegen·Success" (Trim-Szenario, E2E+Backend). TD-S083-5 behoben: E2E-DB per-Test-Isolation (eigene mahl_e2e via ASPNETCORE_ENVIRONMENT=E2E + Reset-Endpoint, workers:1; ADR-S084-4 Addendum). LL-S098-1..3. |

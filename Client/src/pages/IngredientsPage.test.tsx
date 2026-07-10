@@ -32,6 +32,12 @@ const tomaten = { id: '1', name: 'Tomaten', defaultUnit: 'Stück' } as const
 
 const salz = { id: '7', name: 'Salz', defaultUnit: 'g' } as const
 
+// > MUI theme.transitions.duration.leavingScreen (225ms, MUI-Default) + Marge. Settle-
+// Fenster VOR Assertions, die sich auf "Dialog noch im DOM" verlassen: die Exit-Transition
+// hält den Dialog-Knoten kurz im DOM, unabhängig davon ob ein Guard greift – ohne dieses
+// Fenster wäre die Assertion ein Transition-Artefakt statt echtes Verhalten (s. Escape-Test).
+const DIALOG_EXIT_SETTLE_MS = 300
+
 // @US-904-error: Ausgangszustand = eine bestehende Zutat (Salz); der POST eines
 // leeren Namens beantwortet das Backend mit 422 + feld-keyed Body (ADR-S090-1):
 // { errors: { name: ["Name darf nicht leer sein."] } }. GET liefert unverändert
@@ -223,6 +229,33 @@ describe('IngredientsPage – Zutat anlegen', () => {
     expect(screen.queryByTestId('ingredient-list')).not.toBeInTheDocument()
   })
 
+  // Rule-of-Three: die 3 Pending-Tests unten (Speichern-/Abbrechen-Button disabled, Escape
+  // schließt nicht) teilen dieses Setup – hängender POST via externem Resolver, Dialog
+  // öffnen/befüllen/Speichern-Klick. Liefert `resolvePost`, damit jeder Test den POST selbst
+  // zum gewünschten Zeitpunkt abschließt (Cleanup).
+  async function renderWithPendingSave(): Promise<{ resolvePost: () => void }> {
+    // eslint-disable-next-line functional/no-let -- Resolver wird im POST-Handler befuellt
+    let resolvePost: () => void = () => {}
+    const postPending = new Promise<void>((resolve) => { resolvePost = resolve })
+    server.use(
+      http.get('/api/ingredients', () => HttpResponse.json([])),
+      http.post('/api/ingredients', async () => {
+        await postPending
+        return HttpResponse.json(tomaten, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<IngredientsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    await user.type(screen.getByLabelText(/^Name/), 'Tomaten')
+    await user.type(screen.getByLabelText(/^Einheit/), 'Stück')
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    return { resolvePost }
+  }
+
   it('US904_HappyPath_CreateIngredient_ValidData_IngredientAppearsInList', async () => {
     // Given: leere Zutaten-Seite; nach erfolgreichem POST liefert GET die angelegte Zutat
     const user = userEvent.setup()
@@ -258,30 +291,10 @@ describe('IngredientsPage – Zutat anlegen', () => {
 
   // Szenario: Speichern-Button ist während des Speicherns deaktiviert
   it('US904_HappyPath_SaveInFlight_SaveButtonIsDisabled', async () => {
-    // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst – so ist das
+    // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper) – so ist das
     //   Pending-Fenster deterministisch beobachtbar (kein Timer-Race).
-    // eslint-disable-next-line functional/no-let -- Resolver wird im POST-Handler befuellt
-    let resolvePost: () => void = () => {}
-    const postPending = new Promise<void>((resolve) => { resolvePost = resolve })
-    server.use(
-      http.get('/api/ingredients', () => HttpResponse.json([])),
-      http.post('/api/ingredients', async () => {
-        await postPending
-        return HttpResponse.json(tomaten, { status: 201 })
-      }),
-    )
-    const user = userEvent.setup()
-    renderWithProviders(<IngredientsPage />)
-
-    // When: ich auf "Zutat anlegen" klicke
-    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
-    await awaitDialogAutofocus()
-    // When: ich "Tomaten" als Name eingebe
-    await user.type(screen.getByLabelText(/^Name/), 'Tomaten')
-    // When: ich "Stück" als Einheit eingebe
-    await user.type(screen.getByLabelText(/^Einheit/), 'Stück')
-    // When: ich auf "Speichern" klicke
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
+    const { resolvePost } = await renderWithPendingSave()
 
     // Then: der "Speichern"-Button ist deaktiviert, solange die Antwort aussteht
     await waitFor(() => {
@@ -290,6 +303,90 @@ describe('IngredientsPage – Zutat anlegen', () => {
 
     // Cleanup (kein Szenario-Assert, reine Test-Infrastruktur): POST auflösen und das
     //   Schließen des Dialogs abwarten, damit kein hängender Handler in den nächsten Test läuft.
+    resolvePost()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
+
+  // Szenario: Abbrechen ist während des Speicherns deaktiviert
+  it('US904_HappyPath_SaveInFlight_CancelButtonIsDisabled', async () => {
+    // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper)
+    // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
+    const { resolvePost } = await renderWithPendingSave()
+
+    // Then: der "Abbrechen"-Button ist deaktiviert, solange die Antwort aussteht
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled()
+    })
+
+    // Cleanup: POST auflösen und Schließen abwarten (analog zum Save-Button-Test)
+    resolvePost()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
+
+  // Szenario: Der Dialog lässt sich während des Speicherns nicht per Escape schließen
+  it('US904_HappyPath_SaveInFlight_EscapeDoesNotCloseDialog', async () => {
+    // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper)
+    // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
+    const { resolvePost } = await renderWithPendingSave()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+    })
+
+    // When: ich Escape drücke – aus dem noch aktiven Name-Feld heraus (Fokus IM Dialog):
+    //   sonst fiele der Fokus vom deaktivierten Speichern-Button auf <body> außerhalb des
+    //   Modals, und der MUI-Escape-Handler würde gar nicht erst erreicht -> der Test wäre
+    //   ohne echten Guard grün (Fokus-Artefakt statt Verhalten).
+    const nameField = screen.getByLabelText(/^Name/)
+    nameField.focus()
+    fireEvent.keyDown(nameField, { key: 'Escape', code: 'Escape' })
+
+    // Then: der "Zutat anlegen"-Dialog ist weiterhin geöffnet, solange die Antwort aussteht.
+    //   Settle-Fenster VOR der Assertion: ohne echten Guard triggert Escape ein onClose,
+    //   dessen Exit-Transition den Dialog erst NACH der Transition aus dem DOM entfernt –
+    //   eine sofortige Assertion sähe ihn fälschlich noch als "im Dokument".
+    await new Promise((resolve) => { setTimeout(resolve, DIALOG_EXIT_SETTLE_MS) })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    // Cleanup: POST auflösen und Schließen abwarten (Erfolgspfad schließt regulär).
+    resolvePost()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
+
+  // Szenario: Der Dialog lässt sich während des Speicherns nicht per Backdrop-Klick schließen
+  it('US904_HappyPath_SaveInFlight_BackdropClickDoesNotCloseDialog', async () => {
+    // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper)
+    // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
+    const { resolvePost } = await renderWithPendingSave()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+    })
+
+    // When: ich auf den Backdrop klicke. MUI erkennt "Backdrop" NICHT am Klick-Ziel selbst,
+    //   sondern zweistufig: `onMouseDown` auf dem `.MuiDialog-container` merkt sich
+    //   target === currentTarget (Klick beginnt/endet auf dem Container, nicht auf einem Kind
+    //   wie dem Paper) in einer Ref; der anschließende `onClick` auf dem `.MuiDialog-root`
+    //   liest diese Ref und ruft bei true `onClose(reason='backdropClick')`. Ein reines
+    //   `fireEvent.click` OHNE vorheriges `mousedown` setzt die Ref nie (bliebe vakuös grün,
+    //   unabhängig vom Guard) – daher explizit `mouseDown` vor `click` auf dem Container.
+    const dialogContainer = document.querySelector('.MuiDialog-container')
+    if (!dialogContainer) throw new Error('MuiDialog-container nicht gefunden')
+    fireEvent.mouseDown(dialogContainer)
+    fireEvent.click(dialogContainer)
+
+    // Then: der "Zutat anlegen"-Dialog ist weiterhin geöffnet, solange die Antwort aussteht.
+    //   Settle-Fenster VOR der Assertion (analog Escape-Test): ohne echten Guard triggert der
+    //   Backdrop-Klick ein onClose, dessen Exit-Transition den Dialog erst NACH der Transition
+    //   aus dem DOM entfernt – eine sofortige Assertion sähe ihn fälschlich noch als "im Dokument".
+    await new Promise((resolve) => { setTimeout(resolve, DIALOG_EXIT_SETTLE_MS) })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    // Cleanup: POST auflösen und Schließen abwarten (Erfolgspfad schließt regulär).
     resolvePost()
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -414,6 +511,43 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
     // Then: das Name-Feld ist NICHT als ungültig markiert (der Fehler betrifft nur die
     //   Einheit) — killt den Mutanten "es wird immer dasselbe Feld markiert" und treibt
     //   den name-absent-Zweig (FieldErrors ohne name-Key).
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
+  })
+})
+
+describe('IngredientsPage – Reopen nach fehlgeschlagenem Speichern und Abbrechen', () => {
+  // Szenario: Nach fehlgeschlagenem Speichern und Abbrechen ist der Dialog beim erneuten Öffnen fehlerfrei
+  it('US904_EdgeCase_ReopenDialogAfterFailedSaveAndCancel_IsErrorFree', async () => {
+    // Given: bestehende Zutat (Salz); leerer Name -> Backend antwortet 422 (Bug R1: der
+    //   Fehlerzustand darf beim Reopen nicht mehr sichtbar sein)
+    useEmptyNameRejectingHandlers()
+    const user = userEvent.setup()
+    renderWithProviders(<IngredientsPage />)
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    // When: ich "g" als Einheit eingebe (Name bleibt leer)
+    await user.type(screen.getByLabelText(/^Einheit/), 'g')
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // When: die Fehlermeldung "Name darf nicht leer sein." erscheint
+    await screen.findByText('Name darf nicht leer sein.')
+
+    // When: ich auf "Abbrechen" klicke -> Dialog schließt (Close-Transition abwarten)
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    // When: ich erneut auf "Zutat anlegen" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+
+    // Then: keine Fehlermeldung sichtbar (der alte Fehlerzustand ist zurückgesetzt)
+    expect(screen.queryByText('Name darf nicht leer sein.')).not.toBeInTheDocument()
+    // Then: das Name-Feld ist nicht als ungültig markiert (aria-invalid zurückgesetzt)
     expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
   })
 })

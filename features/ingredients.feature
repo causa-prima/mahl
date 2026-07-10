@@ -125,6 +125,16 @@ Feature: Zutaten verwalten
     And ich Escape drücke
     Then ist der "Zutat anlegen"-Dialog weiterhin geöffnet solange die Antwort aussteht
 
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
+  @US-904-happy-path
+  Scenario: Der Dialog lässt sich während des Speicherns nicht per Backdrop-Klick schließen
+    When ich auf "Zutat anlegen" klicke
+    And ich "Tomaten" als Name eingebe
+    And ich "Stück" als Einheit eingebe
+    And ich auf "Speichern" klicke
+    And ich neben den Dialog klicke
+    Then ist der "Zutat anlegen"-Dialog weiterhin geöffnet solange die Antwort aussteht
+
   # @run-9 · Löschen·Pending · Frontend-only · Singleton
   @US-904-happy-path
   Scenario: Löschen-Button ist während des Löschens deaktiviert

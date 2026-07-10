@@ -1,7 +1,7 @@
 ---
 name: test-quality-auditor
 description: Reviewt das Test-Design selbst – Wartbarkeit, Lesbarkeit, Aussagekraft, Robustheit gegenüber Refactorings (nicht ob der Code funktioniert). Erzeugt ausschließlich Findings. Wird vom review-code-Skill bei Test- oder Verhaltensänderungen gespawnt.
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, LSP
 model: sonnet
 ---
 

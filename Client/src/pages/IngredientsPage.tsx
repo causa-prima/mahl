@@ -34,10 +34,18 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
   const { open, name, unit, nameError, unitError, isPending, onNameChange, onUnitChange, onClose, onSubmit } = props
   const nameInputRef = useRef<HTMLInputElement>(null)
 
+  // UX-Guideline Prinzip 3 ("Sperren während Pending"): MUI ruft `onClose` für BEIDE
+  // Schließ-Pfade (Escape UND Backdrop-Klick) auf – während `isPending` beide sperren,
+  // ohne den Erfolgspfad zu berühren (der ruft `closeDialog` direkt über `onSuccess`).
+  const handleClose = () => {
+    if (isPending) return
+    onClose()
+  }
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       aria-labelledby="create-ingredient-title"
       // Framework-geliefert (Prinzip 8, "Enter sendet ab"): echtes <form> via
       // Dialog-Paper-Slot statt onClick. `formNoValidate` am Speichern-Button, weil
@@ -83,7 +91,7 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
         />
       </DialogContent>
       <DialogActions>
-        <Button type="button" onClick={onClose}>Abbrechen</Button>
+        <Button type="button" onClick={handleClose} disabled={isPending}>Abbrechen</Button>
         <Button type="submit" formNoValidate variant="contained" disabled={isPending}>Speichern</Button>
       </DialogActions>
     </Dialog>
@@ -103,7 +111,7 @@ export default function IngredientsPage() {
     setUnit('')
   }
 
-  const [save, saveError, isPending] = useResultMutation(createIngredient, () => {
+  const [save, saveError, isPending, resetSaveError] = useResultMutation(createIngredient, () => {
     closeDialog()
     // Äquivalenter Mutant: Die App hat nur eine Query-Art (['ingredients']), daher ist
     // invalidateQueries({}) (alle) ≡ invalidateQueries({ queryKey: ingredientsKey }).
@@ -128,6 +136,11 @@ export default function IngredientsPage() {
   const nameError = fieldErrors?.name?.[0]
   const unitError = fieldErrors?.defaultUnit?.[0]
 
+  const handleCancel = () => {
+    resetSaveError()
+    closeDialog()
+  }
+
   return (
     <div>
       {ingredients && ingredients.length > 0
@@ -151,7 +164,7 @@ export default function IngredientsPage() {
         isPending={isPending}
         onNameChange={setName}
         onUnitChange={setUnit}
-        onClose={closeDialog}
+        onClose={handleCancel}
         onSubmit={() => { save({ name, defaultUnit: unit }) }}
       />
     </div>

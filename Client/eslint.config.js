@@ -79,13 +79,18 @@ export default defineConfig([
     },
   },
 
-  // --- max-lines-per-function: aus für Tests (OBS-S085-7) ---
-  // complexity (10) und max-depth (4) gelten weiter auch für Tests; nur die verrauschte
-  // Zeilen-Metrik ist hier aus.
+  // --- Zeilen-Metriken aus für Tests (OBS-S085-7, erweitert um max-lines) ---
+  // complexity (10) und max-depth (4) gelten weiter auch für Tests und fangen echte Smells
+  // (verschleierte Logik im Test) ab; nur die verrauschten ZEILEN-Metriken sind hier aus:
+  // max-lines-per-function (tabellengetriebene Tests/viele Assertions) UND max-lines auf
+  // Datei-Ebene. Test-Dateien wachsen strukturell linear mit der Szenario-Zahl (jede Story
+  // fügt Tests derselben Fläche hinzu) – Dateilänge ist hier kein Komplexitäts-Smell, den
+  // ein Deckel sinnvoll begrenzt, sondern führte nur zu mechanischem Aufteilen ohne Nutzen.
   {
     files: ['**/*.{test,spec}.{ts,tsx}'],
     rules: {
       'max-lines-per-function': 'off',
+      'max-lines': 'off',
     },
   },
 
