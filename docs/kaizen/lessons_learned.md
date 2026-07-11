@@ -43,6 +43,17 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 102 – 2026-07-11
+
+- **[MITTEL] [PROZESS] [Kaizen] LL-S102-1 – Lösungskandidaten bei der OBS-Erfassung biasen den späteren Drain**
+  Quelle: User
+  Was: Beim `closing-session`-Erfassen dreier neuer OBS (S102-1/-2/-3) schrieb ich jeweils einen Lösungs-„Kandidat: …" ins Maßnahme-Feld, obwohl die Erfassung nur Problem/Ziel + „offen (Drain)" tragen soll; der User korrigierte es als wiederkehrendes Muster.
+  Warum: Die zum Verständnis gerade präsente Lösungsidee wurde miterfasst, obwohl `closing-session` Schritt 2 und der `observations.md`-Header ausdrücklich „bei Erfassung offen, keine vermutete Lösung" verlangen – Regel gelesen, im selben Schritt nicht angewandt.
+  Regel: Bei der OBS-Erfassung nur Problem/Ziel benennen und die Maßnahme auf „offen (Drain)" lassen – keinen Lösungskandidaten notieren, weil er den ergebnisoffenen Drain zu plausiblen-aber-falschen Kandidaten verleitet. Die Lösung entsteht erst beim Drain.
+  Bezug: CM-S047-1 (Guideline gelesen, nicht angewandt)
+
+---
+
 ## Session 101 – 2026-07-10
 
 - **[MITTEL] [QUALITÄT] [TS-Code] LL-S101-1 – Negativ-Assertions sind vakuös-anfällig, brauchen einen Faithfulness-Beweis**

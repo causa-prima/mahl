@@ -259,6 +259,22 @@ test.describe('US904_EdgeCase: Zutaten verwalten', () => {
     // Then: das Name-Feld ist nicht als ungültig markiert (aria-invalid zurückgesetzt)
     await expect(page.getByLabel('Name')).toHaveAttribute('aria-invalid', 'false')
   })
+
+  // Szenario: Name mit exakt 30 Zeichen wird akzeptiert
+  test('US904_EdgeCase_CreateIngredient_NameExactly30Chars_AppearsInList', async ({ page }) => {
+    // When: Dialog öffnen, einen Namen mit genau 30 Zeichen (Grenzwert, ADR-S051-3: max. 30
+    //   ist gültig -> die Grenze liegt bei > 30, nicht >= 30), "g" als Einheit, speichern
+    const nameWith30Chars = 'a'.repeat(30)
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill(nameWith30Chars)
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: die neue Zutat (30-Zeichen-Name) erscheint in der Zutaten-Liste
+    await expect(page.getByTestId('ingredient-list').getByText(nameWith30Chars)).toBeVisible()
+    // Then: der "Zutat anlegen"-Dialog ist geschlossen (Erfolgspfad)
+    await expect(page.getByRole('dialog')).toBeHidden()
+  })
 })
 
 // @US-904-error
@@ -350,6 +366,24 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     await expect(page.getByText('Name darf nicht leer sein.')).toBeVisible()
     await expect(page.getByText('Einheit darf nicht leer sein.')).toBeVisible()
     // Then: die Zutaten-Liste bleibt unverändert
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
+
+  // Szenario: Zutat mit zu langem Namen anlegen schlägt fehl
+  test('US904_Error_CreateIngredient_NameTooLong_ShowsErrorAndListUnchanged', async ({ page }) => {
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert")
+    const { listItems, itemsBefore } = await captureIngredientList(page)
+
+    // When: Dialog öffnen, einen Namen mit 31 Zeichen (> 30, ADR-S051-3), "g" als Einheit, speichern
+    const nameWith31Chars = 'a'.repeat(31)
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill(nameWith31Chars)
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: Fehlermeldung erscheint (ADR-S051-2: fixer Text)
+    await expect(page.getByText('Name darf maximal 30 Zeichen lang sein.')).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert (DB-Ausgangszustand nach Fehler)
     await expect(listItems).toHaveCount(itemsBefore)
   })
 })

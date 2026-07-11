@@ -189,9 +189,9 @@ Ausführungsbefehle (`dotnet-test.py`, `dotnet-stryker.py`, Timeouts): `docs/pro
 
 ## Test-Setup
 
-- **Alle Tests:** `Server.Tests/` – Domain Logic + API Endpoints (NUnit + FluentAssertions + Microsoft.AspNetCore.Mvc.Testing + EF InMemory)
+- **Alle Tests:** `Server.Tests/` – Domain Logic + API Endpoints (xunit.v3 + AwesomeAssertions + Microsoft.AspNetCore.Mvc.Testing + EF InMemory; MTP-Runner via `UseMicrosoftTestingPlatformRunner`)
 
-> **Hinweis:** Production nutzt PostgreSQL – die Testinfrastruktur verwendet bewusst EF InMemory. Jeder Test läuft gegen eine isolierte, frische In-Memory-DB (`InstancePerTestCase` + `EnsureDeletedAsync`).
+> **Hinweis:** Production nutzt PostgreSQL – die Testinfrastruktur verwendet bewusst EF InMemory. Jeder Test läuft gegen eine isolierte, frische In-Memory-DB (xunit erzeugt pro Testmethode eine neue Testklassen-Instanz; `EndpointsTestsBase : IDisposable` legt via `EnsureCreated` im Ctor + `EnsureDeleted` in `Dispose` pro Test eine frische DB an).
 >
 > **Bekannte Einschränkung:** EF InMemory erzwingt keine DB-Constraints (UNIQUE, FK). Tests für Constraint-Verletzungen (z.B. Duplicate-Name-409) müssen über explizite Endpoint-Logik abgesichert sein – nicht durch DB-Constraints. Das ist gewollt: Constraint-Logik gehört in den Endpoint-Layer, nicht in die DB. Wer PostgreSQL-spezifisches Verhalten testen will (z.B. Transaktionsisolation), braucht Testcontainers – das ist im SKELETON nicht vorgesehen.
 

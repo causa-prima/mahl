@@ -11,15 +11,19 @@ internal abstract record IngredientValidationError
     private IngredientValidationError() { } // prevents external subtypes (strongest encapsulation)
 
     private sealed record NameEmptyCase : IngredientValidationError;
+    // ADR-S051-3: name max. 30 Zeichen, nach Trimming gemessen.
+    private sealed record NameTooLongCase : IngredientValidationError;
     private sealed record UnitEmptyCase : IngredientValidationError;
 
     public static IngredientValidationError NameEmpty { get; } = new NameEmptyCase();
+    public static IngredientValidationError NameTooLong { get; } = new NameTooLongCase();
     public static IngredientValidationError UnitEmpty { get; } = new UnitEmptyCase();
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage] // ADR-S040-1: structurally unreachable _-arm
-    public T Match<T>(Func<T> onNameEmpty, Func<T> onUnitEmpty) => this switch
+    public T Match<T>(Func<T> onNameEmpty, Func<T> onNameTooLong, Func<T> onUnitEmpty) => this switch
     {
         NameEmptyCase => onNameEmpty(),
+        NameTooLongCase => onNameTooLong(),
         UnitEmptyCase => onUnitEmpty(),
         _ => SumType.Unreachable<T>(), // ADR-S040-1: private subtypes make this arm unreachable
     };

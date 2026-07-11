@@ -217,3 +217,32 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
+## OBS-S102-1 – `dotnet-stryker.py --mutate` akzeptiert nur einen einzelnen Dateipfad
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: `--mutate` nimmt nur einen Dateipfad; ein komma-getrenntes Mehrfach-Argument scheitert („unrecognized arguments" bzw. beim String-Workaround „Excluded" auf allen Dateien). Wer mehrere geänderte Dateien in einem Lauf gezielt mutieren will, muss mehrere separate Läufe machen (kleine Zeitkosten). Aufgetreten in run-3, als der Backend-Implementer zwei Dateien in einem Lauf mutieren wollte.
+- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
+- Bezug: –
+
+## OBS-S102-2 – `qa-check` TEST-FREIGABE-AUDIT sieht die geänderte Testdatei nicht (mögliches Poka-Yoke-Loch)
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: In run-3 meldete `qa-check.py --verify --approved-tests` wiederholt „Check 1: GEÄNDERTE TEST-DATEIEN: keine" und im TEST-FREIGABE-AUDIT „`…IngredientsEndpointsTests.cs`: freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf (committet/zurückgesetzt?)", obwohl `git status` die Datei klar als `M` (unstaged) zeigt und sie inhaltlich neue Tests enthält. Der Audit vergleicht die freigegebene Datei nur, wenn er sie als „geändert" erkennt; erkennt Check 1 die Änderung nicht, unterbleibt der Anker-Abgleich still. Damit könnte eine nachträgliche Assertion-Manipulation (genau das, was der CM-S070-1-Blob-Anker fangen soll) durchrutschen. In run-3 kein Schaden (Orchestrator hat den Diff manuell reviewt, Inhalt = Anker), aber der mechanische Guard versagte hier lautlos – die Ursache (warum Check 1 die geänderte Datei nicht sieht) ist unverstanden. Klasse „Poka-Yoke schlägt Wachsamkeit" (OBS-S100-2).
+- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
+- Bezug: CM-S070-1 (Blob-Anker-Audit); OBS-S100-2 (Poka-Yoke vs. Wachsamkeit)
+
+## OBS-S102-3 – Team-Subagenten liefern ihren Endbericht inkonsistent (plain text statt `SendMessage` → Orchestrator sieht ihn nicht)
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: AGENT    Kontext: Agent-Prompt
+- Beobachtung: In run-3 lieferten 3 von 4 Review-Auditoren (code-quality/functional-correctness/test-quality) ihren Findings-Report per `SendMessage` an den Orchestrator; der vierte (security-auditor) gab ihn als **plain-text-Output** aus und wurde damit idle. Plain-Text-Output eines Team-Subagenten ist für den Orchestrator **nicht sichtbar** (SendMessage-Tool-Doku: „to communicate, you MUST call this tool") → der Report lag im Subagent-Log, kam aber nie beim Orchestrator an, bis dieser ihn nach User-Hinweis per `SendMessage` aktiv anforderte. Weder die Auditor-Agent-Definitionen (`.claude/agents/*-auditor.md`) noch der `review-code`-Spawn-Prompt schreiben den Ausgabekanal (Endbericht per `SendMessage` an den Orchestrator) explizit vor → inkonsistentes Berichtsverhalten, ein Review-Finding kann komplett übersehen werden. Der Orchestrator-Fallback (CM-S102-3: bei finished ohne Report aktiv abrufen) fängt es ab, behebt aber nicht die Ursache beim Subagenten. Verifiziert per Log-Nachschau (Subagent-Log `agent-asec-run3-*`, plain-text-Report um 20:07, `SendMessage` erst um 20:11 nach Nachfrage).
+- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
+- Bezug: CM-S102-3 (Orchestrator-Fallback); OBS-S101-2 (Subagent-Signal-Semantik)
+
+---
+

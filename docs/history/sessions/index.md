@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 102 | 2026-07-11 | SKELETON (US-904 run-3) | OBS-Drain Blöcke 1–4 (7 OBS, CM-S102-1/-2/-3, Ref-Direction-Poka-Yoke-Hook) + US-904 run-3 „Name-Validierung" (Backend Max-Length 30, `NameTooLong`-Sum-Type, real Backend-only); LL-S102-1, OBS-S102-1..3, TD-S102-1. |
 | 101 | 2026-07-10 | SKELETON (US-904 run-2) | run-2 „Dialog-Verhalten" abgeschlossen: Escape/Backdrop-Sperre + Abbrechen-disabled + Fehler-Reset während Pending (useResultMutation→4-Tupel); Backdrop spec-first + gherkin-workshop-Pending-Policy; LSP für Implementer/Auditoren; LL/CM-S101-1. |
 | 100 | 2026-07-06 | SKELETON (US-904 run-2) | US-904 run-2 „Dialog-Verhalten" (FE-only): required-Asterisk, Autofokus (onEntered), disabled-Save, `<form>`/Escape; useResultMutation→3-Tupel. Guard verworfen (ADR-S100-1). Tooling: `.stryker-tmp` gitignore/pre-clean + atomarer RunLock. 3 Szenarien spec-first. LL-S100-1..3. |
 | 99 | 2026-07-04 | SKELETON (OBS-Drain + Task #35) | OBS-Drain (Backlog 20→13). Drain: OBS-S092-1, S085-10 (Schwere→Impact), S090-1 (typecheck), S090-3 (Alt-Hooks/Fable), S090-5 (TD-Grooming). Task #35: qa-check-Hash index-unabhängig + Blob-Anker-Test-Freigabe-Gate + tsc-Gate (OBS-S090-2/-4 archiviert; LL-S099-2). |

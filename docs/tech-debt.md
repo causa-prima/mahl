@@ -60,10 +60,11 @@ Eintrag-Format:
 
 ---
 
-## TD-S083-4 — Validierung (FE+BE): keine Max-Length, keine Branded-Types
+## TD-S083-4 — Validierung (FE+BE): Max-Length, keine Branded-Types
 **Priorität:** Niedrig
-**Problem:** Keine Max-Length auf Name/DefaultUnit (Kestrel-Body-Limit deckelt); keine Frontend-Branded-Types/`makeIngredientName`-Factory.
-**Behebung/Trigger:** Validierungs-Szenario.
+**Teilweise behoben (S102/run-3):** `name`-Max-Length (30 Zeichen, nach Trimming) server-seitig implementiert (ADR-S051-3, `IngredientMappings.ValidateName`).
+**Offen:** `defaultUnit`-Max-Length (20, ADR-S051-3) → mit run-4 (Einheit-Validierung); Frontend-Branded-Types/`makeIngredientName`-Factory (kein Szenario, YAGNI).
+**Behebung/Trigger:** `defaultUnit`-Max-Length mit run-4; Branded-Types bei Bedarf.
 
 ---
 
@@ -120,3 +121,10 @@ Eintrag-Format:
 **Priorität:** Niedrig
 **Problem:** `useResultMutation` gibt ein 4-Tupel `[mutate, error, isPending, reset]` zurück (zwei davon Funktionen). Positions-Tupel werden mit wachsender Länge fehleranfällig: Call-Sites destrukturieren in exakter Reihenfolge, `error`/`isPending` sind leicht verwechselbar. Ein Objekt `{ save, error, isPending, reset }` wäre selbstdokumentierend und reihenfolgeunabhängig.
 **Behebung/Trigger:** Mit dem nächsten großen Hook-Schritt bündeln (volle MutationState-Union, ADR-S083-2) – dann die Rückgabe auf ein Objekt umstellen, damit die Call-Sites nicht zweimal angefasst werden.
+
+---
+
+## TD-S102-1 — Backend: kein explizites app-weites Request-Body-Size-Limit
+**Priorität:** Niedrig – SKELETON ohne Auth; durch Kestrels impliziten ~30-MB-Default begrenzt
+**Problem:** `POST /api/ingredients` deserialisiert/bindet den vollständigen Request-Body, BEVOR die Feld-Validierung greift (`name.Value.Length > 30` läuft erst nach Model-Binding). Ein anonymer Client kann daher wiederholt große Bodies (bis Kestrels implizitem ~30-MB-Default, in `Program.cs` nirgends explizit gesetzt) senden → Parsing-/Trimming-Last vor jeder Ablehnung. Kein durch run-3 verschärftes Risiko – der Zustand ist ggü. vorher unverändert. (Die fehlende `defaultUnit`-Längenbegrenzung ist Teil von TD-S083-4, nicht hier.) Quelle: security-auditor (Review run-3, SR-2).
+**Behebung/Trigger:** Explizites app-weites `MaxRequestBodySize` in `Program.cs` (statt Verlass auf den impliziten Framework-Default) – mit run-4 oder einer eigenen Härtungs-Aufgabe.

@@ -131,6 +131,58 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
         persisted.Should().BeEmpty();
     }
 
+    // @US-904-error: Server-seitige Max-Length-Validierung (ADR-S051-3: name max. 30 Zeichen, nach
+    // Trimming gemessen). Eigener Test statt weiterer [InlineData] der Empty-Theory oben – andere
+    // fachliche Invariante (zu lang statt leer), eigener erwarteter Text (ADR-S051-2).
+    [Fact]
+    public async Task US904_Error_CreateIngredient_NameExceeds30Chars_Returns422WithNameTooLongError()
+    {
+        // Given: a name of 31 characters (exceeds the 30-character limit, ADR-S051-3)
+        var request = new CreateIngredientRequest(Name: new string('A', 31), DefaultUnit: "g");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 422 Unprocessable Entity (ADR-S090-1)
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        // Then: field-keyed error body carries the fixed max-length message (ADR-S090-1, ADR-S051-2)
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["name"] = ["Name darf maximal 30 Zeichen lang sein."],
+        });
+
+        // Then: nothing is persisted – the ingredient list stays unchanged (empty)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEmpty();
+    }
+
+    // @US-904-edge-case: die Grenze liegt bei > 30, NICHT >= 30 – exakt 30 Zeichen ist gültig (ADR-S051-3).
+    [Fact]
+    public async Task US904_EdgeCase_CreateIngredient_NameExactly30Chars_Returns201()
+    {
+        // Given: a name of exactly 30 characters (at the limit, still valid per ADR-S051-3)
+        var name = new string('A', 30);
+        var request = new CreateIngredientRequest(Name: name, DefaultUnit: "g");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 201 Created – the boundary value is accepted
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Name.Should().Be(name);
+        body.DefaultUnit.Should().Be("g");
+
+        // Then: the ingredient is persisted (full-state DB assertion) with the server-generated id
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = body.Id, Name = name, DefaultUnit = "g" }]);
+    }
+
     // Eigener Test (nicht weitere InlineData der Single-Field-Theory): die Invariante ist hier der
     // collect-all-Merge – BEIDE unabhängigen Pflichtfelder werden validiert und ihre Fehler GLEICHZEITIG
     // gemeldet (ADR-S000-1 collect-all, gültig laut ADR-S090-1). Die Single-Field-Theory pinnt nur je EINEN Key.

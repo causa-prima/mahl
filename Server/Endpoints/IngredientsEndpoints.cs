@@ -50,32 +50,46 @@ internal static class IngredientsEndpoints
 
 file static class IngredientMappings
 {
+    // ADR-S051-3: name max. 30 Zeichen, nach Trimming gemessen.
+    private const int MaxNameLength = 30;
+
     // Collect-all validation of the independent required fields (ADR-S000-1, gültig laut ADR-S090-1):
     // name and unit are validated independently and all errors collected, so both-fields-empty reports both
     // field errors at once. The Bind/Map chain carries the validated values on success; MapError replaces the
     // chain's first error with the full collected set.
     internal static OneOf<Ingredient, IReadOnlyList<IngredientValidationError>> ToDomain(this CreateIngredientDto dto)
     {
-        var name = NonEmptyTrimmedString.Create(dto.Name);
-        var unit = NonEmptyTrimmedString.Create(dto.DefaultUnit);
+        var name = ValidateName(dto.Name);
+        var unit = ValidateUnit(dto.DefaultUnit);
 
         // 0-or-1 error per field, concatenated -> the collect-all error set (empty when both fields are valid).
-        IReadOnlyList<IngredientValidationError> errors =
-        [
-            .. name.ErrorOrEmpty(IngredientValidationError.NameEmpty),
-            .. unit.ErrorOrEmpty(IngredientValidationError.UnitEmpty),
-        ];
+        IReadOnlyList<IngredientValidationError> errors = [.. name.ErrorOrEmpty(), .. unit.ErrorOrEmpty()];
 
         // ADR-S030-1: server-side UUIDv7 primary key.
         return name
             .Bind(validName => unit.Map(validUnit => Ingredient.Create(Guid.CreateVersion7(), validName, validUnit)))
-            .MapError<Ingredient, Error, IReadOnlyList<IngredientValidationError>>(_ => errors);
+            .MapError<Ingredient, IngredientValidationError, IReadOnlyList<IngredientValidationError>>(_ => errors);
     }
+
+    // ADR-S051-3: name max. 30 Zeichen, nach Trimming gemessen -> Länge wird auf dem bereits getrimmten
+    // NonEmptyTrimmedString-Wert geprüft. Leer und zu lang schließen sich strukturell aus (Bind stoppt bei Empty).
+    private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateName(string input) =>
+        NonEmptyTrimmedString.Create(input)
+            .MapError<NonEmptyTrimmedString, Error, IngredientValidationError>(_ => IngredientValidationError.NameEmpty)
+            .Bind<NonEmptyTrimmedString, NonEmptyTrimmedString, IngredientValidationError>(name =>
+                name.Value.Length > MaxNameLength
+                    ? (OneOf<NonEmptyTrimmedString, IngredientValidationError>) IngredientValidationError.NameTooLong
+                    : name);
+
+    // Kein Max-Length-Check für unit in diesem Lauf (run-4) – nur Nicht-Leer-Validierung.
+    private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateUnit(string input) =>
+        NonEmptyTrimmedString.Create(input)
+            .MapError<NonEmptyTrimmedString, Error, IngredientValidationError>(_ => IngredientValidationError.UnitEmpty);
 
     // 0-or-1 error for a validated field: empty when valid, the field's error otherwise.
     private static IEnumerable<IngredientValidationError> ErrorOrEmpty(
-        this OneOf<NonEmptyTrimmedString, Error> field, IngredientValidationError error) =>
-        field.Match(_ => Enumerable.Empty<IngredientValidationError>(), _ => [error]);
+        this OneOf<NonEmptyTrimmedString, IngredientValidationError> field) =>
+        field.Match(_ => Enumerable.Empty<IngredientValidationError>(), e => [e]);
 
     // ADR-S090-1: field-keyed 422 body { "errors": { "<jsonPropertyName>": ["<msg>"] } } – multiple field
     // errors group into one dictionary so all messages appear simultaneously.
@@ -91,6 +105,7 @@ file static class IngredientMappings
     // field-agnostic. Exhaustive .Match – a new field variant breaks this signature at compile time.
     private static (string Key, string Message) Describe(IngredientValidationError error) => error.Match(
         onNameEmpty: () => ("name", "Name darf nicht leer sein."),
+        onNameTooLong: () => ("name", "Name darf maximal 30 Zeichen lang sein."),
         onUnitEmpty: () => ("defaultUnit", "Einheit darf nicht leer sein."));
 
     internal static IngredientDbType ToDbType(this Ingredient domain) =>
