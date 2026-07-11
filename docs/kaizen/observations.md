@@ -30,15 +30,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
-## OBS-S101-2 – Orchestrator pollt arbeitende Subagenten (missverständliches Team-Tooling?)
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: TOOLING    Kontext: Agent-Prompt
-- Beobachtung: Der Orchestrator fragte den Layer-Subagenten während laufender ~2-min-Stryker-Läufe mehrfach nach dem Status, obwohl dieser noch arbeitete – ausgelöst durch `idle_notification`/„available"-Signale, die mehrdeutig sind (Abschluss vs. Zwischenzustand), und ein fehlendes klares „arbeite noch"-Signal. Der User berichtet, das Muster tritt session- und orchestratorübergreifend auf → vermutlich missverständliches Claude-Code-Team-Tooling, kein Einzelfehler.
-- Entscheidung/Maßnahme: offen – beim Drain zu bewerten. Vor jeder Maßnahme die Ursache im Claude-Code-Team-Tooling verifizieren (ist die `idle_notification`-Semantik tatsächlich mehrdeutig, oder ein Orchestrator-Missverständnis?).
-- Bezug: –
-
 ## OBS-S101-1 – Flaky-Timeout einzelner Vitest-Tests unter Stryker-Systemlast
 - Quelle: Subagent
 - Status: NEU
@@ -74,28 +65,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Die S099-Lösung für OBS-S090-4 (Blob-Anker-Audit) verlangt vom Orchestrator mehrstufige manuelle Schritte: pro freigegebener Test-Datei `git hash-object -w`, die `pfad=sha`-Paare über den GREEN/REFACTOR-Zyklus hinweg im Kontext halten und in Schritt 4 an `qa-check --verify --approved-tests` durchreichen. Bewusster Trade-off (mechanischer Gate statt „dran denken"), aber die manuelle Zustandshaltung ist selbst vergessbar/fehleranfällig – nur der `--verify`-Abbruch bei geänderten Tests ohne `--approved-tests` fängt das Weglassen.
 - Entscheidung/Maßnahme: offen – im ersten realen `implementing-scenario`-Lauf nach S099 beobachten, ob die `pfad=sha`-Pflege real reibt; falls ja, Automatisierung erwägen (z.B. qa-check gibt beim Subagent-Übergabe-Lauf die Test-Blob-SHAs bereits mit aus, oder ein Helfer sammelt sie). Vor Umsetzung Häufigkeit/Reibung prüfen (Impact gering).
 - Bezug: OBS-S090-4 (S099 umgesetzt); CM-S070-1
-
----
-
-## OBS-S100-1 – Zustandsdokumente sammeln Erledigtes / Verweise auf gelöschte Artefakte
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: PROZESS    Kontext: Doku-Hygiene
-- Beobachtung: Agenten halten wiederkehrend **bereits Erledigtes** an Stellen fest, die nur den *offenen/aktuellen* Zustand tragen sollten (Changelog-artig; diese Session „erledigt in run-2" in TD-S077-1, vom User korrigiert – laut User ein Muster über viele Sessions). Allgemeiner: **Verweise zeigen auf Artefakte, die beim Erledigen gelöscht werden** – z.B. „siehe TD-SXXX" auf ein TD, das beim Abschluss entfernt wird → toter Verweis, die referenzierte Info existiert danach nur noch in der git-Historie. Ergebnis: aufgeblähte Zustandsdokumente + dangling references / Informationsverlust. Betrifft nicht nur umgesetzten Code, sondern jede Referenz auf inzwischen irrelevante/gelöschte Dinge. **Aktuell kein akuter Schaden, weil der User beim Mitlesen manuell abfängt – aber das ist ein fehlerträchtiger, nicht garantierter, ermüdender *menschlicher* Guard, kein struktureller; der scheinbar geringe Impact ruht also auf User-Aufwand (Verstärker: OBS-S100-2).**
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden. Mögliche Richtungen (nicht vorgreifen): Leitplanke „Zustandsdokumente tragen nur offenen Zustand" + „Verweise robust gegen Löschung des Ziels" (nötige Info am Verweisort inlinen statt nur verweisen, oder nur auf stabile Artefakte wie ADR verweisen). Vor Umsetzung Häufigkeit/Impact prüfen.
-- Bezug: —
-
----
-
-## OBS-S100-2 – Agent-Auffälligkeiten erodieren User-Vertrauen → mehr Kontrolle → Ermüdung (Verstärker)
-- Quelle: User
-- Status: NEU
-- Impact: HOCH    Häufigkeit: dauerhaft
-- Kategorie: AGENT    Kontext: Mensch-Agent-Zusammenarbeit
-- Beobachtung: Jede Auffälligkeit (nicht nur OBS-S100-1) hat neben dem lokalen Defekt einen versteckten Zweitschaden: sie erodiert das Vertrauen des Users in die Agenten, woraufhin er *alles* genauer prüft – anstrengend, ermüdend, ein sich selbst verstärkender Kreislauf. Der wahre Kostenfaktor einer Auffälligkeit ist damit größer als der lokale Defekt; scheinbar „geringe" Auffälligkeiten summieren sich über diesen Kanal.
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden. Richtung (nicht vorgreifen): **strukturelle/mechanische Guards (Poka-Yoke), die nicht auf User-Wachsamkeit angewiesen sind, höher priorisieren** als „der Agent passt besser auf"; Auffälligkeits-Reduktion trägt Zusatznutzen über den Vertrauens-/Ermüdungs-Multiplikator. Meta-Beobachtung – als Priorisierungs-Linse für andere OBS/CM nutzen, nicht als Einzel-Fix.
-- Bezug: OBS-S100-1
 
 ---
 
@@ -152,14 +121,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: kaizen-Schritt 0 sah vor, alle Archiv-Dateien jede Retro neu gegen den Filter zu prüfen → Token-Kosten steigen, Grenznutzen gering.
 - Entscheidung/Maßnahme: **B gewählt** — Staffel B (nur zuletzt archivierte Periode doppelprüfen) → (kein Rückfall) → A (Archiv-Scan weglassen). Umsetzung: kaizen Schritt 0 (bereits angewandt). Gekoppelt an CM „Noise als LL" (AKTIV + beobachten).
 
-## OBS-S086-5 – Session-Datei-Inhalt: Scope definieren
-- Quelle: User
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Doku
-- Beobachtung: Unklar/unausgewertet, was in `docs/history/sessions/session_NNN.md` gehört – ist es sinnvoll, alles festzuhalten? Welche Teile können/sollten weg, was fehlt? (Analog zu OBS-S085-9 für `index.md`, aber für die Session-Dateien.)
-- Entscheidung/Maßnahme: offen (Retro)
-
 ## OBS-S087-1 – Technische Schuld durchsuchbar/relevanz-gefiltert machen
 - Quelle: User
 - Status: NEU
@@ -180,11 +141,11 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S088-1 – Hook-Registrierung: ein Dispatcher je Matcher/Event statt Einzeleinträge
 - Quelle: User
-- Status: NEU
+- Status: IN BEOBACHTUNG bis S110
 - Impact: GERING–MITTEL    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: Pro Tool-Matcher stehen mehrere Hook-Scripts einzeln in `settings.json` (PreToolUse `Edit|Write`: dependency-allowlist, code-quality-blocking, index-length, e2e-scenario-ref). Ein neuer/entfernter Check erfordert eine `settings.json`-Änderung → **Claude-Code-Reload** nötig, bevor er greift. `check-code-quality-blocking.py` ist bereits ein In-Process-Dispatcher (`CHECKS`-Liste + `checks/`-Package) – Checks dort sind reload-frei. Verallgemeinert man das (ein Dispatcher je Matcher *und* Event, der die Einzel-Checks aufruft), würde künftiges Hinzufügen/Entfernen eines Checks nur den Dispatcher-Inhalt ändern → sofort live, ohne Reload. Designpunkte: Pre (blocking, exit 2) vs. Post (non-blocking) getrennt; uneinheitlicher Input-Vertrag (Fragment-`HookInput` vs. voller Post-Edit-Inhalt + Datei-Reads bei e2e-scenario-ref → Dispatcher gibt rohes JSON, Checks adaptieren); Output-Stil je Dispatcher einheitlich (Bash nutzt JSON-`permissionDecision`); fail-open je Check.
-- Entscheidung/Maßnahme: offen (Retro) – als eigener fokussierter Refactor mit eigenen Tests, getrennt vom Szenario-Tracking-Commit. **Fable-Audit (S099):** kein Eigenwert als Poka-Yoke – lohnt sich als **Enabler** für OBS-S095-3 (dessen reload-freien Check in den `check-code-quality-blocking.py`-Dispatcher einhängen). Zusammen angehen.
+- Entscheidung/Maßnahme: aufgeschoben (S102-Drain) bis S110 – **der Enabler-Zug ist entfallen:** OBS-S095-3 wurde als eigenständiges PreToolUse-Script gebaut (nicht in den Dispatcher gehängt), also braucht der Referenz-Hook den Dispatcher-Refactor nicht mehr. Eigenwert laut Fable-Audit (S099) gering (kein Poka-Yoke), und die Reload-Friktion bei Hook-Wartung ist selten (mehrere Sessions). Re-Trigger: nächster realer Bedarf an reload-freiem Check-Management (z.B. mehrere neue Checks gleichzeitig in Sicht); Backstop bis S110.
 - Bezug: OBS-S085-16 (Reload-Friktion-Familie)
 
 ## OBS-S091-2 – Wrapper-Aufrufpfad cwd-relativ, kollidiert mit Projekt-Tooling-cwd
@@ -224,39 +185,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Kategorie: TOOLING    Kontext: Build/Analyzer
 - Beobachtung: SonarAnalyzer S125 („Sections of code should not be commented out") interpretiert deutschsprachige Kommentare, die mit „…;" enden, als auskommentierten Code und bricht den Build. In dieser Session musste ein korrekter Erklär-Kommentar nur umformuliert werden, um S125 zu beruhigen – inhaltlich unnötiger Eingriff.
 - Entscheidung/Maßnahme: offen (Retro) – Impact gering; vor Config-Änderung Häufigkeit beobachten.
-
----
-
-## OBS-S095-2 – review-docs: Check auf „Low-Value-Content" (grenzwertiger Mehrwert, Kosten > Nutzen)
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Doku
-- Beobachtung: Skills/Docs könnten Selbstverständlichkeiten enthalten — Regeln, gegen die ohnehin nie verstoßen würde, oder Inhalte mit grenzwertigem Mehrwert, deren Token-/Lesekosten den Nutzen nicht rechtfertigen. Offen, ob der `review-docs`-Skill dafür einen expliziten Check hat. Die Skill-Beschreibung nennt „Minimalität", aber das zielt eher auf Redundanz/Länge — „Low-Value-Content" (Regel ist korrekt, aber unnötig, weil der Fehler praktisch nie passiert) ist ein anderer, schärferer Winkel und evtl. nicht abgedeckt.
-- Entscheidung/Maßnahme: offen (Retro)
-- Bezug: —
-
----
-
-## OBS-S095-3 – Poka-Yoke-Hook: stabile Datei darf keine volatile ID referenzieren (Referenz-Richtung)
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Das principles.md-Prinzip „Referenzen laufen volatil → stabil, nie umgekehrt" wird nur manuell durchgesetzt (S094: LL-S094-2; S095: 2 weitere Funde in Skills). Ein **syntaktischer** Check ist poka-yoke-bar (kein Ermessen): Beim Edit/Write einer **stabilen** Datei prüfen, ob neuer Inhalt ein **volatiles** ID-Schema (`OBS-`/`OQ-`/`LL-`/`TD-S…`) referenziert. Empirie S095: nur 5 Bestands-Treffer in 3 stabilen Dateien (FP-Risiko niedrig) — **sofern** die kaizen-internen Bookkeeping-Dateien (`observations.md`, `countermeasures.md`, `lessons_learned.md`, `process.md`) aus dem „stabilen" Set ausgeschlossen werden.
-- Entscheidung/Maßnahme: offen — Hook gezielt bauen (wird dann CM); Bestand: 2 von 5 Refs in S095 bereinigt, die 3 TS-Guideline-Hits bleiben als dokumentierte Pilot-Ausnahme. **Fable-Hook-Audit (S099):** als **einzige** hochwertige noch ungenutzte Hook-Chance bestätigt (Prio HOCH) – mechanisch fundiert (Zwilling `check-e2e-scenario-ref.py` läuft produktiv, PreToolUse `Edit|Write`, exit 2), FP-arm, ermessensfrei. **Umsetzungs-Empfehlung:** Check in den bestehenden `check-code-quality-blocking.py`-Dispatcher einhängen (kein Reload; rechtfertigt zugleich OBS-S088-1). Offene Design-Punkte: stabil-Datei-Glob + Ausschluss der kaizen-Bookkeeping-Dateien + `ref-ok`-Kommentar-Allowlist für die 3 Pilot-Ausnahmen.
-- Bezug: principles.md „Referenzen volatil→stabil"; CM-S086-1 (Referenz-Hygiene/stale Anchors); LL-S094-2
-
----
-
-## OBS-S095-4 – „Lead-Developer"-Subagent als Eskalations-Instanz für Layer-Implementer
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: AGENT    Kontext: Agent-Prompt
-- Beobachtung: Statt anspruchsvolle Schichten komplett auf Opus laufen zu lassen, könnte ein dedizierter „Lead-Developer"-Subagent (stark, z.B. Opus) als Eskalations-Instanz dienen, an den schwächere Implementer (sonnet/haiku) gezielt **Fragen** übergeben — wie in echten Teams, wo Juniors Hilfestellung von Seniors holen. So liefe nur der punktuelle Rat auf dem teuren Modell, nicht die ganze Schicht. Vorausschauende Optimierung der Modell-/Token-Ökonomie; baut auf der S095-Entscheidung „Implementer-Default = sonnet, Opus-Eskalation pro Schicht" auf.
-- Entscheidung/Maßnahme: offen (Retro) — eigene Anpassung, vor Umsetzung bewerten.
-- Bezug: OBS-S085-8 / OBS-S093-2 (Modellwahl pro Schicht)
 
 ---
 

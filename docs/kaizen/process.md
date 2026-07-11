@@ -57,6 +57,7 @@ Der proaktive Track für System-Design-Beobachtungen. **Eintrags-Format, ID-Sche
 
 - **Sorgfalt UND Beweisbarkeit skalieren mit Gefahr:** Je höher die Gefahr eines Kandidaten, desto wichtiger der nachträgliche **Beweis**, dass durch die Änderung **kein neues/anderes Problem** entstanden ist (Verifikation / Pilot / Vorher-Nachher).
 - **Evaluierungs-Gate:** Nicht-triviale oder höher-Gefahr-Antworten werden **NICHT sofort** umgesetzt → Kandidaten erarbeiten, abwägen (für OBS beim **Drain**, für ein LL-Muster bei der **CM-Wahl**), dann begründet committen. Trivial / niedrige Gefahr → sofort umsetzen + Einzeiler.
+- **Vertrauens-/Ermüdungs-Multiplikator:** Der wahre Impact einer Agent-Auffälligkeit ist **größer als ihr lokaler Defekt** – jede Auffälligkeit erodiert zusätzlich das User-Vertrauen, was mehr manuelle Kontrolle und Ermüdung nach sich zieht (sich selbst verstärkender Kreis). Konsequenzen für die Kandidaten-Bewertung: (1) den Multiplikator zum lokalen Impact **hinzuzählen** – scheinbar „geringe" Auffälligkeiten summieren sich über diesen Kanal; (2) bei gleichem lokalem Impact schlägt der **strukturelle/mechanische Guard (Poka-Yoke)** den Wachsamkeits-Guard („der Agent passt besser auf" / „der User fängt es beim Mitlesen ab"), weil letzterer den Ermüdungskreis nicht bricht, sondern speist. Priorisierungs-Linse, kein Einzel-Fix.
 
 ---
 

@@ -46,6 +46,15 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   die bei Lösung gelöscht wird) – sonst dangelt die Referenz, sobald die volatile Stelle verschwindet.
   Die volatile Stelle referenziert die stabile; relevante Informationen leben (auch) in der stabilen Quelle.
 
+- **Zustandsdokumente tragen nur den offenen/aktuellen Zustand – kein Erledigtes.**
+  Ein Zustandsdokument (z.B. `AGENT_MEMORY.md` „Nächste Prioritäten", `tech-debt.md`, `open-questions.md`,
+  der `NEU`-Pool in `observations.md`) beschreibt, was **offen** ist – kein Changelog. Zwei Richtungen, beide Pflicht:
+  **(a) präventiv** – nichts Erledigtes hineinschreiben (Einträge vorwärtsgerichtet formulieren, nicht „erledigt in run-X");
+  **(b) kurativ** – ist ein Eintrag erledigt, wird er **aus dem Dokument entfernt** (er lebt in git-Historie / Session-Log /
+  Archiv weiter), nicht als „erledigt"-Notiz stehengelassen. Weil solche Dokumente laufend geräumt werden, sind ihre
+  Einträge/IDs volatil → an Verweisstellen die nötige Info **inlinen** oder nur auf **stabile** Artefakte (ADR, Guideline)
+  verweisen (siehe Prinzip „volatil → stabil" oben; der syntaktische Guard dafür ist in Arbeit).
+
 ## Kommunikation & Argumentation
 
 - **"Unterstützt" ≠ "beweist" – Empirie vor Behauptung, Empfehlung und Fertig-Erklärung.**

@@ -57,7 +57,8 @@ TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
 
 4. `docs/history/sessions/session_NNN.md` – neue Session-Datei anlegen
 → TaskUpdate "3. Session-Datei anlegen": in_progress
-   Inhalt: Implementiertes, Probleme, Ergebnisse, offene Punkte
+   Inhalt = **was in dieser Session passierte** (Historie): Implementiertes, Entscheidungen, Probleme, Review-/Subagent-Beobachtungen.
+   **Scope-Disziplin:** (a) KEIN vorwärtsgerichteter Zustand (offene Punkte / nächster Lauf) – der lebt in `AGENT_MEMORY` „Nächste Prioritäten" (auto-geladen) + ist via `next_run.py` ableitbar; in read-only Historie wäre er sofort stale. (b) Learnings/Beobachtungen nur als knappe ID + Ein-Satz + Verweis auf die kanonische Quelle (`lessons_learned.md`/`observations.md`), kein nacherzählter Inhalt (Drift-Schutz, Single Source of Truth).
    Wird NACH Doku-Änderungen erstellt (damit finaler Zustand widergespiegelt wird).
 
 5. `docs/kaizen/lessons_learned.md` – Einträge schreiben:

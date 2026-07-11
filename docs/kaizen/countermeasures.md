@@ -36,6 +36,21 @@ Reaktionsregeln je Impact: docs/kaizen/process.md
 
 ## Aktive Maßnahmen
 
+### CM-S102-1 – Zustandsdokumente sammeln Erledigtes / Verweise auf gelöschte Artefakte
+**Impact:** MITTEL | **Kategorie:** PROZESS | **Kontext:** Doku | **Status:** AKTIV | **Seit:** S102
+**Problem:** Agenten halten wiederkehrend **Erledigtes** in Zustandsdokumenten fest (changelog-artig; z.B. „erledigt in run-X"), obwohl diese nur den offenen Zustand tragen sollen; zudem verweisen Stellen auf Artefakte, die beim Erledigen gelöscht/archiviert werden → tote Refs / Informationsverlust. Bislang nur ein **menschlicher** Guard (User fängt beim Mitlesen ab) – fehlerträchtig, ermüdend, nicht garantiert (OBS-S100-1; Vertrauens-/Ermüdungs-Multiplikator OBS-S100-2).
+**Maßnahme:** Prinzip „Zustandsdokumente tragen nur den offenen/aktuellen Zustand – kein Erledigtes" in `principles.md` dokumentiert ✓ (Abschnitt „Doku & Referenzen"), mit beiden Richtungen (präventiv: nichts Erledigtes hineinschreiben; kurativ: erledigte Einträge entfernen). Der mechanisierbare Teil (tote Refs auf volatile IDs) wird vom geplanten syntaktischen Poka-Yoke-Hook (OBS-S095-3) mit abgedeckt. **Wirksamkeit prüfen:** künftige Zustandsdokument-Edits (AGENT_MEMORY „Nächste Prioritäten", tech-debt.md, open-questions.md) auf stehengebliebenes Erledigtes scannen; Regression → zurück auf AKTIV. Bezug: OBS-S100-1, OBS-S095-3.
+
+### CM-S102-2 – Poka-Yoke-Hook: Referenz-Richtung volatil→stabil
+**Impact:** GERING | **Kategorie:** TOOLING | **Kontext:** Hook/Script, Doku | **Status:** AKTIV | **Seit:** S102
+**Problem:** Das principles.md-Prinzip „Referenzen laufen volatil → stabil" wurde nur **manuell** durchgesetzt (CM-S095-1), mit wiederkehrenden Funden (LL-S094-2; S095 weitere in Skills) → menschlicher Wachsamkeits-Guard (vgl. OBS-S100-2).
+**Maßnahme:** Syntaktischer PreToolUse-Poka-Yoke `.claude/hooks/check-ref-direction.py` (via TDD, `tests/test_ref_direction.py`, in `settings.json` unter `Edit|Write` registriert, exit 2): blockt einen Edit/Write an einer **stabilen** Datei, der ein **volatiles** ID-Schema (`OBS-`/`OQ-`/`LL-`/`TD-S…`) einführt. Datei-Scope default-protected (`docs/**`, `.claude/skills/**`, `.claude/agents/**`, `CLAUDE.md`) + explizite Ausnahmen (kaizen-Bookkeeping, archive, volatile Tracker, session-Logs, kaizen-Skill); Zeilen-Ausnahme via `ref-ok`-Marker. **Wirksamkeit prüfen:** BEWÄHRT, wenn nach S102 kein neuer volatil→stabil-Fund mehr auftritt, der den Hook hätte auslösen müssen; Regression (z.B. Hook per `ref-ok` umgangen ohne echten Grund) → zurück auf AKTIV. Bezug: OBS-S095-3, OBS-S100-1 (toter-Ref-Teil mit abgedeckt), CM-S095-1.
+
+### CM-S102-3 – Orchestrator pollt arbeitende Subagenten (Idle-Signal missverstanden)
+**Impact:** MITTEL | **Kategorie:** TOOLING | **Kontext:** Agent-Prompt | **Status:** AKTIV | **Seit:** S102
+**Problem:** Der Orchestrator fragte einen Layer-Subagenten während laufender ~2-min-Stryker-Läufe mehrfach per `SendMessage` nach dem Status, obwohl dieser noch arbeitete – ausgelöst durch `idle_notification`/„available"-Zwischensignale, die er als „fertig" missdeutete. Verschwendet Tokens und stört den arbeitenden Subagenten; laut User session- und orchestratorübergreifend (OBS-S101-2). Verifizierte Harness-Semantik: Hintergrund-Subagenten melden ihren Abschluss automatisch; Zwischensignale sind kein Abschluss, Pollen ist verschwendet.
+**Maßnahme:** Spawn-Regel in `implementing-scenario` SKILL.md (innerer Loop, „Arbeitende Subagenten nicht pollen"): auf den inhaltlichen Return warten (Test-Review-Signal / Verifikations-Hash / Return), Idle-/„available"-Zwischensignale nicht mit Status-Nachfragen beantworten; `SendMessage` bleibt für PLANUNG-Rückfragen und Findings-Übergabe. **Wirksamkeit prüfen:** nächster realer `implementing-scenario`-Lauf – kein Status-Poll eines arbeitenden Subagenten mehr (BEWÄHRT, wenn über 1–2 Läufe kein Rückfall; Regression → zurück auf AKTIV). Robust gegen beide Ursachen (mehrdeutiges Signal *oder* Orchestrator-Missverständnis). Bezug: OBS-S101-2.
+
 ### CM-S101-1 – Vakuöse Negativ-/Guard-Tests (grün trotz fehlendem Guard)
 **Impact:** MITTEL | **Kategorie:** QUALITÄT | **Kontext:** TS-Code, TDD | **Status:** AKTIV | **Seit:** S101
 **Problem:** Tests, die prüfen dass etwas NICHT passiert (Dialog schließt nicht bei Escape/Backdrop während Pending), waren vakuös grün – auch ohne den Guard (Escape aus `<body>` erreicht MUIs Handler nie; Backdrop-`fireEvent.click` ohne `mousedown` lässt MUIs zweistufige Erkennung leer; fehlendes Settle-Fenster sieht den Dialog während der Schließ-Transition fälschlich noch im DOM). Bei retroaktivem Spezifizieren emergenten Verhaltens fehlt zudem die RED-Phase, die die Vakuität aufdecken würde (LL-S101-1).
@@ -124,7 +139,7 @@ Reaktionsregeln je Impact: docs/kaizen/process.md
 ### CM-S095-1 – Stabile Quelle referenziert volatile Stelle (Referenz-Richtung)
 **Impact:** GERING | **Kategorie:** PROZESS | **Kontext:** Doku | **Status:** AKTIV | **Seit:** S095
 **Problem:** Eine stabile Quelle (ADR/Skill/Guideline/principles) referenziert eine volatile Stelle (OQ-/OBS-/LL-/TD-ID), die bei Lösung gelöscht/archiviert wird → Referenz dangelt/wird stale (LL-S094-2; S095: weitere Funde in Skills).
-**Maßnahme:** Prinzip „Referenzen laufen volatil → stabil, nie umgekehrt" in `principles.md` dokumentiert ✓ (Abschnitt „Doku & Referenzen"). Syntaktischer Poka-Yoke-Hook geplant → OBS-S095-3 (wird beim Bau zur eigenständigen CM).
+**Maßnahme:** Prinzip „Referenzen laufen volatil → stabil, nie umgekehrt" in `principles.md` dokumentiert ✓ (Abschnitt „Doku & Referenzen"). Syntaktischer Poka-Yoke-Hook **gebaut S102** → eigenständige CM-S102-2 (`check-ref-direction.py`); der manuelle Guard hier ist damit mechanisch abgesichert.
 
 ### CM-S095-2 – Schluss/Empfehlung aus unvollständig zerlegtem Raum
 **Impact:** MITTEL | **Kategorie:** AGENT | **Kontext:** Kommunikation | **Status:** AKTIV | **Seit:** S095

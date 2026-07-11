@@ -320,3 +320,76 @@ Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – äl
 - Entscheidung/Maßnahme: **Umgesetzt (S099):** Zwei-Teile-Lösung. (1) Der Übergabe-Hash ist jetzt index-unabhängig (Working-Tree-Content) → Stagen bringt dem Subagenten nichts mehr, der Anreiz entfällt. (2) Der eigentliche Gate ist ein **Blob-Anker**: der Orchestrator friert die freigegebenen Tests nach dem Review als immutable git-Blob ein (`git hash-object -w`), und `qa-check --verify --approved-tests` vergleicht mechanisch die aktuellen Test-Blobs gegen die Freigabe – zeigt jede Änderung seit Freigabe als Diff (Setup erlaubt, Assertions verboten). Content-addressed → immun gegen Subagent-`git add`. `--verify` erzwingt `--approved-tests` bei geänderten Tests (Vergessens-Schutz). Attack-Szenario real validiert: valider Hash + nachträglich geänderte Assertion → Hash verifiziert, Audit deckt Diff auf. Siehe CM-S070-1. Der Fable-Befund „nicht per Hook lösbar" bleibt gültig – die Lösung ist Script-basiert, kein Hook.
 - Bezug: OBS-S090-2 (qa-check-Hash/Staging-Reihenfolge; gemeinsam gelöst); CM-S070-1
 
+## OBS-S101-2 – Orchestrator pollt arbeitende Subagenten (missverständliches Team-Tooling?)
+- Quelle: User
+- Status: UMGESETZT (S102)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Agent-Prompt
+- Beobachtung: Der Orchestrator fragte den Layer-Subagenten während laufender ~2-min-Stryker-Läufe mehrfach nach dem Status, obwohl dieser noch arbeitete – ausgelöst durch `idle_notification`/„available"-Signale, die mehrdeutig sind (Abschluss vs. Zwischenzustand), und ein fehlendes klares „arbeite noch"-Signal. Der User berichtet, das Muster tritt session- und orchestratorübergreifend auf → vermutlich missverständliches Claude-Code-Team-Tooling, kein Einzelfehler.
+- Entscheidung/Maßnahme: UMGESETZT (S102) – Ursache aus dem eigenen Harness-Kontext verifiziert statt spekuliert: „Subagents run in the background by default; you'll be notified when one completes" + „polling is wasted." Die **Completion-Notification** ist das Signal, idle-/available-Zwischensignale sind es nicht. Leitplanke daher gegen **beide** möglichen Ursachen (mehrdeutiges Signal *oder* Orchestrator-Missverständnis) robust: Spawn-Regel „Arbeitende Subagenten nicht pollen" im inneren Loop von `implementing-scenario` – auf den inhaltlichen Return warten, Zwischensignale nicht mit Status-Nachfragen beantworten. Gespiegelt als CM-S102-3 (evaluierbar). Option B (erst `claude-code-guide`-Agent zur `idle_notification`-Mechanik) verworfen – die Harness-Semantik war bereits belastbar und die Leitplanke ursachen-robust.
+- Bezug: CM-S102-3
+
+## OBS-S100-1 – Zustandsdokumente sammeln Erledigtes / Verweise auf gelöschte Artefakte
+- Quelle: User
+- Status: UMGESETZT (S102)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Doku-Hygiene
+- Beobachtung: Agenten halten wiederkehrend **bereits Erledigtes** an Stellen fest, die nur den *offenen/aktuellen* Zustand tragen sollten (Changelog-artig; diese Session „erledigt in run-2" in TD-S077-1, vom User korrigiert – laut User ein Muster über viele Sessions). Allgemeiner: **Verweise zeigen auf Artefakte, die beim Erledigen gelöscht werden** – z.B. „siehe TD-SXXX" auf ein TD, das beim Abschluss entfernt wird → toter Verweis, die referenzierte Info existiert danach nur noch in der git-Historie. Ergebnis: aufgeblähte Zustandsdokumente + dangling references / Informationsverlust. Betrifft nicht nur umgesetzten Code, sondern jede Referenz auf inzwischen irrelevante/gelöschte Dinge. **Aktuell kein akuter Schaden, weil der User beim Mitlesen manuell abfängt – aber das ist ein fehlerträchtiger, nicht garantierter, ermüdender *menschlicher* Guard, kein struktureller; der scheinbar geringe Impact ruht also auf User-Aufwand (Verstärker: OBS-S100-2).**
+- Entscheidung/Maßnahme: UMGESETZT (S102) – Prinzip „Zustandsdokumente tragen nur den offenen/aktuellen Zustand – kein Erledigtes" in `principles.md` (Abschnitt „Doku & Referenzen") mit **beiden** Richtungen: präventiv (nichts Erledigtes hineinschreiben) + kurativ (erledigte Einträge aktiv entfernen, sie leben in git/Archiv weiter). Gespiegelt als CM-S102-1 (evaluierbar). Der mechanisierbare Teilaspekt „tote Refs auf volatile IDs" wird vom geplanten Poka-Yoke-Hook OBS-S095-3 mit abgedeckt (dort als Bezug vermerkt). Konsequent nach OBS-S100-2: menschlicher Guard reicht nicht, so viel wie möglich mechanisieren.
+- Bezug: OBS-S100-2, OBS-S095-3, CM-S102-1
+
+---
+
+## OBS-S100-2 – Agent-Auffälligkeiten erodieren User-Vertrauen → mehr Kontrolle → Ermüdung (Verstärker)
+- Quelle: User
+- Status: UMGESETZT (S102)
+- Impact: HOCH    Häufigkeit: dauerhaft
+- Kategorie: AGENT    Kontext: Mensch-Agent-Zusammenarbeit
+- Beobachtung: Jede Auffälligkeit (nicht nur OBS-S100-1) hat neben dem lokalen Defekt einen versteckten Zweitschaden: sie erodiert das Vertrauen des Users in die Agenten, woraufhin er *alles* genauer prüft – anstrengend, ermüdend, ein sich selbst verstärkender Kreislauf. Der wahre Kostenfaktor einer Auffälligkeit ist damit größer als der lokale Defekt; scheinbar „geringe" Auffälligkeiten summieren sich über diesen Kanal.
+- Entscheidung/Maßnahme: UMGESETZT (S102) – als Priorisierungs-Linse in `docs/kaizen/process.md`, Abschnitt „Gefahr & Kandidaten-Bewertung", verankert (Bullet „Vertrauens-/Ermüdungs-Multiplikator"): der Multiplikator zählt zum lokalen Impact hinzu, und bei gleichem lokalem Impact schlägt der strukturelle Poka-Yoke-Guard den Wachsamkeits-Guard. Dort verankert statt als abstraktes principle, weil die Linse genau am Kandidaten-Bewertungspunkt wirken soll. Keine CM (Meta-Linse im Prozess selbst, kein trackbares Einzel-Verhalten).
+- Bezug: OBS-S100-1
+
+---
+
+## OBS-S086-5 – Session-Datei-Inhalt: Scope definieren
+- Quelle: User
+- Status: UMGESETZT (S102)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: Unklar/unausgewertet, was in `docs/history/sessions/session_NNN.md` gehört – ist es sinnvoll, alles festzuhalten? Welche Teile können/sollten weg, was fehlt? (Analog zu OBS-S085-9 für `index.md`, aber für die Session-Dateien.)
+- Entscheidung/Maßnahme: UMGESETZT (S102) – **beide** Dimensionen empirisch geprüft (auf User-Nachfrage, gegen den Zerlegungs-Fehler „nur eine Richtung"): (i) *„fehlt etwas?"* → keine Reibung in lessons_learned/Archiv gefunden (anders als das analoge S085-9 „index.md zu lang", das einen konkreten Auslöser hatte). (ii) *„kann weg?"* → Session-Dateien real gesichtet (session_100/101): „Offene Punkte/Nächster Lauf" dupliziert `AGENT_MEMORY` „Nächste Prioritäten" + `next_run.py` und ist in read-only Historie sofort stale; „Learnings/Beobachtungen" sind ein knapper ID-Index (milde Redundanz). **Umsetzung:** `closing-session` Schritt 4 um eine Scope-Disziplin ergänzt – Session-Datei = Historie (was passierte); KEIN vorwärtsgerichteter Zustand; Learnings/Beobachtungen nur als ID+Ein-Satz+Verweis. Einmal-Skill-Regel (keine CM, GERING). Verzahnt mit OBS-S100-1 / CM-S086-1 (Single Source of Truth).
+
+## OBS-S095-2 – review-docs: Check auf „Low-Value-Content" (grenzwertiger Mehrwert, Kosten > Nutzen)
+- Quelle: User
+- Status: UMGESETZT (S102)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: Skills/Docs könnten Selbstverständlichkeiten enthalten — Regeln, gegen die ohnehin nie verstoßen würde, oder Inhalte mit grenzwertigem Mehrwert, deren Token-/Lesekosten den Nutzen nicht rechtfertigen. Offen, ob der `review-docs`-Skill dafür einen expliziten Check hat. Die Skill-Beschreibung nennt „Minimalität", aber das zielt eher auf Redundanz/Länge — „Low-Value-Content" (Regel ist korrekt, aber unnötig, weil der Fehler praktisch nie passiert) ist ein anderer, schärferer Winkel und evtl. nicht abgedeckt.
+- Entscheidung/Maßnahme: UMGESETZT (S102) – Discovery bestätigte die Lücke: `review-docs` Agent 1 prüft nur Progressive Disclosure / Redundanz / Länge, nicht den Low-Value-Winkel. Agent 1 um ein Kriterium „Low-Value-Content" ergänzt, bewusst als **Prüf-Linse** (flaggen + begründen, nicht blind streichen – die Beurteilung „wird nie verletzt" ist selbst unsicher). Einmal-Skill-Regel (keine CM, MITTEL, aber gezielt in bestehenden Skill integriert).
+- Bezug: —
+
+---
+
+## OBS-S095-3 – Poka-Yoke-Hook: stabile Datei darf keine volatile ID referenzieren (Referenz-Richtung)
+- Quelle: User
+- Status: UMGESETZT (S102)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Das principles.md-Prinzip „Referenzen laufen volatil → stabil, nie umgekehrt" wird nur manuell durchgesetzt (S094: LL-S094-2; S095: 2 weitere Funde in Skills). Ein **syntaktischer** Check ist poka-yoke-bar (kein Ermessen): Beim Edit/Write einer **stabilen** Datei prüfen, ob neuer Inhalt ein **volatiles** ID-Schema (`OBS-`/`OQ-`/`LL-`/`TD-S…`) referenziert. Empirie S095: nur 5 Bestands-Treffer in 3 stabilen Dateien (FP-Risiko niedrig) — **sofern** die kaizen-internen Bookkeeping-Dateien (`observations.md`, `countermeasures.md`, `lessons_learned.md`, `process.md`) aus dem „stabilen" Set ausgeschlossen werden.
+- Entscheidung/Maßnahme: UMGESETZT (S102) – als **eigenständiges PreToolUse-Script** `.claude/hooks/check-ref-direction.py` gebaut (nach dem Zwilling-Muster `check-e2e-scenario-ref.py`), via TDD (14 Tests in `tests/test_ref_direction.py`), in `settings.json` unter `Edit|Write` registriert, exit 2. **Design-Korrektur zur S099-Empfehlung:** NICHT in den `check-code-quality-blocking.py`-Dispatcher gehängt – der ist PostToolUse + auf C#-Code-Fragmente ausgelegt; der Zwilling ist bewusst ein eigenes Pre-Script. Das entkoppelt S088-1 (verliert seinen Enabler-Zug). Datei-Scope (User-Entscheid S102): **default-protected** (`docs/**`, `.claude/skills/**`, `.claude/agents/**`, `CLAUDE.md`) **+ explizite Ausnahmen** (kaizen-Bookkeeping, `archive/`, volatile Tracker tech-debt/open-questions/AGENT_MEMORY, `history/sessions/`, `skills/kaizen/`) – robuster gegen neue Dateien als eine Whitelist. Zeilen-Ausnahme via `ref-ok`-Marker. Bestand bereinigt: adr.md 2 Beleg-Verweise entfernt, adr.md 2 + TS-Pilot als `ref-ok` markiert; `principles.md` bewusst geschützt (sauber). Deckt zugleich den toten-Ref-Teil von OBS-S100-1 ab. → CM-S102-2.
+- Maßnahme: (frühere Bestandsnotiz) 2 von 5 Refs in S095 bereinigt; **Fable-Hook-Audit S099** bestätigte den Hook als einzige hochwertige ungenutzte Poka-Yoke-Chance (Prio HOCH), FP-arm, ermessensfrei.
+- Bezug: principles.md „Referenzen volatil→stabil"; CM-S086-1 (Referenz-Hygiene/stale Anchors); LL-S094-2; OBS-S100-1 (Hook soll den toten-Ref-Teilaspekt „Verweis auf volatile/gelöschte ID" mit abdecken)
+
+---
+
+## OBS-S095-4 – „Lead-Developer"-Subagent als Eskalations-Instanz für Layer-Implementer
+- Quelle: User
+- Status: VERWORFEN (unzuverlässiger Trigger + YAGNI + Kommunikations-Overhead)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: AGENT    Kontext: Agent-Prompt
+- Beobachtung: Statt anspruchsvolle Schichten komplett auf Opus laufen zu lassen, könnte ein dedizierter „Lead-Developer"-Subagent (stark, z.B. Opus) als Eskalations-Instanz dienen, an den schwächere Implementer (sonnet/haiku) gezielt **Fragen** übergeben — wie in echten Teams, wo Juniors Hilfestellung von Seniors holen. So liefe nur der punktuelle Rat auf dem teuren Modell, nicht die ganze Schicht. Vorausschauende Optimierung der Modell-/Token-Ökonomie; baut auf der S095-Entscheidung „Implementer-Default = sonnet, Opus-Eskalation pro Schicht" auf.
+- Entscheidung/Maßnahme: VERWORFEN (S102). **Kern-Einwand (User):** Der Mechanismus hängt an einem **Selbst-Eskalations-Trigger** – der schwächere Implementer müsste seine eigene Grenze erkennen und um Hilfe bitten. Genau diese Metakognition ist bei LLM-Subagenten unzuverlässig (systematische Überkonfidenz, Dunning-Kruger-artig): der Auslöser feuert gerade dann nicht, wenn er am nötigsten wäre → struktureller Konstruktionsfehler, nicht bloß „noch nicht nötig". **Zusätzlich:** (a) YAGNI – „ganze Schicht auf Opus" (S095) ist nicht als zu teuer belegt; (b) ein Fragen-Protokoll verschärft die ohnehin reibende Orchestrator↔Subagent-Kommunikation (vgl. OBS-S101-2). Die *proaktive* Variante (ungefragtes Senior-Review) existiert bereits als Review-Auditoren → nichts Eigenständiges bleibt übrig. Re-Aufgriff nur bei belegtem Bedarf (Opus-Schicht-Eskalation nachweislich zu teuer *und* ein zuverlässigerer, nicht selbst-eingeschätzter Trigger).
+- Bezug: OBS-S085-8 / OBS-S093-2 (Modellwahl pro Schicht); OBS-S101-2 (Kommunikations-Reibung)
+
+---
+

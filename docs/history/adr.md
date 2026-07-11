@@ -693,7 +693,7 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Verworfen:** Volle 4er-Union jetzt – erzeugt unausgeübte Zweige + Suppressions vor dem treibenden Szenario (widerspricht der Suppression-Minimierung).
 
-**Addendum (run-2, "Speichern-Button deaktiviert während des Speicherns"):** Der `pending`-Teil der oben aufgeschobenen Erweiterung wird **minimal** eingelöst: `useResultMutation` liefert neu ein 3-Tupel `[mutate, error, isPending]`, wobei `isPending = mutation.isPending` (React Query). **Keine** volle `MutationState`-Union, **kein** `matchState`, **kein** `throwOnError` – die Begründung von oben gilt unverändert für diese Teile, weil `throwOnError` weiterhin `QueryCache.onError` voraussetzt (existiert noch nicht, TD-S090-2) und die volle Union weiterhin unausgeübte `idle`/`error`-Zweige erzeugen würde. Die volle Union + `matchState` + `throwOnError` bleiben mit den @US-904-error/resilience-Szenarien aufgeschoben.
+**Addendum (run-2, "Speichern-Button deaktiviert während des Speicherns"):** Der `pending`-Teil der oben aufgeschobenen Erweiterung wird **minimal** eingelöst: `useResultMutation` liefert neu ein 3-Tupel `[mutate, error, isPending]`, wobei `isPending = mutation.isPending` (React Query). **Keine** volle `MutationState`-Union, **kein** `matchState`, **kein** `throwOnError` – die Begründung von oben gilt unverändert für diese Teile, weil `throwOnError` weiterhin `QueryCache.onError` voraussetzt (existiert noch nicht) und die volle Union weiterhin unausgeübte `idle`/`error`-Zweige erzeugen würde. Die volle Union + `matchState` + `throwOnError` bleiben mit den @US-904-error/resilience-Szenarien aufgeschoben.
 
 **Begründung:** Bring! ist im Familienshopping-Kontext etabliert und auf Touch-Geräten gut bedienbar. US-304 (Visuelle Darstellung & Varianten) wurde aufgelöst, weil das Layout kein Feature-Increment ist, sondern ein Designprinzip – die Kachel-Entscheidung fällt einmalig und ist kein eigenständiges Implementierungsticket.
 
@@ -729,7 +729,7 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 **Entscheidung:** Das Stryker-Mutation-Level bleibt auf „Standard" (Default) – es wird nicht auf Advanced angehoben. Advanced ist das einzige höhere Level mit zusätzlichen Mutator-Kategorien: Regex, Math Methods, **String Methods**. „Complete" ist laut Stryker.NET-Doku **deckungsgleich mit Advanced** (verifiziert S092: die Level-Tabelle listet keine Complete-exklusiven Mutationen, nur die Beschreibung „all possible mutations") – die einzige relevante Schwelle ist also Standard → Advanced.
 
 **Begründung:**
-1. **Der Anlass schließt den Blindspot nicht:** String-Method-Mutationen (z.B. `Trim()`) sind erst ab Advanced aktiv. Der einzige Advanced-Mutant für `input?.Trim()` ist `Trim() → ""` – er macht jeden Wert leer und wird vom Happy-Path-Test trivial getötet. Trim-*Korrektheit* (Whitespace wird entfernt, getrimmter Wert gespeichert) pinnt damit **kein** Mutation-Level, sondern nur ein szenariogetriebener Verhaltenstest auf den gespeicherten/zurückgegebenen Wert (vgl. LL-S092-1).
+1. **Der Anlass schließt den Blindspot nicht:** String-Method-Mutationen (z.B. `Trim()`) sind erst ab Advanced aktiv. Der einzige Advanced-Mutant für `input?.Trim()` ist `Trim() → ""` – er macht jeden Wert leer und wird vom Happy-Path-Test trivial getötet. Trim-*Korrektheit* (Whitespace wird entfernt, getrimmter Wert gespeichert) pinnt damit **kein** Mutation-Level, sondern nur ein szenariogetriebener Verhaltenstest auf den gespeicherten/zurückgegebenen Wert.
 2. **Advanced verteuert das 100%-Gate (ADR-S041-8):** mehr Mutanten, mehr *äquivalente* Mutanten → mehr begründete Suppressions + Triage, langsamere Läufe – ohne proportionalen Korrektheitsgewinn, da die hochwertigen Verhaltensweisen (Trim, Casing, URL) ohnehin szenariogetrieben gepinnt werden.
 3. **Standard ist der Upstream-Default** (einfachere Baseline).
 
@@ -831,7 +831,7 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Kontext:** Das Test-Projekt nutzt den MTP-Runner (ADR-S063-1). Darunter ist `coverlet.collector` (VSTest-DataCollector) wirkungslos. Beim WSL-/ext4-Umzug (S089) zeigte sich, dass das Branch-Coverage-Gate dadurch nur über veraltete cobertura-Reports „bestand" (Stale-Masking).
 
-**Entscheidung:** Das Coverage-Gate läuft über eine **MTP-native** Engine, bevorzugt **`coverlet.MTP`** (in der Dependency-Allowlist). Die Umsetzung ist vertagt; operativer Stand + Trigger: **TD-S089-1**.
+**Entscheidung:** Das Coverage-Gate läuft über eine **MTP-native** Engine, bevorzugt **`coverlet.MTP`** (in der Dependency-Allowlist). Die Umsetzung ist vertagt; operativer Stand + Trigger: **TD-S089-1**. <!-- ref-ok: bewusster ADR→TD-Statusverweis (Entscheidung stabil, Umsetzungs-Tracking im TD) -->
 
 **Begründung:** `coverlet.MTP` reproduziert die bisherige Mess-Semantik (gleiche Engine; `--coverlet-skip-auto-props` schließt **präzise** nur Auto-Properties aus, nicht async/yield) → „100%" behält dieselbe Bedeutung; cobertura ist coverlet-nativ (Parser-kompatibel); OSS/inspizierbar.
 
@@ -840,7 +840,7 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 - **`Microsoft.Testing.Extensions.CodeCoverage`** – Auto-Props nur via breitem `CompilerGeneratedAttribute`-Exclude (schließt async/yield mit aus → überzeichnet ein 100%-Branch-Gate); Closed-Source. Bleibt **Fallback**.
 - **Zurück zu VSTest** – Rückschritt gegen die xunit-v3/MTP-Wahl (ADR-S063-1).
 
-**Status Proposed (nicht Accepted):** vor der realen Nutzung ist noch eine MTP-Versions-Kompatibilität zu lösen – Details und Trigger in TD-S089-1.
+**Status Proposed (nicht Accepted):** vor der realen Nutzung ist noch eine MTP-Versions-Kompatibilität zu lösen – Details und Trigger in TD-S089-1. <!-- ref-ok: bewusster ADR→TD-Statusverweis (Entscheidung stabil, Umsetzungs-Tracking im TD) -->
 
 ---
 

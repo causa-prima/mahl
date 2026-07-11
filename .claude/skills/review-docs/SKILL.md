@@ -92,6 +92,7 @@ Lies alle Projekt- und globalen Docs. Suche nach:
 - Ob das **Navigation-Table-Pattern** in CLAUDE.md genutzt wird: Verweis "lies X wenn du Y tust" statt Inhalt direkt einzubetten (lädt nichts automatisch, aber setzt diszipliniertes Abrufen voraus)
 - Ob **Subdirectory-CLAUDE.md**-Dateien sinnvoll wären – aber als letztes Mittel einordnen: Sie erzwingen das Laden für *alle* Arbeit in diesem Pfad, sind also nicht wirklich lazy; sinnvoll nur wenn ein gesamtes Unterverzeichnis dauerhaft eigene Instruktionen braucht
 - Dokumente, die zusammengeführt werden könnten ohne Informationsverlust
+- **Low-Value-Content** (anderer Winkel als Redundanz/Länge): Regeln/Inhalte, die *korrekt und knapp* sind, gegen die aber praktisch **nie verstoßen würde** – der adressierte Fehler tritt nie auf → Lese-/Token-Kosten ohne realen Nutzen. Als **Prüf-Linse** behandeln (Streichung *erwägen*, nicht automatisch): die Beurteilung „wird nie verletzt" ist selbst unsicher, daher nur flaggen + begründen, nicht blind entfernen.
 
 Bewerte auch: Werden Skills/Agenten klar genug beschrieben, sodass der Hauptagent nur die wirklich relevanten lädt?
 
