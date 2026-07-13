@@ -19,6 +19,7 @@ sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müsse
 | 6. Konsistente Terminologie | Bei allen sichtbaren Texten (Labels, Buttons, Meldungen) |
 | 7. Leerer Zustand erklärt sich | Bei jeder Liste, Tabelle oder Ansicht, die leer sein kann |
 | 8. Formular-/Dialog-Baseline | Bei jedem Formular oder Dialog (Pflichtfeld-Markierung, Fokus-Führung, Tastatur) |
+| 9. Erreichbarkeit / Navigation | Sobald mehr als eine Seite/Route existiert |
 
 > **Voraussetzung:** Diese Guideline gilt für alle React-Komponenten.
 > `docs/guidelines/coding-guideline-typescript.md` beschreibt die technische Umsetzung.
@@ -181,3 +182,16 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 
 ✅ Pflichtfelder mit Asterisk; Fokus beim Öffnen im ersten Feld; nach Fehler Fokus aufs fehlerhafte Feld; Enter speichert; Escape schließt.
 ❌ Pflichtfelder optisch nicht von optionalen unterscheidbar; nach „Speichern" mit Fehler bleibt der Fokus auf dem Button und die Fehlermeldung steht ungesehen darüber; ein manueller Enter-Handler, der in einem künftigen mehrzeiligen Feld den Zeilenumbruch verschluckt.
+
+---
+
+## 9. Erreichbarkeit / Navigation
+
+**Warum:** Eine Seite, die nur per direkter URL erreichbar ist, findet niemand — Deep-Links sind kein Ersatz für eine sichtbare Navigation. Ohne strukturelle Regel wird das erst bemerkt, wenn schon mehrere Seiten ohne Verbindung zueinander existieren.
+
+**Entscheidungsregel:** Sobald eine zweite Seite/Route eingeführt wird, bekommt **jede** erreichbare Seite einen Eintrag in der In-App-Navigation (z.B. AppBar/Sidebar) — strukturell, für jede neue Route, unabhängig davon, ob die einzelne Story das erwähnt. Bei genau einer Seite (aktueller Stand) ist diese Regel nicht anwendbar.
+
+**Abgrenzung zu Gherkin-Szenarien:** Diese Guideline erzwingt nur die *strukturelle* Regel ("jede Route hat einen Nav-Eintrag", per Review). Das *konkrete* Verhalten ("von A nach B navigieren") ist ein Gherkin-Szenario — es gehört in `features/navigation.feature` (Tag `@CROSS-navigation`), nicht in das Feature-File der einzelnen Entität, damit bestehende Feature-Dateien beim Hinzufügen einer neuen Seite nicht nachträglich angepasst werden müssen. Details: ADR-S103-1; Aufnahme in den Szenario-Pool via `gherkin-workshop`-Checkliste (Schritt 1).
+
+✅ Neue Seite „Rezepte" → Eintrag in der AppBar-Navigation + Szenario „Von der Zutatenliste zu den Rezepten navigieren" in `features/navigation.feature`.
+❌ Neue Seite nur per manuell eingegebener URL erreichbar; Navigations-Szenario im `ingredients.feature` versteckt, weil es „gerade dort naheliegend war".

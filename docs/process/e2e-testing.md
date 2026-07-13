@@ -63,8 +63,12 @@ Die Step-Definitionen (z.B. `When ich ein Rezept … anlege`) werden im Test-Cod
 | `@US-NNN-edge-case` | Szenario | Grenzfall / Sonderverhalten |
 | `@NFR-<domain>` | Feature | Querschnittliche NFR-Feature-Datei (z.B. `@NFR-resilience`) |
 | `@NFR-<domain>-<typ>` | Szenario | NFR-Szenario nach Fehler-Typ (z.B. `@NFR-resilience-network`) |
+| `@CROSS-<domain>` | Feature | Querschnittliche **funktionale** Feature-Datei, nicht an eine einzelne US gebunden (z.B. `@CROSS-navigation`) |
+| `@CROSS-<domain>-<typ>` | Szenario | CROSS-Szenario nach Typ (z.B. `@CROSS-navigation-ingredients-to-recipes`) |
 
 NFR-Features haben keine US-ID. Der CI-Validator behandelt `@NFR-*`-Tags als eigene Klasse – Traceability-Pflicht gilt analog: jedes `@NFR-*`-Szenario braucht einen grünen E2E-Test.
+
+**`@CROSS-*` vs. `@NFR-*`:** Beide sind Feature-Tags ohne US-ID und unterliegen derselben Traceability-Pflicht. Unterschied: `@NFR-*` beschreibt nicht-funktionale Eigenschaften (Resilienz, Performance); `@CROSS-*` beschreibt funktionales Verhalten, das mehrere Stories/Seiten verbindet und deshalb keiner einzelnen US-Feature-Datei gehört (z.B. Navigation zwischen Seiten). Grund für die eigene Datei statt Verteilung auf die beteiligten Entitäts-Features: bestehende Feature-Dateien müssten sonst nachträglich angepasst werden, sobald eine neue Seite hinzukommt (ADR-S103-1).
 
 ---
 

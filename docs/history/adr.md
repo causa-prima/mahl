@@ -112,6 +112,23 @@ Verwertet werden die Kommentare von **`next_run.py`**: DONE-Erkennung (Titel kom
 
 ---
 
+### ADR-S103-1: Navigation zwischen Seiten – eigenes Cross-Feature statt Story-Feature
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:gherkin, testing:e2e, frontend:react
+
+**Entscheidung:** Sobald eine Story eine neue Seite/Route einführt und bereits mindestens eine andere Seite existiert, gehört das Szenario "wie kommt der Nutzer dorthin" nicht in das Feature-File der Entität, sondern in eine eigene, entitätsübergreifende Datei `features/navigation.feature`, getaggt mit der neuen Feature-Tag-Klasse `@CROSS-<domain>` (erste Instanz: `@CROSS-navigation`). `@CROSS-*` ergänzt `@NFR-*` (docs/process/e2e-testing.md): beide sind Feature-Tags ohne US-ID mit identischer Traceability-Pflicht, `@NFR-*` für nicht-funktionale, `@CROSS-*` für funktionale Querschnitts-Szenarien.
+
+Die Prüfung "entsteht hier ein Navigations-Bedarf?" wird fester Bestandteil der UI-Verhaltens-Checkliste in Schritt 1 des `gherkin-workshop`-Skills (Aspekt "Erreichbarkeit (Navigation)") – für die erste Seite der Anwendung "Nicht relevant", ab der zweiten Seite relevant.
+
+Zusätzlich strukturelle Vorgabe (Interaction Design, kein Szenario nötig dafür): jede Route bekommt einen Eintrag in der In-App-Navigation, erzwungen per Review – UX-Guideline `coding-guideline-ux.md` Prinzip 9.
+
+**Begründung:** Ohne eigene Datei müsste beim Hinzufügen der zweiten Seite nachträglich ein bereits abgeschlossenes Feature-File (z.B. `ingredients.feature`) angepasst werden, nur weil eine andere Story einen neuen Nav-Weg dorthin braucht – das widerspricht dem Prinzip, dass abgenommene Specs nicht rückwirkend fremde Anforderungen aufnehmen. Eine eigene Story/Epic "Navigation" wurde verworfen (siehe unten), weil Navigation selbst i.d.R. keinen eigenständigen Business-Value hat (INVEST-Kriterium "Valuable" verletzt) und das Risiko eines vorab gebauten Nav-Frameworks ohne konkreten zweiten Bedarf birgt.
+
+**Verworfen:** Eigene User Story/Epic "Navigation" – kein eigenständiger Business-Value, Gefahr von Premature-Abstraction (Nav-Framework vor dem zweiten konkreten Anwendungsfall).
+
+---
+
 ## API-Validierung & Fehlerbehandlung (alle Endpoints)
 
 ### ADR-S000-1: Collect-all Validation: kein Fail-Fast für unabhängige Felder
