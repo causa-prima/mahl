@@ -30,6 +30,24 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
+## OBS-S103-1 – `dotnet-stryker.py --mutate` unklar bei Einzeldatei-Ziel / stillem 0-Treffer
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: `dotnet-stryker.py --mutate` akzeptiert nur eine einzelne Datei (keine Kommaliste/Brace-Expansion), und der Pfad muss relativ zu `Server/` sein (`Endpoints/Foo.cs`, nicht `Server/Endpoints/Foo.cs`). Bei falschem Muster oder 0 gefundenen Mutanten für die Zieldatei meldet das Tool stillschweigend `0/0/0` statt einer klaren Fehlermeldung → der Subagent brauchte zwei unnötige Läufe, bis er es per Doku-Beispiel (`--mutate Domain/Foo.cs`) korrigierte.
+- Entscheidung/Maßnahme: offen – beim Drain zu bewerten. Kandidat: explizite Fehlermeldung bei 0 gefundenen Mutanten für die Zieldatei (statt nur den Tabellenausschnitt zu zeigen). Vor Umsetzung Häufigkeit/Reibung prüfen (Impact gering).
+- Bezug: –
+
+## OBS-S103-2 – Stryker 100 % pinnt nicht die Reihenfolge von „erstes-von-N"-Prioritätslogik
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: QUALITÄT    Kontext: Mutation-Testing
+- Beobachtung: Bei der Fokus-aufs-erste-Fehlerfeld-Logik (`nameError ? nameRef : unitError ? unitRef : undefined`) töteten die zwei Einzelfeld-Tests alle Stryker-Mutanten (100 %), aber der Mehrfeld-Fall (beide fehlerhaft → Priorität Name) war **nicht** gepinnt: ein menschlicher Prioritäts-Swap (Einheit vor Name) mutiert identisch und bliebe bei 100 % unentdeckt (im Review als FC-F1 gefunden, mit explizitem Mehrfeld-Assert geschlossen). Verallgemeinert: „erstes-von-N"-/Prioritäts-Auswahllogik braucht einen expliziten Mehrfach-Fall-Test; Stryker-100 % über Einzelfälle genügt nicht.
+- Entscheidung/Maßnahme: offen – beim Drain zu bewerten. Kandidat: Hinweis in Test-/Review-Guideline (Prioritäts-/Auswahllogik → expliziter Mehrfach-Fall-Test, Stryker fängt die Ordering-Lücke nicht). Vor Umsetzung Häufigkeit prüfen (Impact gering, Einzelbeobachtung).
+- Bezug: –
+
 ## OBS-S101-1 – Flaky-Timeout einzelner Vitest-Tests unter Stryker-Systemlast
 - Quelle: Subagent
 - Status: NEU

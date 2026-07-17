@@ -43,6 +43,17 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 103 – 2026-07-17
+
+- **[MITTEL] [PROZESS] [Kommunikation] LL-S103-1 – Entscheidung dem User ohne die zum Urteil nötige Substanz vorgelegt**
+  Quelle: User
+  Was: Bei der Rest-Findings-Triage (implementing-scenario Schritt 6.1) legte ich die ⚠️-Findings in einer `AskUserQuestion` nur als Kurz-Labels/IDs vor; der User konnte nicht urteilen ("verstehe die einzelnen Probleme nicht") und musste die Substanz einzeln nachfordern.
+  Warum: Schritt 6.1 verlangt bereits „mit genug Kontext zum Entscheiden" (seit S077 gegen durchgefallene Findings eingeführt); ich hatte den vollen Subagent-/Orchestrator-Kontext, wandte die Regel aber nicht an (Curse of Knowledge) → Instanz von CM-S047-1.
+  Regel: Jede Entscheidungsvorlage an den User trägt die Substanz jeder Option inline (konkretes Problem + Auswirkung/Fall), nie nur Label/ID/Empfehlung; Selbst-Check vorm Absenden: „Könnte jemand ohne meinen Kontext hiermit entscheiden?"
+  Bezug: CM-S047-1 (Regression: Regel bekannt, nicht angewandt)
+
+---
+
 ## Session 102 – 2026-07-11
 
 - **[MITTEL] [PROZESS] [Kaizen] LL-S102-1 – Lösungskandidaten bei der OBS-Erfassung biasen den späteren Drain**

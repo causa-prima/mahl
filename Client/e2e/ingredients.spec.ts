@@ -275,6 +275,23 @@ test.describe('US904_EdgeCase: Zutaten verwalten', () => {
     // Then: der "Zutat anlegen"-Dialog ist geschlossen (Erfolgspfad)
     await expect(page.getByRole('dialog')).toBeHidden()
   })
+
+  // Szenario: Einheit mit exakt 20 Zeichen wird akzeptiert
+  test('US904_EdgeCase_CreateIngredient_UnitExactly20Chars_AppearsInList', async ({ page }) => {
+    // When: Dialog öffnen, "Salz" als Name, eine Einheit mit genau 20 Zeichen (Grenzwert,
+    //   ADR-S051-3: max. 20 ist gültig -> die Grenze liegt bei > 20, nicht >= 20), speichern
+    const unitWith20Chars = 'a'.repeat(20)
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Salz')
+    await page.getByLabel('Einheit').fill(unitWith20Chars)
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: die neue Zutat (mit 20-Zeichen-Einheit) erscheint in der Zutaten-Liste
+    await expect(page.getByTestId('ingredient-list').getByText('Salz')).toBeVisible()
+    await expect(page.getByTestId('ingredient-list').getByText(unitWith20Chars)).toBeVisible()
+    // Then: der "Zutat anlegen"-Dialog ist geschlossen (Erfolgspfad)
+    await expect(page.getByRole('dialog')).toBeHidden()
+  })
 })
 
 // @US-904-error
@@ -330,6 +347,11 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
 
     // Then: Fehlermeldung erscheint
     await expect(page.getByText('Einheit darf nicht leer sein.')).toBeVisible()
+    // Then: der Fokus liegt auf dem Einheit-Feld. Es ist das erste (hier einzige) fehlerhafte
+    //   Feld — Name "Salz" ist gültig (UX-Guideline Prinzip 8 "Fokus aufs erste fehlerhafte
+    //   Feld" / TD-S094-1). Pinnt zugleich den "nur späteres Feld fehlerhaft"-Fall: der Fokus
+    //   landet NICHT hart auf dem (visuell ersten) Name-Feld, sondern auf dem fehlerhaften.
+    await expect(page.getByLabel('Einheit')).toBeFocused()
     // Then: die Zutaten-Liste bleibt unverändert
     await expect(listItems).toHaveCount(itemsBefore)
   })
@@ -365,6 +387,12 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     // Treibt den Backend-Merge: kurzschließende Validierung lieferte nur die Name-Meldung.
     await expect(page.getByText('Name darf nicht leer sein.')).toBeVisible()
     await expect(page.getByText('Einheit darf nicht leer sein.')).toBeVisible()
+    // Then: der Fokus liegt auf dem Name-Feld. Beide Felder sind fehlerhaft -> "mehrere ->
+    //   das erste" (UX-Guideline Prinzip 8 / TD-S094-1, Fokus-Priorität in DOM-Reihenfolge
+    //   Name vor Einheit). Pinnt den Mehrfeld-Fall, den die Einzelfeld-Fokus-Tests nicht
+    //   abdecken: ein Prioritäts-Swap im Fokus-Hook (Einheit vor Name) bliebe sonst
+    //   unentdeckt (Stryker kann diesen menschlichen Refactor strukturell nicht fangen).
+    await expect(page.getByLabel('Name')).toBeFocused()
     // Then: die Zutaten-Liste bleibt unverändert
     await expect(listItems).toHaveCount(itemsBefore)
   })
@@ -383,6 +411,24 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
 
     // Then: Fehlermeldung erscheint (ADR-S051-2: fixer Text)
     await expect(page.getByText('Name darf maximal 30 Zeichen lang sein.')).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert (DB-Ausgangszustand nach Fehler)
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
+
+  // Szenario: Zutat mit zu langer Einheit anlegen schlägt fehl
+  test('US904_Error_CreateIngredient_UnitTooLong_ShowsErrorAndListUnchanged', async ({ page }) => {
+    // Given: Ausgangs-Anzahl der Zutaten (für "bleibt unverändert")
+    const { listItems, itemsBefore } = await captureIngredientList(page)
+
+    // When: Dialog öffnen, "Salz" als Name, eine Einheit mit 21 Zeichen (> 20, ADR-S051-3), speichern
+    const unitWith21Chars = 'a'.repeat(21)
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Salz')
+    await page.getByLabel('Einheit').fill(unitWith21Chars)
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: Fehlermeldung erscheint (ADR-S051-2: fixer Text)
+    await expect(page.getByText('Einheit darf maximal 20 Zeichen lang sein.')).toBeVisible()
     // Then: die Zutaten-Liste bleibt unverändert (DB-Ausgangszustand nach Fehler)
     await expect(listItems).toHaveCount(itemsBefore)
   })

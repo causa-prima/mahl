@@ -420,6 +420,11 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leerer Name)', () => 
     expect(await screen.findByText('Name darf nicht leer sein.')).toBeInTheDocument()
     // Then: das Name-Feld ist als ungültig markiert (a11y-Fehlerzustand, UX-Guideline §4)
     expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'true')
+    // Then: das Name-Feld hat den Fokus (UX-Guideline Prinzip 8 "Fokus aufs erste
+    //   fehlerhafte Feld", TD-S094-1 – nicht durch einen eigenen Gherkin-Step getrieben,
+    //   sondern durch die Guideline-Baseline; "erstes Feld fehlerhaft" -> Name-Feld).
+    //   waitFor, weil der Fokus asynchron via useEffect nach dem Render-Commit gesetzt wird.
+    await waitFor(() => { expect(screen.getByLabelText(/^Name/)).toHaveFocus() })
   })
 
   it('US904_Error_CreateIngredient_EmptyName_KeepsDialogOpen', async () => {
@@ -512,6 +517,10 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
     //   Einheit) — killt den Mutanten "es wird immer dasselbe Feld markiert" und treibt
     //   den name-absent-Zweig (FieldErrors ohne name-Key).
     expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
+    // Then: das Einheit-Feld hat den Fokus (UX-Guideline Prinzip 8 "Fokus aufs erste
+    //   fehlerhafte Feld"; "nur späteres Feld fehlerhaft" -> Einheit-Feld, nicht Name).
+    //   waitFor, weil der Fokus asynchron via useEffect nach dem Render-Commit gesetzt wird.
+    await waitFor(() => { expect(screen.getByLabelText(/^Einheit/)).toHaveFocus() })
   })
 })
 

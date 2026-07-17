@@ -110,13 +110,6 @@ Eintrag-Format:
 
 ---
 
-## TD-S094-1 — Zutaten-Dialog: Fokus aufs erste fehlerhafte Feld fehlt (Prinzip 8)
-**Priorität:** Mittel – passend zu run-4 „Anlegen·Einheit-Validierung"
-**Problem:** Nach einem Validierungsfehler springt der Fokus nicht aufs erste fehlerhafte Feld (UX-Guideline Prinzip 8); die Error-Tests prüfen nur `aria-invalid`, nicht den Fokus. Der Fehlerpfad wird erst von den @US-904-error-Läufen getrieben – run-2 (Dialog-Verhalten, Happy-Path) enthält kein Szenario, das Fokus-nach-Fehler beobachtbar macht.
-**Behebung/Trigger:** Braucht ein Szenario (spec-first), das den Fokus-nach-Fehler fordert – passend zu run-4 „Einheit-Validierung", wo der Fehlerpfad das treibende Szenario ist; per Review (Prinzip 8) erzwungen.
-
----
-
 ## TD-S101-1 — Frontend Hook: `useResultMutation` 4er-Positions-Tupel
 **Priorität:** Niedrig
 **Problem:** `useResultMutation` gibt ein 4-Tupel `[mutate, error, isPending, reset]` zurück (zwei davon Funktionen). Positions-Tupel werden mit wachsender Länge fehleranfällig: Call-Sites destrukturieren in exakter Reihenfolge, `error`/`isPending` sind leicht verwechselbar. Ein Objekt `{ save, error, isPending, reset }` wäre selbstdokumentierend und reihenfolgeunabhängig.

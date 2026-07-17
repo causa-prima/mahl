@@ -52,6 +52,8 @@ file static class IngredientMappings
 {
     // ADR-S051-3: name max. 30 Zeichen, nach Trimming gemessen.
     private const int MaxNameLength = 30;
+    // ADR-S051-3: defaultUnit max. 20 Zeichen, nach Trimming gemessen.
+    private const int MaxUnitLength = 20;
 
     // Collect-all validation of the independent required fields (ADR-S000-1, gültig laut ADR-S090-1):
     // name and unit are validated independently and all errors collected, so both-fields-empty reports both
@@ -71,20 +73,23 @@ file static class IngredientMappings
             .MapError<Ingredient, IngredientValidationError, IReadOnlyList<IngredientValidationError>>(_ => errors);
     }
 
-    // ADR-S051-3: name max. 30 Zeichen, nach Trimming gemessen -> Länge wird auf dem bereits getrimmten
+    // ADR-S051-3: max. Länge je Feld, nach Trimming gemessen -> Länge wird auf dem bereits getrimmten
     // NonEmptyTrimmedString-Wert geprüft. Leer und zu lang schließen sich strukturell aus (Bind stoppt bei Empty).
-    private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateName(string input) =>
+    // Gemeinsamer Helper für name/unit – identische Struktur, nur Grenzwert und Error-Cases unterscheiden sich.
+    private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateField(
+        string input, int maxLength, IngredientValidationError emptyError, IngredientValidationError tooLongError) =>
         NonEmptyTrimmedString.Create(input)
-            .MapError<NonEmptyTrimmedString, Error, IngredientValidationError>(_ => IngredientValidationError.NameEmpty)
-            .Bind<NonEmptyTrimmedString, NonEmptyTrimmedString, IngredientValidationError>(name =>
-                name.Value.Length > MaxNameLength
-                    ? (OneOf<NonEmptyTrimmedString, IngredientValidationError>) IngredientValidationError.NameTooLong
-                    : name);
+            .MapError<NonEmptyTrimmedString, Error, IngredientValidationError>(_ => emptyError)
+            .Bind<NonEmptyTrimmedString, NonEmptyTrimmedString, IngredientValidationError>(value =>
+                value.Value.Length > maxLength
+                    ? (OneOf<NonEmptyTrimmedString, IngredientValidationError>) tooLongError
+                    : value);
 
-    // Kein Max-Length-Check für unit in diesem Lauf (run-4) – nur Nicht-Leer-Validierung.
+    private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateName(string input) =>
+        ValidateField(input, MaxNameLength, IngredientValidationError.NameEmpty, IngredientValidationError.NameTooLong);
+
     private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateUnit(string input) =>
-        NonEmptyTrimmedString.Create(input)
-            .MapError<NonEmptyTrimmedString, Error, IngredientValidationError>(_ => IngredientValidationError.UnitEmpty);
+        ValidateField(input, MaxUnitLength, IngredientValidationError.UnitEmpty, IngredientValidationError.UnitTooLong);
 
     // 0-or-1 error for a validated field: empty when valid, the field's error otherwise.
     private static IEnumerable<IngredientValidationError> ErrorOrEmpty(
@@ -106,7 +111,8 @@ file static class IngredientMappings
     private static (string Key, string Message) Describe(IngredientValidationError error) => error.Match(
         onNameEmpty: () => ("name", "Name darf nicht leer sein."),
         onNameTooLong: () => ("name", "Name darf maximal 30 Zeichen lang sein."),
-        onUnitEmpty: () => ("defaultUnit", "Einheit darf nicht leer sein."));
+        onUnitEmpty: () => ("defaultUnit", "Einheit darf nicht leer sein."),
+        onUnitTooLong: () => ("defaultUnit", "Einheit darf maximal 20 Zeichen lang sein."));
 
     internal static IngredientDbType ToDbType(this Ingredient domain) =>
         new() { Id = domain.Id, Name = domain.Name.Value, DefaultUnit = domain.DefaultUnit.Value };

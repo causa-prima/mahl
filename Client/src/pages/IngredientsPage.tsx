@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
@@ -28,11 +28,32 @@ type CreateIngredientDialogProps = {
   readonly onSubmit: () => void
 }
 
+// UX-Guideline Prinzip 8 ("Fokus aufs erste fehlerhafte Feld", TD-S094-1): nach einem
+// Validierungsfehler springt der Fokus auf das erste fehlerhafte Feld in DOM-Reihenfolge
+// (Name vor Einheit). Kein Transition-Race wie beim Autofokus (ADR-S100-1): der Dialog ist
+// beim Fehler bereits offen/sichtbar, `.focus()` greift deterministisch. Als eigene Funktion
+// ausgelagert, weil das Fokus-Management nach Validierungsfehler ein eigenständiges,
+// testbares Verhalten ist (losgelöst vom reinen Rendering); dass CreateIngredientDialog
+// dadurch unter dem Zeilen-Richtwert bleibt, ist ein Nebeneffekt.
+function useFocusFirstInvalidField(
+  nameInputRef: Readonly<React.RefObject<HTMLInputElement | null>>,
+  unitInputRef: Readonly<React.RefObject<HTMLInputElement | null>>,
+  nameError: string | undefined,
+  unitError: string | undefined,
+): void {
+  useEffect(() => {
+    const firstInvalidFieldRef = nameError ? nameInputRef : unitError ? unitInputRef : undefined
+    firstInvalidFieldRef?.current?.focus()
+  }, [nameError, unitError, nameInputRef, unitInputRef])
+}
+
 // Ausgelagert aus IngredientsPage (Refactor, keine eigenes Szenario/Test – die
 // Komponenten-Tests decken diesen Dialog weiterhin über die IngredientsPage-API ab).
 function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
   const { open, name, unit, nameError, unitError, isPending, onNameChange, onUnitChange, onClose, onSubmit } = props
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const unitInputRef = useRef<HTMLInputElement>(null)
+  useFocusFirstInvalidField(nameInputRef, unitInputRef, nameError, unitError)
 
   // UX-Guideline Prinzip 3 ("Sperren während Pending"): MUI ruft `onClose` für BEIDE
   // Schließ-Pfade (Escape UND Backdrop-Klick) auf – während `isPending` beide sperren,
@@ -88,6 +109,7 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
           error={Boolean(unitError)}
           helperText={unitError}
           required
+          inputRef={unitInputRef}
         />
       </DialogContent>
       <DialogActions>
