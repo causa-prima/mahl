@@ -86,6 +86,11 @@ Bewerte jeden Aspekt mit **✅ gut / ⚠️ verbesserungswürdig / ❌ Problem**
 - Welche Schritte verbrauchen unverhältnismäßig viele Tokens/Zeit ohne klaren Mehrwert?
 - Gibt es Redundanzen in den Prompts oder Dokumenten?
 - Ist der SessionStart-Hook (AGENT_MEMORY.md laden) sinnvoll kalibriert?
+- Führt ein Skill einen **deterministischen** Schritt freihändig aus (eindeutig aus dem Zustand
+  ableitbar – z.B. nächste Session-/Run-Nummer bestimmen, Status setzen, Eintrag archivieren,
+  Metadaten filtern/listen), der zuverlässiger und token-ärmer per **Script** liefe? Bestehende
+  Vorbilder: `obs-archive.py`, `next_run.py`, `decisions.py`. (Prinzip: `docs/kaizen/principles.md`,
+  „Deterministische Skill-Schritte mechanisieren".)
 
 ### 6. Robustheit & Fehlerresistenz
 - Was passiert, wenn ein Agent einen Schritt überspringt oder falsch interpretiert?

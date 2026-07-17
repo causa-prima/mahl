@@ -30,6 +30,10 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Der häufigste Fehlerursprung ist nicht fehlendes Wissen, sondern fehlendes Anwenden.
   Hooks und Pflicht-Schritte in Skills sind zuverlässiger als Lese-Disziplin.
 
+- **Deterministische Skill-Schritte mechanisieren.** Beim Schreiben/Ändern eines Skills prüfen, ob
+  ein deterministischer Schritt (Session-Nummer bestimmen, Status setzen, archivieren …) statt
+  freihändig besser als Script liefe (Token↓, Varianz↓). Details: `workflow-auditor.md` Dim. 5.
+
 ## Doku & Referenzen
 
 - **Single Source of Truth: Information am passendsten Ort, sonst referenzieren.**

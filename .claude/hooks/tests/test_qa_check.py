@@ -187,9 +187,9 @@ def test_worktree_diff_untracked_and_invariant(tmp_path, monkeypatch):
     _write(tmp_path, "Client/src/new.ts", "NEWLINE\n")
     monkeypatch.chdir(tmp_path)
     # // When der Working-Tree-Diff vor und nach `git add` erzeugt wird
-    before = qa._worktree_diff("Client/src/", 0)
+    before = qa._worktree_diff(("Client/src/",), 0)
     g("add", ".")
-    after = qa._worktree_diff("Client/src/", 0)
+    after = qa._worktree_diff(("Client/src/",), 0)
     # // Then erfasst er sowohl untracked als auch modifizierte Zeilen und ist index-unabhängig
     assert "NEWLINE" in before
     assert "MODLINE" in before
@@ -307,6 +307,58 @@ def test_audit_approved_tests_recognizes_test_tsx(tmp_path, monkeypatch):
     # // When gegen die Freigabe-SHA geprüft wird
     findings, lines = qa.audit_approved_tests("frontend", {"Client/src/pages/Foo.test.tsx": sha})
     # // Then greift der Anker-Audit auch für .test.tsx (Abweichung samt Diff gemeldet)
+    assert findings == 1
+    assert "999" in "\n".join(lines)
+
+
+# --- Backend-Tests unter Server.Tests/ (OBS-S102-2: Layer-Präfix war blind) ---
+# Regression: Backend-xUnit-Tests liegen unter Server.Tests/, der Layer-Präfix war aber
+# nur "Server/". "Server.Tests/…".startswith("Server/") ist False → check_changed_test_files,
+# der Blob-Anker-Audit UND der Übergabe-Hash-Fingerprint waren für Backend-Testcode blind
+# (CM-S070-1 faktisch aus). Frontend war nie betroffen (Tests unter Client/src/).
+
+def test_check_changed_test_files_backend_in_server_tests_dir(tmp_path, monkeypatch):
+    # // Given eine geänderte Backend-Test-Datei unter Server.Tests/
+    g = _init_repo(tmp_path)
+    _write(tmp_path, "Server/Endpoints/Foo.cs", "// prod\n")
+    _write(tmp_path, "Server.Tests/FooTests.cs", "// [Fact] a\n")
+    g("add", ".")
+    g("commit", "-qm", "init")
+    _write(tmp_path, "Server.Tests/FooTests.cs", "// [Fact] a CHANGED\n")
+    monkeypatch.chdir(tmp_path)
+    # // When / // Then wird sie als geänderte Backend-Test-Datei gelistet
+    assert "Server.Tests/FooTests.cs" in qa.check_changed_test_files("backend")
+
+
+def test_content_fingerprint_backend_binds_server_tests(tmp_path, monkeypatch):
+    # // Given ein committeter Ausgangszustand mit Prod- und Test-Datei
+    g = _init_repo(tmp_path)
+    _write(tmp_path, "Server/Endpoints/Foo.cs", "// prod\n")
+    _write(tmp_path, "Server.Tests/FooTests.cs", "// assert 1\n")
+    g("add", ".")
+    g("commit", "-qm", "init")
+    monkeypatch.chdir(tmp_path)
+    base = qa._worktree_content_fingerprint("backend")
+    # // When NUR der Backend-Testcode geändert wird (z.B. Assertion entfernt)
+    _write(tmp_path, "Server.Tests/FooTests.cs", "// assert entfernt\n")
+    # // Then ändert sich der Übergabe-Fingerprint (sonst wäre CM-S070-1 für Backend wirkungslos)
+    assert qa._worktree_content_fingerprint("backend") != base
+
+
+def test_audit_approved_tests_backend_server_tests_dir(tmp_path, monkeypatch):
+    # // Given eine freigegebene Backend-Test-Datei, deren Assertion danach geändert wurde
+    g = _init_repo(tmp_path)
+    _write(tmp_path, "Server/Endpoints/Foo.cs", "// prod\n")
+    g("add", ".")
+    g("commit", "-qm", "init")
+    _write(tmp_path, "Server.Tests/FooTests.cs", "// Assert.Equal(1, x)\n")
+    monkeypatch.chdir(tmp_path)
+    sha = _hash_object(tmp_path, "Server.Tests/FooTests.cs")
+    _write(tmp_path, "Server.Tests/FooTests.cs", "// Assert.Equal(999, x)\n")
+    g("add", "Server.Tests/FooTests.cs")
+    # // When gegen die Freigabe-SHA geprüft wird
+    findings, lines = qa.audit_approved_tests("backend", {"Server.Tests/FooTests.cs": sha})
+    # // Then greift der Anker-Audit auch für Server.Tests/ (Abweichung samt Diff gemeldet)
     assert findings == 1
     assert "999" in "\n".join(lines)
 

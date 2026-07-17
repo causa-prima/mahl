@@ -55,8 +55,16 @@ diskutiert wird. Für jedes Item:
    Erfassung die Lösung vor und schwächt die Discovery). Erarbeite die Kandidaten jetzt gemeinsam und
    schlage sie dem User vor – Orchestrator schlägt vor, User entscheidet.
 
-3. **Same-Artefakt-Kolokation erwägen.** Berührt ein Kandidat dieselbe Datei wie ein anderes offenes OBS,
-   erwäge die Mitnahme (Begründung: `process.md`). Nur bei **gleicher Datei**, nicht bei bloßer Themen-Nähe.
+3. **Kolokation & Konsolidierung erwägen** (zwei getrennte Fälle):
+   - **Same-Artefakt-Kolokation** (gemeinsam *lösen*): Berührt ein Kandidat dieselbe Datei wie ein anderes
+     offenes OBS, erwäge die Mitnahme (auch bei verschiedenen Problemen; Begründung: `process.md`). Nur bei
+     **gleicher Datei**, nicht bei bloßer Themen-Nähe. Marker: `+Koloc:`.
+   - **Thematisch/parametrische Konsolidierung** (zu *einem* Eintrag zusammenführen): Beschreibt ein Item
+     **dasselbe oder eng verwandte Problem** wie ein anderes offenes OBS – auch an anderer Stelle, analog
+     parametrisierten Tests – dann den tragenden Eintrag erweitern und den anderen als `VERWORFEN
+     (konsolidiert in OBS-…)` schließen, oder via `Bezug:` gemeinsam lösbar halten. Senkt Backlog-Redundanz
+     und Drain-Last. (Die teure „ist das dasselbe Problem?"-Beurteilung gehört hierher in den Drain, nicht in
+     die billige Erfassung – `process.md` „Erfassung ist billig, Klassifikation ist teuer".)
 
 4. **Gefahr & CM-Gate** (s. `process.md` „Gefahr & Kandidaten-Bewertung" + „Wann gehört etwas wohin?"): Bei
    höher-Gefahr/nicht-trivialen Items erst absichern/belegen, dann umsetzen – Sorgfalt und Beweisbarkeit

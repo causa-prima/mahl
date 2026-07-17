@@ -91,6 +91,14 @@ Agent-Prompts enthalten (je Agent):
   (konkrete Datei + Sektion) und Begründung (nicht nur Guideline zitieren)
 - Hinweis: Projekt-Guidelines (`docs/guidelines/coding-guideline-*.md`) haben Vorrang vor
   agenten-eigenen Checklisten
+- **Ausgabekanal (Pflicht):** Den vollständigen Findings-Endbericht **per `SendMessage` an den
+  Orchestrator** zurückgeben – NICHT nur als plain-text-Antwort ausgeben. Grund: Wird der Auditor
+  als Team-Subagent gespawnt (Regelfall via `implementing-scenario`), ist sein plain-text-Output
+  für den Orchestrator **unsichtbar** (SendMessage-Tool-Doku) → der Report ginge verloren, ein
+  Finding würde übersehen (real passiert: ein Auditor lieferte plain-text und wurde idle). Der
+  Orchestrator-Fallback CM-S102-3 fängt das nur ab; diese Prompt-Zeile behebt die Ursache. (Läuft
+  `review-code` ausnahmsweise standalone ohne Team – kein `SendMessage` verfügbar –, ist der
+  Rückgabewert des Agenten der Kanal.)
 
 ### 4. Findings zusammenführen
 → TaskUpdate "3. Review-Agenten spawnen": completed | TaskUpdate "4. Findings zusammenführen": in_progress

@@ -393,3 +393,59 @@ Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – äl
 
 ---
 
+## OBS-S087-1 – Technische Schuld durchsuchbar/relevanz-gefiltert machen
+- Quelle: User
+- Status: VERWORFEN (konsolidiert in OBS-S096-3, S104)
+- Impact: GERING–MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: `docs/tech-debt.md` wird heute per Volltext-grep durchsucht (bei 10 Einträgen ausreichend). Wächst die Datei, wäre es nützlich, wenn der Architektur-Check in `implementing-scenario` (oder ein eigenes Script) die zum bearbeiteten Code-Bereich **potentiell relevante** technische Schuld automatisch identifiziert/auflistet – z.B. über kuratierte Bereichs-Keywords pro Eintrag. Bewusst NICHT jetzt umgesetzt (YAGNI): Keyword-Vokabular sollte **gemeinsam mit dem konsumierenden Script** entworfen werden, sonst spekulative Tags ohne Abnehmer + Drift.
+- Entscheidung/Maßnahme: **Verworfen als eigener Eintrag (S104) – Gegenstand entfällt NICHT** (nicht Kalt-Abwertung): TD-Relevanz-Filterung ist ein **Spezialfall** von OBS-S096-3 (Scripted-Access-Layer) und lebt dort als Facette + Re-Trigger (1) „implementing-scenario TD-Sichtung reibt" weiter (deckungsgleicher Abnehmer). Getrennte Verfolgung wäre Redundanz.
+- Bezug: OBS-S096-3 (konsolidiert); OBS-S085-16 (AGENT_MEMORY-Restruktur, in deren Zuge tech-debt.md ausgelagert wurde)
+
+## OBS-S087-2 – Gemeinsame „Tracker-Datei-Konvention" einmal dokumentieren
+- Quelle: Agent
+- Status: VERWORFEN (Low-Value + Drift-Last, S104)
+- Impact: GERING–MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: `observations.md`, `countermeasures.md`, `tech-debt.md`, `open-questions.md` teilen inzwischen dasselbe Muster (Header `wann-lesen/wann-schreiben/Eintrag-Format`, Session-basierte IDs `XX-S<NNN>-<n>`, Fließtext statt Tabelle, `---`-Trenner zwischen Einträgen, Sortierung nach ID aufsteigend). Das Muster ist nirgends zentral beschrieben → beim Anlegen einer neuen Tracker-Datei wird es ad-hoc re-derived (S087: tech-debt.md ~4× überarbeitet, s. LL-S087-1). Eine einmalige Konventions-Beschreibung (z.B. in `process.md` oder einem kurzen Doku-Styleguide) würde das vermeiden.
+- Entscheidung/Maßnahme: **Verworfen (S104).** Low-Value: eine *neue* Tracker-Datei anzulegen ist sehr selten (die 4 bestehenden decken den Bedarf); eine zentrale Konventions-Doku kostet laufende Wartung + Drift-Risiko gegen die realen Dateien, ohne verlässlichen Abnehmer. Simpelste Baseline genügt: beim Anlegen eine bestehende Tracker-Datei als Vorlage nehmen. Kein Kalt-Abwertungs-Verwerf – der Nutzen wäre auch bei Frisch-Beobachtung gering und selten.
+- Bezug: LL-S087-1
+
+## OBS-S096-1 – Vor OBS-Erfassung mit bestehenden Einträgen zusammenfassen (parametrisiert/Klasse/Referenz)
+- Quelle: User
+- Status: UMGESETZT (S104)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Kaizen
+- Beobachtung: Vor dem Festhalten einer neuen OBS prüfen, ob sie mit einem bestehenden Eintrag zusammenfassbar ist – analog parametrisierten Tests: dieselbe Beobachtung an anderer Stelle → bestehendes OBS erweitern statt neu anlegen. Auch nach Problemklassen/anderen Gruppierungen bündeln. Zudem per `Bezug:` mehrere OBS an derselben Stelle gemeinsam lösbar machen (auch bei unterschiedlichen Problemen). Senkt Backlog-Redundanz und Drain-Last.
+- Entscheidung/Maßnahme: **Umgesetzt (S104) im Drain statt bei Erfassung.** Pushback zum Original-Zeitpunkt „Erfassung": systematischer Backlog-Abgleich ist teure Klassifikation und würde das Prinzip „Erfassung ist billig, Klassifikation ist teuer" (`process.md`) verletzen. Stattdessen `draining-observations` Schritt 3 um **„Thematisch/parametrische Konsolidierung"** erweitert (dasselbe/eng verwandte Problem → tragenden Eintrag erweitern, anderen `VERWORFEN (konsolidiert in …)` bzw. via `Bezug:` koppeln) – zusätzlich zur bestehenden Same-Artefakt-Kolokation. Genau in diesem Drain praktiziert (S087-1 → S096-3).
+- Bezug: OBS-S086-2 (Verständnis vor Erfassung); OBS-S086-3 (blockweise)
+
+## OBS-S096-2 – Welche Skill-Schritte deterministisch per Script erledigbar?
+- Quelle: User
+- Status: UMGESETZT (S104)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Skill/Script
+- Beobachtung: Systematisch prüfen, welche Skill-Schritte deterministisch per Script statt freihändig vom Agenten erledigt werden könnten – inkl. Schritte, die erst Voraussetzungen brauchen (z.B. „zum Parsen muss das Header-/Eintragsformat deterministisch bestimmbar sein"). Senkt Token/Varianz, erhöht Verlässlichkeit.
+- Entscheidung/Maßnahme: **Umgesetzt (S104) als stehendes Prinzip statt Big-Bang-Audit** (dauerhaft wirksam, nicht Momentaufnahme): (a) `docs/kaizen/principles.md` → „Deterministische Skill-Schritte mechanisieren" (Prozess-Disziplin, Session-Start geladen); (b) Prüfpunkt in `.claude/agents/workflow-auditor.md` Dimension 5 (Ressourceneffizienz) → greift beim `review-workflow`-Audit. Bewusst dort statt `review-docs`: Mechanisierbarkeit ist Prozess-/Effizienz-Design, nicht Textqualität (Projekt-Abgrenzung review-docs↔review-workflow). Ein mechanisch erzwingendes Gate ist unmöglich (Mechanisierbarkeit = semantisches Urteil, kein Muster) → Nudge ist die Obergrenze. Bekannte Kandidaten (z.B. nächste Session-Nummer bestimmen, gerade manuell per grep gemacht) opportunistisch umsetzen.
+- Bezug: OBS-S096-3
+
+## OBS-S102-2 – `qa-check` TEST-FREIGABE-AUDIT sieht die geänderte Testdatei nicht (mögliches Poka-Yoke-Loch)
+- Quelle: Orchestrator
+- Status: UMGESETZT (S104)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: In run-3 meldete `qa-check.py --verify --approved-tests` wiederholt „Check 1: GEÄNDERTE TEST-DATEIEN: keine" und im TEST-FREIGABE-AUDIT „`…IngredientsEndpointsTests.cs`: freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf (committet/zurückgesetzt?)", obwohl `git status` die Datei klar als `M` (unstaged) zeigt und sie inhaltlich neue Tests enthält. Der Audit vergleicht die freigegebene Datei nur, wenn er sie als „geändert" erkennt; erkennt Check 1 die Änderung nicht, unterbleibt der Anker-Abgleich still. Damit könnte eine nachträgliche Assertion-Manipulation (genau das, was der CM-S070-1-Blob-Anker fangen soll) durchrutschen. In run-3 kein Schaden (Orchestrator hat den Diff manuell reviewt, Inhalt = Anker), aber der mechanische Guard versagte hier lautlos – die Ursache (warum Check 1 die geänderte Datei nicht sieht) ist unverstanden. Klasse „Poka-Yoke schlägt Wachsamkeit" (OBS-S100-2).
+- Entscheidung/Maßnahme: **Umgesetzt (S104, TDD).** Ursache belegt: Backend-xUnit-Tests liegen unter `Server.Tests/`, aber `qa-check.py` setzte `_LAYER_PATHS["backend"] = "Server/"` – `"Server.Tests/…".startswith("Server/")` ist False → `check_changed_test_files("backend")` war systematisch blind (Frontend nie betroffen, Tests unter `Client/src/`). **Tragweite größer als erfasst:** nicht nur der Blob-Anker-Audit, auch `_worktree_content_fingerprint("backend")` band den Backend-Testcode NICHT in den Übergabe-Hash → da `--verify` Stryker nicht neu laufen lässt, blieb ein Hash nach Assertion-Entfernung gültig; CM-S070-1 war für Backend faktisch aus. Fix: `_LAYER_PATHS` auf Prefix-Tupel (`Server/`, `Server.Tests/`); `_changed_paths`/`_worktree_diff` nehmen ein Tupel, `str.startswith(tuple)` + git-Multi-Pathspec. 3 Regressionstests (`test_check_changed_test_files_backend_in_server_tests_dir`, `…_content_fingerprint_backend_binds_server_tests`, `…_audit_approved_tests_backend_server_tests_dir`). Kein neuer CM (Bug-Fix an bestehendem Guard).
+- Bezug: CM-S070-1 (Blob-Anker-Audit); OBS-S100-2 (Poka-Yoke vs. Wachsamkeit)
+
+## OBS-S102-3 – Team-Subagenten liefern ihren Endbericht inkonsistent (plain text statt `SendMessage` → Orchestrator sieht ihn nicht)
+- Quelle: Orchestrator
+- Status: UMGESETZT (S104)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: AGENT    Kontext: Agent-Prompt
+- Beobachtung: In run-3 lieferten 3 von 4 Review-Auditoren (code-quality/functional-correctness/test-quality) ihren Findings-Report per `SendMessage` an den Orchestrator; der vierte (security-auditor) gab ihn als **plain-text-Output** aus und wurde damit idle. Plain-Text-Output eines Team-Subagenten ist für den Orchestrator **nicht sichtbar** (SendMessage-Tool-Doku: „to communicate, you MUST call this tool") → der Report lag im Subagent-Log, kam aber nie beim Orchestrator an, bis dieser ihn nach User-Hinweis per `SendMessage` aktiv anforderte. Weder die Auditor-Agent-Definitionen (`.claude/agents/*-auditor.md`) noch der `review-code`-Spawn-Prompt schreiben den Ausgabekanal (Endbericht per `SendMessage` an den Orchestrator) explizit vor → inkonsistentes Berichtsverhalten, ein Review-Finding kann komplett übersehen werden. Der Orchestrator-Fallback (CM-S102-3: bei finished ohne Report aktiv abrufen) fängt es ab, behebt aber nicht die Ursache beim Subagenten. Verifiziert per Log-Nachschau (Subagent-Log `agent-asec-run3-*`, plain-text-Report um 20:07, `SendMessage` erst um 20:11 nach Nachfrage).
+- Entscheidung/Maßnahme: **Umgesetzt (S104).** Ausgabekanal zentral im `review-code`-Spawn-Prompt vorgeschrieben (Block „Agent-Prompts enthalten"): Endbericht **per `SendMessage` an den Orchestrator**, nicht als plain-text-Output – mit Begründung (Team-Subagent-plain-text ist für den Orchestrator unsichtbar) und Standalone-Ausnahme (kein Team → Rückgabewert ist der Kanal). Bewusst zentral statt in die 5 `*-auditor.md` dupliziert: hält die Agent-Defs kontext-frei (wissen nicht, ob Team-Spawn). CM-S102-3 bleibt als Orchestrator-Fallback; diese Zeile behebt die Ursache beim Subagenten.
+- Bezug: CM-S102-3 (Orchestrator-Fallback); OBS-S101-2 (Subagent-Signal-Semantik)
+
+---
+

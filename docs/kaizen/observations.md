@@ -139,24 +139,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: kaizen-Schritt 0 sah vor, alle Archiv-Dateien jede Retro neu gegen den Filter zu prüfen → Token-Kosten steigen, Grenznutzen gering.
 - Entscheidung/Maßnahme: **B gewählt** — Staffel B (nur zuletzt archivierte Periode doppelprüfen) → (kein Rückfall) → A (Archiv-Scan weglassen). Umsetzung: kaizen Schritt 0 (bereits angewandt). Gekoppelt an CM „Noise als LL" (AKTIV + beobachten).
 
-## OBS-S087-1 – Technische Schuld durchsuchbar/relevanz-gefiltert machen
-- Quelle: User
-- Status: NEU
-- Impact: GERING–MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: `docs/tech-debt.md` wird heute per Volltext-grep durchsucht (bei 10 Einträgen ausreichend). Wächst die Datei, wäre es nützlich, wenn der Architektur-Check in `implementing-scenario` (oder ein eigenes Script) die zum bearbeiteten Code-Bereich **potentiell relevante** technische Schuld automatisch identifiziert/auflistet – z.B. über kuratierte Bereichs-Keywords pro Eintrag. Bewusst NICHT jetzt umgesetzt (YAGNI): Keyword-Vokabular sollte **gemeinsam mit dem konsumierenden Script** entworfen werden, sonst spekulative Tags ohne Abnehmer + Drift.
-- Entscheidung/Maßnahme: offen (Retro)
-- Bezug: OBS-S085-16 (AGENT_MEMORY-Restruktur, in deren Zuge tech-debt.md ausgelagert wurde)
-
-## OBS-S087-2 – Gemeinsame „Tracker-Datei-Konvention" einmal dokumentieren
-- Quelle: Agent
-- Status: NEU
-- Impact: GERING–MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Doku
-- Beobachtung: `observations.md`, `countermeasures.md`, `tech-debt.md`, `open-questions.md` teilen inzwischen dasselbe Muster (Header `wann-lesen/wann-schreiben/Eintrag-Format`, Session-basierte IDs `XX-S<NNN>-<n>`, Fließtext statt Tabelle, `---`-Trenner zwischen Einträgen, Sortierung nach ID aufsteigend). Das Muster ist nirgends zentral beschrieben → beim Anlegen einer neuen Tracker-Datei wird es ad-hoc re-derived (S087: tech-debt.md ~4× überarbeitet, s. LL-S087-1). Eine einmalige Konventions-Beschreibung (z.B. in `process.md` oder einem kurzen Doku-Styleguide) würde das vermeiden.
-- Entscheidung/Maßnahme: offen (Retro)
-- Bezug: LL-S087-1
-
 ## OBS-S088-1 – Hook-Registrierung: ein Dispatcher je Matcher/Event statt Einzeleinträge
 - Quelle: User
 - Status: IN BEOBACHTUNG bis S110
@@ -206,32 +188,14 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
-## OBS-S096-1 – Vor OBS-Erfassung mit bestehenden Einträgen zusammenfassen (parametrisiert/Klasse/Referenz)
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Kaizen
-- Beobachtung: Vor dem Festhalten einer neuen OBS prüfen, ob sie mit einem bestehenden Eintrag zusammenfassbar ist – analog parametrisierten Tests: dieselbe Beobachtung an anderer Stelle → bestehendes OBS erweitern statt neu anlegen. Auch nach Problemklassen/anderen Gruppierungen bündeln. Zudem per `Bezug:` mehrere OBS an derselben Stelle gemeinsam lösbar machen (auch bei unterschiedlichen Problemen). Senkt Backlog-Redundanz und Drain-Last.
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
-- Bezug: OBS-S086-2 (Verständnis vor Erfassung); OBS-S086-3 (blockweise)
-
-## OBS-S096-2 – Welche Skill-Schritte deterministisch per Script erledigbar?
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Skill/Script
-- Beobachtung: Systematisch prüfen, welche Skill-Schritte deterministisch per Script statt freihändig vom Agenten erledigt werden könnten – inkl. Schritte, die erst Voraussetzungen brauchen (z.B. „zum Parsen muss das Header-/Eintragsformat deterministisch bestimmbar sein"). Senkt Token/Varianz, erhöht Verlässlichkeit.
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
-- Bezug: OBS-S096-3
-
 ## OBS-S096-3 – Scripted-Access-Layer für TD/OBS/LL/Doc (Lesen/Schreiben, Metadaten listen/filtern/move)
 - Quelle: User
-- Status: NEU
+- Status: IN BEOBACHTUNG bis S112
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Doku/Script
-- Beobachtung: Möglichst viel über Script(e) zugänglich machen: Lesen + Schreiben von TD/OBS/LL etc., idealerweise auch Lesen von Doc-Teilen; ein Auflisten aller Inhalts-Header/Metadaten (schneller Überblick + Suche), Filtern nach Metadaten (wie ADRs via `decisions.py`), ggf. Status-Update/Move wo passend. Vorher bewerten, wo es sich (besonders) lohnt. (`obs-drain.py`/`obs-archive.py` sind ein erster Schritt für OBS.)
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
-- Bezug: OBS-S092-2 (Doku-Header lesen, geparkt); OBS-S087-1 (TD durchsuchbar); OBS-S096-2
+- Beobachtung: Möglichst viel über Script(e) zugänglich machen: Lesen + Schreiben von TD/OBS/LL etc., idealerweise auch Lesen von Doc-Teilen; ein Auflisten aller Inhalts-Header/Metadaten (schneller Überblick + Suche), Filtern nach Metadaten (wie ADRs via `decisions.py`), ggf. Status-Update/Move wo passend. Vorher bewerten, wo es sich (besonders) lohnt. (`obs-drain.py`/`obs-archive.py` sind ein erster Schritt für OBS.) **Facette (aus OBS-S087-1 konsolidiert, S104):** technische Schuld durchsuchbar/relevanz-gefiltert machen – der Architektur-Check in `implementing-scenario` (oder ein Script) listet die zum bearbeiteten Code-Bereich potentiell relevante TD automatisch auf (kuratierte Bereichs-Keywords pro Eintrag).
+- Entscheidung/Maßnahme: **Aufgeschoben (S104-Drain) bis S112.** YAGNI: Access-Layer/Tag-Vokabular ohne konkreten Abnehmer driftet – der **Abnehmer definiert das Schema** (deshalb nicht spekulativ vorbauen; OBS gibt es schon Scripts, TD/LL nicht, TD heute 15 Einträge/123 Zeilen → grep noch tragbar). **Re-Trigger (event-basiert, Backstop S112):** (1) `implementing-scenario` Schritt 0 (TD-Sichtung, area-basiert) reibt real – grep verfehlt Bereichs-Treffer oder ertrinkt in Fehltreffern → konkreter Abnehmer für Bereichs-Keywords, Script+Schema gemeinsam mit *diesem* Schritt entwerfen; (2) eine Tracker-Datei wächst über Schwelle (TD > ~30 Einträge ODER Datei > ~250 Zeilen); (3) ein manueller Schreib-Mehrschritt für TD/LL reibt (Status/Archiv-Workflow, analog `obs-archive.py` für OBS).
+- Bezug: OBS-S092-2 (Doku-Header lesen, geparkt); OBS-S096-2 (Skill-Mechanisierung, umgesetzt S104)
 
 ---
 
@@ -243,24 +207,4 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: `--mutate` nimmt nur einen Dateipfad; ein komma-getrenntes Mehrfach-Argument scheitert („unrecognized arguments" bzw. beim String-Workaround „Excluded" auf allen Dateien). Wer mehrere geänderte Dateien in einem Lauf gezielt mutieren will, muss mehrere separate Läufe machen (kleine Zeitkosten). Aufgetreten in run-3, als der Backend-Implementer zwei Dateien in einem Lauf mutieren wollte.
 - Entscheidung/Maßnahme: offen – beim Drain entscheiden.
 - Bezug: –
-
-## OBS-S102-2 – `qa-check` TEST-FREIGABE-AUDIT sieht die geänderte Testdatei nicht (mögliches Poka-Yoke-Loch)
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: In run-3 meldete `qa-check.py --verify --approved-tests` wiederholt „Check 1: GEÄNDERTE TEST-DATEIEN: keine" und im TEST-FREIGABE-AUDIT „`…IngredientsEndpointsTests.cs`: freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf (committet/zurückgesetzt?)", obwohl `git status` die Datei klar als `M` (unstaged) zeigt und sie inhaltlich neue Tests enthält. Der Audit vergleicht die freigegebene Datei nur, wenn er sie als „geändert" erkennt; erkennt Check 1 die Änderung nicht, unterbleibt der Anker-Abgleich still. Damit könnte eine nachträgliche Assertion-Manipulation (genau das, was der CM-S070-1-Blob-Anker fangen soll) durchrutschen. In run-3 kein Schaden (Orchestrator hat den Diff manuell reviewt, Inhalt = Anker), aber der mechanische Guard versagte hier lautlos – die Ursache (warum Check 1 die geänderte Datei nicht sieht) ist unverstanden. Klasse „Poka-Yoke schlägt Wachsamkeit" (OBS-S100-2).
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
-- Bezug: CM-S070-1 (Blob-Anker-Audit); OBS-S100-2 (Poka-Yoke vs. Wachsamkeit)
-
-## OBS-S102-3 – Team-Subagenten liefern ihren Endbericht inkonsistent (plain text statt `SendMessage` → Orchestrator sieht ihn nicht)
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: AGENT    Kontext: Agent-Prompt
-- Beobachtung: In run-3 lieferten 3 von 4 Review-Auditoren (code-quality/functional-correctness/test-quality) ihren Findings-Report per `SendMessage` an den Orchestrator; der vierte (security-auditor) gab ihn als **plain-text-Output** aus und wurde damit idle. Plain-Text-Output eines Team-Subagenten ist für den Orchestrator **nicht sichtbar** (SendMessage-Tool-Doku: „to communicate, you MUST call this tool") → der Report lag im Subagent-Log, kam aber nie beim Orchestrator an, bis dieser ihn nach User-Hinweis per `SendMessage` aktiv anforderte. Weder die Auditor-Agent-Definitionen (`.claude/agents/*-auditor.md`) noch der `review-code`-Spawn-Prompt schreiben den Ausgabekanal (Endbericht per `SendMessage` an den Orchestrator) explizit vor → inkonsistentes Berichtsverhalten, ein Review-Finding kann komplett übersehen werden. Der Orchestrator-Fallback (CM-S102-3: bei finished ohne Report aktiv abrufen) fängt es ab, behebt aber nicht die Ursache beim Subagenten. Verifiziert per Log-Nachschau (Subagent-Log `agent-asec-run3-*`, plain-text-Report um 20:07, `SendMessage` erst um 20:11 nach Nachfrage).
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
-- Bezug: CM-S102-3 (Orchestrator-Fallback); OBS-S101-2 (Subagent-Signal-Semantik)
-
----
 

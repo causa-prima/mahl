@@ -40,10 +40,14 @@ _SCRIPTS   = Path(__file__).parent
 _REPO_ROOT = _SCRIPTS.parent.parent
 _CLIENT_DIR = _REPO_ROOT / "Client"
 
-# Dateipfad-Präfixe die zu welcher Schicht gehören
-_LAYER_PATHS = {
-    "backend":  "Server/",
-    "frontend": "Client/src/",
+# Dateipfad-Präfixe die zu welcher Schicht gehören. Tupel, weil eine Schicht in mehreren
+# Wurzeln liegen kann: Backend-Produktionscode unter Server/, xUnit-Tests unter Server.Tests/.
+# (Wäre der Backend-Präfix nur "Server/", fiele Server.Tests/ durch – "Server.Tests/…"
+# beginnt NICHT mit "Server/" – und Test-Erkennung, Blob-Anker-Audit UND Übergabe-Hash
+# wären für Backend-Testcode blind; OBS-S102-2.)
+_LAYER_PATHS: dict[str, tuple[str, ...]] = {
+    "backend":  ("Server/", "Server.Tests/"),
+    "frontend": ("Client/src/",),
 }
 
 
@@ -63,16 +67,17 @@ def _porcelain_path(line: str) -> str:
     return path.strip('"')
 
 
-def _changed_paths(prefix: str) -> list[str]:
-    """Sortierte Liste geänderter (modifiziert + neu/untracked) Working-Tree-Pfade unter prefix.
+def _changed_paths(prefixes: tuple[str, ...]) -> list[str]:
+    """Sortierte Liste geänderter (modifiziert + neu/untracked) Working-Tree-Pfade unter prefixes.
 
     Index-unabhängig: `git status --porcelain -uall` listet eine geänderte Datei unabhängig
     davon, ob sie gestaged (`M `/`A `) oder ungestaged (` M`/`??`) ist – Stagen ändert die
-    Pfad-Menge nicht.
+    Pfad-Menge nicht. `prefixes` ist ein Tupel (mehrere Wurzeln je Schicht, z.B. Server/ +
+    Server.Tests/); git nimmt mehrere Pathspecs und `str.startswith` ein Tupel direkt.
     """
-    out = _git("status", "--porcelain", "-uall", "--", prefix)
+    out = _git("status", "--porcelain", "-uall", "--", *prefixes)
     paths = (_porcelain_path(line) for line in out.splitlines())
-    return sorted(p for p in paths if p and p.startswith(prefix))
+    return sorted(p for p in paths if p and p.startswith(prefixes))
 
 
 def _file_in_head(path: str) -> bool:
@@ -99,8 +104,8 @@ def _worktree_content_fingerprint(layer: str) -> str:
     return h.hexdigest()[:16]
 
 
-def _worktree_diff(prefix: str, unified: int) -> str:
-    """Unified-Diff des Working-Tree gegen HEAD unter prefix, inkl. neuer (untracked) Dateien.
+def _worktree_diff(prefixes: tuple[str, ...], unified: int) -> str:
+    """Unified-Diff des Working-Tree gegen HEAD unter prefixes, inkl. neuer (untracked) Dateien.
 
     Ersetzt das frühere `git diff --staged`: erfasst Änderungen index-unabhängig, damit der
     Subagent NICHT stagen muss. Für in HEAD existierende Dateien liefert `git diff HEAD`
@@ -110,7 +115,7 @@ def _worktree_diff(prefix: str, unified: int) -> str:
     """
     u = f"-U{unified}"
     parts: list[str] = []
-    for path in _changed_paths(prefix):
+    for path in _changed_paths(prefixes):
         if _file_in_head(path):
             parts.append(_git("diff", "HEAD", u, "--", path))
         else:
@@ -186,28 +191,28 @@ def _is_test_file(path: str) -> bool:
 
 
 def check_changed_test_files(layer: str) -> list[str]:
-    prefix = _LAYER_PATHS[layer]
-    return [f for f in _changed_paths(prefix) if _is_test_file(f)]
+    prefixes = _LAYER_PATHS[layer]
+    return [f for f in _changed_paths(prefixes) if _is_test_file(f)]
 
 
 def check_new_suppressions(layer: str) -> list[tuple[str, str]]:
-    prefix = _LAYER_PATHS[layer]
-    out = _worktree_diff(prefix, 0)
+    prefixes = _LAYER_PATHS[layer]
+    out = _worktree_diff(prefixes, 0)
     findings: list[tuple[str, str]] = []
     current_file = ""
     for line in out.splitlines():
         if line.startswith("+++ b/"):
             current_file = line[6:]
         elif line.startswith("+") and not line.startswith("+++"):
-            if current_file.startswith(prefix) and re.search(r'(Stryker disable|v8 ignore)', line):
+            if current_file.startswith(prefixes) and re.search(r'(Stryker disable|v8 ignore)', line):
                 findings.append((current_file, line[1:].strip()))
     return findings
 
 
 def check_unit_test_patterns(layer: str) -> list[tuple[str, str]]:
     """Verdächtige Unit-Test-Muster die nicht dem erlaubten Test-Typ entsprechen."""
-    prefix = _LAYER_PATHS[layer]
-    out = _worktree_diff(prefix, 8)
+    prefixes = _LAYER_PATHS[layer]
+    out = _worktree_diff(prefixes, 8)
     findings: list[tuple[str, str]] = []
     current_file = ""
     context: list[str] = []
@@ -220,7 +225,7 @@ def check_unit_test_patterns(layer: str) -> list[tuple[str, str]]:
             context.append(line)
             if len(context) > 12:
                 context.pop(0)
-        if not (line.startswith("+") and not line.startswith("+++") and current_file.startswith(prefix)):
+        if not (line.startswith("+") and not line.startswith("+++") and current_file.startswith(prefixes)):
             continue
         content = line[1:]
         ctx = " ".join(context)
@@ -243,8 +248,8 @@ def check_unit_test_patterns(layer: str) -> list[tuple[str, str]]:
 
 def check_test_structure(layer: str) -> list[tuple[str, str]]:
     """Prüft ob neue Test-Methoden // Given / // When / // Then Kommentare enthalten."""
-    prefix = _LAYER_PATHS[layer]
-    out = _worktree_diff(prefix, 40)
+    prefixes = _LAYER_PATHS[layer]
+    out = _worktree_diff(prefixes, 40)
     findings: list[tuple[str, str]] = []
     current_file = ""
     # Collect added lines per test block: (file, trigger_line, [added_lines_in_block])
@@ -264,7 +269,7 @@ def check_test_structure(layer: str) -> list[tuple[str, str]]:
             current_file = line[6:]
             current_block = None
             current_trigger = ""
-        elif not current_file.startswith(prefix) or not _is_test_file(current_file):
+        elif not current_file.startswith(prefixes) or not _is_test_file(current_file):
             continue
         elif test_marker.match(line):
             if current_block is not None:
