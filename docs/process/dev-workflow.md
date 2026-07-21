@@ -243,11 +243,15 @@ python3 .claude/scripts/playwright-test.py --verbose
 
 **KEINE Migrations-Hölle** – bei Schema-Änderungen einfach neu aufbauen:
 
+> **`--project` = `Infrastructure`, `--startup-project` = `Server`:** DbContext und Migrationen liegen
+> im `Infrastructure`-Projekt (ADR-S041-2), die DI-/Host-Konfiguration in `Server`. `dotnet ef` braucht
+> beide Angaben – nur `--project Server` scheitert mit „target project doesn't match migrations assembly".
+
 ```bash
-dotnet ef database drop --force --project Server   # drop ist deny → # --allow-once anhängen
-dotnet ef migrations remove --project Server
-dotnet ef migrations add InitialCreate --project Server
-dotnet ef database update --project Server
+dotnet ef database drop --force --project Infrastructure --startup-project Server   # drop ist deny → # --allow-once anhängen
+dotnet ef migrations remove --project Infrastructure --startup-project Server
+dotnet ef migrations add InitialCreate --project Infrastructure --startup-project Server
+dotnet ef database update --project Infrastructure --startup-project Server
 
 # Danach Seed-Daten laden:
 dotnet run --project Server -- --seed-data
@@ -259,10 +263,10 @@ dotnet run --project Server -- --seed-data
 
 ```bash
 # Neue Migration hinzufügen
-dotnet ef migrations add MigrationName --project Server
+dotnet ef migrations add MigrationName --project Infrastructure --startup-project Server
 
 # Migrations anwenden
-dotnet ef database update --project Server
+dotnet ef database update --project Infrastructure --startup-project Server
 ```
 
 ---

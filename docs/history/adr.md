@@ -387,6 +387,10 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 **Begründung Weekly-Pool → 204:** Der Pool ist ein Set ohne Ownership-Semantik. "Ist nicht drin" und "wurde gerade entfernt" sind äquivalente Zustände. Race-Conditions sollen transparent sein.
 
+**Addendum – Reihenfolge relativ zum If-Match-Check:** Seit `DELETE /api/ingredients/{id}` als erster mutierender Single-Resource-Endpoint auch If-Match prüft (ADR-S058-1), stellt sich die Frage, welcher Check zuerst greift, wenn beide zuschlagen (Ressource nicht (mehr) aktiv UND If-Match fehlt/ist stale). Entscheidung: **Not-Found-Check läuft immer zuerst.** Eine bereits soft-deleted oder nie existente Ressource liefert 404, unabhängig davon ob If-Match fehlt (sonst 428) oder stale ist (sonst 412). Begründung: 404 ist die eindeutigere, für den Client handlungsleitendere Aussage ("es gibt nichts zu aktualisieren") – ein 412 würde fälschlich suggerieren, die Ressource existiere noch und ein Retry mit frischem ETag könnte helfen. Gilt analog für `DELETE /api/recipes/{id}`, sobald dort If-Match eingeführt wird.
+
+**Addendum – gleichzeitiges Doppel-DELETE:** Zwei Clients löschen dieselbe aktive Ressource gleichzeitig, beide mit demselben (zum Zeitpunkt des Sendens gültigen) If-Match. Der erste Request gewinnt (204, Soft-Delete). Der zweite Request findet die Ressource beim Not-Found-Check noch als aktiv vor (Race gegen den ersten Commit) und erreicht den EF-Concurrency-Check – dessen `OriginalValue` ist inzwischen stale → **412**, nicht 404. Das ist optimistic-concurrency-korrekt (kein Re-Read zwischen Not-Found-Check und Save) und self-healing: ein Retry des Verlierers liest die Ressource neu ein und erhält dann korrekt 404 (jetzt soft-deleted).
+
 ---
 
 ## Recipes-Endpoints
@@ -1008,6 +1012,69 @@ Kein einzelner DB-Wert bildet den Collection-Zustand korrekt ab. `MAX(xmin)` ist
 **Verworfen:** `MAX(xmin)` für Collections – blind gegenüber Deletes.
 **Verworfen:** `SUM(xmin)` für Collections – korrekt für PostgreSQL 9.4+, aber kein etabliertes Muster; eingeschränkte Portabilität.
 **Verworfen:** Content-Hash für Single Resources – bricht die EF Core Concurrency-Token-Kopplung.
+
+---
+
+### ADR-S106-1: Erste Single-Resource-xmin-ETag-Umsetzung: POST als ETag-Quelle, manuelle xmin-Konfiguration
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, http:etag, arch:caching, db:xmin
+
+**Entscheidung:** `DELETE /api/ingredients/{id}` (US-904 run-10) ist der erste mutierende Single-Resource-Endpoint im Projekt und damit die erste konkrete Umsetzung von ADR-S058-1/ADR-S058-3 (xmin-ETag + If-Match). Zwei Abweichungen von der ursprünglichen Formulierung dieser ADRs:
+
+1. **Kein `GET /api/ingredients/{id}`.** `POST /api/ingredients` liefert den xmin-ETag der neu angelegten Zeile im `ETag`-Response-Header – das ist der ETag, den ein Client für ein nachfolgendes `If-Match` bei DELETE/PUT/PATCH braucht. Ein dedizierter Single-Resource-GET-Endpoint ist bewusst nicht Teil dieser Umsetzung.
+2. **`UseXminAsConcurrencyToken()` existiert nicht** in `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.1 (per Assembly-Introspektion verifiziert – frühere Annahme aus allgemeinem Wissen, keine belastbare Quelle). Stattdessen manuelle Shadow-Property-Konfiguration in `MahlDbContext.OnModelCreating`:
+   ```csharp
+   modelBuilder.Entity<IngredientDbType>()
+       .Property<uint>("xmin")
+       .HasColumnType("xid")
+       .ValueGeneratedOnAddOrUpdate()
+       .IsConcurrencyToken();
+   ```
+   Funktional identisch zum (nicht vorhandenen) Helper: `xmin` bleibt eine reine Postgres-Systemspalte (keine Migrations-DDL), EF Core wirft `DbUpdateConcurrencyException` bei stale `OriginalValue` automatisch.
+
+**Begründung:** Beide Punkte sind reine Implementierungsdetails, keine Abweichung von der Kernentscheidung (xmin als Single-Resource-ETag-Quelle, ADR-S058-3 bleibt unverändert gültig). Dokumentiert, damit zukünftige Single-Resource-Endpoints (z.B. Recipes) dasselbe Muster übernehmen, statt den fehlenden Helper erneut zu suchen.
+
+---
+
+### ADR-S106-2: If-Match-Fehlerbehandlung: 428/400/412-Dreiteilung, kein `*`/Weak/List-Support
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, http:etag, http:delete, http:400
+
+**Entscheidung:** Ein If-Match-Header auf `DELETE /api/ingredients/{id}` fällt in genau eine von drei Kategorien:
+
+| Zustand | Status |
+|---------|--------|
+| Header fehlt komplett | 428 Precondition Required |
+| Header vorhanden, aber nicht zu einem xmin parsebar (non-hex, Overflow, leer, `*`, weak `W/"..."`, Multi-Value-Liste) | **400 Bad Request** |
+| Header vorhanden, wohlgeformt, aber stale (parst, matcht aber nicht den aktuellen xmin) | 412 Precondition Failed |
+
+400-Body (analog `NotFoundProblem`, ADR-S054-6): `detail: "Der If-Match-Header ist ungültig."`, `errorCode: "INVALID_IF_MATCH"`.
+
+`*` (RFC-7232-Wildcard), weake ETags und Multi-Value-Listen werden bewusst **nicht** unterstützt (YAGNI) – konsistent zum bereits bestehenden Nichtsupport in `ETagMiddleware` (nur Single-Tag-Ordinal-Vergleich). Ein solcher Wert fällt in die 400-Kategorie statt eine eigene Semantik zu bekommen.
+
+Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-Variante (die bei malformed Input eine unbehandelte `FormatException`/`OverflowException` → 500 durchschlagen ließe, Stack-Trace-Leak-Risiko). `TryParse` folgt dem Standard-.NET-Idiom (wie `uint.TryParse` selbst) statt OneOf/ROP: ein nicht-parsebarer If-Match ist ein technischer HTTP-Protokoll-Parsing-Fehler, kein Domänen-/Validierungsfehler (docs/guidelines/csharp-rop.md: ROP gilt für Domänenfehler).
+
+**Verworfen:** `*`/Weak/List-Support jetzt einführen – kein Konsument, YAGNI (konsistent zur bestehenden ETagMiddleware-Entscheidung).
+**Verworfen:** `Parse` als werfende Methode behalten und im Endpoint mit `try/catch` abfangen – `TryParse` ist das idiomatische .NET-Muster für einen erwarteten Fehlerfall ohne Exception-Overhead.
+
+---
+
+### ADR-S106-3: Querschnitts-Protokoll-/Invarianten-Tests ohne treibendes Gherkin-Szenario tragen keinen US-Tag
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:integration-test, testing:gherkin
+
+**Entscheidung:** Backend-Integrationstests, die reines Querschnitts-Verhalten absichern und NICHT von einem Gherkin-Szenario getrieben sind, tragen bewusst KEINEN `USxxx_`-Tag. Zwei Kategorien:
+1. **Protokoll-/Infrastruktur-Mechanik** – HTTP-Precondition-Verhalten aus einer Querschnitts-ADR (ETag-Format, `If-Match`-Pflicht 428/400/412, POST-liefert-ETag; ADR-S058-1/-3, ADR-S106-1/-2). Präzedenz: die `ETagMiddleware`-Tests (Collection-ETag) tragen ebenfalls keinen US-Tag.
+2. **Stryker-blinde Invarianten** – Tests, die eine bewusste Reihenfolge-/Prioritäts-Invariante gegen Refactoring-Regression pinnen, die Stryker strukturell nicht fangen kann (Statement-Reorder ist kein Mutant; z.B. die 404-vor-If-Match-Dominanz, ADR-S000-5-Addendum). Dieselbe Klasse wie ein Fokus-Prioritäts-Pin, den ein 100 %-Mutation-Score über Einzelfälle allein nicht absichert.
+
+**Begründung:** `docs/process/e2e-testing.md` verlangt US-Tag + ScenarioType als Spec↔Test-Traceability für **szenario-getriebene** Tests. Ein Querschnitts-/Invarianten-Test hat per Definition kein einzelnes treibendes Szenario; ein erzwungener US-Tag wäre eine falsche Traceability-Behauptung. Zentral hier dokumentiert, statt in jedem betroffenen Test einzeln (vermeidet die Kommentar-Wiederholung über die betroffenen Tests und deren Drift).
+
+**Guard (Abgrenzung zu Gold-Plating):** Ein US-Tag-loser Test MUSS per Kommentar als Kategorie 1 oder 2 ausgewiesen sein (welche ADR / welche Invariante). Prüft ein Test hingegen Domänen-/Szenario-Verhalten, ist US-Tag + Gherkin-Szenario Pflicht – fehlt beides, ist es eine Outside-In-Verletzung / Gold-Plating (review-checklist.md „Test-Audit").
+
+**Verworfen:** Die Ausnahme pro betroffenem Test als Kommentar wiederholen – driftet und macht die Grenze „legitime Infra-Ausnahme vs. Gold-Plating" für jeden Review neu verhandelbar.
 
 ---
 

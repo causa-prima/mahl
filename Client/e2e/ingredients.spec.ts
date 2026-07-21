@@ -511,3 +511,37 @@ test.describe('US904_Error: Duplikat-Name', () => {
     await expect(listItems).toHaveCount(itemsBefore)
   })
 })
+
+// @US-904-edge-case: run-10 „Löschen·Konflikt" (Singleton). Reiner API-Pfad – laut Feature-Kommentar gibt
+// es keinen UI-Weg, den Lösch-Befehl erneut abzusenden; der Step mappt direkt auf DELETE /api/ingredients/{id}.
+// ADR-S000-5: DELETE ist nicht-idempotent -> erneutes Löschen einer bereits soft-deleted Zutat gibt 404
+// (nicht 204), damit ein doppelter Aufruf einen echten Fehler sichtbar macht. Die Fehlermeldung liegt im
+// ProblemDetails-`detail` (ADR-S054-6).
+// If-Match ist hier reines PLUMBING (wie Content-Type): DELETE verlangt als mutierender Single-Resource-
+// Endpoint einen If-Match-Header (ADR-S058-1), sonst 428 – ohne ihn käme der Test nie zum 204/404 des
+// Szenarios. Der xmin-ETag kommt aus dem POST-Response (ADR-S058-3). Das ETag-/If-Match-VERHALTEN selbst
+// (428/412, POST liefert ETag) wird bewusst NICHT hier, sondern nur in Server.Tests geprüft – exakt wie
+// der Collection-ETag (ETagMiddlewareTests). Beim erneuten Löschen dominiert der Not-Found-Check VOR dem
+// If-Match-Check -> 404 (nicht 412), auch mit stale ETag.
+test.describe('US904_EdgeCase: Löschen·Konflikt', () => {
+  // Szenario: Bereits gelöschte Zutat erneut löschen schlägt fehl
+  test('US904_EdgeCase_DeleteIngredient_AlreadyDeleted_Returns404NotFound', async ({ request }) => {
+    // Given: die Zutat "Pfeffer" (g) existiert und wurde gelöscht (POST anlegen + erster DELETE = 204).
+    //   Der ETag aus dem POST wird als If-Match mitgeschickt (Plumbing, s.o.).
+    const createResponse = await request.post(`${E2E_API_BASE}/api/ingredients`, { data: { name: 'Pfeffer', defaultUnit: 'g' } })
+    expect(createResponse.status(), 'Seed-Zutat muss angelegt werden (201)').toBe(201)
+    const { id } = await createResponse.json() as { id: string }
+    const etag = createResponse.headers()['etag']
+    const firstDelete = await request.delete(`${E2E_API_BASE}/api/ingredients/${id}`, { headers: { 'If-Match': etag } })
+    expect(firstDelete.status(), 'Erstes Löschen muss gelingen (204)').toBe(204)
+
+    // When: ich den Lösch-Befehl für "Pfeffer" erneut absende (gleicher, nun stale ETag)
+    const secondDelete = await request.delete(`${E2E_API_BASE}/api/ingredients/${id}`, { headers: { 'If-Match': etag } })
+
+    // Then: 404 mit der Fehlermeldung "Zutat wurde nicht gefunden." (ADR-S000-5 / ProblemDetails detail);
+    //   Not-Found dominiert vor If-Match -> 404, nicht 412.
+    expect(secondDelete.status(), 'Erneutes Löschen muss fehlschlagen (404)').toBe(404)
+    const body = await secondDelete.json() as { detail?: string }
+    expect(body.detail).toBe('Zutat wurde nicht gefunden.')
+  })
+})

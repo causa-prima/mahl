@@ -15,7 +15,39 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     private sealed record IngredientResponse(Guid Id, string Name, string DefaultUnit);
     private sealed record CreateIngredientRequest(string Name, string DefaultUnit);
     private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
+    private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
 #pragma warning restore CA1812
+
+    // Helper: sendet DELETE mit optionalem If-Match-Header. HttpClient.DeleteAsync kennt keine
+    // Custom-Header-Overload -> HttpRequestMessage nötig, wie im bestehenden ETag-Test-Muster
+    // (ETagMiddlewareTests) für If-None-Match.
+    private async Task<HttpResponseMessage> DeleteIngredientAsync(Guid id, string? ifMatch)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/ingredients/{id}");
+        if (ifMatch is not null)
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        return await Client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    // Helper: legt eine Zutat via POST an und liefert sie zusammen mit ihrem echten xmin-ETag
+    // zurück – das POST+Deserialize+ETag-Auslesen-Setup wiederholt sich über mehrere DELETE-Tests.
+    private async Task<(IngredientResponse Ingredient, string ETag)> CreateIngredientAsync(string name, string unit)
+    {
+        var createRequest = new CreateIngredientRequest(Name: name, DefaultUnit: unit);
+        var createResponse = await Client.PostAsJsonAsync("/api/ingredients", createRequest, TestContext.Current.CancellationToken);
+        var created = await createResponse.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        return (created!, createResponse.Headers.ETag!.Tag);
+    }
+
+    // Helper: pinnt den Soft-Delete-Erfolgszustand (full-state DB assertion, DeletedAt aus dem
+    // Equivalenzvergleich ausgeschlossen weil sein exakter Zeitstempel nicht Teil des erwarteten
+    // Zustands ist – stattdessen separat auf "gesetzt" geprüft). Dupliziert sich über mehrere Tests.
+    private async Task AssertSoftDeletedAsync(IngredientDbType expected)
+    {
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo([expected], o => o.Excluding(x => x.DeletedAt));
+        persisted[0].DeletedAt.Should().NotBeNull();
+    }
 
     [Fact]
     public async Task US904_HappyPath_GetIngredients_EmptyDb_Returns200WithEmptyList()
@@ -301,5 +333,172 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: nothing is persisted – the ingredient list stays unchanged (empty)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEmpty();
+    }
+
+    // ADR-S058-3: erste Single-Resource-xmin-ETag-Umsetzung – POST liefert den ETag der neu angelegten
+    // Zeile, damit ein Client ihn als If-Match für ein nachfolgendes DELETE (Optimistic Concurrency,
+    // ADR-S058-1) mitschicken kann. Nicht durch ein Gherkin-Szenario getrieben (wie der Collection-ETag,
+    // s. ETagMiddlewareTests) – daher ohne US904-Präfix.
+    [Fact]
+    public async Task CreateIngredient_ValidData_Returns201WithXminETagHeader()
+    {
+        // Given: name and unit for a new ingredient
+        var request = new CreateIngredientRequest(Name: "Zimt", DefaultUnit: "g");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 201 Created with a quoted, non-empty ETag header (ADR-S058-3: xmin, hex-encoded)
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.Headers.ETag.Should().NotBeNull();
+        response.Headers.ETag!.Tag.Should().StartWith("\"").And.EndWith("\"");
+        response.Headers.ETag.Tag.Trim('"').Should().NotBeEmpty();
+    }
+
+    // @US-904-edge-case: "Bereits gelöschte Zutat erneut löschen schlägt fehl" – das Given des Szenarios
+    // ("...existiert und gelöscht wurde") erzwingt, dass das ERSTE Löschen korrekt gelingt. Pinnt damit
+    // die eigentliche Soft-Delete-Erfolgsmechanik des Endpoints: 204 und die Zeile bleibt physisch
+    // bestehen mit gesetztem DeletedAt (ADR-S000-6 Soft-Delete) – kein eigenständiges EdgeCase-Verhalten
+    // dieses Tests selbst.
+    [Fact]
+    public async Task US904_EdgeCase_DeleteIngredient_ActiveIngredientWithValidIfMatch_Returns204AndSoftDeletesRow()
+    {
+        // Given: an ingredient created via POST (real xmin ETag from the response)
+        var (created, etag) = await CreateIngredientAsync("Pfeffer", "g");
+
+        // When: the ingredient is deleted with the matching If-Match
+        var response = await DeleteIngredientAsync(created.Id, etag);
+
+        // Then: 204 No Content (ADR-S000-5)
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Then: the row is soft-deleted – physically retained, DeletedAt set (ADR-S000-6)
+        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Pfeffer", DefaultUnit = "g" });
+    }
+
+    // @US-904-edge-case: "Bereits gelöschte Zutat erneut löschen schlägt fehl". Sendet bewusst dasselbe
+    // (jetzt STALE) If-Match wie beim ersten Löschen mit, um die Not-Found-VOR-If-Match-Reihenfolge zu
+    // pinnen (ADR-S000-5: 404, nicht 412).
+    [Fact]
+    public async Task US904_EdgeCase_DeleteIngredient_AlreadyDeleted_Returns404WithNotFoundDetail()
+    {
+        // Given: "Pfeffer" (g) existiert und wurde bereits gelöscht (erstes DELETE gelingt, 204)
+        var (created, etag) = await CreateIngredientAsync("Pfeffer", "g");
+        var firstDelete = await DeleteIngredientAsync(created.Id, etag);
+        firstDelete.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // When: der Lösch-Befehl für "Pfeffer" wird erneut abgesendet (gleicher, nun stale ETag)
+        var response = await DeleteIngredientAsync(created.Id, etag);
+
+        // Then: 404 mit der fixen deutschen Fehlermeldung und maschinenlesbarem errorCode (ADR-S051-5, ADR-S054-6)
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Detail.Should().Be("Zutat wurde nicht gefunden.");
+        body.ErrorCode.Should().Be("INGREDIENT_NOT_FOUND");
+
+        // Then: die Zeile bleibt unverändert soft-deleted – keine weitere Mutation (full-state DB assertion)
+        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Pfeffer", DefaultUnit = "g" });
+    }
+
+    // ADR-S058-1: mutierende Single-Resource-Endpoints verlangen If-Match. Nicht durch das Gherkin-Szenario
+    // getrieben (wie der Collection-ETag) – daher ohne US904-Präfix, geprüft ausschließlich hier
+    // (Server.Tests), nicht im äußeren E2E.
+    [Fact]
+    public async Task DeleteIngredient_ActiveIngredientMissingIfMatch_Returns428PreconditionRequired()
+    {
+        // Given: eine aktive Zutat
+        var (created, _) = await CreateIngredientAsync("Salz", "g");
+
+        // When: DELETE ohne If-Match-Header
+        var response = await DeleteIngredientAsync(created.Id, ifMatch: null);
+
+        // Then: 428 Precondition Required
+        response.StatusCode.Should().Be(HttpStatusCode.PreconditionRequired);
+
+        // Then: nichts wird soft-deleted (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Salz", DefaultUnit = "g" }]);
+    }
+
+    // ADR-S058-1/ADR-S058-3: stale If-Match auf eine aktive Zeile -> 412 (EF Core prüft xmin beim
+    // SaveChanges). Nicht durch das Gherkin-Szenario getrieben – daher ohne US904-Präfix.
+    [Fact]
+    public async Task DeleteIngredient_ActiveIngredientStaleIfMatch_Returns412PreconditionFailed()
+    {
+        // Given: eine aktive Zutat (echter ETag aus dem POST)
+        var (created, _) = await CreateIngredientAsync("Muskat", "g");
+
+        // When: DELETE mit einem wohlgeformten, aber nicht passenden (stale) If-Match
+        var response = await DeleteIngredientAsync(created.Id, ifMatch: "\"deadbeef\"");
+
+        // Then: 412 Precondition Failed
+        response.StatusCode.Should().Be(HttpStatusCode.PreconditionFailed);
+
+        // Then: nichts wird soft-deleted (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Muskat", DefaultUnit = "g" }]);
+    }
+
+    // Ein If-Match-Wert, der wie ein ETag AUSSIEHT, aber nicht zu einem xmin geparst werden kann
+    // (non-hex/Overflow/leer/Wildcard), würde sonst eine unbehandelte FormatException/OverflowException
+    // -> 500 (Stack-Trace-Leak-Risiko) auslösen. Dreiteilung: 428 = fehlt, 400 = nicht-parsebar (dieser
+    // Test), 412 = wohlgeformt-aber-stale (Test oben). `*`/Weak-ETags/Multi-Value-Listen werden bewusst
+    // NICHT unterstützt (YAGNI, konsistent zum Nichtsupport in ETagMiddleware).
+    [Theory]
+    [InlineData("zzzzzzzz")] // non-hex
+    [InlineData("\"1ffffffff\"")] // 9 Hex-Ziffern -> Overflow für uint
+    [InlineData("\"\"")] // quoted-leer (ein echt leerer Header-Wert erreicht den Server transport-bedingt gar nicht -> 428, s. Kommentar oben)
+    [InlineData("*")] // Wildcard
+    public async Task DeleteIngredient_ActiveIngredientMalformedIfMatch_Returns400BadRequest(string malformedIfMatch)
+    {
+        // Given: eine aktive Zutat
+        var (created, _) = await CreateIngredientAsync("Kardamom", "g");
+
+        // When: DELETE mit einem nicht-parsebaren If-Match
+        var response = await DeleteIngredientAsync(created.Id, malformedIfMatch);
+
+        // Then: 400 Bad Request (nicht 500 – die Ausnahme wird VOR dem EF-Concurrency-Pfad abgefangen)
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Detail.Should().Be("Der If-Match-Header ist ungültig.");
+        body.ErrorCode.Should().Be("INVALID_IF_MATCH");
+
+        // Then: nichts wird soft-deleted (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Kardamom", DefaultUnit = "g" }]);
+    }
+
+    // Pinnt die 404-Dominanz aus dem ADR-S000-5-Addendum GEGEN den If-Match-Check, auch wenn dieser
+    // einen anderen Fehlerstatus (400 malformed / 428 fehlend) liefern würde – eine bereits soft-deleted
+    // Zeile liefert IMMER 404, unabhängig vom If-Match-Zustand. Der bestehende "AlreadyDeleted"-Test
+    // deckt das nur für ein WOHLGEFORMTES (stale) If-Match ab; ohne diesen Test bliebe eine versehentliche
+    // Vertauschung der Check-Reihenfolge (If-Match VOR Existenz-Check) unentdeckt grün. Stryker kann diese
+    // Ordering-Invariante strukturell nicht fangen (Statement-Reorder ist kein Mutant) – daher hier als
+    // expliziter Regressions-Test, ohne US-Tag (Protokoll-/Invarianten-Test).
+    [Theory]
+    [InlineData("zzzzzzzz")] // malformed If-Match auf soft-deleted Zeile -> 404, nicht 400
+    [InlineData(null)] // fehlendes If-Match auf soft-deleted Zeile -> 404, nicht 428
+    public async Task DeleteIngredient_AlreadySoftDeletedWithMalformedOrMissingIfMatch_Returns404NotBadRequestOrPreconditionRequired(
+        string? ifMatch)
+    {
+        // Given: "Wacholder" existiert und wurde bereits gelöscht (erstes DELETE gelingt, 204)
+        var (created, etag) = await CreateIngredientAsync("Wacholder", "g");
+        var firstDelete = await DeleteIngredientAsync(created.Id, etag);
+        firstDelete.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // When: der Lösch-Befehl wird erneut abgesendet, mit einem malformed bzw. fehlenden If-Match
+        var response = await DeleteIngredientAsync(created.Id, ifMatch);
+
+        // Then: 404 dominiert – nicht 400 (malformed) und nicht 428 (fehlend)
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Detail.Should().Be("Zutat wurde nicht gefunden.");
+        body.ErrorCode.Should().Be("INGREDIENT_NOT_FOUND");
+
+        // Then: die Zeile bleibt unverändert soft-deleted – keine weitere Mutation (full-state DB assertion)
+        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Wacholder", DefaultUnit = "g" });
     }
 }

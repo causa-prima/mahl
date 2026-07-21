@@ -121,3 +121,10 @@ Eintrag-Format:
 **Priorität:** Niedrig – SKELETON ohne Auth; durch Kestrels impliziten ~30-MB-Default begrenzt
 **Problem:** `POST /api/ingredients` deserialisiert/bindet den vollständigen Request-Body, BEVOR die Feld-Validierung greift (`name.Value.Length > 30` läuft erst nach Model-Binding). Ein anonymer Client kann daher wiederholt große Bodies (bis Kestrels implizitem ~30-MB-Default, in `Program.cs` nirgends explizit gesetzt) senden → Parsing-/Trimming-Last vor jeder Ablehnung. Kein durch run-3 verschärftes Risiko – der Zustand ist ggü. vorher unverändert. (Die fehlende `defaultUnit`-Längenbegrenzung ist Teil von TD-S083-4, nicht hier.) Quelle: security-auditor (Review run-3, SR-2).
 **Behebung/Trigger:** Explizites app-weites `MaxRequestBodySize` in `Program.cs` (statt Verlass auf den impliziten Framework-Default) – mit run-4 oder einer eigenen Härtungs-Aufgabe.
+
+---
+
+## TD-S106-1 — Backend: kein globaler Exception-Handler / ProblemDetails-Fallback
+**Priorität:** Niedrig – SKELETON ohne Auth; der konkrete run-10-500-Pfad (malformed If-Match) ist bereits gefixt (ADR-S106-2)
+**Problem:** `Server/Program.cs` registriert keinen `app.UseExceptionHandler(...)` / kein `AddProblemDetails`. Eine unbehandelte Exception in irgendeinem Endpoint schlägt daher als roher 500 durch – bei versehentlichem `ASPNETCORE_ENVIRONMENT=Development` mit voller Developer-Exception-Page (Stack-Trace-Leak, NFR-Verstoß „keine Stack-Traces für User"). DELETE war der erste Endpoint mit client-steuerbarem Input, der das sichtbar machte; der konkrete Pfad ist mit `XminETag.TryParse` → 400 (ADR-S106-2) geschlossen, aber die systemische Verteidigungslinie fehlt weiterhin. Quelle: security-auditor (Review run-10, SEC-2).
+**Behebung/Trigger:** Zentralen Exception-Handler ergänzen (mappt unbehandelte Exceptions generisch auf RFC7807-ProblemDetails ohne Stack-Trace) – bei der ersten Härtungs-/Resilience-Aufgabe oder sobald ein weiterer Endpoint client-steuerbaren Input verarbeitet.

@@ -30,13 +30,40 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
+## OBS-S106-1 – Szenario-Clustering (Run-Generierung) modelliert Cross-Run-State-Abhängigkeiten nicht
+- Quelle: User + Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: gherkin-workshop / scenario-clustering
+- Beobachtung: Beim Einstieg in US-904 run-7 fiel auf, dass die Run-Generierung (gherkin-workshop Schritt 6, `.claude/skills/gherkin-workshop/references/scenario-clustering.md`) Cross-Run-**Zustands-Abhängigkeiten** nicht abbildet. Konkret der Soft-Delete-Lebenszyklus: (1) run-7 S3 „Soft-deleted Zutat erscheint nicht in der Liste" ist ein **Reader** von `DeletedAt`, aber **kein vorausgehender Run schreibt** `DeletedAt` (der DELETE-Writer ist run-8/run-10) → das E2E-Arrangement „existiert und gelöscht wurde" hat keinen echten Vordertür-Weg, erzwingt entweder einen Test-only-Endpoint oder das Vorziehen eines späteren Runs. (2) run-8 Sz.1 fordert „Then ist die Zutaten-Liste leer" nach dem Löschen – das **setzt run-7's GET-Filter voraus**, run-8 kann also nicht vor run-7. Das Clustering ordnet/splittet also einen Zustands-Lebenszyklus so, dass Reader vor Writer landen bzw. eine Reihenfolge entsteht, die eine echte Abhängigkeit verletzt. Kostete diese Session eine mehrrundige Design-Diskussion.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: –
+
+## OBS-S106-2 – Run-Planung flaggt Querschnitts-Policy-Rollout beim ersten Endpoint-Typ nicht vorab
+- Quelle: Orchestrator + Subagent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: gherkin-workshop / scenario-clustering
+- Beobachtung: Dass run-10 den **ersten mutierenden Single-Resource-Endpoint** (DELETE) einführt und damit die Querschnitts-Policy ETag/If-Match/Optimistic-Concurrency (ADR-S058-1/-3) auslöst, wurde nicht in der Run-/Szenario-Planung sichtbar, sondern kam erst als PLANUNG-Eskalation des Backend-Subagenten mitten in der Implementierung hoch → mehrrundige Design-Diskussion über Scope (ETag jetzt vs. aufschieben), die vorab hätte eingeplant werden können. Verallgemeinert: Wenn ein Run den ERSTEN Endpoint eines Typs einführt (erster Single-Resource-Mutator; erste zweite Seite → Navigation; …), zieht das eine Querschnitts-Policy nach, die die feature-orientierte Clusterung nicht abbildet.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: OBS-S106-1
+
+## OBS-S106-3 – `dotnet-stryker.py --mutate <Datei>` untauglich für Test-Removal-Gegenprobe
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: Für die Gegenprobe „bleibt der Score 100 %, wenn Test X entfernt wird?" (Gold-Plating-Nachweis) lieferte `dotnet-stryker.py --mutate <Zieldatei>` keine verwertbare Aussage – alle Mutanten wurden als „Excluded" gemeldet (0/0/0). Erst der volle `qa-check.py`-Lauf war belastbar. Der Quick-Check adressiert einen anderen Zweck (eine Zieldatei fokussiert prüfen) und ist für die „Survivor durch Testentfernung"-Frage strukturell ungeeignet.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: OBS-S103-1
+
 ## OBS-S105-2 – C#-String-Ops triggern unter `TreatWarningsAsErrors` kulturbezogene Analyzer
 - Quelle: Subagent + Orchestrator
 - Status: NEU
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: C#-Code
 - Beobachtung: Naive String-Operationen brechen unter `TreatWarningsAsErrors` den Build über kulturbezogene Analyzer – in S105 zweifach getroffen: (1) `.ToLower()` in einem EF-Core-LINQ-Prädikat → CA1304/CA1311/CA1862/MA0011 (Analyzer nehmen Laufzeit-`CurrentCulture` an, obwohl der Ausdruck zu SQL `LOWER()` übersetzt wird → braucht ein gezieltes `#pragma`); (2) `IndexOf(char)` / `==` / im `.env`-Parser → CA1307/MA0006 (hier ist der Nudge berechtigt → `Split`/`StringComparison.Ordinal`/`string.Equals`). Beide Male kostete es einen Trial-and-Error-Zyklus.
-- Entscheidung/Maßnahme: offen – beim Drain zu bewerten. Kandidat: die portablen/ordinalen Muster + der EF-LINQ-Pragma-Fall einmal projektweit dokumentieren (Guideline oder dev-workflow), damit der nächste Agent nicht erneut rät. Vor Umsetzung Häufigkeit prüfen (Impact gering; das Eindeutigkeits-Feature nutzt den `.ToLower()`-Pfad nicht mehr, DB-only).
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: LL-S105-1
 
 ## OBS-S103-1 – `dotnet-stryker.py --mutate` unklar bei Einzeldatei-Ziel / stillem 0-Treffer
@@ -45,7 +72,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
 - Beobachtung: `dotnet-stryker.py --mutate` akzeptiert nur eine einzelne Datei (keine Kommaliste/Brace-Expansion), und der Pfad muss relativ zu `Server/` sein (`Endpoints/Foo.cs`, nicht `Server/Endpoints/Foo.cs`). Bei falschem Muster oder 0 gefundenen Mutanten für die Zieldatei meldet das Tool stillschweigend `0/0/0` statt einer klaren Fehlermeldung → der Subagent brauchte zwei unnötige Läufe, bis er es per Doku-Beispiel (`--mutate Domain/Foo.cs`) korrigierte.
-- Entscheidung/Maßnahme: offen – beim Drain zu bewerten. Kandidat: explizite Fehlermeldung bei 0 gefundenen Mutanten für die Zieldatei (statt nur den Tabellenausschnitt zu zeigen). Vor Umsetzung Häufigkeit/Reibung prüfen (Impact gering).
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 
 ## OBS-S103-2 – Stryker 100 % pinnt nicht die Reihenfolge von „erstes-von-N"-Prioritätslogik
@@ -54,7 +81,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: QUALITÄT    Kontext: Mutation-Testing
 - Beobachtung: Bei der Fokus-aufs-erste-Fehlerfeld-Logik (`nameError ? nameRef : unitError ? unitRef : undefined`) töteten die zwei Einzelfeld-Tests alle Stryker-Mutanten (100 %), aber der Mehrfeld-Fall (beide fehlerhaft → Priorität Name) war **nicht** gepinnt: ein menschlicher Prioritäts-Swap (Einheit vor Name) mutiert identisch und bliebe bei 100 % unentdeckt (im Review als FC-F1 gefunden, mit explizitem Mehrfeld-Assert geschlossen). Verallgemeinert: „erstes-von-N"-/Prioritäts-Auswahllogik braucht einen expliziten Mehrfach-Fall-Test; Stryker-100 % über Einzelfälle genügt nicht.
-- Entscheidung/Maßnahme: offen – beim Drain zu bewerten. Kandidat: Hinweis in Test-/Review-Guideline (Prioritäts-/Auswahllogik → expliziter Mehrfach-Fall-Test, Stryker fängt die Ordering-Lücke nicht). Vor Umsetzung Häufigkeit prüfen (Impact gering, Einzelbeobachtung).
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 
 ## OBS-S101-1 – Flaky-Timeout einzelner Vitest-Tests unter Stryker-Systemlast
@@ -63,7 +90,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
 - Beobachtung: `US904_HappyPath_ReopenDialogAfterCancel_FieldsAreEmpty` lief während eines Stryker-Dry-Runs in einen 5000-ms-Timeout, isoliert (`vitest-run.py --filter`) sofort grün (~900 ms). Ursache vermutlich Systemlast durch viele parallele Checker-/Runner-Prozesse. Kein echter Regress, aber ein solcher Timeout kann einen Übergabe-`qa-check`-Hash fälschlich scheitern lassen (falscher Rot-Alarm).
-- Entscheidung/Maßnahme: offen – beim Drain zu bewerten. Bislang Einzelbeobachtung (Häufigkeit unklar), Impact gering.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 
 ## OBS-S101-3 – useResultMutation: 4er-Positions-Tupel → Objekt-Rückgabe
@@ -81,7 +108,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: PROZESS    Kontext: Sonstiges
 - Beobachtung: Die S099-Lösung für OBS-S090-5 (TD-Sichtung in `implementing-scenario` Schritt 0 P5 + TD-Abgleich Schritt 6.1) fängt TD nur, wenn ein Lauf die betroffenen Bereiche real berührt (area-basiert – systematisiert den opportunistischen Fang, wie TD-S083-5 in S098). Infra-/Waisen-TD in Bereichen, die **kein** Lauf je anfasst, bleibt weiter uncaught. Der periodische Voll-Sweep wurde bewusst aus der Kaizen-Retro verbannt (Retro = Prozess, nicht Technik) → ein anderer Träger für einen periodischen TD-Sweep ist offen.
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden (möglicher Träger: eigener leichter TD-Review-Trigger außerhalb der Prozess-Retro; vor Umsetzung Nutzen/Häufigkeit prüfen, Impact gering).
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S090-5 (TD-Grooming, S099 umgesetzt); OBS-S087-1 (TD relevanz-filterbar)
 
 ## OBS-S099-2 – Test-Freigabe-Anker verlangt manuelle Zustandshaltung im Orchestrator
@@ -90,7 +117,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: PROZESS    Kontext: implementing-scenario / qa-check
 - Beobachtung: Die S099-Lösung für OBS-S090-4 (Blob-Anker-Audit) verlangt vom Orchestrator mehrstufige manuelle Schritte: pro freigegebener Test-Datei `git hash-object -w`, die `pfad=sha`-Paare über den GREEN/REFACTOR-Zyklus hinweg im Kontext halten und in Schritt 4 an `qa-check --verify --approved-tests` durchreichen. Bewusster Trade-off (mechanischer Gate statt „dran denken"), aber die manuelle Zustandshaltung ist selbst vergessbar/fehleranfällig – nur der `--verify`-Abbruch bei geänderten Tests ohne `--approved-tests` fängt das Weglassen.
-- Entscheidung/Maßnahme: offen – im ersten realen `implementing-scenario`-Lauf nach S099 beobachten, ob die `pfad=sha`-Pflege real reibt; falls ja, Automatisierung erwägen (z.B. qa-check gibt beim Subagent-Übergabe-Lauf die Test-Blob-SHAs bereits mit aus, oder ein Helfer sammelt sie). Vor Umsetzung Häufigkeit/Reibung prüfen (Impact gering).
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S090-4 (S099 umgesetzt); CM-S070-1
 
 ---
@@ -101,7 +128,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
 - Beobachtung: Meldet `qa-check` einen Stryker-Score < 100 %, nennt es nur die Prozentzahl, nicht *welche* Zeilen überlebten. Man muss danach separat `stryker-frontend.py` (bzw. den Backend-Pendant) bemühen, um die Survivor-Stellen zu sehen – ein zusätzlicher Lauf für Information, die der eben abgeschlossene Lauf bereits hatte. Konkret in dieser Session beim 98,1-%-Survivor (Fokus-Guard) aufgetreten.
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden. Kandidat: `qa-check` gibt bei < 100 % die `[Survived]`-Zeilen direkt mit aus (aus dem bereits vorliegenden Stryker-Report), damit kein Zweitlauf nötig ist. Vor Umsetzung Häufigkeit/Reibung prüfen (Impact gering).
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S085-3
 
 ---
@@ -163,7 +190,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: Die Wrapper liegen im Repo-Root (`.claude/scripts/`) und lösen ihren Root intern via `_util.REPO_ROOT` auf — aber der **Aufrufpfad** `python3 .claude/scripts/foo.py` ist cwd-relativ. Projekt-Tooling (`npm`/`dotnet`/`vite`) zieht die Shell in `Client/`/`Server/`-Subdirs; der nächste Wrapper-Aufruf scheitert dann mit „No such file" (S091: beide Subagenten + Orchestrator betroffen).
-- Entscheidung/Maßnahme: offen (Retro)
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: —
 
 ## OBS-S092-2 – Dokumentiertes Kommando zum Header-Lesen (statt eigenes Script)
@@ -193,7 +220,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Build/Analyzer
 - Beobachtung: SonarAnalyzer S125 („Sections of code should not be commented out") interpretiert deutschsprachige Kommentare, die mit „…;" enden, als auskommentierten Code und bricht den Build. In dieser Session musste ein korrekter Erklär-Kommentar nur umformuliert werden, um S125 zu beruhigen – inhaltlich unnötiger Eingriff.
-- Entscheidung/Maßnahme: offen (Retro) – Impact gering; vor Config-Änderung Häufigkeit beobachten.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
 ---
 
@@ -214,6 +241,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: `--mutate` nimmt nur einen Dateipfad; ein komma-getrenntes Mehrfach-Argument scheitert („unrecognized arguments" bzw. beim String-Workaround „Excluded" auf allen Dateien). Wer mehrere geänderte Dateien in einem Lauf gezielt mutieren will, muss mehrere separate Läufe machen (kleine Zeitkosten). Aufgetreten in run-3, als der Backend-Implementer zwei Dateien in einem Lauf mutieren wollte.
-- Entscheidung/Maßnahme: offen – beim Drain entscheiden.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 

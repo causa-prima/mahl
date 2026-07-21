@@ -2,6 +2,7 @@ using mahl.Infrastructure;
 using mahl.Infrastructure.DatabaseTypes;
 using mahl.Server.Domain;
 using mahl.Server.Dtos;
+using mahl.Server.Middleware;
 using mahl.Server.Types;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -34,7 +35,7 @@ internal static class IngredientsEndpoints
         group.MapPost(
             // Stryker disable once String : Route patterns "/" and "" are treated equivalently by ASP.NET Core routing
             "/",
-            async (CreateIngredientDto dto, MahlDbContext db) =>
+            async (CreateIngredientDto dto, MahlDbContext db, HttpContext httpContext) =>
                 await dto.ToDomain()
                     .MapError<Ingredient, IReadOnlyList<IngredientValidationError>, IResult>(IngredientMappings.ValidationProblemFor)
                     .BindAsync<Ingredient, IngredientDto, IResult>(async ingredient =>
@@ -42,7 +43,8 @@ internal static class IngredientsEndpoints
                         // ADR-S105-2: Eindeutigkeit ist ein DB-Constraint (funktionaler LOWER(name)-Unique-
                         // Index, ADR-S051-3/ADR-S004-1 Addendum S105) – kein App-Layer-Check-then-Insert
                         // (TOCTOU-Race). Der schreibende Endpoint fängt die Unique-Violation (Postgres 23505).
-                        db.Ingredients.Add(ingredient.ToDbType());
+                        var dbType = ingredient.ToDbType();
+                        db.Ingredients.Add(dbType);
                         try
                         {
                             await db.SaveChangesAsync();
@@ -52,11 +54,50 @@ internal static class IngredientsEndpoints
                             return OneOf<IngredientDto, IResult>.FromT1(
                                 IngredientMappings.ValidationProblemFor([IngredientValidationError.NameDuplicate(ingredient.Name.Value)]));
                         }
+                        // ADR-S058-3: der ETag der neu angelegten Zeile geht mit dem 201 heraus, damit ein
+                        // Client ihn als If-Match auf ein späteres DELETE/PUT/PATCH mitschicken kann.
+                        httpContext.Response.Headers.ETag = XminETag.Format((uint) db.Entry(dbType).Property("xmin").CurrentValue!);
                         return ingredient.ToDto();
                     })
                     .MatchAsync(
                         created => Results.Created($"/api/ingredients/{created.Id}", created),
                         error => error));
+
+        group.MapDelete(
+            "/{id:guid}",
+            async (Guid id, HttpRequest request, MahlDbContext db) =>
+            {
+                // ADR-S000-5/ADR-S051-5: Not-Found dominiert VOR dem If-Match-Check – eine bereits
+                // soft-deleted oder nie existente Zeile liefert immer 404, auch mit fehlendem/stale If-Match.
+                var ingredient = await db.Ingredients.FirstOrDefaultAsync(i => i.Id == id && i.DeletedAt == null);
+                if (ingredient is null)
+                    return IngredientMappings.NotFoundProblem();
+
+                // ADR-S058-1: mutierender Single-Resource-Endpoint verlangt If-Match.
+                var ifMatch = request.Headers.IfMatch;
+                if (ifMatch.Count == 0)
+                    return Results.StatusCode(StatusCodes.Status428PreconditionRequired);
+
+                // ADR-S106-2: 428/400/412-Dreiteilung – ein If-Match, der zwar vorhanden, aber nicht zu
+                // einem xmin parsebar ist (non-hex/Overflow/leer/Wildcard/Liste), liefert 400 statt einer
+                // unbehandelten FormatException/OverflowException (die vorher als 500 durchschlug).
+                if (!XminETag.TryParse(ifMatch.ToString(), out var xmin))
+                    return IngredientMappings.InvalidIfMatchProblem();
+
+                // ADR-S058-3: xmin als Concurrency-Token setzen – EF Core prüft ihn beim SaveChangesAsync
+                // gegen den aktuellen DB-Wert und wirft DbUpdateConcurrencyException bei Mismatch.
+                db.Entry(ingredient).Property("xmin").OriginalValue = xmin;
+                ingredient.DeletedAt = DateTimeOffset.UtcNow;
+                try
+                {
+                    await db.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
+                }
+                return Results.NoContent();
+            });
     }
 }
 
@@ -132,4 +173,20 @@ file static class IngredientMappings
 
     internal static IngredientDto ToDto(this Ingredient domain) =>
         new(domain.Id, domain.Name.Value, domain.DefaultUnit.Value);
+
+    // ADR-S051-5/ADR-S054-6: fixe deutsche Meldung + maschinenlesbarer errorCode für den DELETE-404-Fall
+    // (nicht vorhanden ODER bereits soft-deleted, ADR-S000-5).
+    internal static IResult NotFoundProblem() =>
+        Results.Problem(
+            detail: "Zutat wurde nicht gefunden.",
+            statusCode: StatusCodes.Status404NotFound,
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["errorCode"] = "INGREDIENT_NOT_FOUND" });
+
+    // ADR-S106-2/ADR-S054-6: fixe deutsche Meldung + maschinenlesbarer errorCode für einen
+    // vorhandenen, aber nicht zu einem xmin parsebaren If-Match-Header (428/400/412-Dreiteilung).
+    internal static IResult InvalidIfMatchProblem() =>
+        Results.Problem(
+            detail: "Der If-Match-Header ist ungültig.",
+            statusCode: StatusCodes.Status400BadRequest,
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["errorCode"] = "INVALID_IF_MATCH" });
 }

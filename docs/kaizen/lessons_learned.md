@@ -43,6 +43,20 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 106 – 2026-07-21
+
+- **[HOCH] [PROZESS] [Skill-Nutzung] LL-S106-1 – Lösungskandidat bei OBS-Erfassung ankert den Drain-Agenten**
+  Quelle: User
+  Was: Beim Erfassen von OBS-S106-1 – und laut User wiederholt – schrieb der Orchestrator eine Kandidaten-/Lösungsrichtung ins Feld „Entscheidung/Maßnahme", obwohl es bei Erfassung „offen" bleiben soll (Bestandseinträge wie OBS-S105-2/-S103-1 zeigen dieselbe Drift).
+  Warum: Das Feld ist die Vordertür zum Drain; ein vorab notierter Kandidat ankert den bewusst frischen Drain-Agenten (Anchoring-Bias) und untergräbt genau dessen Debiasing-Zweck.
+  Regel: Bei OBS-Erfassung (und jedem aufgeschobenen Finding) bleibt „Entscheidung/Maßnahme" strikt „offen" – KEINE Lösungs-/Kandidaten-Richtung; Lösungskandidaten entstehen erst beim Drain durch frische Augen. → Kandidat für mechanischen Guard (Poka-Yoke) bei der nächsten Retro prüfen.
+
+- **[MITTEL] [PROZESS] [Skill-Nutzung] LL-S106-2 – Subagenten nummerieren neue ADRs mit der falschen Session (jüngste ADR-Serie fortgesetzt)**
+  Quelle: Orchestrator
+  Was: Zwei Backend-Subagenten legten die run-10-ADRs als `ADR-S105-3`/`-4` an (jüngste Serie war S105-2), obwohl die Session 106 ist – die ADR-ID ist session-basiert (der Session-105-Index nennt exakt S105-1/-2). Nachträgliche Umnummerierung auf S106-1/-2 inkl. ~7 Code-/Doku-Referenzen nötig.
+  Warum: Ein Subagent mitten in der Session hat kein klares Signal für „aktuelle Session-Nummer" (der Index zeigt die letzte ABGESCHLOSSENE = 105; die laufende wird erst beim Abschluss vergeben) und setzt naiv die höchste bestehende ADR-Serie fort.
+  Regel: Neue ADR-IDs nutzen die **laufende** Session-Nummer = „letzter Index-Eintrag + 1", nicht die Fortsetzung der jüngsten ADR-Serie. Der Orchestrator gibt Subagenten, die ADRs anlegen, die Session-Nummer explizit vor (oder ein Script leitet sie ab). → Kandidat für mechanische ADR-ID-Vergabe/-Validierung bei der nächsten Retro.
+
 ## Session 105 – 2026-07-21
 
 - **[HOCH] [PROZESS] [Testing] LL-S105-1 – False-Green durch Test↔Prod-Divergenz der DB-Engine-Config (Locale)**

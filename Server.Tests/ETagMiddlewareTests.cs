@@ -89,8 +89,13 @@ public class ETagMiddlewareTests(PostgresContainerFixture postgres) : EndpointsT
         response.Headers.ETag!.Tag.Should().NotBe(emptyEtag);
     }
 
+    // ADR-S058-3: seit der ersten Single-Resource-xmin-ETag-Umsetzung setzt der POST-Endpoint selbst
+    // einen ETag-Header (nicht die Collection-Content-Hash-Middleware, die nur GET anfasst).
+    // Dieser Test pinnt weiterhin nur das MIDDLEWARE-Verhalten: kein Content-Hash-Overwrite/-Eingriff
+    // bei Nicht-GET, Body bleibt unangetastet. Der ETag-Wert selbst (xmin-Format) wird in
+    // IngredientsEndpointsTests (CreateIngredient_ValidData_Returns201WithXminETagHeader) gepinnt.
     [Fact]
-    public async Task ETagMiddleware_PostRequest_PassesThroughWithoutETag()
+    public async Task ETagMiddleware_PostRequest_PassesThroughWithEndpointSetETagUnmodified()
     {
         // Given: a valid create request
         var createRequest = new CreateIngredientRequest(Name: "Tomaten", DefaultUnit: "Stück");
@@ -98,9 +103,15 @@ public class ETagMiddlewareTests(PostgresContainerFixture postgres) : EndpointsT
         // When: a non-GET (POST) request is made
         var response = await Client.PostAsJsonAsync("/api/ingredients", createRequest, TestContext.Current.CancellationToken);
 
-        // Then: the response passes through untouched — 201 Created, body intact, no content-hash ETag
+        // Then: the response passes through untouched — 201 Created, body intact. The ETag header
+        // is the endpoint's own xmin ETag (not a middleware-generated content-hash) — the middleware
+        // does not act on non-GET requests at all.
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        response.Headers.ETag.Should().BeNull();
+        response.Headers.ETag.Should().NotBeNull();
+        // xmin ist hex-kodiert und (bei uint) maximal 8 Ziffern lang – ein Content-Hash (z.B. SHA-256,
+        // 64 Hex-Ziffern) würde dieses Format nicht erfüllen. Pinnt damit die im Testnamen versprochene
+        // "xmin, kein Content-Hash"-Eigenschaft, nicht nur "irgendein nicht-leerer ETag".
+        response.Headers.ETag!.Tag.Trim('"').Should().MatchRegex("^[0-9a-f]{1,8}$");
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().BeEquivalentTo(
             new IngredientResponse(Id: body!.Id, Name: "Tomaten", DefaultUnit: "Stück"));

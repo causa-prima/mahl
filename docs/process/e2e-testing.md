@@ -145,6 +145,8 @@ Alle drei Ebenen tragen denselben Identifier – das ermöglicht direktes Grep (
 
 **Pflicht:** Kein Backend-Integrationstest ohne erkennbare Szenario-Zuordnung (US-Tag + ScenarioType).
 
+> **Ausnahme (ADR-S106-3):** Querschnitts-**Protokoll-/Infra-Tests** (ETag/If-Match-Mechanik, POST-liefert-ETag) und **Stryker-blinde Invarianten-Tests** (Reihenfolge-/Prioritäts-Pins, die kein Mutant fängt) haben per Definition kein treibendes Szenario → **kein US-Tag**. Sie MÜSSEN per Kommentar als solche ausgewiesen sein (welche ADR / welche Invariante). Alles andere ohne Szenario bleibt eine Outside-In-Verletzung.
+
 ### Test-Audit (Teil jedes Reviews)
 
 Bei jedem Code-Review prüfen:
