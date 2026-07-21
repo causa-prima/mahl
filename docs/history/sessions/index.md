@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 105 | 2026-07-21 | SKELETON (US-904 run-6) | run-6 „Name-Eindeutigkeit": field-keyed 422 bei Duplikat (`NameDuplicate`-Case) + DB-Constraint `LOWER(name)` (ADR-S105-2); Integrationstests EF-InMemory→Testcontainers (ADR-S105-1); Locale-Test≠Prod via Single-Source `config/postgres.env` (CM-S105-1); LL-S105-1, OBS-S105-2. |
 | 103 | 2026-07-17 | SKELETON (US-904 run-4) | run-4 „Einheit-Validierung" (Full-Stack): Backend Max-Length 20 (`UnitTooLong`-Case, `ValidateField`-Helper), Frontend Fokus-aufs-erste-Fehlerfeld (`useFocusFirstInvalidField`, erledigt TD-S094-1); Review 0 ❌ (FC-F1 Mehrfeld-Fokus-Pin); LL-S103-1, OBS-S103-1/-2. |
 | 102 | 2026-07-11 | SKELETON (US-904 run-3) | OBS-Drain Blöcke 1–4 (7 OBS, CM-S102-1/-2/-3, Ref-Direction-Poka-Yoke-Hook) + US-904 run-3 „Name-Validierung" (Backend Max-Length 30, `NameTooLong`-Sum-Type, real Backend-only); LL-S102-1, OBS-S102-1..3, TD-S102-1. |
 | 101 | 2026-07-10 | SKELETON (US-904 run-2) | run-2 „Dialog-Verhalten" abgeschlossen: Escape/Backdrop-Sperre + Abbrechen-disabled + Fehler-Reset während Pending (useResultMutation→4-Tupel); Backdrop spec-first + gherkin-workshop-Pending-Policy; LSP für Implementer/Auditoren; LL/CM-S101-1. |

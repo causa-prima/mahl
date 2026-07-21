@@ -399,6 +399,14 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     # git safe write (explizit kein -f/--force – das ist in WRONG_APPROACH_PATTERNS)
     (re.compile(r'^git\s+add\b(?!.*\s(?:-f\b|--force\b))'), None, 'git add <datei>  (ohne -f/--force)'),
     (re.compile(r'^git\s+stash\s+(list|push|save|pop|apply|drop)\b'), None, 'git stash list|push|save|pop|apply|drop'),
+    # git hash-object: berechnet Blob-SHA (mit -w höchstens ein unreferenziertes Blob-Objekt in
+    # die Object-DB) – verändert weder Working Tree, Index, Refs noch History. Keine gefährlichen
+    # Flags → beliebige Optionen/Dateien erlaubt. Nutzung: Test-Freigabe-Anker (qa-check --approved-tests).
+    (
+        re.compile(r'^git\s+(?:-C\s+\S+\s+)?hash-object\b'),
+        None,
+        'git [-C <pfad>] hash-object [-w] <datei>…  (Blob-SHA für Test-Freigabe-Anker)',
+    ),
 ]
 
 

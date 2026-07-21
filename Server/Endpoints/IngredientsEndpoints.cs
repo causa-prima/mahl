@@ -4,6 +4,7 @@ using mahl.Server.Domain;
 using mahl.Server.Dtos;
 using mahl.Server.Types;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using OneOf;
 using OneOf.Types;
 
@@ -38,8 +39,19 @@ internal static class IngredientsEndpoints
                     .MapError<Ingredient, IReadOnlyList<IngredientValidationError>, IResult>(IngredientMappings.ValidationProblemFor)
                     .BindAsync<Ingredient, IngredientDto, IResult>(async ingredient =>
                     {
+                        // ADR-S105-2: Eindeutigkeit ist ein DB-Constraint (funktionaler LOWER(name)-Unique-
+                        // Index, ADR-S051-3/ADR-S004-1 Addendum S105) – kein App-Layer-Check-then-Insert
+                        // (TOCTOU-Race). Der schreibende Endpoint fängt die Unique-Violation (Postgres 23505).
                         db.Ingredients.Add(ingredient.ToDbType());
-                        await db.SaveChangesAsync();
+                        try
+                        {
+                            await db.SaveChangesAsync();
+                        }
+                        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
+                        {
+                            return OneOf<IngredientDto, IResult>.FromT1(
+                                IngredientMappings.ValidationProblemFor([IngredientValidationError.NameDuplicate(ingredient.Name.Value)]));
+                        }
                         return ingredient.ToDto();
                     })
                     .MatchAsync(
@@ -112,7 +124,8 @@ file static class IngredientMappings
         onNameEmpty: () => ("name", "Name darf nicht leer sein."),
         onNameTooLong: () => ("name", "Name darf maximal 30 Zeichen lang sein."),
         onUnitEmpty: () => ("defaultUnit", "Einheit darf nicht leer sein."),
-        onUnitTooLong: () => ("defaultUnit", "Einheit darf maximal 20 Zeichen lang sein."));
+        onUnitTooLong: () => ("defaultUnit", "Einheit darf maximal 20 Zeichen lang sein."),
+        onNameDuplicate: name => ("name", $"Eine Zutat mit dem Namen '{name}' existiert bereits."));
 
     internal static IngredientDbType ToDbType(this Ingredient domain) =>
         new() { Id = domain.Id, Name = domain.Name.Value, DefaultUnit = domain.DefaultUnit.Value };

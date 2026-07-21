@@ -202,6 +202,7 @@ Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und pe
 |----------------|------|
 | `name` leer (Ingredient) | `"Name darf nicht leer sein."` |
 | `name` zu lang (Ingredient, > 30 Zeichen) | `"Name darf maximal 30 Zeichen lang sein."` |
+| `name` bereits vergeben (aktives Duplikat, ADR-S004-1) | `"Eine Zutat mit dem Namen '{name}' existiert bereits."` (`{name}` = getrimmter Request-Wert, nicht der gespeicherte) |
 | `defaultUnit` leer | `"Einheit darf nicht leer sein."` |
 | `defaultUnit` zu lang (> 20 Zeichen) | `"Einheit darf maximal 20 Zeichen lang sein."` |
 | `title` leer (Recipe) | `"Titel darf nicht leer sein."` |
@@ -223,7 +224,7 @@ Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und pe
 **Status:** Accepted
 **Tags:** scope:feature, resource:ingredients, http:post, http:409, arch:error-handling
 
-**Entscheidung:** `POST /api/ingredients` mit einem Namen, der bereits soft-deleted existiert, gibt `409 Conflict` zurück mit Body `{ "code": "ingredient_soft_deleted", "id": Guid }`. Aktiver Duplikat-Name liefert dagegen plain text: `"Eine Zutat mit dem Namen '{name}' existiert bereits."`.
+**Entscheidung:** `POST /api/ingredients` mit einem Namen, der bereits soft-deleted existiert, gibt `409 Conflict` zurück mit Body `{ "code": "ingredient_soft_deleted", "id": Guid }`. Aktiver Duplikat-Name (nicht soft-deleted) liefert `422 Unprocessable Content` als field-keyed Body auf `name` (ADR-S090-1): `{ "errors": { "name": ["Eine Zutat mit dem Namen '{name}' existiert bereits."] } }`.
 
 Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (transparent für den Nutzer).
 
@@ -231,9 +232,57 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 **Begründung:** Das strukturierte Objekt ermöglicht dem Frontend, den `id`-Wert auszulesen und einen "Wiederherstellen"-CTA anzubieten, ohne Text parsen zu müssen.
 
+**Addendum (S105) – Aktiver Duplikat: 422 field-keyed statt plain text (Konflikt-Auflösung mit ADR-S090-1):** Die ursprüngliche „plain text"-Klausel für den *aktiven* Duplikat-Fall stammt aus der Zeit vor dem field-keyed-422-Contract (ADR-S090-1) und wurde nie implementiert. Sie wird ersetzt: aktives Duplikat läuft über denselben field-keyed 422-Pfad wie alle anderen Feld-Validierungsfehler (`name`-Key, dynamische Meldung) → das Frontend rendert die Meldung ohne Sonderbehandlung am Name-Feld (generischer `FieldErrors`-Konsum in `createIngredient`). **Unberührt bleibt** der soft-deleted-Fall: `409 Conflict` + strukturierter `{ code, id }`-Body – dort verzweigt der Client Logik (Restore-Orchestrierung), was ADR-S090-1s Display-only-422 bewusst *nicht* abdeckt (dessen Drift-Strategie nimmt Body-Logik-Konsum explizit aus). Die beiden Duplikat-Zweige liefern damit unterschiedliche Codes (aktiv 422 / soft-deleted 409), gerechtfertigt durch unterschiedliches Client-Verhalten (anzeigen vs. orchestrieren).
+
+**Durchsetzungs-Mechanismus (S105, s. ADR-S105-2):** Die aktive-Duplikat-Prüfung ist ein **DB-Constraint** (funktionaler Unique-Index auf `LOWER(name)`), kein App-Layer-`AnyAsync`-Check. Der POST fängt die `DbUpdateException` (Postgres `23505`) und mappt sie auf dasselbe field-keyed 422. Das eliminiert das TOCTOU-Fenster eines Check-then-Insert. Der 422-*Contract* oben bleibt unverändert – nur der Mechanismus.
+
 **Verworfen:** Transparentes Server-seitiges Reaktivieren – bricht POST-Semantik, zwei Pfade in einem Endpoint.
 **Verworfen:** Immer 409 ohne Restore-Möglichkeit – Sackgasse für den Nutzer.
 **Verworfen:** Neu anlegen neben soft-deletem Eintrag – erzeugt stille Inkonsistenz (zwei "Butter"-Einträge mit verschiedenen IDs).
+**Verworfen (S105):** App-Layer-`AnyAsync`-Check als alleinige Durchsetzung – TOCTOU-Race unter Nebenläufigkeit (zwei parallele POSTs passieren beide die Prüfung → Duplikat), nicht durch einen Test absicherbar. Ersetzt durch den DB-Constraint (ADR-S105-2).
+
+---
+
+### ADR-S105-1: Integrationstest-Provider: EF-InMemory → Testcontainers-Postgres
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:integration-test, tooling:build
+
+**Entscheidung:** Die `Server.Tests`-Integrationstests laufen gegen ein **echtes Postgres in einem Testcontainer** (`Testcontainers.PostgreSql`) statt gegen den EF-Core-InMemory-Provider. Container-Lebenszyklus: ein geteilter Container pro Test-Lauf (xUnit-Collection-/Class-Fixture), Schema via `MigrateAsync` (dieselben Migrations wie E2E/Prod), Daten-Reset pro Test.
+
+**Begründung:** Der InMemory-Provider ist keine relationale DB – er erzwingt **weder Unique-Constraints noch funktionale Indizes** (`LOWER(name)`). Integritätsregeln wie die case-insensitive Namens-Eindeutigkeit (ADR-S105-2) sind dort strukturell nicht testbar; ein DB-Constraint wäre unverifiziert. Testcontainers nutzt die **identische Engine wie Prod** → kein Dialekt-Drift, alle Constraints/Indizes/Collations greifen im Test exakt wie in Produktion. Deckt sich mit der offiziellen EF-Core-Testing-Guidance (InMemory nicht für Verhalten, das relationale Semantik braucht).
+
+**Konsequenz/Trade-off:** Docker-Abhängigkeit für den Test-Lauf; langsamer als InMemory, insbesondere unter Stryker (Test-Suite pro Mutant) – gemildert durch Container-Wiederverwendung + schnellen per-Test-Reset.
+
+**Verworfen:**
+- **EF-InMemory beibehalten** – kann den DB-Constraint nicht durchsetzen → die Kernregel dieses Runs bliebe untestbar, der `DbUpdateException`→422-Zweig ein untestbarer Survivor.
+- **SQLite in-memory** – schneller/kein Docker, aber anderer Dialekt und **ASCII-only `LOWER()`** (Umlaute wie „Ä"/„ä" folden nicht) → Umlaut-Case-Insensitivität nicht prod-treu.
+
+**Addendum (S105) – DB-Locale muss umlaut-faltend sein (`en_US.utf8`, nicht `C`):** Ob `LOWER('Ö')='ö'` gilt, hängt am **`LC_CTYPE` der DB**, nicht am Postgres-Dialekt oder Encoding an sich (unter `--locale=C` faltet `LOWER()` nur ASCII, auch bei UTF8-Encoding). Der funktionale `LOWER(name)`-Unique-Index (ADR-S105-2) setzt die Umlaut-Case-Insensitivität (ADR-S051-3) also nur unter einem umlaut-faltenden Locale korrekt durch. Empirisch bestätigt: Der Testcontainer (`postgres:15-alpine`) nutzt Default `en_US.utf8` und faltet Umlaute. `docker-compose.yml` erzwang zunächst `--locale=C` (Test≠Prod-Divergenz) → der Override wurde entfernt, damit initdb denselben Default `en_US.utf8` erbt. Guard: Der case-insensitive Duplikat-Test verwendet bewusst „Öl"/„öl" (nicht ASCII) – auf E2E-Ebene der **einzige** Test, der eine regressierte compose-Locale fängt (Server.Tests nutzt immer den Container-Default). Verworfen: `--locale=en_US.utf8` explizit setzen (Risiko, dass ein künftiges Alpine-Image die Locale nicht generieren kann; der Image-Default ist beweisbar vorhanden).
+
+**Addendum (S105) – Trade-off geteilte Collection (Inter-Klassen-Parallelität):** Ein *einziger* geteilter Container für die ganze Assembly (via `[CollectionDefinition]`) bindet alle Testklassen in **eine** xUnit-Collection → sie laufen **seriell**, nicht klassen-parallel. Bewusst akzeptiert (Container-Start dominiert; ein Container pro Klasse wäre teurer). Die Suite ist gegenüber EF-InMemory rund **4,6× langsamer** (gemessen S105) – spürbar, aber nicht kritisch. Skalierungsrisiko v. a. unter Stryker (Suite pro Mutant) → falls die Suite-Dauer kritisch wird, hier ansetzen (mehrere Collections + Container-Pool).
+
+---
+
+### ADR-S105-2: Eindeutigkeit DB-seitig durchsetzen (DB-only), nicht per App-Layer-Check-then-Insert
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:validation, db:constraint
+
+**Entscheidung (allgemeines Prinzip):** Eindeutigkeitsregeln werden per **Unique-Index in der Datenbank** durchgesetzt, nicht per vorgelagertem App-Layer-`AnyAsync`-Check-then-Insert. Der schreibende Endpoint fängt die `DbUpdateException` (Postgres SqlState `23505`) beim `SaveChangesAsync` und mappt sie auf das field-keyed 422 (ADR-S090-1); der Key ist das/die verletzende(n) Request-Feld(er). Funktionale/partielle/case-insensitive Indizes werden als **Raw-SQL in der Migration** angelegt (nicht per Model-Config ausdrückbar; als Migration vom Mutation-Testing ausgenommen).
+
+**Begründung:** Single source of truth = die DB. Ein App-Layer-Check + separater Insert ist ein **TOCTOU-Race** (zwei parallele Requests passieren beide die Prüfung, bevor der jeweils andere committet), das ohne DB-Constraint weder schließbar noch testbar ist. DB-only eliminiert das Race; da **jeder** Verstoß den Constraint auslöst, ist der 422-Pfad durch die regulären Szenario-Tests deterministisch abgedeckt – kein nur-im-Race-erreichbarer Branch, keine Coverage-Suppression. Voraussetzung ist ein constraint-durchsetzender Test-Provider (ADR-S105-1).
+
+**Geltungsbereich & Grenze:** Gilt für den **einfachen „Verstoß ablehnen"-Fall**. Hängt die Antwort von weiterem Zustand ab, inspiziert der App-Layer diesen Zustand bewusst, und der DB-Constraint bleibt der Integritäts-Backstop – Beispiel: ein *soft-deleted* Duplikat liefert `409` + Restore-Orchestrierung, **nicht** 422 (ADR-S004-1/S000-2, run-11); dort fängt der Endpoint die `23505` und verzweigt nach Soft-Delete-Zustand (409 vs. 422). Die **Index-Form** (case-sensitiv/-insensitiv, funktional, partiell z. B. `WHERE deleted_at IS NULL`, mehrspaltig) ist pro Constraint zu wählen; sie ist **nicht** Teil dieses allgemeinen Prinzips.
+
+**Abgrenzung Feld-Validierung vs. Cross-Entity:** Feld-Validierung (leer/zu lang) bleibt im Domain-Typ/Endpoint vor dem Insert (ADR-S090-1, collect-all). Eindeutigkeit ist ein **Cross-Entity-Constraint** und gehört an die einzige Stelle, die ihn atomar garantieren kann – die DB (vgl. `architecture.md`: Cross-Entity-Constraints nicht im Typ ausdrückbar).
+
+**Erste Anwendung – Ingredient-Name (run-6):** funktionaler Unique-Index auf `LOWER(name)` (case-insensitiv, ADR-S051-3) über alle Zeilen; `POST /api/ingredients` mappt `23505` → 422 `name` → „Eine Zutat mit dem Namen '{eingegebener getrimmter Name}' existiert bereits." (ADR-S004-1/-S051-2).
+
+**Verworfen:**
+- **App-Layer-`AnyAsync`-Check (allein)** – TOCTOU-Race, s. o.
+- **App-Check + DB-Constraint + `DbUpdateException`-Handler** – der Handler-Zweig wäre nur durch einen echten Race auslösbar (App-Check fängt sequentielle Fälle vorher ab) → nicht deterministisch testbar, Coverage-Suppression nötig. DB-only vermeidet das.
+- **`citext`-Spaltentyp** – Postgres-Extension, zusätzliche Schema-Abhängigkeit; funktionaler `LOWER()`-Index genügt.
 
 ---
 

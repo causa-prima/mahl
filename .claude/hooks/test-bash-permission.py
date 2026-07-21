@@ -277,6 +277,11 @@ def test_allow_patterns() -> int:
         ("git add -p", "git add -p (interaktiv)"),
         ("git stash push -m 'save'", "git stash push"),
         ("git stash pop", "git stash pop"),
+        # git hash-object (Blob-SHA für Test-Freigabe-Anker; keine gefährlichen Flags)
+        ("git hash-object -w Server.Tests/Foo.cs", "git hash-object -w <datei>"),
+        ("git hash-object -w Server.Tests/Foo.cs Client/e2e/bar.spec.ts", "git hash-object -w <mehrere dateien>"),
+        ("git hash-object file.txt", "git hash-object ohne -w"),
+        ("git -C Client hash-object -w e2e/bar.spec.ts", "git -C hash-object"),
         # Frontend-Wrapper-Scripts
         ("python3 .claude/scripts/vitest-run.py", "vitest-run.py"),
         ("python3 .claude/scripts/vitest-run.py --filter IngredientsPage", "vitest-run.py --filter"),

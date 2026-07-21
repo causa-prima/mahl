@@ -8,7 +8,8 @@ using Xunit;
 
 namespace mahl.Server.Tests;
 
-public class IngredientsEndpointsTests : EndpointsTestsBase
+[Collection(PostgresCollectionDefinition.Name)]
+public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : EndpointsTestsBase(postgres)
 {
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
     private sealed record IngredientResponse(Guid Id, string Name, string DefaultUnit);
@@ -233,6 +234,44 @@ public class IngredientsEndpointsTests : EndpointsTestsBase
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
             [new IngredientDbType { Id = body.Id, Name = "Salz", DefaultUnit = unit }]);
+    }
+
+    // @US-904-error: Drei Gherkin-Szenarien testen dieselbe fachliche Invariante (Eindeutigkeit case-insensitiv,
+    // ADR-S051-3; Meldung field-keyed 422 mit dem getrimmten EINGEGEBENEN Namen, ADR-S090-1/ADR-S004-1) mit nur
+    // variierendem Input/Setup -> ein parametrisierter Test (docs/process/tdd-process.md "Parametrisierte Tests"):
+    // "Zutat mit bereits vorhandenem Namen anlegen schlägt fehl" (exakte Schreibweise) |
+    // "Zutat mit vorhandenem Namen in abweichender Schreibweise anlegen schlägt fehl" (case-insensitiv) |
+    // "Fehlermeldung bei Duplikat zeigt getrimmten Namen" (Trailing-Space).
+    [Theory]
+    [InlineData("Zucker", "g", "Zucker", "kg", "Zucker")]
+    [InlineData("Öl", "ml", "öl", "l", "öl")] // Umlaut statt ASCII: Case-Insensitivität (ADR-S051-3) + nagelt das umlaut-faltende Locale fest (ADR-S105-1: en_US.utf8, nicht C)
+    [InlineData("Tomaten", "Stück", "tomaten ", "g", "tomaten")] // Trailing-Space in requestName ist beabsichtigt (Trim-Szenario; deckt ASCII-Faltung ab)
+    public async Task US904_Error_CreateIngredient_DuplicateName_Returns422WithNameDuplicateError(
+        string existingName, string existingUnit, string requestName, string requestUnit, string expectedNameInMessage)
+    {
+        // Given: an ingredient with the existing name already exists
+        var existing = new IngredientDbType { Id = Guid.CreateVersion7(), Name = existingName, DefaultUnit = existingUnit };
+        Db.Ingredients.Add(existing);
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // When: another ingredient with a duplicate (possibly differently cased/padded) name is created
+        var request = new CreateIngredientRequest(Name: requestName, DefaultUnit: requestUnit);
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 422 Unprocessable Entity (ADR-S090-1, ADR-S004-1 Addendum S105 – aktives Duplikat ist field-keyed)
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        // Then: field-keyed error body names the ENTERED (trimmed) name, not the stored one (ADR-S004-1)
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["name"] = [$"Eine Zutat mit dem Namen '{expectedNameInMessage}' existiert bereits."],
+        });
+
+        // Then: the ingredient list stays unchanged – only the pre-existing ingredient remains
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo([existing]);
     }
 
     // Eigener Test (nicht weitere InlineData der Single-Field-Theory): die Invariante ist hier der

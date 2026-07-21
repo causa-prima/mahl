@@ -6,7 +6,8 @@ using Xunit;
 
 namespace mahl.Server.Tests;
 
-public class ETagMiddlewareTests : EndpointsTestsBase
+[Collection(PostgresCollectionDefinition.Name)]
+public class ETagMiddlewareTests(PostgresContainerFixture postgres) : EndpointsTestsBase(postgres)
 {
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
     private sealed record CreateIngredientRequest(string Name, string DefaultUnit);

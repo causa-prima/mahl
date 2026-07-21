@@ -228,13 +228,14 @@ Feature: Zutaten verwalten
 
   # @run-6 · Anlegen·Name-Eindeutigkeit · Full-Stack
   @US-904-error
+  # Umlaut "Öl"/"öl" statt ASCII: prüft Case-Insensitivität UND nagelt das umlaut-faltende DB-Locale fest (ADR-S105-1).
   Scenario: Zutat mit vorhandenem Namen in abweichender Schreibweise anlegen schlägt fehl
-    Given die Zutat "Tomaten" mit Einheit "Stück" existiert
+    Given die Zutat "Öl" mit Einheit "ml" existiert
     When ich auf "Zutat anlegen" klicke
-    And ich "tomaten" als Name eingebe
-    And ich "g" als Einheit eingebe
+    And ich "öl" als Name eingebe
+    And ich "l" als Einheit eingebe
     And ich auf "Speichern" klicke
-    Then sehe ich die Fehlermeldung "Eine Zutat mit dem Namen 'tomaten' existiert bereits."
+    Then sehe ich die Fehlermeldung "Eine Zutat mit dem Namen 'öl' existiert bereits."
     And die Zutaten-Liste bleibt unverändert
 
   # @run-6 · Anlegen·Name-Eindeutigkeit · Full-Stack

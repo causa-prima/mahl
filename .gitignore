@@ -399,3 +399,7 @@ Client/reports/
 StrykerOutput/
 # Stryker-Sandbox (bei Crash liegen geblieben; regenerierbar) – nicht committen/linten
 .stryker-tmp/
+
+# Lokale Secrets. NICHT committen. Geteilte NICHT-geheime DB-Config liegt in config/postgres.env (CM-S105-1).
+.env
+.env.local

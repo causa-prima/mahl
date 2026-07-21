@@ -1,4 +1,15 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page, type APIRequestContext } from '@playwright/test'
+
+// E2E-Backend (ASPNETCORE_URLS in playwright.config.ts). An einer Stelle statt mehrfach hartkodiert.
+const E2E_API_BASE = 'http://localhost:5059'
+
+// Legt eine Zutat direkt über die API an (Vorbedingung "die Zutat X existiert"), vor dem Laden der
+// Seite. Ein zweiter POST käme als Duplikat nicht durch – der direkte API-Seed ist der saubere Weg,
+// den Ausgangszustand über den ausgehenden Port herzustellen.
+async function seedIngredientViaApi(request: APIRequestContext, name: string, defaultUnit: string): Promise<void> {
+  const response = await request.post(`${E2E_API_BASE}/api/ingredients`, { data: { name, defaultUnit } })
+  expect(response.status(), 'Seed-Zutat muss angelegt werden (201)').toBe(201)
+}
 
 // Erfasst die Zutaten-Liste samt Ausgangs-Anzahl für "Liste bleibt unverändert"-Assertions.
 // networkidle: initiales GET abklingen lassen – während des Ladens zeigt die Seite denselben
@@ -39,7 +50,7 @@ async function submitWithDelayedPost(page: Readonly<Page>): Promise<void> {
 // describe-eigenen beforeEach (page.goto), also VOR dem initialen GET. (Bei einem zweiten Spec-File
 // nach `e2e/fixtures.ts` als geteilte Auto-Fixture ziehen, damit kein Spec den Reset vergessen kann.)
 test.beforeEach(async ({ request }) => {
-  const res = await request.post('http://localhost:5059/api/test/reset')
+  const res = await request.post(`${E2E_API_BASE}/api/test/reset`)
   // Laut scheitern, falls der Reset-Endpoint nicht existiert (falsche Umgebung) statt still zu no-op'en.
   expect(res.status(), 'Reset-Endpoint muss in der E2E-Umgebung 204 liefern').toBe(204)
 })
@@ -430,6 +441,73 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     // Then: Fehlermeldung erscheint (ADR-S051-2: fixer Text)
     await expect(page.getByText('Einheit darf maximal 20 Zeichen lang sein.')).toBeVisible()
     // Then: die Zutaten-Liste bleibt unverändert (DB-Ausgangszustand nach Fehler)
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
+})
+
+// @US-904-error: aktives Duplikat (run-6). Der Name-Eindeutigkeits-Check ist case-insensitiv und misst
+// den getrimmten Namen (ADR-S051-3); die Fehlermeldung nennt den getrimmten *Request*-Wert (nicht den
+// gespeicherten) und erscheint feld-keyed am Name-Feld als 422 (ADR-S004-1 Addendum S105 / ADR-S090-1).
+// Die Duplikat-Zutat wird per API angelegt – VOR dem Laden der Seite, damit der initiale GET sie enthält
+// (5059 = E2E-Backend wie im Reset-beforeEach). Explizite Tests pro Szenario (die `// Szenario:`-
+// Traceability verlangt einen Kommentar je Test, daher keine Parametrisierungs-Schleife).
+test.describe('US904_Error: Duplikat-Name', () => {
+  // Szenario: Zutat mit bereits vorhandenem Namen anlegen schlägt fehl
+  test('US904_Error_CreateIngredient_ExactDuplicateName_ShowsErrorAndListUnchanged', async ({ page, request }) => {
+    // Given: die Zutat "Zucker" (g) existiert bereits (aktiv)
+    await seedIngredientViaApi(request, 'Zucker', 'g')
+    await page.goto('/ingredients')
+    const { listItems, itemsBefore } = await captureIngredientList(page)
+
+    // When: Dialog öffnen, denselben Namen "Zucker" (andere Einheit "kg") anlegen, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Zucker')
+    await page.getByLabel('Einheit').fill('kg')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: Duplikat-Fehlermeldung mit dem eingegebenen Namen erscheint
+    await expect(page.getByText("Eine Zutat mit dem Namen 'Zucker' existiert bereits.")).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert (kein zweiter Eintrag angelegt)
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
+
+  // Szenario: Zutat mit vorhandenem Namen in abweichender Schreibweise anlegen schlägt fehl
+  // Umlaut "Öl"/"öl": prüft Case-Insensitivität UND das umlaut-faltende E2E-DB-Locale (ADR-S105-1) – der
+  // einzige Test, der eine falsch konfigurierte docker-compose-Locale fängt (Server.Tests nutzt den Container-Default).
+  test('US904_Error_CreateIngredient_CaseInsensitiveDuplicateName_ShowsErrorAndListUnchanged', async ({ page, request }) => {
+    // Given: die Zutat "Öl" (ml) existiert bereits (aktiv)
+    await seedIngredientViaApi(request, 'Öl', 'ml')
+    await page.goto('/ingredients')
+    const { listItems, itemsBefore } = await captureIngredientList(page)
+
+    // When: Dialog öffnen, "öl" (nur Groß-/Kleinschreibung abweichend) anlegen, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('öl')
+    await page.getByLabel('Einheit').fill('l')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: Duplikat-Fehlermeldung mit dem getippten Namen "öl" (case-insensitiv erkannt)
+    await expect(page.getByText("Eine Zutat mit dem Namen 'öl' existiert bereits.")).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert (kein zweiter Eintrag angelegt)
+    await expect(listItems).toHaveCount(itemsBefore)
+  })
+
+  // Szenario: Fehlermeldung bei Duplikat zeigt getrimmten Namen
+  test('US904_Error_CreateIngredient_WhitespacePaddedDuplicateName_ShowsTrimmedNameError', async ({ page, request }) => {
+    // Given: die Zutat "Tomaten" (Stück) existiert bereits (aktiv)
+    await seedIngredientViaApi(request, 'Tomaten', 'Stück')
+    await page.goto('/ingredients')
+    const { listItems, itemsBefore } = await captureIngredientList(page)
+
+    // When: Dialog öffnen, "tomaten " (mit Trailing-Space) anlegen, speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('tomaten ')
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: die Meldung zeigt den GETRIMMTEN Namen "tomaten" (nicht "tomaten ")
+    await expect(page.getByText("Eine Zutat mit dem Namen 'tomaten' existiert bereits.")).toBeVisible()
+    // Then: die Zutaten-Liste bleibt unverändert (kein zweiter Eintrag angelegt)
     await expect(listItems).toHaveCount(itemsBefore)
   })
 })

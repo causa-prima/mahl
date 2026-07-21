@@ -43,6 +43,14 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 105 – 2026-07-21
+
+- **[HOCH] [PROZESS] [Testing] LL-S105-1 – False-Green durch Test↔Prod-Divergenz der DB-Engine-Config (Locale)**
+  Quelle: Subagent (Auditor) → Orchestrator
+  Was: Die auf einen `LOWER(name)`-DB-Index verlagerte Umlaut-Eindeutigkeit (ADR-S051-3) lief im Testcontainer (Default `en_US.utf8`) grün, während `docker-compose` mit `--locale=C` konfiguriert war (dort faltet `LOWER()` nur ASCII) – Review 0 ❌, die stille Umlaut-Regression fing erst ein einzelner, empirisch verifizierter Auditor-Punkt.
+  Warum: Der Testcontainer erbt den Image-Default-Locale, nicht die Deployment-Config – ein verhaltensrelevanter Konfig-Unterschied, den die grüne Suite unsichtbar ließ.
+  Regel: Verlagerst du Verhalten auf DB-Engine-Config (Locale/Collation/Extensions), mache diese Config test↔prod identisch UND decke das Verhalten mit einem Test ab, der unter divergierender Config real fehlschlüge (hier: Umlaut-Fall statt reinem ASCII). → CM-S105-1.
+
 ## Session 103 – 2026-07-17
 
 - **[MITTEL] [PROZESS] [Kommunikation] LL-S103-1 – Entscheidung dem User ohne die zum Urteil nötige Substanz vorgelegt**

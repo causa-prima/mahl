@@ -17,29 +17,23 @@ internal static class E2ETestSupport
 {
     internal static async Task UseE2ETestSupportAsync(this WebApplication app)
     {
-        // Schema pro Lauf provisionieren (legt mahl_e2e bei Bedarf an).
+        // Schema pro Lauf NEU provisionieren (ADR-S105-1/-2: InitialCreate wurde um den funktionalen
+        // LOWER(name)-Unique-Index ergänzt; MigrateAsync würde eine bereits angewandte, geänderte
+        // Migration NICHT erneut ausführen). EnsureDeletedAsync vor MigrateAsync erzwingt einen frischen
+        // Schema-Stand pro Lauf. Nur für die dedizierte E2E-DB (mahl_e2e) vertretbar, niemand sonst nutzt sie.
         using (var scope = app.Services.CreateScope())
         {
-            await scope.ServiceProvider.GetRequiredService<MahlDbContext>().Database.MigrateAsync();
+            var db = scope.ServiceProvider.GetRequiredService<MahlDbContext>();
+            await db.Database.EnsureDeletedAsync();
+            await db.Database.MigrateAsync();
         }
 
-        // Leert vor jedem Test ALLE Tabellen (Playwright beforeEach) -> leere DB je Test. Tabellennamen
-        // generisch aus dem EF-Modell, daher kein Pflegeaufwand bei neuen Entitäten. Begründung TRUNCATE
-        // statt DROP / RESTART IDENTITY / CASCADE: ADR-S084-4 Addendum. Prämisse: mind. eine gemappte
-        // Entität (sonst leeres TRUNCATE-Statement) – für diese App strukturell immer erfüllt.
+        // Leert vor jedem Test ALLE Tabellen (Playwright beforeEach) -> leere DB je Test. Begründung
+        // TRUNCATE statt DROP / RESTART IDENTITY / CASCADE: ADR-S084-4 Addendum. Reset-Logik geteilt mit
+        // Server.Tests (ADR-S105-1): Infrastructure.DatabaseResetExtensions.
         app.MapPost("/api/test/reset", async (MahlDbContext db) =>
         {
-            var tables = db.Model.GetEntityTypes()
-                .Select(t => (Schema: t.GetSchema(), Name: t.GetTableName()))
-                .Where(t => t.Name is not null)
-                .Distinct()
-                .Select(t => t.Schema is null ? $"\"{t.Name}\"" : $"\"{t.Schema}\".\"{t.Name}\"");
-            var truncate = $"TRUNCATE TABLE {string.Join(", ", tables)} RESTART IDENTITY CASCADE";
-            // EF1002: Tabellennamen stammen aus dem EF-Modell (Compile-Zeit-Schema), nicht aus Nutzereingaben
-            // -> keine Injection-Fläche; Identifier sind in SQL ohnehin nicht parametrisierbar.
-#pragma warning disable EF1002 // Table identifiers come from the trusted EF model, not user input
-            await db.Database.ExecuteSqlRawAsync(truncate);
-#pragma warning restore EF1002
+            await db.TruncateAllTablesAsync();
             return Results.NoContent();
         });
     }

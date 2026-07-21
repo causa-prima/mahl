@@ -36,6 +36,11 @@ Reaktionsregeln je Impact: docs/kaizen/process.md
 
 ## Aktive Maßnahmen
 
+### CM-S105-1 – Postgres-Init-Config aus einer Single Source (Test == Prod by construction)
+**Impact:** HOCH | **Kategorie:** PROZESS | **Kontext:** Testing, C#-Code | **Status:** AKTIV | **Seit:** S105
+**Problem:** Testcontainer (`en_US.utf8`) und `docker-compose` (`--locale=C`) hatten getrennte Config-Quellen → das Locale divergierte → grüne Suite, aber das Deployment hätte die Umlaut-Eindeutigkeit still gebrochen (LL-S105-1).
+**Maßnahme:** `config/postgres.env` ist die einzige Quelle der Postgres-Init-Config; `docker-compose.yml` lädt sie via `env_file:`, die `PostgresContainerFixture` liest dieselbe Datei (`PostgresTestConfig`) und setzt `WithEnvironment(...)`. Locale/Encoding können damit nicht mehr zwischen Test und Deployment auseinanderlaufen. Backstop: die config-sensitiven Öl-Duplikat-Tests (Server.Tests-InlineData + E2E) fallen, falls eine Seite doch aufhört, Umlaute zu falten. `.env` ist gitignored (für spätere Secrets reserviert).
+
 ### CM-S102-1 – Zustandsdokumente sammeln Erledigtes / Verweise auf gelöschte Artefakte
 **Impact:** MITTEL | **Kategorie:** PROZESS | **Kontext:** Doku | **Status:** AKTIV | **Seit:** S102
 **Problem:** Agenten halten wiederkehrend **Erledigtes** in Zustandsdokumenten fest (changelog-artig; z.B. „erledigt in run-X"), obwohl diese nur den offenen Zustand tragen sollen; zudem verweisen Stellen auf Artefakte, die beim Erledigen gelöscht/archiviert werden → tote Refs / Informationsverlust. Bislang nur ein **menschlicher** Guard (User fängt beim Mitlesen ab) – fehlerträchtig, ermüdend, nicht garantiert (OBS-S100-1; Vertrauens-/Ermüdungs-Multiplikator OBS-S100-2).

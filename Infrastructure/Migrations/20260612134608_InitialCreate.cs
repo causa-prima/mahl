@@ -23,11 +23,19 @@ namespace mahl.Infrastructure.Migrations
                 {
                     table.PrimaryKey("PK_Ingredients", x => x.Id);
                 });
+
+            // ADR-S105-2: Eindeutigkeit case-insensitiv (ADR-S051-3) als DB-Constraint statt App-Layer-
+            // Check-then-Insert (TOCTOU-Race). Funktionaler Index auf LOWER(name) – nicht per EF-Model-
+            // Config ausdrückbar, daher Raw-SQL. Vom Mutation-Testing ausgenommen (generierte Migration).
+            migrationBuilder.Sql(
+                "CREATE UNIQUE INDEX \"IX_Ingredients_Name_Lower\" ON \"Ingredients\" (LOWER(\"Name\"));");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP INDEX IF EXISTS \"IX_Ingredients_Name_Lower\";");
+
             migrationBuilder.DropTable(
                 name: "Ingredients");
         }

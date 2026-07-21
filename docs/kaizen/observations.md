@@ -30,6 +30,15 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
+## OBS-S105-2 – C#-String-Ops triggern unter `TreatWarningsAsErrors` kulturbezogene Analyzer
+- Quelle: Subagent + Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: C#-Code
+- Beobachtung: Naive String-Operationen brechen unter `TreatWarningsAsErrors` den Build über kulturbezogene Analyzer – in S105 zweifach getroffen: (1) `.ToLower()` in einem EF-Core-LINQ-Prädikat → CA1304/CA1311/CA1862/MA0011 (Analyzer nehmen Laufzeit-`CurrentCulture` an, obwohl der Ausdruck zu SQL `LOWER()` übersetzt wird → braucht ein gezieltes `#pragma`); (2) `IndexOf(char)` / `==` / im `.env`-Parser → CA1307/MA0006 (hier ist der Nudge berechtigt → `Split`/`StringComparison.Ordinal`/`string.Equals`). Beide Male kostete es einen Trial-and-Error-Zyklus.
+- Entscheidung/Maßnahme: offen – beim Drain zu bewerten. Kandidat: die portablen/ordinalen Muster + der EF-LINQ-Pragma-Fall einmal projektweit dokumentieren (Guideline oder dev-workflow), damit der nächste Agent nicht erneut rät. Vor Umsetzung Häufigkeit prüfen (Impact gering; das Eindeutigkeits-Feature nutzt den `.ToLower()`-Pfad nicht mehr, DB-only).
+- Bezug: LL-S105-1
+
 ## OBS-S103-1 – `dotnet-stryker.py --mutate` unklar bei Einzeldatei-Ziel / stillem 0-Treffer
 - Quelle: Subagent
 - Status: NEU

@@ -1,42 +1,43 @@
 using mahl.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace mahl.Server.Tests.Helpers;
 
-public class EndpointsTestsBase : IDisposable
+// ADR-S105-1: Schema lebt im geteilten Postgres-Testcontainer (PostgresContainerFixture, einmalig
+// via MigrateAsync provisioniert) – hier wird pro Test nur noch der Datenbestand zurückgesetzt
+// (TruncateAllTablesAsync), nicht das Schema selbst neu angelegt/gelöscht.
+public class EndpointsTestsBase : IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
-    private readonly IServiceScope _scope;
-    private readonly HttpClient _client;
-    private readonly MahlDbContext _db;
+    private readonly PostgresContainerFixture _postgres;
+    private TestWebApplicationFactory _factory = null!;
+    private IServiceScope _scope = null!;
+    private HttpClient _client = null!;
+    private MahlDbContext _db = null!;
 
     protected HttpClient Client => _client;
     protected MahlDbContext Db => _db;
 
-    protected EndpointsTestsBase()
+    protected EndpointsTestsBase(PostgresContainerFixture postgres)
     {
-        _factory = new TestWebApplicationFactory();
+        _postgres = postgres;
+    }
+
+    public async ValueTask InitializeAsync()
+    {
+        _factory = new TestWebApplicationFactory(_postgres.ConnectionString);
         _client = _factory.CreateClient();
         _scope = _factory.Services.CreateScope();
         _db = _scope.ServiceProvider.GetRequiredService<MahlDbContext>();
-        _db.Database.EnsureCreated();
+        await _db.TruncateAllTablesAsync();
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        Dispose(true);
+        await _db.DisposeAsync();
+        _scope.Dispose();
+        _client.Dispose();
+        await _factory.DisposeAsync();
         GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _db.Database.EnsureDeleted();
-            _db.Dispose();
-            _scope.Dispose();
-            _client.Dispose();
-            _factory.Dispose();
-        }
     }
 }
