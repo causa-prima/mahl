@@ -55,6 +55,8 @@ Präsentiere Kandidaten als Tabelle:
 
 Falls keine Kandidaten gefunden: kurz melden ("Kein Noise gefunden – Preprocessing-CM wirkt.") und direkt mit Schritt 1 weitermachen.
 
+**Impact-Sanity-Check (gleicher Durchgang, nur aktuelle Periode):** Prüfe zusätzlich jeden Eintrag der **aktuellen** Periode gegen die `process.md`-Impact-Definition – Jenga-Score und Pattern-Cluster (Schritt 2) sind impact-gewichtet, ein Fehl-Rating verzerrt sie. Achte gezielt auf die drei häufigen Fehler (s. `process.md`, „Impact richtig bemessen"): **Neuheit ≠ Impact** („schon durch ein Prinzip abgedeckt" ist kein GERING-Grund), **Klasse ≠ Einzelfall** (bemessen wird die Problem-Klasse falls unbemerkt, nicht der zufällig abgefangene Fall), **„schnell bemerkt" ist kein Kriterium**. Präsentiere grobe Fehl-Ratings (v.a. GERING/HOCH-Grenzfälle) als Tabelle (Eintrag | Ist | Vorschlag | Grund) und korrigiere **nur nach User-Freigabe**, **vor** Schritt 2. Bei mehreren unsicheren Grenzfällen optional auf einen **blinden Multi-Rater-Durchgang** eskalieren: mehrere Subagenten raten ein tag-entferntes Sample unabhängig neu; hohe Inter-Rater-Übereinstimmung + systematische Abweichung vom Ist = echtes Fehl-Rating (nicht bloß subjektive Streuung).
+
 → TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": completed | TaskUpdate "1. User-/Meta-Beobachtungen abfragen": in_progress
 
 ---

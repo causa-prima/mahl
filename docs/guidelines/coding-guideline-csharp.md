@@ -159,6 +159,11 @@ public static class IngredientsEndpoints { ... }
 - Die Domäne vertraut weder Request-Daten noch DB-Daten – `Create()` ist die einzige Einstiegsmethode
 - **Layer-Isolation:** DB-Inkonsistenz (fehlerhafte Daten in der Datenbank) darf kein unbehandeltes `throw` auslösen. `Results.Problem(detail, statusCode: 500)` gibt strukturiertes `application/problem+json` zurück – testbar per ContentType und Body-Assertion. Unbehandelte Exceptions geben HTML/plain-text zurück und sind nicht testbar.
 
+### Provider-/Assembly-spezifische Aufrufe nicht inline in `Program.Main`
+
+- Provider-/Assembly-spezifische Aufrufe (EF-Relational `MigrateAsync()`, Npgsql o.ä.), die nur unter einer bestimmten Umgebung laufen (z.B. hinter `if (env.IsE2E)`), **nicht inline** in `Program.<Main>$` setzen, sondern in eine **eigene Methode** auslagern.
+- Grund: JIT ist per-Methode lazy, löst aber **innerhalb** einer Methode beim Kompilieren alle referenzierten Assemblies auf – ein *nicht genommener* `if`-Branch schützt nicht. Ein Test-Host mit anderem Provider (`WebApplicationFactory` + InMemory) scheitert sonst schon beim JIT von `Main` mit `FileNotFoundException` auf der Relational-Assembly, obwohl der Zweig nie ausgeführt wird. Der Body der ausgelagerten Methode JITtet erst beim tatsächlichen Aufruf.
+
 ### Dependency Rule
 
 ```

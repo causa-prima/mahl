@@ -30,6 +30,15 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
+## OBS-S107-1 – Subagenten nummerieren neue ADRs mit der jüngsten Serie statt der laufenden Session
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Skill-Nutzung
+- Beobachtung: Zwei Backend-Subagenten legten neue ADRs mit der jüngsten bestehenden Serien-Nummer (S105-3/-4) statt der laufenden Session (106) an → nachträgliche Umnummerierung inkl. ~7 Code-/Doku-Referenzen (LL-S106-2). Ein Subagent mitten in der Session hat kein klares Signal für die laufende Session-Nummer (der Index zeigt die letzte ABGESCHLOSSENE) und setzt naiv die höchste bestehende ADR-Serie fort. Bislang 1× beobachtet; die auslösende Klasse (Subagent legt ADR mitten in Session an) wiederholt sich potentiell in jedem Lauf.
+- Entscheidung/Maßnahme: Aufgeschoben (S107-Retro) bis zum 2. Vorkommen – 1× liegt unter der 2×-Muster-Schwelle für eine stehende CM. Lösungsrichtung bewusst offen (Drain/Retro entscheidet frisch). Re-Trigger: 2. Auftreten einer mit falscher Session nummerierten ADR-ID.
+- Bezug: LL-S106-2
+
 ## OBS-S106-1 – Szenario-Clustering (Run-Generierung) modelliert Cross-Run-State-Abhängigkeiten nicht
 - Quelle: User + Orchestrator
 - Status: NEU
@@ -200,17 +209,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Kategorie: TOOLING    Kontext: Doku/Hook/Script
 - Beobachtung: Viele Doku-Dateien tragen im Header die Meta-Infos inkl. Schema/Format (z.B. lessons_learned, observations, adr, tech-debt). Agenten lesen sie ad-hoc (sed/Read), teils unvollständig. Es genügt ein **dokumentiertes Kommando-Pattern** mit bestehenden Tools (z.B. `sed -n '1,/^-->/p' <datei>` o.ä.), aufgenommen in den Startup-Hinweis bzw. die `--list`-Referenz – **kein eigenes Script** (Wartung) und **nicht** alle Header im Startup injizieren (zu teuer). Ggf. zweigeteilt (Metadaten vs. Schema), aber evtl. besser immer beides gemeinsam, da Schema ohne Metadaten selten nützt.
 - Entscheidung/Maßnahme: Aufgeschoben – beim Drain zur Doku-Architektur-/Progressive-Disclosure-Designfrage gewachsen, kein Quick-Edit mehr: (1) welche Dateien brauchen überhaupt einen Header (vs. Name/Index erklärt sich selbst)? (2) was gehört in den Header (Leitfrage: *wann* liest ein Agent die Datei und *welche* Header-Info braucht er dann)? (3) In-Datei-Header vs. **Wiki-Struktur** (eigene Index-/Header-Dateien mit MD-Links). Der kleine Slice (sed-Pattern + Endmarker-Konvention `-->` vs. `---`) ist durch genau diese offenen Fragen blockiert. Re-Trigger: nächster Doku-Struktur-/`review-docs`-Durchgang.
-
----
-
-## OBS-S092-3 – kaizen-Workshop prüft LL-Metadaten (v.a. Impact) vor dem Retro-Skript
-- Quelle: User
-- Status: IN BEOBACHTUNG bis S105
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Review
-- Beobachtung: LL-Metadaten (insb. Impact) könnten falsch/inkonsistent gesetzt sein und damit Jenga-/Prioritäts-Matrix verzerren. Idee: Der kaizen-Workshop listet vor dem Retro-Skript potentielle Metadaten-Fehler auf. Nutzen ist empirisch prüfbar: mehrere Subagenten bewerten bestehende Einträge (oder ein Sample) **blind** neu; viele Abweichungen → analysieren und Schlüsse ziehen (echte Fehlklassifikation vs. bloßer Drift / subjektive Streuung).
-- Entscheidung/Maßnahme: **S099 (Drain) aufgeschoben bis S105** – kein Drain-Quick-Edit, sondern erst die Blind-Rebewertung als Sonde nötig. Diese läuft in der nächsten Kaizen-Retro billig mit (LLs werden dort ohnehin angefasst): zu Beginn mehrere Subagenten ein LL-Sample **blind** re-raten lassen, Abweichungen prüfen → dann über einen festen Workshop-Schritt entscheiden. In AGENT_MEMORY „Nächste Prioritäten" als Retro-Auftakt vermerkt (sonst vergessen). Re-Trigger: nächster Kaizen-Lauf.
-- Bezug: Impact-Vokabular geteilt mit lessons_learned
 
 ---
 

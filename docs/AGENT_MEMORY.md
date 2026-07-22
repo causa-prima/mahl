@@ -7,6 +7,8 @@
 
 ## Nächste Prioritäten
 
+- **⟶ ZUERST: Poka-Yoke `check-obs-capture.py` bauen (CM-S107-1):** PreToolUse-Hook via TDD (analog `check-ref-direction.py`), der bei einem **neu** erfassten OBS in `observations.md` das Feld `- Entscheidung/Maßnahme:` auf den Kanon-Token `offen` zwingt (sonst exit 2) – verhindert Lösungskandidaten bei der Erfassung (Anchoring des Drain-Agenten). Details: `countermeasures.md` CM-S107-1.
+
 - **US-904 nächster Lauf:** {{NEXT_RUN}}. Offene/erledigte: `python3 .claude/scripts/next_run.py --open|--done --story US-904`.
   - **Roadmap-Kontext** (nicht an „nächstes" gebunden): **run-10 „Löschen·Konflikt" wurde vorgezogen** (vor run-7): DELETE-Endpoint (soft-delete, `DeletedAt`) + erste Single-Resource-xmin-ETag-Grundlage (POST liefert ETag; If-Match 428/400/412; ADR-S106-1/-2) existieren. Konsequenzen: run-8 (Löschen-UI) baut auf dem DELETE-Endpoint auf; run-8 Sz.1 „Liste leer nach Löschen" **setzt run-7's GET-Filter voraus** (OBS-S106-1); run-11 muss den Unique-Index partiell machen (`WHERE DeletedAt IS NULL`) für Reaktivierung. „sortiert" (run-7 „Liste") führt `OrderBy(name)` ein → aktiviert den TD-S084-2-ETag real (Stryker-killbar weil Insertion-Order ≠ alphabetisch). Cold-Start-Race **TD-S083-3 bleibt offen** – `disabled={isPending}` sperrt nur *während des POST*, nicht bis zum Settle des initialen GET. Tests: `user.type`/`fireEvent.click` (TS-Guideline).
 
@@ -15,6 +17,4 @@
 - **Deep-Link-Anforderung klären:** Vor US-602 (Rezept-Detailansicht) – welche Entitäten, Hintergründe, Architektur-Implikationen. US-602 ist zugleich die erste Story mit einer zweiten Seite – damit greift erstmals der Checklisten-Punkt „Erreichbarkeit (Navigation)" im `gherkin-workshop` (Schritt 1): Navigations-Szenario gehört nach ADR-S103-1 in `features/navigation.feature` (`@CROSS-navigation`), nicht ins Rezepte-Feature; strukturelle Nav-Vorgabe siehe UX-Guideline Prinzip 9.
 
 - **Visuelle Konsistenz-Guideline:** `docs/guidelines/coding-guideline-ux.md` um Spacing/Hierarchie/Farbe erweitern, sobald >3 Komponenten dieselben visuellen Entscheidungen treffen.
-
-- **Nächste Kaizen-Retro – Auftakt-Sonde (OBS-S092-3):** Zu Beginn der Retro mehrere Subagenten ein LL-Sample **blind** re-raten lassen (v.a. Impact) — Grund: LL-Metadaten-Fehler verzerren Jenga/Prioritäts-Matrix; Nutzen eines festen Workshop-Schritts erst so verifizieren. Done: Abweichungen ausgewertet + Entscheidung über festen Schritt getroffen (OBS-S092-3 dann schließen).
 

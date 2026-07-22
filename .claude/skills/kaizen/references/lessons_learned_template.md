@@ -27,7 +27,7 @@ Impact:     KRITISCH | HOCH | MITTEL | GERING
 Kategorien: PROZESS | AGENT | QUALITÄT | TOOLING
 Kontext:    TDD | C#-Code | TS-Code | Bash/Permission | Mutation-Testing |
             Hook/Script | Review | Agent-Prompt | Skill-Nutzung | Gherkin |
-            Doku | Kommunikation | Sonstiges
+            Doku | Kommunikation | Testing | Sonstiges
 
 Alle drei Tags sind Pflicht. Definitionen und Reaktionsregeln: docs/kaizen/process.md
 

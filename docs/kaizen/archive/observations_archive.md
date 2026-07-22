@@ -449,3 +449,14 @@ Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – äl
 
 ---
 
+## OBS-S092-3 – kaizen-Workshop prüft LL-Metadaten (v.a. Impact) vor dem Retro-Skript
+- Quelle: User
+- Status: UMGESETZT (S107)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Review
+- Beobachtung: LL-Metadaten (insb. Impact) könnten falsch/inkonsistent gesetzt sein und damit Jenga-/Prioritäts-Matrix verzerren. Idee: Der kaizen-Workshop listet vor dem Retro-Skript potentielle Metadaten-Fehler auf. Nutzen ist empirisch prüfbar: mehrere Subagenten bewerten bestehende Einträge (oder ein Sample) **blind** neu; viele Abweichungen → analysieren und Schlüsse ziehen (echte Fehlklassifikation vs. bloßer Drift / subjektive Streuung).
+- Entscheidung/Maßnahme: **S099 (Drain) aufgeschoben bis S105** – kein Drain-Quick-Edit, sondern erst die Blind-Rebewertung als Sonde nötig. Diese läuft in der nächsten Kaizen-Retro billig mit (LLs werden dort ohnehin angefasst): zu Beginn mehrere Subagenten ein LL-Sample **blind** re-raten lassen, Abweichungen prüfen → dann über einen festen Workshop-Schritt entscheiden. In AGENT_MEMORY „Nächste Prioritäten" als Retro-Auftakt vermerkt (sonst vergessen). Re-Trigger: nächster Kaizen-Lauf. **S107 (Sonde durchgeführt → UMGESETZT):** 3 Subagenten rateten ein 12-Einträge-Sample (tag-entfernt) blind neu → hohe Inter-Rater-Reliabilität (11/12 einstimmig) + ~⅓ Abweichung vom Ist, wobei die Rater in den Divergenzen näher an der process.md-Definition lagen (LL-S096-1 als GERING klar fehl-getaggt). Befund: reales Fehl-Rating (nicht bloße Streuung); Ursachen (a) Fehl-Raten bei Erfassung, (b) grobe Impact-Definitionen. Umsetzung: process.md-Impact-Rubrik geschärft (Klasse≠Einzelfall, Neuheit≠Impact, „schnell bemerkt" kein Kriterium) + billiger fester Impact-Sanity-Check in kaizen Schritt 0 (blinder Multi-Rater nur als Eskalation, nicht als stehender Schritt – Token-Kosten); 5 Impacts der Periode korrigiert.
+- Bezug: Impact-Vokabular geteilt mit lessons_learned
+
+---
+

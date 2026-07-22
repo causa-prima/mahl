@@ -108,9 +108,14 @@ Die Retro behandelt OBS nicht (das macht der Drain), berührt sie aber an einer 
 | Impact | Definition | Sofortreaktion | Maßnahmen-Anspruch |
 |---------|-----------|----------------|-------------------|
 | **KRITISCH** | Verursacht signifikanten Rework oder Qualitätsverlust; darf unter keinen Umständen wiederholt werden | **Andon-Cord:** Arbeit sofort stoppen, Ursache analysieren, Gegenmaßnahme definieren – erst dann weitermachen | Poka-yoke **Pflicht** – schwächere Maßnahmen reichen nicht |
-| **HOCH** | Verzögert die Arbeit spürbar oder gefährdet Qualität | In derselben Session: Eintrag in `lessons_learned.md` + `countermeasures.md` | Poka-yoke anstreben wenn verhältnismäßig; sonst expliziter Schritt in Guideline oder Skill |
-| **MITTEL** | Kleine Prozessabweichung, schnell bemerkt | Eintrag in `lessons_learned.md` | Poka-yoke anstreben wenn einfach umsetzbar; sonst Eintrag in `principles.md` wenn wiederholt |
-| **GERING** | Stilistisch oder präferenzbedingt | Eintrag in `lessons_learned.md` | Keine Maßnahme nötig |
+| **HOCH** | Verzögert die Arbeit spürbar (Stunden Fehlsuche) **oder** gefährdet Qualität/Korrektheit (False-Green das echte Regression maskiert, Datenintegrität, falsche User-Entscheidung) | In derselben Session: Eintrag in `lessons_learned.md` + `countermeasures.md` | Poka-yoke anstreben wenn verhältnismäßig; sonst expliziter Schritt in Guideline oder Skill |
+| **MITTEL** | Spürbare, aber begrenzte Prozess-/Qualitätsreibung mit engem Blast-Radius (vermeidbare Nacharbeit, mehrrundige Korrektur) | Eintrag in `lessons_learned.md` | Poka-yoke anstreben wenn einfach umsetzbar; sonst Eintrag in `principles.md` wenn wiederholt |
+| **GERING** | Rein stilistisch/präferenzbedingt/kosmetisch – **keine** Qualitäts- oder Prozessfolge | Eintrag in `lessons_learned.md` | Keine Maßnahme nötig |
+
+**Impact richtig bemessen (drei häufige Fehler):**
+- **Schaden, nicht Neuheit:** Impact misst den potenziellen Schaden – **nicht**, ob bereits ein Prinzip/eine Gegenmaßnahme existiert. „Schon abgedeckt" ist **kein** Grund für GERING.
+- **Klasse, nicht Einzelfall:** Bemessen wird die Problem-**Klasse**, falls sie **unbemerkt** bliebe – nicht der zufällig abgefangene Einzelfall (LLs werden ohnehin auf Klassen-Ebene formuliert).
+- **„Schnell bemerkt" ist kein Impact-Kriterium:** Ein still-grüner/maskierter Fehler ist gerade *nicht* schnell bemerkt; „bemerkt" ≠ „geringer Schaden".
 
 ---
 
@@ -140,6 +145,7 @@ Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
 | `TS-Code` | TypeScript/React-Implementierung, Frontend-Guidelines |
 | `Bash/Permission` | Befehlsausführung & Permission-Hook (Allow-Liste, `--allow-once`, ad-hoc-Befehle) |
 | `Mutation-Testing` | Stryker / QA-Gate (Score, Hashes, Coverage-Gate, Build-Lock für Mutation-Läufe) |
+| `Testing` | Test-Infrastruktur & -Ausführung: Test↔Prod-Config-Parität, Test-Host/Provider (WebApplicationFactory, InMemory), E2E-Setup, Env-Propagation an gespawnte Test-Prozesse – abzugrenzen von `Mutation-Testing` (Score/Gate) und `TDD` (Red-Green-Loop) |
 | `Hook/Script` | Selbstgebaute Projekt-Automatisierung (.claude-Hooks & -Scripts, Pfad-Matcher, Migrations-Scripts) |
 | `Review` | Code- oder Dokument-Review-Prozess |
 | `Agent-Prompt` | Formulierung & Mechanik von Sub-Agenten-Instruktionen |
