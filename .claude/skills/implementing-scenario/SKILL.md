@@ -38,17 +38,7 @@ abzuweichen: sofort kommunizieren und auf Bestätigung warten. Ein guter Grund l
 das strikte Befolgen einer Regel nachweislich zu schlechterem Ergebnis führt – z.B. wenn ein
 Test ohne vorangehende Domain-Typen nicht schreibbar ist (zirkuläre Abhängigkeit).
 
-Lege folgende Task-Liste an (Regeln: `docs/process/task-system.md`):
-```
-TaskCreate: "Schritt 0: Architektur-Check"
-TaskCreate: "Schritt 1–3: TDD-Zyklus (Double-Loop)"
-TaskCreate: "Schritt 4: Orchestrator-Check"
-TaskCreate: "Schritt 5: Review-Loop"
-TaskCreate: "Schritt 6: Abschluss (Session-Abschluss & Commit)"
-```
-
 ── SCHRITT 0: ARCHITEKTUR-CHECK ─────────────────────────────────────────────
-→ TaskUpdate "Schritt 0: Architektur-Check": in_progress
 
 Beantworte diese Fragen schriftlich, bevor der erste Test geschrieben wird.
 Der Schritt ist wichtig, weil nachträgliche Architekturentscheidungen teuer sind –
@@ -129,7 +119,6 @@ Dieser Schritt ist reine Analyse – noch kein Produktionscode schreiben. Domain
 Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 
 ── SCHRITT 1–3: TDD-ZYKLUS (DOUBLE-LOOP) ───────────────────────────────────
-→ TaskUpdate "Schritt 0: Architektur-Check": completed | TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": in_progress
 
 Ziel: genau die Szenarien des Laufs aus $ARGUMENTS vollständig grün bekommen – nicht mehr, nicht weniger.
 
@@ -231,7 +220,6 @@ Gegen diesen Anker prüft Schritt 4, dass nach der Freigabe **nur Setup** (Mock-
 - **Given/When-Struktur:** Neue Tests sollen durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Fehlen diese → Finding melden (nicht blockierend).
 
 ── SCHRITT 4: ORCHESTRATOR-CHECK ────────────────────────────────────────────
-→ TaskUpdate "Schritt 1–3: TDD-Zyklus (Double-Loop)": completed | TaskUpdate "Schritt 4: Orchestrator-Check": in_progress
 
 **E2E-Loop schließen:**
 
@@ -291,7 +279,6 @@ umgesetzten Korrekturen führt der Subagent `qa-check.py` erneut aus und liefert
 aktualisierten `=== VERIFIKATIONS-HASH ===`-Block.
 
 ── SCHRITT 5: REVIEW-LOOP ───────────────────────────────────────────────────
-→ TaskUpdate "Schritt 4: Orchestrator-Check": completed | TaskUpdate "Schritt 5: Review-Loop": in_progress
 
 Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
 
@@ -299,7 +286,6 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
 
 1. `.claude/skills/review-code/SKILL.md` laden und den darin beschriebenen Prozess ausführen.
    Eingaben übergeben: Szenario-Tags + Given/When/Then aller Szenarien des Laufs (aus Schritt 0), YAGNI-Liste (aus Schritt 0), geänderte Dateien (git diff), Check-2-Output (Suppressionen) aus dem Schritt-4-qa-check, gemeinsam ermittelte ADRs (Schritt 0 + Subagenten-PLANUNG).
-   Keine neue Task-Liste anlegen – review-code läuft eingebettet in den implementing-scenario-Ablauf.
    Die von review-code gespawnten spezialisierten Agenten erhalten **kein Iterations-Wissen** –
    weder Findings aus früheren Runden noch Hinweise auf bereits abgelehnte false positives.
 
@@ -317,7 +303,6 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
 Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
 
 ── SCHRITT 6: ABSCHLUSS (SESSION-ABSCHLUSS & COMMIT) ───────────────────────
-→ TaskUpdate "Schritt 5: Review-Loop": completed | TaskUpdate "Schritt 6: Abschluss (Session-Abschluss & Commit)": in_progress
 
 1. **Offene Punkte mit dem User triagieren (bevor committed wird):** Sammle aus dem gesamten Ablauf alles, was nicht in den Szenario-Code eingeflossen ist – nichts darf nur in der Konversation hängen bleiben oder ungefragt irgendwo eingetragen werden:
    - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return durchsehen und **pro Subagent explizit ausweisen**, ob er Feedback gab (Inhalt) oder nicht („keine"). Wird daraus ein OBS/LL erfasst, die **Quelle präzise** eintragen (`Subagent` vs. `Orchestrator`), damit später beobachtbar bleibt, woher das Feedback stammt.
@@ -356,5 +341,3 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
    von Schritt 0 übernehmen.
    Beispiel: `$ARGUMENTS = @US-904 run-3` (Label „Anlegen·Name-Validierung") → `"US-904: Lauf 3 – Anlegen·Name-Validierung"`
    Co-Authored-By: Modellname aus dem System-Kontext einsetzen.
-
-→ TaskUpdate "Schritt 6: Abschluss (Session-Abschluss & Commit)": completed

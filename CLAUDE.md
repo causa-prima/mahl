@@ -35,18 +35,11 @@
 | Offene Fragen / geparkte Diskussionen | `docs/open-questions.md` |
 | Langsame Befehle dokumentieren | `docs/process/slow-commands.md` |
 | Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "Befehlsauswahl & Timeouts") |
-| Task-Liste anlegen / verwalten | `docs/process/task-system.md` |
 | Warum wurde X so entschieden? | `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`) |
 | Was passierte in Session X? | `docs/history/sessions/index.md` → ggf. spezifische Session-Datei |
 | Neuen Agenten beauftragen | `.claude/agents/` (bestehende Definitionen als Vorlage) + Skill `review-code` |
 | Interface/API designen (Design It Twice) | Skill `design-an-interface` verwenden |
 | Session abschließen | Skill `closing-session` verwenden |
-
----
-
-## Task-System (Fortschritt & Planung)
-
-Aufgaben mit ≥ 3 Schritten erfordern eine Task-Liste → Regeln: `docs/process/task-system.md`
 
 ---
 

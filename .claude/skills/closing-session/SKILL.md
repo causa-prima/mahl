@@ -9,18 +9,7 @@ user-invocable: true
 
 # Session abschließen
 
-Lege zu Beginn folgende Task-Liste an:
-```
-TaskCreate: "1. Intern reflektieren"
-TaskCreate: "2. Dokumentations-Änderungsbedarf prüfen"
-TaskCreate: "3. Session-Datei anlegen"
-TaskCreate: "4. lessons_learned.md aktualisieren"
-TaskCreate: "5. index.md aktualisieren"
-TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
-```
-
-1. Session intern reflektieren
-→ TaskUpdate "1. Intern reflektieren": in_progress – **kein Output an User, kein Warten**:
+1. Session intern reflektieren – **kein Output an User, kein Warten**:
    - Was war schwierig / hat nicht funktioniert – und warum?
    - Gab es KRITISCH-Findings? (Wurden bereits per Andon-Cord behandelt – hier nur festhalten)
    - Welche Erkenntnisse gehören in `principles.md` oder `countermeasures.md`?
@@ -29,7 +18,6 @@ TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
    Diese Punkte werden in Schritt 4 dokumentiert (Beobachtungen → `observations.md`, Format §`observations.md`).
 
 2. Dokumentations-Änderungsbedarf prüfen + Beobachtungs-Prompt – **einziger Schritt mit User-Interaktion**:
-→ TaskUpdate "1. Intern reflektieren": completed | TaskUpdate "2. Dokumentations-Änderungsbedarf prüfen": in_progress
    Prüfen: Muss irgendein Dokument angepasst werden? (AGENT_MEMORY, GLOSSARY, CODING_GUIDELINEs, etc.)
    - Falls in dieser Session eine neue Guideline eingeführt oder wesentlich erweitert wurde: prüfen
      welche Skills sie referenzieren sollen, und ob bestehende Feature-Files einen Retrofit-Workshop brauchen.
@@ -49,20 +37,17 @@ TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
    - Falls nichts anzupassen / keine Beobachtung: direkt mit Schritt 4 weitermachen.
 
 3. Dokumentations-Änderungen umsetzen (falls User zugestimmt hat):
-→ TaskUpdate "2. Dokumentations-Änderungsbedarf prüfen": completed
    - Dokumente anpassen, dann weiter mit Schritt 4.
    - **Neue Beobachtungen** (aus dem Beobachtungs-Prompt) → `docs/kaizen/observations.md` schreiben
      (Format im Header dieser Datei, Status NEU; bei user-gemeldet `Quelle: User`). KEINE Lösung jetzt
      umsetzen, wenn sie aufgeschoben/nicht-trivial ist – die Retro evaluiert (Evaluierungs-Gate).
 
 4. `docs/history/sessions/session_NNN.md` – neue Session-Datei anlegen
-→ TaskUpdate "3. Session-Datei anlegen": in_progress
    Inhalt = **was in dieser Session passierte** (Historie): Implementiertes, Entscheidungen, Probleme, Review-/Subagent-Beobachtungen.
    **Scope-Disziplin:** (a) KEIN vorwärtsgerichteter Zustand (offene Punkte / nächster Lauf) – der lebt in `AGENT_MEMORY` „Nächste Prioritäten" (auto-geladen) + ist via `next_run.py` ableitbar; in read-only Historie wäre er sofort stale. (b) Learnings/Beobachtungen nur als knappe ID + Ein-Satz + Verweis auf die kanonische Quelle (`lessons_learned.md`/`observations.md`), kein nacherzählter Inhalt (Drift-Schutz, Single Source of Truth).
    Wird NACH Doku-Änderungen erstellt (damit finaler Zustand widergespiegelt wird).
 
 5. `docs/kaizen/lessons_learned.md` – Einträge schreiben:
-→ TaskUpdate "3. Session-Datei anlegen": completed | TaskUpdate "4. lessons_learned.md aktualisieren": in_progress
 
    Eintrag-Format + Erfassungs-Test + Beispiel: **Header von `docs/kaizen/lessons_learned.md`** (steht beim Schreiben direkt vor dir – kein separates Einlesen nötig). Impact/Kategorie-Definitionen + Reaktionsregeln: `docs/kaizen/process.md`
 
@@ -83,14 +68,12 @@ TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
    "Keine Learnings" nur mit expliziter Begründung akzeptabel.
 
 6. `docs/history/sessions/index.md` – neue Zeile ergänzen
-→ TaskUpdate "4. lessons_learned.md aktualisieren": completed | TaskUpdate "5. index.md aktualisieren": in_progress
    Format: `| <Nr> | <Datum> | <Phase> | <Kurzfassung> |`. **Kurzfassung = ein Satz, *was* sich geändert hat – kein „warum"/Begründung** (das gehört in die Session-Datei); auf ADR-/Session-IDs verweisen statt Prosa. Soft-Ziel ~150, **harter Cap 300 Zeichen** – ein PreToolUse-Hook (`check-index-length.py`) blockiert zu lange neue Einträge automatisch. Für den vollen Report (inkl. grandfatherter Altbestände):
    ```bash
    python3 .claude/scripts/check-index-length.py
    ```
 
 7. Projekt-Status aktualisieren:
-→ TaskUpdate "5. index.md aktualisieren": completed | TaskUpdate "6. AGENT_MEMORY.md aktualisieren": in_progress
    - **`docs/AGENT_MEMORY.md` schlank halten** – wird bei jedem Session-Start voll injiziert (jede Zeile kostet Token). Leitfrage: „Welche Info braucht JEDER Agent beim Start, um den Projektstatus einzuordnen?" Nur: **Phase**, **Aktuelle Story**, **Nächste Prioritäten**.
      - **Nächsten Lauf nicht von Hand pflegen:** Der Platzhalter `{{NEXT_RUN}}` in der Prioritätenliste wird beim Session-Start automatisch zum nächsten offenen Lauf aufgelöst (`next_run.py`; Mechanik: ADR-S041-7) – stehen lassen.
      - **Lauf außer der Reihe** (Priorität überschreibt die Feature-Reihenfolge, z.B. error vor sortiert): als Anstrich **über** den Platzhalter setzen, nach Umsetzung entfernen.
@@ -100,4 +83,3 @@ TaskCreate: "6. AGENT_MEMORY.md aktualisieren"
      ```
      **Phasen-Review ausstehend:** Skill `review-code` über gesamtes Phase-Delta starten.
      ```
-→ TaskUpdate "6. AGENT_MEMORY.md aktualisieren": completed

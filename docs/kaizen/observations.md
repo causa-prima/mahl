@@ -15,6 +15,17 @@ Eintrag-Format:
   - Kategorie: PROZESS | AGENT | QUALITÄT | TOOLING    Kontext: <Kontext-Tag wie in lessons_learned>
   - Beobachtung: <was ist nicht ideal / was fiel auf>
   - Entscheidung/Maßnahme: <bei Erfassung offen; beim Drain: gewählte Lösung + warum statt Alternativen / Verwerf-Grund / Aufschub-Grund + Re-Trigger>; → CM-… falls stehende Leitplanke
+            (bei Erfassung mechanisch erzwungen: `.claude/hooks/check-obs-capture.py` lässt bei einem NEUEN Eintrag nur
+             genau zwei Werte durch – `offen` oder `offen - beim Drain Kandidaten erstellen und bewerten`, nichts davor
+             und nichts dahinter. Weder Kandidat noch offene Frage: beides ankert den bewusst frischen Drain-Agenten,
+             und beides gehört ins Feld `- Beobachtung:`. Bestands-Einträge sind frei änderbar – der Drain schreibt hier
+             seine Entscheidung hin; bewusster Einzelfall → `obs-ok`-Marker in den Eintrag.)
+
+  Derselbe Hook hält bei NEUEN Einträgen zwei weitere Ausweichwege zu: die Feldliste oben ist abschließend
+  (ein erfundenes `- Lösungsidee:`/`- Kandidaten:`-Feld blockt; nur `- Bezug:` ist optional), und explizite
+  Lösungs-Ansagen im Eintrags-Text (`Lösungsvorschlag:`, `Idee:`, `Kandidat:`, `Abhilfe:`, `Fix:` …) blocken
+  ebenfalls. Ein **Risiko** zu beschreiben („X könnte passieren") ist ausdrücklich erlaubt – gemeint ist nur
+  die vorweggenommene Abhilfe. Kandidaten entstehen beim Drain, nicht bei der Erfassung.
   - Bezug: (optional) LL-S<NNN>-<n> / OBS-S<NNN>-<n> / CM-S<NNN>-<n>
 
   Impact = dieselben vier Werte wie die Impact-Stufe in lessons_learned (geteiltes Vokabular); Impact × Häufigkeit = Prioritäts-Matrix.

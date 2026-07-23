@@ -33,21 +33,7 @@ Lies vor dem Start:
 
 ---
 
-## Task-Liste anlegen
-
-Lege folgende Tasks mit dem TaskCreate-Tool an:
-- „0. Kontext laden"
-- „1. Regelentdeckung (Dialog)"
-- „2. Parallele Scenario-Entdeckung"
-- „3. Synthese"
-- „4. Review-Loop"
-- „5. Feature-File & Freigabe"
-- „6. Szenario-Clustering"
-
----
-
 ## Schritt 0: Kontext laden
-→ TaskUpdate „0. Kontext laden": in_progress
 
 Gherkin-Szenarien sind die Spec – sie dürfen nachträglich nicht angepasst werden, um die
 Implementierung zu bestätigen. Was hier unvollständig oder ungenau ist, zieht sich durch
@@ -95,12 +81,9 @@ Prüfe für jede Operation aus A) welche UX-Prinzipien zutreffen – notiere je 
 
 Notiere A–E schriftlich – Schritt 2 übergibt sie verbatim an die Agents.
 
-→ TaskUpdate „0. Kontext laden": completed
-
 ---
 
 ## Schritt 1: Regelentdeckung (Dialog mit User)
-→ TaskUpdate „1. Regelentdeckung (Dialog)": in_progress
 
 Ziel: Domänenwissen erfassen, das nicht aus Dokumenten ableitbar ist – und latente
 Anforderungen aufdecken, die noch nicht in der User Story formuliert wurden.
@@ -194,12 +177,9 @@ steht (z.B. eine neue Verhaltenssemantik oder ein neues Zustandsmodell)? → Sto
 Per CLAUDE.md-Regel: Business-Logik-Entscheidungen beim User nachfragen und erst dann
 in adr.md dokumentieren, bevor Szenarien geschrieben werden.
 
-→ TaskUpdate „1. Regelentdeckung (Dialog)": completed
-
 ---
 
 ## Schritt 2: Parallele Scenario-Entdeckung
-→ TaskUpdate „2. Parallele Scenario-Entdeckung": in_progress
 
 Starte drei Sub-Agenten **parallel** (in einer einzigen Nachricht mit drei Agent-Aufrufen).
 Befülle die `[Platzhalter]` vor dem Senden mit den konkreten Werten aus Schritt 0/1.
@@ -231,12 +211,9 @@ Outputs früherer zu sehen und unbewusst zu kopieren, statt eigenständig zu ana
 Warte auf alle drei Outputs bevor Schritt 3 beginnt. Wenn ein Agent-Output leer oder
 offensichtlich inkonsistent mit dem Input ist, wiederhole diesen Agent-Aufruf.
 
-→ TaskUpdate „2. Parallele Scenario-Entdeckung": completed
-
 ---
 
 ## Schritt 3: Synthese
-→ TaskUpdate „3. Synthese": in_progress
 
 Führe die Outputs von A, B, C zusammen:
 
@@ -288,12 +265,9 @@ Führe die Outputs von A, B, C zusammen:
 Der Entwurf muss vollständig ausformuliert sein, bevor Schritt 4 beginnt –
 der Review-Agent kann nur prüfen, was er lesen kann.
 
-→ TaskUpdate „3. Synthese": completed
-
 ---
 
 ## Schritt 4: Review-Loop
-→ TaskUpdate „4. Review-Loop": in_progress
 
 Lies `references/agent-review.md` – der Inhalt ist der Prompt für den Review-Agenten.
 Füge ihn zusammen mit diesen Inputs in den Agent-Aufruf ein:
@@ -324,12 +298,9 @@ damit der User den Fortschritt sehen kann.
 **ABBRUCHBEDINGUNG:** Nach Iteration 3 noch CRITICAL/HIGH vorhanden →
 Findings + Kontext dem User präsentieren, fragen wie weiter.
 
-→ TaskUpdate „4. Review-Loop": completed
-
 ---
 
 ## Schritt 5: Feature-File schreiben & Freigabe
-→ TaskUpdate „5. Feature-File & Freigabe": in_progress
 
 **A) Feature-File schreiben:**
 Pfad: `features/<entity-plural-english>.feature`
@@ -360,12 +331,9 @@ widerspricht: Konflikt explizit benennen, Regel zitieren, fragen ob das Szenario
 oder die Regel aktualisiert werden soll. Business-Logic-Entscheidungen gehören dem User
 (CLAUDE.md-Regel: Business-Impact → nachfragen).
 
-→ TaskUpdate „5. Feature-File & Freigabe": completed
-
 ---
 
 ## Schritt 6: Szenario-Clustering
-→ TaskUpdate „6. Szenario-Clustering": in_progress
 
 Erst möglich, wenn die Szenarien vollständig und freigegeben sind (Schritt 5).
 
@@ -376,8 +344,6 @@ Lauf-Kommentar-Tag in die Feature-Datei.
 
 Dem User das Ergebnis kurz vorlegen (Anzahl Läufe, grobe Gruppierung) und freigeben lassen.
 Kommt später doch ein Szenario hinzu, diesen Schritt für die betroffenen Läufe erneut anwenden.
-
-→ TaskUpdate „6. Szenario-Clustering": completed
 
 ---
 

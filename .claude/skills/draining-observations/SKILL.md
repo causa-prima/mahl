@@ -35,8 +35,7 @@ Meldet das Script „Backlog leer", bestätige das kurz und beende – nichts zu
 Der Satz liefert **Wert-Lane** + **Alters-Lane**, dazu ggf. **fällige Wiedervorlagen** (geparkte Items, deren
 Termin erreicht ist) und einen **Hygiene-Reminder** (aufgelöst, aber noch nicht archiviert). Definitionen:
 `process.md`. Ein **`+Koloc:`-Marker** an
-einer Zeile nennt offene OBS an derselben Datei (Kandidaten für Same-Artefakt-Mitnahme, s. Schritt 3). Lege
-eine kurze Task-Liste an (ein Task pro OBS; Regeln: `docs/process/task-system.md`).
+einer Zeile nennt offene OBS an derselben Datei (Kandidaten für Same-Artefakt-Mitnahme, s. Schritt 3).
 
 ## 2. Pro Item: Discovery → Entscheidung
 

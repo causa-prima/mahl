@@ -38,7 +38,7 @@ Globben statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
   `.claude/settings.json` / `settings.local.json`: Welche Gates/Hooks greifen *wirklich*, welche
   nur advisory? Zentral für die Dimensionen „Qualitätssicherung" und „Robustheit & Fehlerresistenz".
 - **Die Prozess-Docs** – in `docs/`: insbesondere `CLAUDE.md` (Navigation), `docs/process/tdd-process.md`,
-  `docs/process/dev-workflow.md`, `docs/process/review-checklist.md`, `docs/process/nfr.md`, `docs/process/task-system.md` sowie die *lebenden*
+  `docs/process/dev-workflow.md`, `docs/process/review-checklist.md`, `docs/process/nfr.md` sowie die *lebenden*
   `docs/kaizen/`-Dateien (lessons_learned, principles, countermeasures, PROCESS).
 - **Die normativen Entwicklungs-Guidelines** – `docs/guidelines/coding-guideline-*`, `docs/reference/architecture.md`,
   `docs/reference/glossary.md`: die Regeln/Muster, die Agenten beim Umsetzen befolgen. Das ist Workflow-Infrastruktur,

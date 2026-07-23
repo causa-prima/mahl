@@ -12,25 +12,9 @@ user-invocable: true
 
 Definitionen für Impact, Kategorien, Kontext-Tags, BEWÄHRT- und Obsolet-Kriterien: `docs/kaizen/process.md`
 
-→ Task-System: `docs/process/task-system.md`
-
-Lege zu Beginn folgende Task-Liste an:
-
-→ TaskCreate "0. Noise-Review: lessons_learned + Archiv bereinigen"
-→ TaskCreate "1. User-/Meta-Beobachtungen abfragen"
-→ TaskCreate "2. retro_report.py ausführen"
-→ TaskCreate "3. countermeasures.md reviewen"
-→ TaskCreate "4. OBS-Retro-Berührung (verlinkt)"
-→ TaskCreate "5. Findings präsentieren & Freigabe"
-→ TaskCreate "6. Änderungen umsetzen"
-→ TaskCreate "7. lessons_learned.md archivieren"
-→ TaskCreate "8. Session-Abschluss anbieten"
-
 ---
 
 ## 0. Noise-Review: lessons_learned + Archiv bereinigen
-
-→ TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": in_progress
 
 Lies `docs/kaizen/lessons_learned.md` und die **zuletzt archivierte Periode** (die jüngste `*.md`-Datei in `docs/kaizen/archive/`). Wende auf jeden Eintrag den Filter-Test aus `docs/kaizen/process.md` an:
 
@@ -57,13 +41,9 @@ Falls keine Kandidaten gefunden: kurz melden ("Kein Noise gefunden – Preproces
 
 **Impact-Sanity-Check (gleicher Durchgang, nur aktuelle Periode):** Prüfe zusätzlich jeden Eintrag der **aktuellen** Periode gegen die `process.md`-Impact-Definition – Jenga-Score und Pattern-Cluster (Schritt 2) sind impact-gewichtet, ein Fehl-Rating verzerrt sie. Achte gezielt auf die drei häufigen Fehler (s. `process.md`, „Impact richtig bemessen"): **Neuheit ≠ Impact** („schon durch ein Prinzip abgedeckt" ist kein GERING-Grund), **Klasse ≠ Einzelfall** (bemessen wird die Problem-Klasse falls unbemerkt, nicht der zufällig abgefangene Fall), **„schnell bemerkt" ist kein Kriterium**. Präsentiere grobe Fehl-Ratings (v.a. GERING/HOCH-Grenzfälle) als Tabelle (Eintrag | Ist | Vorschlag | Grund) und korrigiere **nur nach User-Freigabe**, **vor** Schritt 2. Bei mehreren unsicheren Grenzfällen optional auf einen **blinden Multi-Rater-Durchgang** eskalieren: mehrere Subagenten raten ein tag-entferntes Sample unabhängig neu; hohe Inter-Rater-Übereinstimmung + systematische Abweichung vom Ist = echtes Fehl-Rating (nicht bloß subjektive Streuung).
 
-→ TaskUpdate "0. Noise-Review: lessons_learned + Archiv bereinigen": completed | TaskUpdate "1. User-/Meta-Beobachtungen abfragen": in_progress
-
 ---
 
 ## 1. User-/Meta-Beobachtungen abfragen
-
-→ TaskUpdate "1. User-/Meta-Beobachtungen abfragen": in_progress
 
 Den User aktiv nach **zeitraum-/prozessweiten** Beobachtungen fragen, die **nicht an eine einzelne Session** hängen – also genau die Ebene, die der session-lokale `closing-session`-Prompt nicht erreicht:
 
@@ -78,13 +58,9 @@ Der Noise-Filter (die 3 Fragen aus `process.md`) gilt für ALLE Einträge. Keine
 
 **Dieselbe Routing-Regel gilt für alles, was in Schritt 2–4 *festgestellt* wird** (nicht nur für hier Abgefragtes) – einsortieren nach demselben Erfassungs-Test.
 
-→ TaskUpdate "1. User-/Meta-Beobachtungen abfragen": completed | TaskUpdate "2. retro_report.py ausführen": in_progress
-
 ---
 
 ## 2. retro_report.py ausführen
-
-→ TaskUpdate "2. retro_report.py ausführen": in_progress
 
 ```bash
 python3 .claude/scripts/retro_report.py
@@ -112,8 +88,6 @@ Ergebnis intern festhalten für Schritt 5.
 ---
 
 ## 3. countermeasures.md reviewen
-
-→ TaskUpdate "2. retro_report.py ausführen": completed | TaskUpdate "3. countermeasures.md reviewen": in_progress
 
 Lies `docs/kaizen/countermeasures.md`. Für jeden AKTIV/OFFEN-Eintrag:
 
@@ -149,21 +123,15 @@ Ergebnis intern festhalten für Schritt 5.
 
 ## 4. OBS-Retro-Berührung (verlinkt)
 
-→ TaskUpdate "3. countermeasures.md reviewen": completed | TaskUpdate "4. OBS-Retro-Berührung (verlinkt)": in_progress
-
 Das **Voll-Grooming passiert nicht hier**, sondern via Drain (Skill `draining-observations`); geparkte OBS holt ihre Pflicht-Wiedervorlage selbst zurück. Die Retro berührt OBS nur an einer Stelle (Mechanismus & Begründung: `docs/kaizen/process.md`, Abschnitt „Rolle in der Retro"):
 
 - **Verlinkte OBS als LL-Input:** Beim Root-Causing eines LLs die per `Bezug: LL-<diese-ID>` verlinkten OBS als Design-Input mitdenken; umgekehrt hinter einem LL-Muster ggf. ein neues OBS anlegen (per `Bezug:` verlinkt). Vorgehen + ID-Suche (auch im Archiv): s. process.md.
 
 Ergebnis intern festhalten für Schritt 5 (Backlog-Block in der Findings-Übersicht).
 
-→ TaskUpdate "4. OBS-Retro-Berührung (verlinkt)": completed | TaskUpdate "5. Findings präsentieren & Freigabe": in_progress
-
 ---
 
 ## 5. Findings präsentieren & Freigabe einholen
-
-→ TaskUpdate "5. Findings präsentieren & Freigabe": in_progress
 
 Präsentiere dem User folgende strukturierte Übersicht und **warte auf Freigabe** bevor Änderungen umgesetzt werden. Freigabe kann teilweise erteilt oder abgelehnt werden – nur explizit freigegebene Punkte umsetzen.
 
@@ -208,8 +176,6 @@ Neue/aktualisierte OBS, getroffene Entscheidungen, Eskalationen, verschobene (au
 
 ## 6. Änderungen umsetzen
 
-→ TaskUpdate "5. Findings präsentieren & Freigabe": completed | TaskUpdate "6. Änderungen umsetzen": in_progress
-
 Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: countermeasures.md verweist auf Ziele die bereits existieren müssen):
 1. `docs/kaizen/principles.md` aktualisieren
 2. Guidelines / Skills anpassen – Entscheidungshilfe: `docs/kaizen/process.md`, Abschnitt "Wann gehört etwas wohin?"
@@ -222,8 +188,6 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
 ---
 
 ## 7. lessons_learned.md archivieren
-
-→ TaskUpdate "6. Änderungen umsetzen": completed | TaskUpdate "7. lessons_learned.md archivieren": in_progress
 
 1. Prüfe ob mindestens ein Session-Header (Format: `## Session NNN – YYYY-MM-DD`) in `docs/kaizen/lessons_learned.md` vorhanden ist.
    Falls nicht: Archivierung überspringen, User informieren ("Keine Sessions in lessons_learned.md – Archivierung nicht nötig.").
@@ -242,12 +206,8 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
 
 ## 8. Session-Abschluss anbieten
 
-→ TaskUpdate "7. lessons_learned.md archivieren": completed | TaskUpdate "8. Session-Abschluss anbieten": in_progress
-
 Die Retro ist durch – `lessons_learned.md` ist archiviert, der Jenga-Score resettet, der Trigger erscheint am nächsten Session-Start nicht mehr (kein manuelles Entfernen nötig). Dem User die **Wahl** anbieten:
 
 - **A) Session abschließen** (empfohlen): Skill `closing-session` starten – pflegt AGENT_MEMORY voll und legt die Session-Datei an.
 - **B) Weiterarbeiten:** Retro abgeschlossen, Session-Abschluss später via `closing-session`.
 - **C) Etwas anderes** – nach User-Wunsch.
-
-→ TaskUpdate "8. Session-Abschluss anbieten": completed

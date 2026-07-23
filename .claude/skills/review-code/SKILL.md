@@ -24,17 +24,7 @@ Geänderte Dateien → `git diff` (staged + unstaged) als Standard verwenden.
 
 ## Ablauf
 
-Lege zu Beginn eine Task-Liste an, sofern der Skill standalone aufgerufen wird. Bei Einbettung in einen anderen Skill (z.B. aus implementing-scenario heraus) keine neue Task-Liste anlegen und keine TaskUpdate-Aufrufe für interne Schritte – der Aufrufer verwaltet die Task-Liste. Stattdessen: kurze Status-Zeile pro Schritt ausgeben (z.B. „→ Schritt 1 (Selbstcheck): abgeschlossen").
-
-```
-TaskCreate: "1. Selbstcheck (docs/process/review-checklist.md)"
-TaskCreate: "2. Suppression-Report bewerten"
-TaskCreate: "3. Review-Agenten spawnen"
-TaskCreate: "4. Findings zusammenführen"
-```
-
 ### 1. Selbstcheck (docs/process/review-checklist.md)
-→ TaskUpdate "1. Selbstcheck (docs/process/review-checklist.md)": in_progress
 
 Gehe `docs/process/review-checklist.md` systematisch Punkt für Punkt durch:
 - Architecture Layer (internal-Typen, kein InternalsVisibleTo, Ports-only-Tests)
@@ -48,7 +38,6 @@ Für jedes Finding: Schweregrad ❌/⚠️/✅ + Guideline-Referenz (Datei + Sek
 Findings werden gesammelt – nicht sofort selbst behoben.
 
 ### 2. Suppression-Report bewerten
-→ TaskUpdate "1. Selbstcheck (docs/process/review-checklist.md)": completed | TaskUpdate "2. Suppression-Report bewerten": in_progress
 
 Jeden Eintrag im übergebenen Stryker-Suppression-Report einzeln prüfen. Referenz:
 `docs/process/tdd-process.md` Sektion „Stryker-Survivor behandeln".
@@ -60,7 +49,6 @@ prüfen, nicht blind übernehmen.) Schwache oder fehlende Begründung → ❌ Fi
 Kein Suppression-Report übergeben oder leer → Schritt überspringen.
 
 ### 3. Review-Agenten spawnen
-→ TaskUpdate "2. Suppression-Report bewerten": completed | TaskUpdate "3. Review-Agenten spawnen": in_progress
 
 ⚠️ **Context-Freiheit:** Jeden Agenten ohne Iterations-Vorwissen spawnen – weder frühere
 Findings noch als false positive bekannte Punkte im Prompt. Filtering geschieht im
@@ -101,7 +89,6 @@ Agent-Prompts enthalten (je Agent):
   Rückgabewert des Agenten der Kanal.)
 
 ### 4. Findings zusammenführen
-→ TaskUpdate "3. Review-Agenten spawnen": completed | TaskUpdate "4. Findings zusammenführen": in_progress
 
 Alle Findings aus Selbstcheck + Suppression-Bewertung + Agenten zusammenführen. Für jedes Finding prüfen:
 ist die Begründung semantisch korrekt – „Es ist implementierbar" ≠ „Es ist das richtige
@@ -125,5 +112,3 @@ Suppression-Bewertung:
 
 ✅ Keine weiteren Findings
 ```
-
-→ TaskUpdate "4. Findings zusammenführen": completed

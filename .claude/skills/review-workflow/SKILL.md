@@ -30,10 +30,6 @@ Du (Haupt-Thread) hältst den Verlauf; jeder Agent startet bei null.
 
 ## Ablauf
 
-Task-Liste anlegen (`docs/process/task-system.md`):
-```
-TaskCreate: "Workflow-Audit (Loop bis 0 grobe Schnitzer)"
-```
 Pro Runde eine Status-Zeile ausgeben: „→ Runde N: M grobe Schnitzer".
 
 ### Pro Runde
