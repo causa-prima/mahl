@@ -3,12 +3,30 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
 // E2E-Backend (ASPNETCORE_URLS in playwright.config.ts). An einer Stelle statt mehrfach hartkodiert.
 const E2E_API_BASE = 'http://localhost:5059'
 
-// Legt eine Zutat direkt über die API an (Vorbedingung "die Zutat X existiert"), vor dem Laden der
-// Seite. Ein zweiter POST käme als Duplikat nicht durch – der direkte API-Seed ist der saubere Weg,
-// den Ausgangszustand über den ausgehenden Port herzustellen.
-async function seedIngredientViaApi(request: APIRequestContext, name: string, defaultUnit: string): Promise<void> {
+// Low-Level-Seed über den API-Port: legt eine Zutat an und gibt Id + xmin-ETag zurück (der ETag
+// wird für ein nachfolgendes If-Match beim DELETE gebraucht, ADR-S058-3). Gemeinsame Basis für
+// alle Seed-Varianten und den Löschen·Konflikt-Test – so lebt der POST-201-Block an einer Stelle.
+async function createIngredientViaApi(request: APIRequestContext, name: string, defaultUnit: string): Promise<{ id: string; etag: string }> {
   const response = await request.post(`${E2E_API_BASE}/api/ingredients`, { data: { name, defaultUnit } })
   expect(response.status(), 'Seed-Zutat muss angelegt werden (201)').toBe(201)
+  const { id } = await response.json() as { id: string }
+  return { id, etag: response.headers()['etag'] }
+}
+
+// Legt eine Zutat direkt über die API an (Vorbedingung "die Zutat X existiert"), vor dem Laden der
+// Seite. Ein zweiter POST käme als Duplikat nicht durch – der direkte API-Seed ist der saubere Weg,
+// den Ausgangszustand über den ausgehenden Port herzustellen. Id/ETag werden hier nicht gebraucht.
+async function seedIngredientViaApi(request: APIRequestContext, name: string, defaultUnit: string): Promise<void> {
+  await createIngredientViaApi(request, name, defaultUnit)
+}
+
+// Legt eine Zutat an und löscht sie direkt wieder (soft-delete) – Vorbedingung "die Zutat X
+// existiert und wurde gelöscht". Der ETag aus dem POST-Response geht als If-Match ins DELETE
+// (Plumbing: DELETE verlangt als mutierender Single-Resource-Endpoint einen If-Match, ADR-S058-1).
+async function seedDeletedIngredientViaApi(request: APIRequestContext, name: string, defaultUnit: string): Promise<void> {
+  const { id, etag } = await createIngredientViaApi(request, name, defaultUnit)
+  const deleteResponse = await request.delete(`${E2E_API_BASE}/api/ingredients/${id}`, { headers: { 'If-Match': etag } })
+  expect(deleteResponse.status(), 'Seed-Löschen muss gelingen (204)').toBe(204)
 }
 
 // Erfasst die Zutaten-Liste samt Ausgangs-Anzahl für "Liste bleibt unverändert"-Assertions.
@@ -528,10 +546,7 @@ test.describe('US904_EdgeCase: Löschen·Konflikt', () => {
   test('US904_EdgeCase_DeleteIngredient_AlreadyDeleted_Returns404NotFound', async ({ request }) => {
     // Given: die Zutat "Pfeffer" (g) existiert und wurde gelöscht (POST anlegen + erster DELETE = 204).
     //   Der ETag aus dem POST wird als If-Match mitgeschickt (Plumbing, s.o.).
-    const createResponse = await request.post(`${E2E_API_BASE}/api/ingredients`, { data: { name: 'Pfeffer', defaultUnit: 'g' } })
-    expect(createResponse.status(), 'Seed-Zutat muss angelegt werden (201)').toBe(201)
-    const { id } = await createResponse.json() as { id: string }
-    const etag = createResponse.headers()['etag']
+    const { id, etag } = await createIngredientViaApi(request, 'Pfeffer', 'g')
     const firstDelete = await request.delete(`${E2E_API_BASE}/api/ingredients/${id}`, { headers: { 'If-Match': etag } })
     expect(firstDelete.status(), 'Erstes Löschen muss gelingen (204)').toBe(204)
 
@@ -543,5 +558,62 @@ test.describe('US904_EdgeCase: Löschen·Konflikt', () => {
     expect(secondDelete.status(), 'Erneutes Löschen muss fehlschlagen (404)').toBe(404)
     const body = await secondDelete.json() as { detail?: string }
     expect(body.detail).toBe('Zutat wurde nicht gefunden.')
+  })
+})
+
+// @US-904-happy-path: run-7 „Liste". Die alphabetische Sortierung ist Backend-Verhalten
+// (GET /api/ingredients OrderBy(name), TD-S084-2 – macht zugleich den Collection-Content-Hash-
+// ETag erstmals deterministisch, ADR-S084-1/-2). Das Frontend rendert die Liste unverändert in
+// der vom Server gelieferten Reihenfolge; die DOM-Reihenfolge ist die einzige E2E-beobachtbare
+// Stelle der Sortierung. Seed VOR page.goto, damit der initiale GET die Zutaten enthält – daher
+// eigenes describe ohne goto-beforeEach (analog zum Duplikat-Block).
+test.describe('US904_HappyPath: Zutaten-Liste sortiert', () => {
+  // Szenario: Mehrere Zutaten erscheinen alphabetisch sortiert
+  test('US904_HappyPath_GetIngredients_MultipleIngredients_AppearAlphabeticallySorted', async ({ page, request }) => {
+    // Given: "Zwiebel" (Stück) und "Apfel" (Stück) existieren – bewusst in NICHT-alphabetischer
+    //   Anlege-Reihenfolge (Zwiebel vor Apfel), damit die alphabetische Sortierung die Insertion-
+    //   Order nachweislich überschreibt (ohne OrderBy stünde Zwiebel vor Apfel).
+    await seedIngredientViaApi(request, 'Zwiebel', 'Stück')
+    await seedIngredientViaApi(request, 'Apfel', 'Stück')
+    await page.goto('/ingredients')
+    // Initialen GET settlen lassen (Seed sichtbar), BEVOR der UI-POST feuert – umgeht das
+    // Cold-Start-Race (TD-S083-3), ohne es zu beheben (der POST koalesziert sonst mit dem
+    // noch in-flight-GET).
+    await expect(page.getByTestId('ingredient-list').getByText('Apfel')).toBeVisible()
+
+    // When: ich "Mehl" (g) über die UI anlege
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Mehl')
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+    // Erfolgspfad: der Dialog schließt nach dem POST – erst dann steht die neu geladene Liste.
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    // Then: die Zutaten-Liste zeigt exakt "Apfel", "Mehl", "Zwiebel" in dieser Reihenfolge.
+    //   toHaveText mit Array pinnt Reihenfolge UND Anzahl (genau 3 Einträge); die Regex matcht
+    //   den Namen als Substring des ListItem-Textes (der zusätzlich die Einheit enthält).
+    const items = page.getByTestId('ingredient-list').getByRole('listitem')
+    await expect(items).toHaveText([/Apfel/, /Mehl/, /Zwiebel/])
+  })
+})
+
+// @US-904-edge-case: run-7 „Liste". Soft-Delete-Filterung ist Backend-Verhalten (GET filtert
+// WHERE DeletedAt IS NULL, ADR-S000-6). Eine soft-deleted Zeile kommt gar nicht erst im GET-
+// Response an -> auf E2E-Ebene beobachtbar nur als "nicht in der Liste". Der Löschzustand wird
+// über den API-Port hergestellt (seedDeletedIngredientViaApi), VOR page.goto.
+test.describe('US904_EdgeCase: Soft-deleted Zutat', () => {
+  // Szenario: Soft-deleted Zutat erscheint nicht in der Zutaten-Liste
+  test('US904_EdgeCase_GetIngredients_SoftDeletedIngredient_NotVisibleInList', async ({ page, request }) => {
+    // Given: die Zutat "Basilikum" (Bund) existiert und wurde gelöscht
+    await seedDeletedIngredientViaApi(request, 'Basilikum', 'Bund')
+
+    // When: ich die Zutaten-Liste betrachte
+    await page.goto('/ingredients')
+    // Initialen GET abklingen lassen: während des Ladens zeigt die Seite denselben Empty-State
+    // wie bei echt-leerer Liste, eine zu frühe Assertion wäre ein Ladeartefakt.
+    await page.waitForLoadState('networkidle')
+
+    // Then: "Basilikum" ist nicht in der Zutaten-Liste sichtbar
+    await expect(page.getByText('Basilikum')).toHaveCount(0)
   })
 })

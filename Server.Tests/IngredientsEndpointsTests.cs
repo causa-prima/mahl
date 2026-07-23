@@ -104,6 +104,52 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
             [new IngredientResponse(Id: created.Id, Name: "Tomaten", DefaultUnit: "Stück")]);
     }
 
+    // @US-904-happy-path (run-7 „Liste"): mehrere Zutaten erscheinen alphabetisch sortiert. Insertion-
+    // Order ("Zwiebel", "Apfel", "Mehl") weicht bewusst von der erwarteten alphabetischen Reihenfolge ab –
+    // sonst wäre der OrderBy-Mutant nicht Stryker-killbar (ein reines Insertion-Order-Passthrough würde
+    // den Test zufällig auch bestehen). ADR-S084-1: deterministische Sortierung ist zugleich Voraussetzung
+    // für den stabilen Collection-Content-Hash-ETag.
+    [Fact]
+    public async Task US904_HappyPath_GetIngredients_MultipleIngredients_ReturnsAlphabeticallySortedByName()
+    {
+        // Given: three ingredients created in non-alphabetical order
+        await CreateIngredientAsync("Zwiebel", "Stück");
+        await CreateIngredientAsync("Apfel", "Stück");
+        await CreateIngredientAsync("Mehl", "g");
+
+        // When: the ingredient list is requested
+        var response = await Client.GetAsync("/api/ingredients", TestContext.Current.CancellationToken);
+
+        // Then: 200 OK with the ingredients ordered alphabetically by name, not insertion order
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse[]>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Select(i => i.Name).Should().Equal("Apfel", "Mehl", "Zwiebel");
+    }
+
+    // @US-904-edge-case (run-7 „Liste"): eine soft-deleted Zutat erscheint nicht in der Zutaten-Liste
+    // (ADR-S000-6). Der soft-deleted Zustand wird direkt in der DB hergestellt (statt über POST+DELETE),
+    // um den GET-Test von der Korrektheit des DELETE-Endpoints zu isolieren.
+    [Fact]
+    public async Task US904_EdgeCase_GetIngredients_SoftDeletedIngredient_ExcludedFromResponse()
+    {
+        // Given: one active ingredient and one soft-deleted ingredient (DeletedAt set directly in the DB)
+        var (active, _) = await CreateIngredientAsync("Petersilie", "Bund");
+        Db.Ingredients.Add(new IngredientDbType
+        {
+            Id = Guid.CreateVersion7(), Name = "Basilikum", DefaultUnit = "Stück", DeletedAt = DateTimeOffset.UtcNow,
+        });
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // When: the ingredient list is requested
+        var response = await Client.GetAsync("/api/ingredients", TestContext.Current.CancellationToken);
+
+        // Then: 200 OK with only the active ingredient – the soft-deleted row is filtered out
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse[]>(TestContext.Current.CancellationToken);
+        body.Should().BeEquivalentTo([new IngredientResponse(Id: active.Id, Name: "Petersilie", DefaultUnit: "Bund")]);
+    }
+
     // @US-904-edge-case: Führende und nachfolgende Leerzeichen werden beim Speichern entfernt.
     // Pinnt die Trim-KORREKTHEIT (ADR-S051-1: vor der Validierung trimmen, den getrimmten Wert speichern)
     // am Backend-Grenzwert. Auf E2E-Ebene ist die exakte Whitespace-Entfernung nur mühsam (Regex gegen den
