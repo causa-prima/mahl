@@ -253,3 +253,14 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 
+---
+
+## OBS-S108-1 – Check 6 (`decisions.py`/`qa-check`) erkennt ADR-Referenzen nur mit `//` unmittelbar davor
+- Quelle: Subagent (backend-layer-implementer, run-7)
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Check 6 (`decisions.py check` / `qa-check.py`) erkennt eine `ADR-SXXX-N`-Referenz nur, wenn ein `//` unmittelbar davorsteht (Kommentar am Zeilenanfang) – nicht, wenn zwei ADRs mid-line in einem Fließtext-/Prosa-Kommentar kombiniert werden. In run-7 blieben dadurch zwei in einem Kommentar kombinierte ADR-Referenzen zunächst unerfasst; sichtbar wurde es erst durch den qa-check-Rerun (ein zusätzlicher Lauf, kein Blocker). Risiko: eine real vorhandene ADR-Referenz bleibt unverlinkt/ungeprüft, wenn sie stilistisch in Prosa eingebettet statt als eigene `//`-Zeile geschrieben wird.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: –
+
