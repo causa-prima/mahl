@@ -1,6 +1,21 @@
 {
   "permissions": {
-    "allow": []
+    "allow": [
+      "Edit(Server/**/*.cs)",
+      "Write(Server/**/*.cs)",
+      "Edit(Server.Tests/**/*.cs)",
+      "Write(Server.Tests/**/*.cs)",
+      "Edit(Infrastructure/**/*.cs)",
+      "Write(Infrastructure/**/*.cs)",
+      "Edit(Client/src/**/*.ts)",
+      "Write(Client/src/**/*.ts)",
+      "Edit(Client/src/**/*.tsx)",
+      "Write(Client/src/**/*.tsx)",
+      "Edit(Client/src/**/*.css)",
+      "Write(Client/src/**/*.css)",
+      "Edit(Client/e2e/**/*.ts)",
+      "Write(Client/e2e/**/*.ts)"
+    ]
   },
   "hooks": {
     "SessionStart": [

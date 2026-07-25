@@ -6,7 +6,7 @@ const E2E_API_BASE = 'http://localhost:5059'
 // Low-Level-Seed über den API-Port: legt eine Zutat an und gibt Id + xmin-ETag zurück (der ETag
 // wird für ein nachfolgendes If-Match beim DELETE gebraucht, ADR-S058-3). Gemeinsame Basis für
 // alle Seed-Varianten und den Löschen·Konflikt-Test – so lebt der POST-201-Block an einer Stelle.
-async function createIngredientViaApi(request: APIRequestContext, name: string, defaultUnit: string): Promise<{ id: string; etag: string }> {
+async function createIngredientViaApi(request: Readonly<APIRequestContext>, name: string, defaultUnit: string): Promise<{ id: string; etag: string }> {
   const response = await request.post(`${E2E_API_BASE}/api/ingredients`, { data: { name, defaultUnit } })
   expect(response.status(), 'Seed-Zutat muss angelegt werden (201)').toBe(201)
   const { id } = await response.json() as { id: string }
@@ -16,14 +16,14 @@ async function createIngredientViaApi(request: APIRequestContext, name: string, 
 // Legt eine Zutat direkt über die API an (Vorbedingung "die Zutat X existiert"), vor dem Laden der
 // Seite. Ein zweiter POST käme als Duplikat nicht durch – der direkte API-Seed ist der saubere Weg,
 // den Ausgangszustand über den ausgehenden Port herzustellen. Id/ETag werden hier nicht gebraucht.
-async function seedIngredientViaApi(request: APIRequestContext, name: string, defaultUnit: string): Promise<void> {
+async function seedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, defaultUnit: string): Promise<void> {
   await createIngredientViaApi(request, name, defaultUnit)
 }
 
 // Legt eine Zutat an und löscht sie direkt wieder (soft-delete) – Vorbedingung "die Zutat X
 // existiert und wurde gelöscht". Der ETag aus dem POST-Response geht als If-Match ins DELETE
 // (Plumbing: DELETE verlangt als mutierender Single-Resource-Endpoint einen If-Match, ADR-S058-1).
-async function seedDeletedIngredientViaApi(request: APIRequestContext, name: string, defaultUnit: string): Promise<void> {
+async function seedDeletedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, defaultUnit: string): Promise<void> {
   const { id, etag } = await createIngredientViaApi(request, name, defaultUnit)
   const deleteResponse = await request.delete(`${E2E_API_BASE}/api/ingredients/${id}`, { headers: { 'If-Match': etag } })
   expect(deleteResponse.status(), 'Seed-Löschen muss gelingen (204)').toBe(204)
@@ -615,5 +615,131 @@ test.describe('US904_EdgeCase: Soft-deleted Zutat', () => {
 
     // Then: "Basilikum" ist nicht in der Zutaten-Liste sichtbar
     await expect(page.getByText('Basilikum')).toHaveCount(0)
+  })
+})
+
+// @US-904-happy-path: run-8 „Löschen·Success". Löschen einer Zutat aus der Liste (DELETE mit dem
+// per-Zeile-xmin-ETag als If-Match, ADR-S108-1) + Undo via Toast-„Rückgängig" (Restore-Endpoint
+// ohne If-Match, ADR-S108-2). Black-box: der Test klickt nur, die ETag-/Restore-Mechanik ist
+// interne Implementierung. Seed VOR page.goto, damit der initiale GET die Zutat enthält.
+test.describe('US904_HappyPath: Zutat löschen', () => {
+  // Szenario: Zutat löschen
+  test('US904_HappyPath_DeleteIngredient_FromList_ListEmptyAndUndoToastShown', async ({ page, request }) => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    await page.goto('/ingredients')
+    await expect(page.getByTestId('ingredient-list').getByText('Mehl')).toBeVisible()
+
+    // When: ich bei "Mehl" auf Löschen klicke
+    await page.getByRole('button', { name: 'Mehl löschen' }).click()
+
+    // Then: die Zutaten-Liste ist leer -> Empty-State ersetzt die Liste (kein ingredient-list mehr).
+    //   toHaveCount(0) auf die Liste statt getByText('Mehl'): der Toast-Text "Mehl gelöscht" enthält
+    //   den Substring "Mehl" und würde einen globalen Text-Check fälschlich scheitern lassen.
+    await expect(page.getByText('Noch keine Zutaten angelegt.')).toBeVisible()
+    await expect(page.getByTestId('ingredient-list')).toHaveCount(0)
+    // Then: Toast "Mehl gelöscht" mit "Rückgängig"-Aktion
+    await expect(page.getByText('Mehl gelöscht')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeVisible()
+  })
+
+  // Szenario: Löschen rückgängig machen via Toast
+  test('US904_HappyPath_UndoDelete_ViaToast_IngredientReappearsInList', async ({ page, request }) => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    await page.goto('/ingredients')
+    await expect(page.getByTestId('ingredient-list').getByText('Mehl')).toBeVisible()
+
+    // When: ich bei "Mehl" auf Löschen klicke
+    await page.getByRole('button', { name: 'Mehl löschen' }).click()
+    // When: ich im Toast auf "Rückgängig" klicke (Playwright wartet, bis der Toast-Button da ist)
+    await page.getByRole('button', { name: 'Rückgängig' }).click()
+
+    // Then: "Mehl" ist wieder in der Zutaten-Liste mit Einheit "g" (Restore reaktiviert dieselbe
+    //   Zeile; auf die Liste gescopt, damit der noch sichtbare Toast nicht mitzählt).
+    const list = page.getByTestId('ingredient-list')
+    await expect(list.getByText('Mehl')).toBeVisible()
+    await expect(list.getByText('g')).toBeVisible()
+  })
+})
+
+// @US-904-edge-case: run-8 „Löschen·Success". Verlässlichkeit des Undo-Wegs – der Toast ist die
+// EINZIGE Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5 Stufe 1), solange die
+// Reaktivierung beim Neuanlegen (run-11) fehlt. Verschwindet er zu früh, ist die Zutat für den
+// Nutzer weg. Die Toast-Anzeigezeit beträgt 6 s (autoHideDuration in IngredientsPage.tsx).
+test.describe('US904_EdgeCase: Undo-Toast-Verlässlichkeit', () => {
+  // Szenario: Undo-Toast bleibt bei einem Klick daneben erhalten
+  test('US904_EdgeCase_UndoToast_ClickBesideToast_ToastRemainsVisible', async ({ page, request }) => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    await page.goto('/ingredients')
+    await expect(page.getByTestId('ingredient-list').getByText('Mehl')).toBeVisible()
+
+    // When: ich bei "Mehl" auf Löschen klicke
+    await page.getByRole('button', { name: 'Mehl löschen' }).click()
+    await expect(page.getByText('Mehl gelöscht')).toBeVisible()
+    // When: ich neben den Toast klicke – der Empty-State-Text ist ein neutrales, nicht
+    //   interaktives Ziel weit weg vom Toast (dieser sitzt unten links).
+    await page.getByText('Noch keine Zutaten angelegt.').click()
+
+    // Then: der Toast steht weiterhin samt "Rückgängig" – ein beiläufiger Klick darf den einzigen
+    //   Weg zurück nicht wegnehmen.
+    await expect(page.getByText('Mehl gelöscht')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeVisible()
+  })
+
+  // Szenario: Zweites Löschen gibt dem neuen Toast die volle Rückgängig-Zeit
+  test('US904_EdgeCase_SecondDelete_RestartsUndoWindow', async ({ page, request }) => {
+    // Given: die Zutaten "Mehl" und "Zucker" existieren
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    await seedIngredientViaApi(request, 'Zucker', 'g')
+    await page.goto('/ingredients')
+    await expect(page.getByTestId('ingredient-list').getByText('Zucker')).toBeVisible()
+
+    // When: ich bei "Mehl" auf Löschen klicke
+    await page.getByRole('button', { name: 'Mehl löschen' }).click()
+    await expect(page.getByText('Mehl gelöscht')).toBeVisible()
+
+    // When: ich kurz vor Ablauf der Toast-Anzeigezeit bei "Zucker" auf Löschen klicke.
+    //   Feste Wartezeit ist hier ausnahmsweise korrekt: die verstrichene Zeit IST der
+    //   Testgegenstand, nicht ein Zustand, auf den man warten könnte. 4,5 s < 6 s Anzeigezeit,
+    //   der erste Toast steht also noch.
+    await page.waitForTimeout(4_500)
+    await page.getByRole('button', { name: 'Zucker löschen' }).click()
+
+    // Then: der neue Toast zeigt "Zucker gelöscht" mit "Rückgängig"
+    await expect(page.getByText('Zucker gelöscht')).toBeVisible()
+
+    // Then: "Rückgängig" ist noch verfügbar, nachdem die Anzeigezeit des ERSTEN Toasts abgelaufen
+    //   wäre (t≈7 s > 6 s). Erbt der zweite Toast dessen Restlaufzeit, ist er hier bereits weg –
+    //   der Nutzer verlöre die Undo-Möglichkeit für "Zucker" nach 1,5 statt 6 Sekunden.
+    await page.waitForTimeout(2_500)
+    await expect(page.getByText('Zucker gelöscht')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeVisible()
+  })
+
+  // Szenario: Nur der zuletzt gelöschten Zutat lässt sich das Löschen rückgängig machen
+  test('US904_EdgeCase_TwoDeletes_UndoRestoresOnlyTheLatest', async ({ page, request }) => {
+    // Given: die Zutaten "Mehl" und "Zucker" existieren
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    await seedIngredientViaApi(request, 'Zucker', 'g')
+    await page.goto('/ingredients')
+    await expect(page.getByTestId('ingredient-list').getByText('Mehl')).toBeVisible()
+
+    // When: ich bei "Mehl" und danach bei "Zucker" auf Löschen klicke
+    await page.getByRole('button', { name: 'Mehl löschen' }).click()
+    await expect(page.getByText('Mehl gelöscht')).toBeVisible()
+    await page.getByRole('button', { name: 'Zucker löschen' }).click()
+    await expect(page.getByText('Zucker gelöscht')).toBeVisible()
+
+    // When: ich im Toast auf "Rückgängig" klicke
+    await page.getByRole('button', { name: 'Rückgängig' }).click()
+
+    // Then: nur "Zucker" kehrt zurück – "Mehl" bleibt gelöscht (ADR-S109-1: der Toast hält genau
+    //   einen Löschvorgang vor, der zweite ersetzt den ersten). Auf die Liste gescopt, damit ein
+    //   noch sichtbarer Toast-Text nicht mitzählt.
+    const list = page.getByTestId('ingredient-list')
+    await expect(list.getByText('Zucker')).toBeVisible()
+    await expect(list.getByText('Mehl')).toHaveCount(0)
   })
 })

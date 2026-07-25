@@ -9,9 +9,16 @@ import TextField from '@mui/material/TextField'
 import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemText from '@mui/material/ListItemText'
+import IconButton from '@mui/material/IconButton'
+import Snackbar from '@mui/material/Snackbar'
+import type { SnackbarCloseReason } from '@mui/material/Snackbar'
+import DeleteIcon from '@mui/icons-material/Delete'
 import { useResultQuery } from '../hooks/useResultQuery'
 import { useResultMutation } from '../hooks/useResultMutation'
+import { useDeleteIngredientWithUndo } from '../hooks/useDeleteIngredientWithUndo'
+import type { DeletedIngredient } from '../hooks/useDeleteIngredientWithUndo'
 import { fetchIngredients, createIngredient } from '../services/ingredientsApi'
+import type { Ingredient } from '../services/ingredientsApi'
 
 const ingredientsKey = ['ingredients'] as const
 
@@ -120,12 +127,89 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
   )
 }
 
+type IngredientListProps = {
+  readonly ingredients: readonly Ingredient[]
+  readonly onDelete: (ingredient: Readonly<Ingredient>) => void
+}
+
+// UX-Prinzip 1: die destruktive Aktion steht am Zeilenende (secondaryAction). Das aria-label
+// nennt die Zutat, damit die Aktion auch ohne visuellen Kontext eindeutig ist ("Mehl löschen").
+function IngredientList({ ingredients, onDelete }: Readonly<IngredientListProps>) {
+  return (
+    <List data-testid="ingredient-list">
+      {ingredients.map((ingredient) => (
+        <ListItem
+          key={ingredient.id}
+          secondaryAction={
+            <IconButton
+              aria-label={`${ingredient.name} löschen`}
+              onClick={() => { onDelete(ingredient) }}
+            >
+              <DeleteIcon />
+            </IconButton>
+          }
+        >
+          <ListItemText primary={ingredient.name} secondary={ingredient.defaultUnit} />
+        </ListItem>
+      ))}
+    </List>
+  )
+}
+
+type UndoToastProps = {
+  readonly deleted: DeletedIngredient
+  readonly onUndo: () => void
+  readonly onDismiss: () => void
+}
+
+// UX-Guideline Prinzip 5 ("Destructive Actions schützen"): Soft-Delete + Undo-Toast ersetzt
+// den Bestätigungsdialog. Nicht-blockierende Snackbar; autoHideDuration großzügig, damit
+// "Rückgängig" klickbar bleibt.
+function UndoToast({ deleted, onUndo, onDismiss }: Readonly<UndoToastProps>) {
+  // clickaway (Klick irgendwo auf der Seite) darf den Toast NICHT schließen: sonst wäre die
+  // bewusst großzügige autoHideDuration wertlos, sobald der Nutzer nach dem Löschen woanders
+  // hinklickt – der Undo-Weg für eine destruktive Aktion muss die volle Dauer erreichbar
+  // bleiben (UX-Guideline Prinzip 5). timeout/escapeKeyDown sind bewusste Schließen-Gesten
+  // und schließen weiterhin regulär.
+  const handleClose = (_event: unknown, reason: SnackbarCloseReason) => {
+    if (reason === 'clickaway') return
+    onDismiss()
+  }
+
+  // `key={deleted.id}`: erzwingt einen Remount pro Löschvorgang. Ohne key behält React beim
+  // Wechsel von einer gelöschten Zutat zur nächsten (deleted-Objekt ändert sich, open/
+  // autoHideDuration bleiben literal unverändert) dieselbe Snackbar-Instanz bei – MUIs
+  // Auto-Hide-Timer-Effect (useSnackbar.js, deps [open, autoHideDuration, setAutoHideTimer,
+  // timerAutoHide]) läuft dann NICHT erneut, weil keine dieser Deps sich ändert (open/
+  // autoHideDuration sind Literale, die beiden Callbacks referenzstabil via useEventCallback).
+  // Der neue Toast erbt so die Restlaufzeit des alten statt der vollen autoHideDuration
+  // (US904_EdgeCase_SecondDelete_RestartsUndoWindow). Der Remount startet den Timer frisch.
+  return (
+    <Snackbar
+      key={deleted.id}
+      open
+      autoHideDuration={6000}
+      onClose={handleClose}
+      message={`${deleted.name} gelöscht`}
+      action={<Button onClick={onUndo}>Rückgängig</Button>}
+    />
+  )
+}
+
 export default function IngredientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [name, setName] = useState('')
   const [unit, setUnit] = useState('')
   const queryClient = useQueryClient()
   const ingredients = useResultQuery(ingredientsKey, fetchIngredients)
+
+  const invalidateIngredients = () => {
+    // Äquivalenter Mutant: Die App hat nur eine Query-Art (['ingredients']), daher ist
+    // invalidateQueries({}) (alle) ≡ invalidateQueries({ queryKey: ingredientsKey }).
+    // Deterministisch tötbar erst mit einer zweiten Query-Art.
+    // Stryker disable next-line ObjectLiteral: aequivalent, nur eine Query-Art (s. o.)
+    void queryClient.invalidateQueries({ queryKey: ingredientsKey })
+  }
 
   const closeDialog = () => {
     setIsDialogOpen(false)
@@ -135,12 +219,10 @@ export default function IngredientsPage() {
 
   const [save, saveError, isPending, resetSaveError] = useResultMutation(createIngredient, () => {
     closeDialog()
-    // Äquivalenter Mutant: Die App hat nur eine Query-Art (['ingredients']), daher ist
-    // invalidateQueries({}) (alle) ≡ invalidateQueries({ queryKey: ingredientsKey }).
-    // Deterministisch tötbar erst mit einer zweiten Query-Art.
-    // Stryker disable next-line ObjectLiteral: aequivalent, nur eine Query-Art (s. o.)
-    void queryClient.invalidateQueries({ queryKey: ingredientsKey })
+    invalidateIngredients()
   })
+
+  const { deleted, requestDelete, undoDelete, dismissUndo } = useDeleteIngredientWithUndo(invalidateIngredients)
 
   // Direkter kind-Check statt matchKind (ADR-S056-1) ist hier bewusst aufgeschoben:
   // ADR-S056-1's kanonisches Muster trennt Netzwerk/5xx (werfen -> QueryCache.onError/
@@ -166,15 +248,7 @@ export default function IngredientsPage() {
   return (
     <div>
       {ingredients && ingredients.length > 0
-        ? (
-          <List data-testid="ingredient-list">
-            {ingredients.map((ingredient) => (
-              <ListItem key={ingredient.id}>
-                <ListItemText primary={ingredient.name} secondary={ingredient.defaultUnit} />
-              </ListItem>
-            ))}
-          </List>
-        )
+        ? <IngredientList ingredients={ingredients} onDelete={requestDelete} />
         : <p>Noch keine Zutaten angelegt.</p>}
       <Button variant="contained" onClick={() => { setIsDialogOpen(true) }}>Zutat anlegen</Button>
       <CreateIngredientDialog
@@ -189,6 +263,13 @@ export default function IngredientsPage() {
         onClose={handleCancel}
         onSubmit={() => { save({ name, defaultUnit: unit }) }}
       />
+      {deleted && (
+        <UndoToast
+          deleted={deleted}
+          onUndo={() => { undoDelete(deleted.id) }}
+          onDismiss={dismissUndo}
+        />
+      )}
     </div>
   )
 }

@@ -97,6 +97,33 @@ Feature: Zutaten verwalten
     And ich im Toast auf "Rückgängig" klicke
     Then sehe ich "Mehl" in der Zutaten-Liste mit Einheit "g"
 
+  # @run-8 · Löschen·Success · Full-Stack
+  @US-904-edge-case
+  Scenario: Undo-Toast bleibt bei einem Klick daneben erhalten
+    Given nur die Zutat "Mehl" mit Einheit "g" existiert
+    When ich bei "Mehl" auf Löschen klicke
+    And ich neben den Toast klicke
+    Then sehe ich weiterhin den Toast "Mehl gelöscht" mit "Rückgängig"-Aktion
+
+  # @run-8 · Löschen·Success · Full-Stack
+  @US-904-edge-case
+  Scenario: Zweites Löschen gibt dem neuen Toast die volle Rückgängig-Zeit
+    Given die Zutaten "Mehl" und "Zucker" existieren
+    When ich bei "Mehl" auf Löschen klicke
+    And ich kurz vor Ablauf der Toast-Anzeigezeit bei "Zucker" auf Löschen klicke
+    Then sehe ich den Toast "Zucker gelöscht" mit "Rückgängig"-Aktion
+    And ist "Rückgängig" für "Zucker" noch verfügbar, nachdem die Anzeigezeit des ersten Toasts abgelaufen wäre
+
+  # @run-8 · Löschen·Success · Full-Stack
+  @US-904-edge-case
+  Scenario: Nur der zuletzt gelöschten Zutat lässt sich das Löschen rückgängig machen
+    Given die Zutaten "Mehl" und "Zucker" existieren
+    When ich bei "Mehl" auf Löschen klicke
+    And ich bei "Zucker" auf Löschen klicke
+    And ich im Toast auf "Rückgängig" klicke
+    Then sehe ich "Zucker" in der Zutaten-Liste
+    And ist die Zutat "Mehl" weiterhin gelöscht
+
   # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
   @US-904-happy-path
   Scenario: Speichern-Button ist während des Speicherns deaktiviert

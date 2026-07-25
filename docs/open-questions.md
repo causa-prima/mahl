@@ -19,7 +19,9 @@ Eintrag-Format:
 
 ## OQ-S083-1 — ADR vs. technische Schuld: Taxonomie klären
 **Frage:** Wo verläuft die Grenze? User-Sicht: dauerhafte, code-unabhängige Entscheidung = ADR; Doku konkreter Code-Ausnahmen = technische Schuld.
-**Hintergrund:** Suppression-ADRs (S000-3/S000-4) pinnen `// Stryker disable`-Kommentare auf **konkrete Code-Zeilen** – und S000-4 beschrieb Code, der diese Session erst (neu) geschrieben wurde; solche code-spezifischen Ausnahmen sind eher Tech-Debt als dauerhafte Architekturentscheidung. Prüfen: ADR-S000-3/S000-4 (und ggf. S083-1/-2) ggf. in einen Tech-Debt-/Suppression-Katalog auslagern; Konsequenzen für die ADR-Konvention.
+**Hintergrund:** Suppression-ADRs (S000-3/S000-4) pinnen `// Stryker disable`-Kommentare auf **konkrete Code-Zeilen** – und S000-4 beschrieb Code, der diese Session erst (neu) geschrieben wurde; solche code-spezifischen Ausnahmen sind eher Tech-Debt als dauerhafte Architekturentscheidung. Prüfen: ADR-S000-4 (und ggf. S083-1/-2) ggf. in einen Tech-Debt-/Suppression-Katalog auslagern; Konsequenzen für die ADR-Konvention.
+
+**Teil-Antwort aus S108 (erster Präzedenzfall):** ADR-S000-3 wurde **ersatzlos gelöscht** statt auf „Superseded" gesetzt. Sie plante eine Stryker-Suppression auf dem Soft-Delete-Filter; run-7 führte den Filter dann test-getrieben **ohne** Suppression ein (Score bleibt 100 %, echte Tests killen den `== null`-Mutanten). Angewandtes Unterscheidungskriterium: **Hat die Entscheidung je gegolten?** Eine ADR, die realen Code geprägt hat, bleibt als „Superseded" stehen – ihre Historie erklärt heutigen oder früheren Code (Beispiel: ADR-S000-1 → ADR-S090-1). Eine reine Absichtserklärung für Code, der nie so entstand, erklärt nichts und wird gelöscht; sie war de facto ein Tech-Debt-Eintrag, und solche verschwinden bei Erledigung. Prüfschritt vor dem Löschen: keine `// ADR-SXXX-N`-Referenz im Code (via `decisions.py refs`) – Erwähnungen in Session-Dateien bleiben als Historie gültig und sind kein Hindernis.
 
 ---
 

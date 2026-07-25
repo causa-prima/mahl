@@ -264,3 +264,58 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 
+---
+
+## OBS-S108-3 – Mutations-Läufe können erfolgreich aussehen, ohne etwas mutiert zu haben
+- Quelle: Subagent (backend- + frontend-layer-implementer, run-8)
+- Status: NEU
+- Impact: HOCH    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Drei unabhängige Wege, auf denen ein Mutations-Lauf als bestanden erscheint, obwohl er nichts oder nur einen Bruchteil geprüft hat. (a) `dotnet-stryker.py --mutate` erwartet einen **projekt**-relativen Pfad (`Endpoints/Foo.cs`); mit einem repo-root-relativen Pfad (`Server/Endpoints/Foo.cs` – die Form, die praktisch jedes andere Script im Repo nutzt) wird die Zieldatei als „Excluded" gewertet und der Lauf endet mit „Score: 100.0 %, Valid: 0". (b) `--mutate` mit Brace-Glob (`"src/{a.tsx,b.ts}"`) wird am Komma zerlegt → ungültige Globs → Dry-Run über 0 Dateien, Exit 0. (c) `qa-check.py` weicht bei einem erkannten konkurrierenden Stryker-Lock auf einen bereits vorhandenen Report aus – auch wenn dieser aus einem `--mutate`-Einzeldatei-Lauf stammt und damit einen ganz anderen Scope hat; der Output war in sich widersprüchlich („Score: 100.0 %" oben, „ACHTUNG: Mutation-Score 100.0 % < 100 %" unten) und kostete den Subagenten mehrere Minuten Diagnose. Gemeinsamer Nenner: In allen drei Fällen ist die ausgegebene Zahl 100 %, und in keinem Fall belegt sie, was sie zu belegen scheint. Der Übergabe-Hash bindet den Report-Inhalt, nicht dessen Umfang – bei (c) wäre er also formal gültig gewesen. Der Orchestrator hat den Report-Scope (Dateizahl, Mutantenzahl) in dieser Session deshalb einmal von Hand nachgezählt; das ist kein Bestandteil des regulären Gates.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: OBS-S102-1
+
+---
+
+## OBS-S108-4 – Wrapper-Ergonomie: kein Fortschritt sichtbar, Pfad-Zwang, verdrehte Log-Reihenfolge
+- Quelle: Subagent (backend- + frontend-layer-implementer, run-8)
+- Status: NEU
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Drei kleine Reibungspunkte an den Script-Wrappern, alle ohne Fehlsignal-Risiko. (a) Langlaufende Wrapper geben ihre kuratierte Ausgabe erst am Ende aus; bei Läufen über 120 s bleibt die Task-Output-Datei minutenlang leer, und der Ersatz-Pollpfad `.claude/tmp/stryker_frontend_out.txt` wird am Ende gelöscht – währenddessen ist nicht unterscheidbar, ob der Lauf arbeitet oder hängt. (b) `npm run typecheck` ist nur aus dem `Client/`-Verzeichnis heraus erlaubt, `npm --prefix Client run typecheck` wird geblockt. (c) `dotnet-stryker.py` schreibt seine eigenen `print()`-Ausgaben („Starte: …", „Report verschoben → …") gepuffert, während der `dotnet stryker`-Subprozess ungepuffert auf denselben fd schreibt – im nicht-TTY-Output erscheint der Report-Score dadurch **vor** der „Starte:"-Zeile, was beim schnellen Lesen wie ein Fehlgriff des Aufrufers aussieht.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: –
+
+---
+
+## OBS-S108-5 – Restore-Endpoint ist als CORS-„Simple Request" ohne Preflight erreichbar
+- Quelle: Subagent (security-auditor, Review run-8)
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: QUALITÄT    Kontext: Security
+- Beobachtung: `POST /api/ingredients/{id}/restore` verlangt weder Custom-Header noch Request-Body und ist damit ein CORS-„Simple Request": Ein Browser sendet ihn cross-origin **ohne** Preflight, CORS verhindert nur das Auslesen der Antwort, nicht die serverseitige Ausführung. Alle übrigen mutierenden Endpoints sind hier zufällig geschützt – `DELETE` durch den verpflichtenden `If-Match`-Header, `POST /api/ingredients` durch `Content-Type: application/json`; beide erzwingen dadurch eine Preflight, die mangels CORS-Policy scheitert. Der Verzicht auf If-Match beim Restore ist in ADR-S108-2 bewusst und mit Concurrency-Argumenten begründet – dass If-Match nebenbei auch die Preflight erzwungen hätte, ist ein Nebeneffekt, den die ADR nicht betrachtet. Praktische Tragweite im aktuellen Stand begrenzt: Der Angreifer braucht die Ziel-UUIDv7 (~74 nicht erratbare Zufallsbits), wer sie kennt hat über das ungeschützte GET ohnehin direkten API-Zugriff, und der Schaden beschränkt sich auf das Rückgängigmachen eines Soft-Deletes. Relevant wird es, sobald Auth existiert – dann ist es die einzige Stelle, an der ein fremder Browser eine Zustandsänderung auslösen kann. Kein User-Entscheid nötig (kein Business-Impact, technische Härtungsfrage im Sinne der `CLAUDE.md`-Faustregel) – die Abwägung „Preflight erzwingen vs. bewusst tragen" gehört in den Drain, das Ergebnis in eine ADR.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: –
+
+---
+
+## OBS-S108-6 – `open-questions.md` hat keinen Lese-Trigger: Fragen werden abgelegt, nie vorgelegt
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: Alle Verweise auf `docs/open-questions.md` in Skills, Hooks und Prozessdocs sind **Schreib**-Verweise („dort eintragen"): `gherkin-workshop` legt nicht lösbare Fragen ab (Schritt ~292), `kaizen` und `closing-session` verweisen aufs Eintragen, `implementing-scenario` ebenso. Kein Prozessschritt liest die Datei, legt Einträge zur Klärung vor oder erzwingt eine Wiedervorlage. Alle anderen Tracker haben einen solchen Trigger: `tech-debt.md` wird in `implementing-scenario` Schritt 0.5 gesichtet und in 6.1 abgeglichen, `observations.md` treibt der Drain-Vorschlag am Session-Start, `lessons_learned.md` die Retro über den Jenga-Score. Folge im Bestand: OQ-S083-1/-2 liegen seit 25 Sessions offen, OQ-S094-1/-2 seit 14. Konkret in dieser Session: OQ-S083-1 fragt „ADR vs. technische Schuld: Taxonomie klären" – genau diese Abgrenzung wurde hier dreimal ad hoc neu verhandelt (ADR-S000-3 löschen statt Superseded; Undo-Toast-Touch-Punkt als TD statt OBS; CORS-Punkt als OBS statt OQ), ohne dass die offene Frage konsultiert wurde. Sichtbar wurde sie nur, weil der User sie beiläufig erwähnte. Anders als bei OBS-Einträgen (Feld `Status: IN BEOBACHTUNG bis S<NNN>`) gibt es im OQ-Format zudem kein Feld für einen Wiedervorlage-Termin.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: –
+
+---
+
+## OBS-S108-2 – gherkin-workshop-Checkliste deckt transiente Feedback-Elemente (Toast/Snackbar) nicht ab
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Gherkin
+- Beobachtung: Die Vollständigkeits-Checkliste in `.claude/skills/gherkin-workshop/SKILL.md` (Zeilen ~155-157) fragt „Nach erfolgreicher Aktion", „Abbrechen" und „Feld-Initialisierung" ab – durchgehend dialog- und formularzentriert. Für transiente Feedback-Elemente (Toast/Snackbar) fragt sie nichts: weder Lebensdauer, noch wodurch sie verschwinden, noch was bei mehrfacher Auslösung kurz hintereinander passiert. „Klick außerhalb" kommt vor, aber nur als Abbrechen-Pfad eines Dialogs. In run-8 führte das dazu, dass der Undo-Toast als einzige Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5) ohne jedes Szenario zu seinem Verhalten implementiert wurde. Erst der Review deckte drei beobachtbare Verhaltensaspekte auf, für die Szenarien fehlten (Klick daneben schließt den Toast; zweiter Toast erbt die Restlaufzeit des ersten und verkürzt das Undo-Fenster; nur der letzte Löschvorgang ist rückgängig). Zwei davon waren bereits implementiertes Verhalten ohne Spec, einer ein realer, im Browser reproduzierter Bug. Die Szenarien wurden nachträglich ergänzt – also in umgekehrter Reihenfolge zum Outside-In-Prinzip (ADR-S041-5). Aufgefallen ist die Lücke dem User, nicht dem Workshop und nicht den Review-Agenten.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: –
+

@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 108 | 2026-07-23/25 | SKELETON (US-904 run-7 + run-8) | run-7 „Liste" + run-8 „Löschen·Success" inkl. Undo-Toast-Nachtrag (3 Szenarien): per-Zeile-xmin-ETag (ADR-S108-1), Restore-Endpoint (ADR-S108-2), kein Snackbar-Stacking (ADR-S108-3); ADR-S000-3 gelöscht; Code-Edits auto-allow; LL-S108-1..3, OBS-S108-2..6, TD-S108-1..4. |
 | 107 | 2026-07-22 | SKELETON (Kaizen-Retro S095–106) | Kaizen-Retro: CM-S107-1 (OFFEN, OBS-Erfassungs-Poka-Yoke) + CM-S107-2; Impact-Rubrik geschärft + fester Sanity-Check (kaizen Schritt 0) nach blinder Rater-Sonde (OBS-S092-3), 5 Impacts korrigiert; Kontext-Tag `Testing`; LL-S107-1/-2. |
 | 106 | 2026-07-21 | SKELETON (US-904 run-10) | run-10 „Löschen·Konflikt" (vor run-7 vorgezogen): DELETE + erste Single-Resource-xmin-ETag-Grundlage (POST-ETag, If-Match 428/400/412, 404-Dominanz; ADR-S106-1/-2); malformed-If-Match→400-Härtung; ADR-S106-3, TD-S106-1, LL-S106-1/-2, OBS-S106-1..3. |
 | 105 | 2026-07-21 | SKELETON (US-904 run-6) | run-6 „Name-Eindeutigkeit": field-keyed 422 bei Duplikat (`NameDuplicate`-Case) + DB-Constraint `LOWER(name)` (ADR-S105-2); Integrationstests EF-InMemory→Testcontainers (ADR-S105-1); Locale-Test≠Prod via Single-Source `config/postgres.env` (CM-S105-1); LL-S105-1, OBS-S105-2. |

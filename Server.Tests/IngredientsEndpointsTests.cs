@@ -13,6 +13,10 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 {
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
     private sealed record IngredientResponse(Guid Id, string Name, string DefaultUnit);
+    // ADR-S108-1: eigener, NICHT-blinder Response-Record fürs neue etag-Feld. IngredientResponse bleibt
+    // unverändert – eine Erweiterung würde bestehende BeEquivalentTo-Assertions zwingen, einen xmin-Wert
+    // vorherzusagen, den sie nicht kennen können.
+    private sealed record IngredientWithEtagResponse(Guid Id, string Name, string DefaultUnit, string Etag);
     private sealed record CreateIngredientRequest(string Name, string DefaultUnit);
     private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
@@ -48,6 +52,10 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         persisted.Should().BeEquivalentTo([expected], o => o.Excluding(x => x.DeletedAt));
         persisted[0].DeletedAt.Should().NotBeNull();
     }
+
+    // ADR-S108-2: Restore ohne Body, ohne If-Match (Single-User-App-Ausnahme von ADR-S058-1).
+    private async Task<HttpResponseMessage> RestoreIngredientAsync(Guid id) =>
+        await Client.PostAsync($"/api/ingredients/{id}/restore", content: null, TestContext.Current.CancellationToken);
 
     [Fact]
     public async Task US904_HappyPath_GetIngredients_EmptyDb_Returns200WithEmptyList()
@@ -546,5 +554,94 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
         // Then: die Zeile bleibt unverändert soft-deleted – keine weitere Mutation (full-state DB assertion)
         await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Wacholder", DefaultUnit = "g" });
+    }
+
+    // ADR-S108-1: GET /api/ingredients liefert je Zeile den xmin-ETag im Body (etag-Feld) – die
+    // If-Match-Quelle für ein DELETE einer aus der Liste geladenen Zutat. Kategorie-1-Protokolltest
+    // (ADR-S106-3) ohne treibendes Gherkin-Szenario, daher ohne US-Tag. Der etag-Wert wird gegen den
+    // ECHTEN ETag-Header derselben Zeile verglichen (nicht nur "nicht leer") – beide stammen aus
+    // demselben xmin und müssen identisch sein.
+    [Fact]
+    public async Task GetIngredients_ActiveIngredient_ReturnsRowEtagMatchingItsOwnPostETagHeader()
+    {
+        // Given: an ingredient created via POST (its real xmin ETag from the response header)
+        var (created, etag) = await CreateIngredientAsync("Kreuzkümmel", "g");
+
+        // When: the ingredient list is requested
+        var response = await Client.GetAsync("/api/ingredients", TestContext.Current.CancellationToken);
+
+        // Then: the row's etag field equals the POST's ETag header for the same row (same xmin)
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<IngredientWithEtagResponse[]>(TestContext.Current.CancellationToken);
+        body.Should().BeEquivalentTo(
+            [new IngredientWithEtagResponse(Id: created.Id, Name: "Kreuzkümmel", DefaultUnit: "g", Etag: etag)]);
+    }
+
+    // ADR-S108-1: POST /api/ingredients (201) teilt sich das IngredientDto mit GET – das etag-Feld des
+    // Response-Bodys wird aus demselben xmin gefüllt, das ohnehin schon für den ETag-Response-Header
+    // (ADR-S106-1) gelesen wird. Kategorie-1-Protokolltest (ADR-S106-3), kein US-Tag.
+    [Fact]
+    public async Task CreateIngredient_ValidData_Returns201BodyWithEtagFieldMatchingETagHeader()
+    {
+        // Given: name and unit for a new ingredient
+        var request = new CreateIngredientRequest(Name: "Ingwer", DefaultUnit: "g");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: the body's etag field equals the response's own ETag header (same xmin, read once)
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<IngredientWithEtagResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Etag.Should().Be(response.Headers.ETag!.Tag);
+    }
+
+    // @US-904-happy-path (Szenario 2 "Löschen rückgängig machen via Toast"): pinnt das Backend-
+    // Verhalten hinter "Then sehe ich 'Mehl' in der Zutaten-Liste mit Einheit 'g'" – Restore setzt
+    // DeletedAt = null und lässt Name/Einheit unverändert. Szenario-getrieben, daher US-Tag (nicht
+    // Kategorie-1 nach ADR-S106-3 – das wäre nur reine Protokoll-/Infrastruktur-Mechanik ohne
+    // Domänen-Verhalten). ADR-S108-2: Restore läuft ohne Body und ohne If-Match (Single-User-App-
+    // Ausnahme von ADR-S058-1).
+    [Fact]
+    public async Task US904_HappyPath_RestoreIngredient_SoftDeletedIngredient_Returns204AndClearsDeletedAt()
+    {
+        // Given: "Rosmarin" exists and was already deleted (first DELETE succeeds, 204)
+        var (created, etag) = await CreateIngredientAsync("Rosmarin", "g");
+        var deleteResponse = await DeleteIngredientAsync(created.Id, etag);
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // When: the soft-deleted ingredient is restored (no body, no If-Match)
+        var response = await RestoreIngredientAsync(created.Id);
+
+        // Then: 204 No Content
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Then: the row is active again – DeletedAt cleared, name/unit unchanged (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = created.Id, Name = "Rosmarin", DefaultUnit = "g" }]);
+    }
+
+    // ADR-S108-2: eine nie existente id liefert 404 mit demselben Body wie DELETE (NotFoundProblem,
+    // ADR-S051-5/ADR-S054-6). Kategorie-1-Protokolltest (ADR-S106-3), kein US-Tag.
+    [Fact]
+    public async Task RestoreIngredient_NonExistentId_Returns404WithNotFoundDetail()
+    {
+        // Given: an id that was never created
+        var nonExistentId = Guid.CreateVersion7();
+
+        // When: restoring that id
+        var response = await RestoreIngredientAsync(nonExistentId);
+
+        // Then: 404 with the fixed German detail and machine-readable errorCode
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Detail.Should().Be("Zutat wurde nicht gefunden.");
+        body.ErrorCode.Should().Be("INGREDIENT_NOT_FOUND");
+
+        // Then: nothing was written – the 404 path is read-only, the ingredient list stays empty
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEmpty();
     }
 }

@@ -29,7 +29,8 @@ internal static class IngredientsEndpoints
                 Results.Ok(await db.Ingredients
                     .Where(i => i.DeletedAt == null)
                     .OrderBy(i => i.Name)
-                    .Select(i => new IngredientDto(i.Id, i.Name, i.DefaultUnit))
+                    // ADR-S108-1: per-Zeile xmin-ETag im Body – If-Match-Quelle für ein DELETE aus der Liste.
+                    .Select(i => new IngredientDto(i.Id, i.Name, i.DefaultUnit, XminETag.Format(EF.Property<uint>(i, "xmin"))))
                     .ToListAsync()));
 
         group.MapPost(
@@ -56,8 +57,11 @@ internal static class IngredientsEndpoints
                         }
                         // ADR-S058-3: der ETag der neu angelegten Zeile geht mit dem 201 heraus, damit ein
                         // Client ihn als If-Match auf ein späteres DELETE/PUT/PATCH mitschicken kann.
-                        httpContext.Response.Headers.ETag = XminETag.Format((uint) db.Entry(dbType).Property("xmin").CurrentValue!);
-                        return ingredient.ToDto();
+                        // ADR-S108-1: derselbe xmin füllt zusätzlich das DTO-Feld etag – einmal gelesen,
+                        // für Header UND Body verwendet (kein doppelter xmin-Read).
+                        var xmin = (uint) db.Entry(dbType).Property("xmin").CurrentValue!;
+                        httpContext.Response.Headers.ETag = XminETag.Format(xmin);
+                        return ingredient.ToDto(xmin);
                     })
                     .MatchAsync(
                         created => Results.Created($"/api/ingredients/{created.Id}", created),
@@ -96,6 +100,22 @@ internal static class IngredientsEndpoints
                 {
                     return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
                 }
+                return Results.NoContent();
+            });
+
+        group.MapPost(
+            "/{id:guid}/restore",
+            // ADR-S108-2: minimaler Undo-Restore – ohne Body, ohne If-Match (Single-User-App-Ausnahme
+            // von ADR-S058-1). Query ohne DeletedAt-Filter: die DELETE-Query (aktiv-only) taugt hier
+            // nicht, Restore muss gerade die soft-deleted Zeile finden.
+            async (Guid id, MahlDbContext db) =>
+            {
+                var ingredient = await db.Ingredients.FirstOrDefaultAsync(i => i.Id == id);
+                if (ingredient is null)
+                    return IngredientMappings.NotFoundProblem();
+
+                ingredient.DeletedAt = null;
+                await db.SaveChangesAsync();
                 return Results.NoContent();
             });
     }
@@ -171,8 +191,8 @@ file static class IngredientMappings
     internal static IngredientDbType ToDbType(this Ingredient domain) =>
         new() { Id = domain.Id, Name = domain.Name.Value, DefaultUnit = domain.DefaultUnit.Value };
 
-    internal static IngredientDto ToDto(this Ingredient domain) =>
-        new(domain.Id, domain.Name.Value, domain.DefaultUnit.Value);
+    internal static IngredientDto ToDto(this Ingredient domain, uint xmin) =>
+        new(domain.Id, domain.Name.Value, domain.DefaultUnit.Value, XminETag.Format(xmin));
 
     // ADR-S051-5/ADR-S054-6: fixe deutsche Meldung + maschinenlesbarer errorCode für den DELETE-404-Fall
     // (nicht vorhanden ODER bereits soft-deleted, ADR-S000-5).

@@ -9,6 +9,9 @@ export type Ingredient = {
   readonly id: string
   readonly name: string
   readonly defaultUnit: string
+  // ADR-S108-1: per-Zeile xmin-ETag (hex, "{xmin:x8}") aus dem GET-Body – die If-Match-Quelle
+  // fürs Löschen einer aus der Liste geladenen Zutat.
+  readonly etag: string
 }
 
 export type NewIngredient = {
@@ -30,6 +33,27 @@ export function createIngredient(ingredient: NewIngredient): ResultAsync<Ingredi
     }),
     (e): ApiError => ({ kind: 'Unexpected', message: String(e) }),
   ).andThen(toIngredientResult)
+}
+
+// ADR-S108-1/S058-1: DELETE einer Zutat verlangt If-Match; der Wert ist der per-Zeile-xmin-ETag
+// aus dem GET-Body. Nur Erfolgspfad (run-8) – die Response wird nicht ausgewertet.
+export function deleteIngredient(id: string, etag: string): ResultAsync<Response, ApiError> {
+  return ResultAsync.fromPromise(
+    fetch(`/api/ingredients/${id}`, {
+      method: 'DELETE',
+      headers: { 'If-Match': etag },
+    }),
+    (e): ApiError => ({ kind: 'Unexpected', message: String(e) }),
+  )
+}
+
+// ADR-S108-2: Restore reaktiviert dieselbe soft-deleted Zeile – ohne Body, ohne If-Match
+// (Single-User-App-Ausnahme von ADR-S058-1). Erfolgs-Status 204 (ADR-S108-2).
+export function restoreIngredient(id: string): ResultAsync<Response, ApiError> {
+  return ResultAsync.fromPromise(
+    fetch(`/api/ingredients/${id}/restore`, { method: 'POST' }),
+    (e): ApiError => ({ kind: 'Unexpected', message: String(e) }),
+  )
 }
 
 // ADR-S090-1: 422 -> feld-keyed Validierungsfehler (Err); sonst der angelegte Datensatz.

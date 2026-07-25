@@ -344,19 +344,6 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 ---
 
-### ADR-S000-3: GET /api/ingredients – soft-delete filter: Stryker-Suppression
-
-**Status:** Accepted – **noch nicht implementiert** (geplant für das Soft-Delete-/Löschen-Szenario)
-**Tags:** scope:feature, resource:ingredients, http:get, testing:stryker, db:soft-delete
-
-**Entscheidung:** `// Stryker disable once Equality` auf der `Where(i => i.DeletedAt == null)` Zeile in `IngredientsEndpoints.cs`.
-
-**Begründung:** In den happy-path-Tests existieren keine soft-deleted Einträge – die DB ist leer oder enthält nur aktive Einträge. Damit ist `== null` und `!= null` im Testkontext äquivalent (beide liefern das gleiche Ergebnis). Das Verhalten mit soft-deleted Einträgen wird durch ein dediziertes Soft-Delete-Szenario (künftiger Zyklus) getestet. Keine Vorabtestung außerhalb des vorgesehenen Szenarios.
-
-**Stand US-904 Happy-Path (Session 083):** Weder die `DeletedAt`-Spalte (`IngredientDbType`) noch der `Where`-Filter existieren bislang – bewusst YAGNI, da noch kein Soft-Delete-/Löschen-Szenario implementiert ist. Diese ADR beschreibt die **geplante** Suppression, die zusammen mit der `DeletedAt`-Spalte im Soft-Delete-Zyklus eingeführt wird. Bis dahin liefert `GET /api/ingredients` bewusst ungefiltert alle Rows. Kein Code-↔-ADR-Drift, sondern dokumentierte Reihenfolge.
-
----
-
 ### ADR-S083-1: GET /api/ingredients – Read-Pfad mappt DB→DTO direkt (ToDomain aufgeschoben)
 
 **Status:** Accepted
@@ -390,6 +377,55 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Addendum – Reihenfolge relativ zum If-Match-Check:** Seit `DELETE /api/ingredients/{id}` als erster mutierender Single-Resource-Endpoint auch If-Match prüft (ADR-S058-1), stellt sich die Frage, welcher Check zuerst greift, wenn beide zuschlagen (Ressource nicht (mehr) aktiv UND If-Match fehlt/ist stale). Entscheidung: **Not-Found-Check läuft immer zuerst.** Eine bereits soft-deleted oder nie existente Ressource liefert 404, unabhängig davon ob If-Match fehlt (sonst 428) oder stale ist (sonst 412). Begründung: 404 ist die eindeutigere, für den Client handlungsleitendere Aussage ("es gibt nichts zu aktualisieren") – ein 412 würde fälschlich suggerieren, die Ressource existiere noch und ein Retry mit frischem ETag könnte helfen. Gilt analog für `DELETE /api/recipes/{id}`, sobald dort If-Match eingeführt wird.
 
 **Addendum – gleichzeitiges Doppel-DELETE:** Zwei Clients löschen dieselbe aktive Ressource gleichzeitig, beide mit demselben (zum Zeitpunkt des Sendens gültigen) If-Match. Der erste Request gewinnt (204, Soft-Delete). Der zweite Request findet die Ressource beim Not-Found-Check noch als aktiv vor (Race gegen den ersten Commit) und erreicht den EF-Concurrency-Check – dessen `OriginalValue` ist inzwischen stale → **412**, nicht 404. Das ist optimistic-concurrency-korrekt (kein Re-Read zwischen Not-Found-Check und Save) und self-healing: ein Retry des Verlierers liest die Ressource neu ein und erhält dann korrekt 404 (jetzt soft-deleted).
+
+---
+
+### ADR-S108-1: GET /api/ingredients liefert per-Zeile xmin-ETag im DTO (If-Match-Quelle für DELETE aus der Liste)
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:ingredients, http:get, http:etag, db:xmin, arch:caching
+
+**Entscheidung:** `GET /api/ingredients` nimmt in jedes `IngredientDto` ein Feld `etag` auf – der xmin-Wert der Zeile, hex-kodiert im selben Format wie der Single-Resource-ETag (`XminETag.Format`, lowercase `"{xmin:x8}"`, ADR-S106-1). Die GET-Query selektiert xmin je Zeile mit (`EF.Property<uint>(i, "xmin")`). Das Frontend verwendet diesen Wert als `If-Match` beim `DELETE` (und künftig PUT/PATCH) einer aus der Liste geladenen Zutat.
+
+**Begründung:** Der mutierende Single-Resource-`DELETE` verlangt If-Match (ADR-S058-1/-2, 428 ohne). Für eine aus dem Collection-GET geladene Zutat gab es bisher keine ETag-Quelle: der Collection-ETag (Content-Hash im Response-Header, ADR-S058-3/S084-1) identifiziert die *ganze* Liste, nicht die einzelne Zeile, und ein Single-Resource-`GET /{id}` existiert bewusst nicht (ADR-S106-1). Der per-Zeile-ETag im Body schließt die Lücke ohne Extra-Roundtrip.
+
+**Abgrenzung zweier ETag-Mechanismen (koexistieren):** (1) **Collection-Content-Hash-ETag** im *HTTP-Response-Header* (`If-None-Match` → 304, Caching der ganzen Liste) – unverändert von der Middleware gebildet. (2) **Per-Zeile-xmin-ETag** als *Body-Feld* je DTO (`If-Match` → Optimistic Concurrency der einzelnen Zeile). Unterschiedliche Träger (Header vs. Body), unterschiedliche Zwecke – kein Konflikt.
+
+**Geltungsbereich – `IngredientDto` bleibt ein Typ, der POST-201-Body trägt `etag` mit:** `IngredientDto` wird von `GET /api/ingredients` und `POST /api/ingredients` (201) geteilt. Das `etag`-Feld wird dem gemeinsamen Record hinzugefügt; der POST füllt es aus dem xmin, den er für den `ETag`-Response-Header (ADR-S106-1) ohnehin bereits liest. Begründung: (1) der Frontend-Typ `Ingredient` (`services/ingredientsApi.ts`) führt `etag` als *required* und ist Rückgabetyp von `createIngredient` – ein POST ohne `etag` machte den Typ zur Lüge und lieferte beim direkten Weiterverwenden der POST-Antwort ein `If-Match: undefined`; (2) ein zweites, fast identisches Listen-DTO kostet einen Typ plus Mapping ohne Gegenwert. Der Wert ist per Integrationstest abgedeckt (Kategorie-1-Protokolltest nach ADR-S106-3, kein US-Tag) – nicht ungetestet mitgeschleppt.
+
+**Verworfen:** Single-Resource-`GET /{id}` als ETag-Quelle – zusätzlicher Roundtrip vor jedem DELETE; ADR-S106-1 hatte ihn bewusst weggelassen. DELETE ohne If-Match für den Listen-Flow – Verstoß gegen ADR-S058-1. Separates `IngredientListItemDto` nur für den GET – strikteste YAGNI-Lesart, aber Typ+Mapping-Kosten ohne Gegenwert und lässt die Frontend-Typ-Lüge bestehen.
+
+---
+
+### ADR-S108-2: Restore-Endpoint POST /api/ingredients/{id}/restore – minimaler Undo-Restore, ohne If-Match
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:ingredients, http:post, db:soft-delete, http:etag
+
+**Entscheidung:** Der Restore-Endpoint `POST /api/ingredients/{id}/restore` reaktiviert eine soft-deleted Zutat (`DeletedAt = null`). In seiner ersten Fassung – der direkte „Rückgängig"-Undo unmittelbar nach dem eigenen Löschen – arbeitet er **ohne Request-Body** (Name und Einheit der Zeile bleiben unverändert) und **ohne If-Match-Pflicht**. 404, wenn die id nicht existiert.
+
+**If-Match-Ausnahme (bewusste Abweichung von ADR-S058-1):** ADR-S058-1 verlangt If-Match für *alle* mutierenden Single-Resource-Endpoints. Restore ist ausgenommen, weil: (1) Mahl ist eine Single-User-App (ADR-S054-4) – kein reales Concurrency-Fenster; (2) der Undo folgt direkt auf das eigene DELETE, dessen 204-Response keinen neuen ETag liefert – ein If-Match-Zwang würde einen künstlichen ETag-Rücktransport im DELETE-Response erzwingen, ohne Concurrency-Nutzen (YAGNI). Die Ausnahme ist auf diesen Endpoint begrenzt; DELETE/PUT/PATCH behalten If-Match.
+
+**Geltungsbereich:** Nur der minimale id-basierte Restore ohne Body. Werte-Übernahme aus einem Request, die POST-409-Orchestrierung und der „bereits aktiv"-409-Fall (ADR-S004-1/S051-4/S051-2) sind nicht Teil dieser Entscheidung.
+
+**404-Pfad ist test-autorisiert, obwohl kein Gherkin-Szenario ihn fordert (Addendum S108):** Der Test `RestoreIngredient_NonExistentId_Returns404WithNotFoundDetail` trägt bewusst keinen US-Tag. Begründung: Der Null-Check im Endpoint ist **strukturell erzwungen**, nicht optional – ohne ihn liefe der Restore auf einer nicht existenten id in eine `NullReferenceException` und damit, mangels globalem Exception-Handler, in einen rohen 500. Der Guard muss also existieren, und die 404-Antwort ist oben in dieser ADR bereits als Kontrakt festgelegt. Der Test deckt genau diesen ADR-festgelegten Kontrakt ab und ist damit ein Protokolltest im Sinne von ADR-S106-3 Kategorie 1. **Abgrenzung:** Das ist *keine* Vorwegnahme der Restore-Fehler-UI (späterer Lauf) – getestet wird ausschließlich die Server-Antwort, nicht die Reaktion des Frontends darauf. Der Erfolgspfad-Test des Restore ist demgegenüber szenario-getrieben und trägt deshalb den `US904_HappyPath_`-Tag.
+
+**Verworfen:** Restore mit If-Match – bräuchte ETag-Rücktransport im DELETE-204 ohne Concurrency-Nutzen (Single-User-App). Undo über den POST-409-Reaktivierungs-Flow – das ist Sache der Reaktivierungs-Funktion; ihn für den Undo vorzubauen zöge sie vor. Undo via Neu-Anlegen (neuer POST, neue id) – erzeugt stille Inkonsistenz (ADR-S004-1 verworfen).
+
+---
+
+### ADR-S108-3: Undo-Toast deckt nur den letzten Löschvorgang ab (kein Snackbar-Stacking)
+
+**Status:** Accepted
+**Tags:** scope:feature, story:us-904, frontend:react, arch:error-handling
+
+**Entscheidung:** Der „Rückgängig"-Undo nach dem Löschen einer Zutat hält **genau einen** Löschvorgang vor – den zuletzt ausgeführten. Löscht der Nutzer eine zweite Zutat, bevor er den ersten Undo-Toast genutzt hat, ersetzt der neue Toast den alten; der Undo-Weg für die erste Zutat entfällt ersatzlos. Snackbar-Stacking (mehrere gleichzeitige Undo-Toasts) wird bewusst **nicht** implementiert.
+
+**Begründung:** Der Zustand ist als `DeletedIngredient | null` modelliert (ein Wert, kein Stack) – das hält „Toast offen ohne zugehörige Zutat" strukturell unmöglich. Mehrfach-Undo fordert kein Szenario, und der Aufwand (Map-Modellierung, gestapelte Toasts, Positionierung, eigene Szenarien und Tests) steht in keinem Verhältnis zum Nutzen: Der Sonderfall verlangt zwei Löschungen innerhalb der 6-Sekunden-Toast-Dauer.
+
+**Bekannte Konsequenz (bewusst getragen):** Für die überschriebene Zutat existiert derzeit **kein** UI-Weg zurück – es gibt keinen Papierkorb und keine Liste gelöschter Zutaten. Die Zeile ist nur soft-deleted (`DeletedAt`, ADR-S000-6), also nicht verloren, aber bis zur Reaktivierungs-Funktion (run-11: erneutes Anlegen unter gleichem Namen reaktiviert die Zeile) nur über die API erreichbar. Das ist eine Abweichung vom Wortlaut der UX-Guideline Prinzip 5 Stufe 1 („Soft-Delete + Wiederherstellungsmöglichkeit im UI") für diesen Sonderfall – hier dokumentiert statt stillschweigend in Kauf genommen. Quelle: functional-correctness-auditor, Review run-8.
+
+**Verworfen:** Snackbar-Stacking via Map (id → DeletedIngredient) – korrekt, aber ein eigener Entwurfsschritt weit über den Lauf hinaus. Undo-Weg über einen Papierkorb-Screen – neue Fläche ohne Story. Zweites Löschen sperren, solange ein Undo offen ist – bestraft den Normalfall für einen Randfall.
 
 ---
 

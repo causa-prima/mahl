@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
@@ -31,6 +31,16 @@ async function awaitDialogAutofocus() {
 const tomaten = { id: '1', name: 'Tomaten', defaultUnit: 'Stück' } as const
 
 const salz = { id: '7', name: 'Salz', defaultUnit: 'g' } as const
+
+// run-8: nur "Mehl" (g) existiert. Der per-Zeile-xmin-ETag (ADR-S108-1) reist im GET-Body mit
+// und wird von der Komponente als If-Match beim DELETE verwendet. Realistisches Format: lowercase
+// hex in Quotes ("{xmin:x8}", ADR-S106-1). Das If-Match-VERHALTEN selbst prüft der Service-Client-
+// Test (ingredientsApi.test.ts); hier ist der ETag nur Durchreiche-Wert.
+const mehl = { id: '8', name: 'Mehl', defaultUnit: 'g', etag: '"0000a1b2"' } as const
+
+// run-8-Nachtrag: zweite Zutat für die Undo-Toast-Verlässlichkeits-Szenarien (zwei
+// Löschvorgänge nacheinander). Gleiche ETag-Semantik wie "mehl" – nur als Durchreiche-Wert.
+const zucker = { id: '9', name: 'Zucker', defaultUnit: 'g', etag: '"0000c3d4"' } as const
 
 // > MUI theme.transitions.duration.leavingScreen (225ms, MUI-Default) + Marge. Settle-
 // Fenster VOR Assertions, die sich auf "Dialog noch im DOM" verlassen: die Exit-Transition
@@ -558,5 +568,212 @@ describe('IngredientsPage – Reopen nach fehlgeschlagenem Speichern und Abbrech
     expect(screen.queryByText('Name darf nicht leer sein.')).not.toBeInTheDocument()
     // Then: das Name-Feld ist nicht als ungültig markiert (aria-invalid zurückgesetzt)
     expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
+  })
+})
+
+// @US-904-happy-path: run-8 „Löschen·Success". Löschen aus der Liste (DELETE mit dem per-Zeile-
+// xmin-ETag als If-Match, ADR-S108-1) + Undo via Toast-„Rückgängig" (Restore ohne If-Match,
+// ADR-S108-2). GET-Handler schaltet zwischen [mehl] (aktiv) und [] (gelöscht) um, gesteuert durch
+// den DELETE/Restore-Aufruf – so ist die invalidate-getriebene Listen-Umschaltung echt beobachtbar.
+// Der DELETE-Handler validiert die id (realer Backend-404 bei falscher id, ADR-S000-5): killt den
+// Objekt-Literal-Mutanten am `deleteMutate({ id, etag })`-Aufruf (bei `{}` würde id 'undefined' ->
+// 404 -> Liste bliebe befüllt). Restore antwortet 204 (ADR-S108-2).
+function useDeleteRestoreMehlHandlers(): void {
+  // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET vor/nach Löschen/Restore
+  let isDeleted = false
+  server.use(
+    http.get('/api/ingredients', () => HttpResponse.json(isDeleted ? [] : [mehl])),
+    http.delete('/api/ingredients/:id', ({ params }) => {
+      if (params.id !== mehl.id) return new HttpResponse(null, { status: 404 })
+      isDeleted = true
+      return new HttpResponse(null, { status: 204 })
+    }),
+    http.post('/api/ingredients/:id/restore', ({ params }) => {
+      if (params.id !== mehl.id) return new HttpResponse(null, { status: 404 })
+      isDeleted = false
+      return new HttpResponse(null, { status: 204 })
+    }),
+  )
+}
+
+// run-8-Nachtrag „Undo-Toast-Verlässlichkeit": Mehl UND Zucker aktiv, unabhängig voneinander
+// lösch-/wiederherstellbar (zwei Löschvorgänge nacheinander treiben die Szenarien dieses
+// Blocks). Gleiches Umschalt-Prinzip wie useDeleteRestoreMehlHandlers, nur über eine Menge
+// gelöschter ids statt eines einzelnen Flags.
+function useDeleteRestoreMehlAndZuckerHandlers(): void {
+  // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET vor/nach Löschen/Restore je Zutat
+  let deletedIds: readonly string[] = []
+  const allIngredients = [mehl, zucker]
+  server.use(
+    http.get('/api/ingredients', () =>
+      HttpResponse.json(allIngredients.filter((i) => !deletedIds.includes(i.id)))),
+    http.delete('/api/ingredients/:id', ({ params }) => {
+      if (!allIngredients.some((i) => i.id === params.id)) return new HttpResponse(null, { status: 404 })
+      deletedIds = [...deletedIds, params.id as string]
+      return new HttpResponse(null, { status: 204 })
+    }),
+    http.post('/api/ingredients/:id/restore', ({ params }) => {
+      if (!allIngredients.some((i) => i.id === params.id)) return new HttpResponse(null, { status: 404 })
+      deletedIds = deletedIds.filter((id) => id !== params.id)
+      return new HttpResponse(null, { status: 204 })
+    }),
+  )
+}
+
+describe('IngredientsPage – Zutat löschen', () => {
+  it('US904_HappyPath_DeleteIngredient_FromList_ListEmptyAndUndoToastShown', async () => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    useDeleteRestoreMehlHandlers()
+    renderWithProviders(<IngredientsPage />)
+    const list = await screen.findByTestId('ingredient-list')
+    expect(within(list).getByText('Mehl')).toBeInTheDocument()
+    // Given (Vorbedingung): vor dem Löschen ist kein Undo-Toast sichtbar – pinnt "Toast erst nach
+    //   der Aktion" und killt den Dauer-offen-Mutanten der Snackbar (open immer true).
+    expect(screen.queryByRole('button', { name: 'Rückgängig' })).not.toBeInTheDocument()
+
+    // When: ich bei "Mehl" auf Löschen klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+
+    // Then: die Zutaten-Liste ist leer -> Empty-State ersetzt die Liste (ingredient-list weg)
+    expect(await screen.findByText('Noch keine Zutaten angelegt.')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByTestId('ingredient-list')).not.toBeInTheDocument()
+    })
+    // Then: Toast "Mehl gelöscht" mit "Rückgängig"-Aktion
+    expect(screen.getByText('Mehl gelöscht')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rückgängig' })).toBeInTheDocument()
+  })
+
+  it('US904_HappyPath_UndoDelete_ViaToast_IngredientReappearsInList', async () => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    useDeleteRestoreMehlHandlers()
+    renderWithProviders(<IngredientsPage />)
+    const list = await screen.findByTestId('ingredient-list')
+    expect(within(list).getByText('Mehl')).toBeInTheDocument()
+
+    // When: ich bei "Mehl" auf Löschen klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+    // When: ich im Toast auf "Rückgängig" klicke (findByRole wartet, bis der Toast-Button da ist)
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }))
+
+    // Then: "Mehl" ist wieder in der Zutaten-Liste mit Einheit "g" (Restore reaktiviert dieselbe
+    //   Zeile; auf die Liste gescopt, damit der noch schließende Toast nicht mitzählt).
+    const restoredList = await screen.findByTestId('ingredient-list')
+    expect(await within(restoredList).findByText('Mehl')).toBeInTheDocument()
+    expect(within(restoredList).getByText('g')).toBeInTheDocument()
+  })
+})
+
+// run-8-Nachtrag „Löschen·Success": Verlässlichkeit des Undo-Wegs – der Toast ist die EINZIGE
+// Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5 Stufe 1), solange die
+// Reaktivierung beim Neuanlegen (run-11) fehlt. Drei @US-904-edge-case-Szenarien aus
+// features/ingredients.feature.
+describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
+  // Szenario: Undo-Toast bleibt bei einem Klick daneben erhalten
+  it('US904_EdgeCase_UndoToast_ClickBesideToast_ToastRemainsVisible', async () => {
+    // UX-Guideline Prinzip 5 ("Destructive Actions schützen"): der Undo-Weg für eine
+    //   destruktive Aktion muss die volle autoHideDuration erreichbar bleiben. Ein Klick
+    //   irgendwo auf der Seite (clickaway) ist keine bewusste Abbruch-Entscheidung und darf
+    //   den Toast NICHT schließen – sonst wäre die großzügige autoHideDuration wertlos.
+    //   escapeKeyDown ist eine bewusste Schließen-Geste und schließt weiterhin (deckt den
+    //   onClose-Pfad/setDeleted(null) ab, der die Snackbar aus dem DOM nimmt).
+    // Given: nur die Zutat "Mehl" (g) existiert
+    useDeleteRestoreMehlHandlers()
+    renderWithProviders(<IngredientsPage />)
+    await screen.findByTestId('ingredient-list')
+
+    // When: ich bei "Mehl" auf Löschen klicke -> Toast erscheint
+    fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+    expect(await screen.findByText('Mehl gelöscht')).toBeInTheDocument()
+
+    // When: ich neben den Toast klicke (clickaway). MUIs ClickAwayListener registriert dafür
+    //   einen echten 'click'-Listener auf `document` (Snackbar-Default mouseEvent='onClick');
+    //   ein reines fireEvent.click(document.body) triggert diesen Mechanismus also tatsächlich
+    //   (kein Test-Artefakt, s. node_modules/@mui/material/ClickAwayListener + Snackbar/useSnackbar.js).
+    fireEvent.click(document.body)
+
+    // Then: der Toast bleibt offen -> der Undo-Weg ist weiterhin erreichbar
+    expect(screen.getByText('Mehl gelöscht')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rückgängig' })).toBeInTheDocument()
+
+    // When: ich Escape drücke. Geht über den Wortlaut des Szenarios (nur "Klick daneben")
+    //   hinaus, ist aber KEIN eigenes Szenario: Escape-Dismiss ist MUI-Standardverhalten
+    //   (UX-Guideline coding-guideline-ux.md Prinzip 8, Tabelle "Framework-geliefert – KEIN
+    //   Szenario, per Review erzwungen") – hier zusätzlich mitgeprüft, um zu belegen, dass der
+    //   onClose-Pfad (setDeleted(null)) neben dem clickaway-Guard weiterhin regulär funktioniert.
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
+
+    // Then: jetzt schließt der Toast (Meldung + "Rückgängig" aus dem DOM) – belegt, dass der
+    //   onClose-Pfad (setDeleted(null)) weiterhin funktioniert.
+    await waitFor(() => {
+      expect(screen.queryByText('Mehl gelöscht')).not.toBeInTheDocument()
+    })
+    expect(screen.queryByRole('button', { name: 'Rückgängig' })).not.toBeInTheDocument()
+  })
+
+  // Szenario: Zweites Löschen gibt dem neuen Toast die volle Rückgängig-Zeit
+  it('US904_EdgeCase_SecondDelete_RestartsUndoWindow', async () => {
+    // Given: die Zutaten "Mehl" und "Zucker" existieren
+    useDeleteRestoreMehlAndZuckerHandlers()
+    renderWithProviders(<IngredientsPage />)
+    await screen.findByTestId('ingredient-list')
+
+    // Fake-Timer NUR für den Zeitablauf-Teil dieses Tests: die MUI-autoHideDuration (6s) läuft
+    // über echtes setTimeout – ohne Fake-Timer müsste der Test real 7s warten. fireEvent.click
+    // bleibt synchron (act-gewrappt) und ist von Fake-Timern unabhängig; requestDelete setzt
+    // `deleted` optimistisch synchron (useDeleteIngredientWithUndo.ts), daher reicht eine
+    // direkte Assertion nach dem Klick ohne waitFor/findBy. advanceTimersByTimeAsync (statt
+    // advanceTimersByTime) IN act(async () => ...): erst so committet React den State-Update,
+    // den der abgelaufene MUI-Timer auslöst (handleClose('timeout') -> dismissUndo()) – ohne
+    // act() bleibt document.body auf dem Stand vor dem Timer-Feuern (verifiziert: ohne act()
+    // blieb der Toast in diesem Test fälschlich sichtbar, obwohl der State bereits genullt war).
+    vi.useFakeTimers()
+    try {
+      // When: ich bei "Mehl" auf Löschen klicke -> Toast "Mehl gelöscht" erscheint,
+      //   die 6s-Anzeigezeit startet
+      fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+      expect(screen.getByText('Mehl gelöscht')).toBeInTheDocument()
+
+      // When: ich kurz vor Ablauf der Toast-Anzeigezeit (4,5s < 6s) bei "Zucker" auf Löschen
+      //   klicke. advanceTimersByTimeAsync statt advanceTimersByTime: lässt anhängige Promises
+      //   (Query-Invalidierung/Refetch aus dem ersten Löschen) zwischen den Ticks abarbeiten.
+      await act(async () => { await vi.advanceTimersByTimeAsync(4_500) })
+      fireEvent.click(screen.getByRole('button', { name: 'Zucker löschen' }))
+
+      // Then: der neue Toast zeigt "Zucker gelöscht" mit "Rückgängig"
+      expect(screen.getByText('Zucker gelöscht')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Rückgängig' })).toBeInTheDocument()
+
+      // Then: "Rückgängig" ist noch verfügbar, nachdem die Anzeigezeit des ERSTEN Toasts
+      //   abgelaufen wäre (t≈7s > 6s). Erbt der zweite Toast dessen Restlaufzeit, ist er hier
+      //   bereits weg – der Nutzer verlöre die Undo-Möglichkeit für "Zucker" nach 1,5 statt 6s.
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_500) })
+      expect(screen.getByText('Zucker gelöscht')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Rückgängig' })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Szenario: Nur der zuletzt gelöschten Zutat lässt sich das Löschen rückgängig machen
+  it('US904_EdgeCase_TwoDeletes_UndoRestoresOnlyTheLatest', async () => {
+    // ADR-S108-3: der Undo-Zustand hält genau einen Löschvorgang vor (den zuletzt
+    //   ausgeführten) – kein Snackbar-Stacking. Pinnt diese bewusste Einschränkung.
+    // Given: die Zutaten "Mehl" und "Zucker" existieren
+    useDeleteRestoreMehlAndZuckerHandlers()
+    renderWithProviders(<IngredientsPage />)
+    const list = await screen.findByTestId('ingredient-list')
+    expect(within(list).getByText('Mehl')).toBeInTheDocument()
+
+    // When: ich bei "Mehl" und danach bei "Zucker" auf Löschen klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Zucker löschen' }))
+    // When: ich im Toast auf "Rückgängig" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }))
+
+    // Then: "Zucker" kehrt in die Zutaten-Liste zurück – "Mehl" bleibt gelöscht
+    const restoredList = await screen.findByTestId('ingredient-list')
+    expect(await within(restoredList).findByText('Zucker')).toBeInTheDocument()
+    expect(within(restoredList).queryByText('Mehl')).not.toBeInTheDocument()
   })
 })

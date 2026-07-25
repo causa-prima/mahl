@@ -57,3 +57,27 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: „Läufe fanden statt" nicht zerlegt in „war der wirksame Mechanismus (Gate) über die ganze Periode aktiv?" – die auffällige Lauf-Zahl fürs Ganze genommen.
   Regel: Vor einer CM-BEWÄHRT-/Wirksamkeits-Aussage prüfen, ob der steuernde Mechanismus über den **gesamten** Bewertungszeitraum aktiv war (Gate-off-Perioden zählen nicht) – Lauf-Zahl ≠ gate-gedeckte Lauf-Zahl.
   Bezug: CM-S095-2
+
+---
+
+## Session 108 – 2026-07-23/25
+
+- **[HOCH] [AGENT] [Subagenten] LL-S108-1 – Beide Frontend-Subagenten endeten ohne Übergabe-Report; passives Warten sah dabei korrekt aus**
+  Quelle: Orchestrator
+  Was: Zwei Frontend-Subagenten wurden beendet, ohne ihren `=== VERIFIKATIONS-HASH ===`-Block zu liefern; der Orchestrator wartete jeweils weiter und erfuhr erst durch den User, dass kein Agent mehr läuft – beide Übergabeläufe (`qa-check --layer frontend` inkl. vollem Stryker) musste er danach selbst nachfahren.
+  Warum: Es kam nie eine Abschluss-Meldung an, sondern nur wiederholte idle-Zwischensignale. Die Skill-Regel „idle ignorieren, bei gemeldetem Abschluss ohne Report per `SendMessage` nachfordern" greift damit nicht: Sie deckt nur den Fall ab, in dem ein Abschluss *gemeldet* wird – bleibt beides aus, ist Weiterwarten regelkonform und trotzdem endlos.
+  Regel: Bleibt ein beauftragter Subagent über mehrere idle-Signale ohne inhaltlichen Return, den Fortschritt **mechanisch am Arbeitsbaum** prüfen (`git status`/`git diff`/gezieltes `grep` auf die erwartete Änderung) statt weiter passiv zu warten – und bei erkennbar abgeschlossener Arbeit ohne Report den Verifikationslauf selbst fahren, statt ihn nachzufordern.
+  Bezug: OBS-S108-3
+
+- **[MITTEL] [PROZESS] [Testing] LL-S108-2 – Test-Kategorie pauschal vorgegeben statt pro Test geprüft**
+  Quelle: Orchestrator
+  Was: In der Beauftragung des Backend-Subagenten wurden **beide** Restore-Tests pauschal als „Kategorie-1-Protokolltest nach ADR-S106-3, kein US-Tag" vorgegeben. Für den 404-Test trug das, für den Erfolgs-Test nicht: Er prüft Domänenverhalten (Restore setzt `DeletedAt = null`, Name/Einheit unverändert) und ist damit von Gherkin-Szenario 2 getrieben. Der test-quality-auditor deckte es auf, der Test musste nachträglich auf `US904_HappyPath_…` umgetaggt werden.
+  Warum: Die Einordnung wurde für einen ganzen Arbeitspaket-Block auf einmal getroffen, weil beide Tests denselben Endpoint betreffen – das Kriterium ist aber nicht der Endpoint, sondern ob der einzelne Test Protokoll-Mechanik oder Domänenverhalten prüft. Die vom Subagenten übernommene Begründung („das Gherkin-Szenario beschreibt nur UI-Verhalten, nicht diese API-Mechanik") hätte, konsequent angewandt, jeden Backend-Integrationstest von der US-Tag-Pflicht befreit, da Gherkin nie HTTP-Status oder Bodies beschreibt.
+  Regel: Traceability-Kategorien (US-Tag ja/nein) pro Test einzeln begründen, nie pauschal für ein Arbeitspaket – und die Begründung daraufhin prüfen, ob sie bei konsequenter Anwendung die Regel selbst aushebeln würde.
+
+- **[MITTEL] [PROZESS] [Gherkin] LL-S108-3 – Frontend-Verhalten ohne treibendes Szenario gebaut, Widerspruch erst durch den User bemerkt**
+  Quelle: User
+  Was: Der clickaway-Guard des Undo-Toasts wurde als Review-Fix implementiert und getestet, ohne dass ein Gherkin-Szenario ihn forderte – der zugehörige Component-Test trug trotzdem einen `US904_HappyPath_`-Präfix. Kurz zuvor hatte der Orchestrator im selben Lauf einen Backend-Test wegen genau dieses Musters umtaggen lassen. Der User bemerkte den Widerspruch bei der Frage, ob für den nächsten Fix (Toast-Timer) nicht ein Szenario fehle.
+  Warum: Review-Findings wurden als „Fix" behandelt und damit implizit von der Outside-In-Pflicht ausgenommen; ein Auditor hatte das fehlende Szenario sogar gemeldet, es wurde aber als ⚠️ eingeordnet statt als Prozessverstoß. Dass der Test einen US-Tag trug, verdeckte die Lücke zusätzlich.
+  Regel: Ein Review-Fix, der **beobachtbares Nutzerverhalten** ändert, braucht dasselbe Gherkin-Fundament wie geplante Funktionalität – erst Szenario, dann Test, dann Code. „Kommt aus einem Review-Finding" ist kein Ausnahmegrund.
+  Bezug: OBS-S108-2
