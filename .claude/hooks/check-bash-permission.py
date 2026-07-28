@@ -130,6 +130,12 @@ def _log_command(command: str, log_type: str, log_file: str = _LOG_FILE) -> None
         pass
 
 
+# `npm run <script>`, wahlweise mit vorangestelltem `--prefix <dir>`. Das Fragment MUSS in den
+# Allow- UND den Wrong-Approach-Mustern dasselbe sein: erlaubte man `--prefix` nur im Allow-Teil,
+# liefe `npm --prefix Client run test` an der Wrapper-Pflicht vorbei (die Muster verlangen sonst
+# npm und run direkt nebeneinander).
+_NPM_RUN = r'\bnpm\s+(?:--prefix\s+\S+\s+)?run\s+'
+
 # ---------------------------------------------------------------------------
 # Wrong-Approach-Patterns
 # Falsche Werkzeuge oder Muster – es gibt immer eine bessere Alternative.
@@ -153,13 +159,13 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
     # Frontend E2E-Tests: immer via playwright-test.py (vor dem test-Pattern prüfen)
     (
-        re.compile(r'\bnpm\s+run\s+test:e2e\b'),
+        re.compile(_NPM_RUN + r'test:e2e\b'),
         'E2E-Tests immer via Script aufrufen:\n'
         '  python3 .claude/scripts/playwright-test.py [--filter Pattern] [--verbose]',
     ),
     # Frontend Unit-Tests: immer via vitest-run.py (test:coverage und test:e2e sind ausgenommen)
     (
-        re.compile(r'\bnpm\s+run\s+test(?![\w:])'),
+        re.compile(_NPM_RUN + r'test(?![\w:])'),
         'Frontend-Tests immer via Script aufrufen:\n'
         '  python3 .claude/scripts/vitest-run.py [--filter Pattern] [--verbose]',
     ),
@@ -183,13 +189,13 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
     # npx eslint / npm run lint: immer via eslint-run.py
     (
-        re.compile(r'\bnpx\s+eslint\b|\bnpm\s+run\s+lint\b'),
+        re.compile(r'\bnpx\s+eslint\b|' + _NPM_RUN + r'lint\b'),
         'ESLint immer via Script aufrufen:\n'
         '  python3 .claude/scripts/eslint-run.py [--verbose]',
     ),
     # npx jscpd / npm run lint:duplicates: immer via jscpd-run.py
     (
-        re.compile(r'\bnpx\s+jscpd\b|\bnpm\s+run\s+lint:duplicates\b'),
+        re.compile(r'\bnpx\s+jscpd\b|' + _NPM_RUN + r'lint:duplicates\b'),
         'jscpd immer via Script aufrufen:\n'
         '  python3 .claude/scripts/jscpd-run.py [--verbose]',
     ),
@@ -318,10 +324,12 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         'docker compose up|down',
     ),
     # npm run/audit/outdated/update/ci (nativ). npm run test|lint → WRONG_APPROACH; npm install [pkg] → deny.
+    # `--prefix <dir>` ist erlaubt, damit npm-Scripts nicht erst ein `cd Client` erzwingen – dieses
+    # cd ließ danach jeden repo-root-relativen Wrapper-Aufruf scheitern.
     (
-        re.compile(r'^npm\s+(?:run\s|audit\b|outdated\b|update\b|ci\b)'),
+        re.compile(r'^npm\s+(?:--prefix\s+\S+\s+)?(?:run\s|audit\b|outdated\b|update\b|ci\b)'),
         None,
-        'npm run <script> | audit | outdated | update | ci',
+        'npm [--prefix <dir>] run <script> | audit | outdated | update | ci',
     ),
     # python3 -m pytest auf .claude/ (Hook-Tests)
     (
@@ -731,9 +739,11 @@ _PROJECT_TASK_SCRIPTS: list[str] = [
 # Nutzungshinweis zu den Wrapper-Scripts (OBS-S085-3 C). Erscheint via --list auch in
 # der SessionStart-Injection (session-start.sh ruft --list auf) → eine Quelle.
 _SCRIPT_USAGE_HINT: str = (
-    "Diese Wrapper geben bereits NUR das Relevante aus – normal OHNE nachgelagertes\n"
-    "| tail / | grep / | head aufrufen (der Output ist dafür kuratiert). Mehr Tiefe bei\n"
-    "Bedarf: --verbose (einheitlich bei allen Wrappern). Details/Beispiele: --help.\n"
+    "Im Erfolgsfall geben diese Wrapper nur noch das VERDIKT aus – meist ein bis zwei\n"
+    "Zeilen (z.B. „✓ 29 Tests grün, 3 Dateien, 9.2s“). Im Fehlerfall nur das, was zur\n"
+    "Analyse nötig ist. Ein nachgelagertes | tail / | grep / | head ist damit sinnlos und\n"
+    "kann das Verdikt sogar abschneiden. Mehr Tiefe bei Bedarf: --verbose (einheitlich bei\n"
+    "allen Wrappern). Details/Beispiele: --help.\n"
     "Ist der Output trotzdem zu viel oder zu wenig → als Beobachtung in\n"
     "docs/kaizen/observations.md sammeln, statt ad-hoc zu filtern (so verbessern wir die\n"
     "Scripts, statt das Symptom zu kaschieren)."

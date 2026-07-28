@@ -460,3 +460,97 @@ Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – äl
 
 ---
 
+## OBS-S106-3 – `dotnet-stryker.py --mutate <Datei>` untauglich für Test-Removal-Gegenprobe
+- Quelle: Subagent
+- Status: UMGESETZT (S109)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: Für die Gegenprobe „bleibt der Score 100 %, wenn Test X entfernt wird?" (Gold-Plating-Nachweis) lieferte `dotnet-stryker.py --mutate <Zieldatei>` keine verwertbare Aussage – alle Mutanten wurden als „Excluded" gemeldet (0/0/0). Erst der volle `qa-check.py`-Lauf war belastbar. Der Quick-Check adressiert einen anderen Zweck (eine Zieldatei fokussiert prüfen) und ist für die „Survivor durch Testentfernung"-Frage strukturell ungeeignet.
+- Entscheidung/Maßnahme: **Umgesetzt (S109) – die Diagnose der Beobachtung war falsch, was der Fix sichtbar macht.** „Alle Mutanten Excluded (0/0/0)" war kein struktureller Mangel des Quick-Checks, sondern derselbe Pfad-Fehlgriff wie in OBS-S103-1: ein repo-root-relatives `--mutate`-Ziel leert den Scope, und das Ergebnis kam als scheinbar valides „100 %" zurück – weshalb es wie eine Eigenschaft des Werkzeugs aussah statt wie ein Bedienfehler. Genau dieser Fall bricht jetzt vor dem Lauf mit Korrekturvorschlag ab (`_stryker_target.py`), und ein leerer Report gilt nicht mehr als bestanden. Damit ist `--mutate <Datei>` für die Removal-Gegenprobe brauchbar: Der Lauf misst entweder die Zieldatei oder sagt, dass er nichts gemessen hat. Nicht als „konsolidiert" verworfen, weil die Fehl-Diagnose selbst das Lehrstück ist: ein stilles 0-Ergebnis wird als Werkzeug-Eigenschaft fehlinterpretiert.
+- Bezug: OBS-S103-1
+
+## OBS-S103-1 – `dotnet-stryker.py --mutate` unklar bei Einzeldatei-Ziel / stillem 0-Treffer
+- Quelle: Subagent
+- Status: UMGESETZT (S109)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: `dotnet-stryker.py --mutate` akzeptiert nur eine einzelne Datei (keine Kommaliste/Brace-Expansion), und der Pfad muss relativ zu `Server/` sein (`Endpoints/Foo.cs`, nicht `Server/Endpoints/Foo.cs`). Bei falschem Muster oder 0 gefundenen Mutanten für die Zieldatei meldet das Tool stillschweigend `0/0/0` statt einer klaren Fehlermeldung → der Subagent brauchte zwei unnötige Läufe, bis er es per Doku-Beispiel (`--mutate Domain/Foo.cs`) korrigierte.
+- Entscheidung/Maßnahme: **Umgesetzt (S109)** – alle drei Teilprobleme: (1) *Kommaliste* statt Einzeldatei (s. OBS-S102-1); (2) *falsche Basis* wird vor dem Lauf erkannt – `_stryker_target.py` prüft jedes Muster projekt-relativ und schlägt bei einem repo-root-relativen Pfad den korrigierten vor („Meintest du `Endpoints/Foo.cs`?"), statt den Subagenten raten zu lassen; (3) *stiller 0-Treffer* endet mit Exit 2 vor dem Lauf bzw. – falls die Config den Scope leert – mit dem Null-Mutanten-Gate danach. Verworfen: die Doku nachschärfen, ohne den Mechanismus zu ändern; der Pfad ist gerade deshalb eine Falle, weil praktisch jedes andere Script hier repo-root-relativ arbeitet – Wissen allein hätte den Fehler weiter zugelassen. Die Doku-Korrektur ist trotzdem erfolgt (`dev-workflow.md`).
+- Bezug: –
+
+## OBS-S100-3 – `qa-check` gibt bei <100 % nur den Score aus, nicht die Survivor-Zeilen
+- Quelle: Orchestrator
+- Status: UMGESETZT (S109)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: Meldet `qa-check` einen Stryker-Score < 100 %, nennt es nur die Prozentzahl, nicht *welche* Zeilen überlebten. Man muss danach separat `stryker-frontend.py` (bzw. den Backend-Pendant) bemühen, um die Survivor-Stellen zu sehen – ein zusätzlicher Lauf für Information, die der eben abgeschlossene Lauf bereits hatte. Konkret in dieser Session beim 98,1-%-Survivor (Fokus-Guard) aufgetreten.
+- Entscheidung/Maßnahme: **Umgesetzt (S109) als Mitnahme** beim Stryker-Guard-Umbau (gleiche Dateien): `qa-check` gibt Survivors und NoCoverage jetzt direkt mit Datei/Zeile/Mutator aus – die Formatierung liegt in `_stryker_report.py` und wird mit `stryker-summary.py` geteilt, statt sie zu duplizieren. Zusätzlich steht der **Umfang** (Dateien / valide Mutanten) in der Ausgabe, was im Test dieser Session sofort einen zu eng gelaufenen Report auffliegen ließ. Verworfen: auf `--verbose` verweisen – das wäre wieder ein zweiter Lauf für Daten, die der erste schon hatte.
+- Bezug: OBS-S085-3
+
+---
+
+## OBS-S102-1 – `dotnet-stryker.py --mutate` akzeptiert nur einen einzelnen Dateipfad
+- Quelle: Subagent
+- Status: UMGESETZT (S109)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: `--mutate` nimmt nur einen Dateipfad; ein komma-getrenntes Mehrfach-Argument scheitert („unrecognized arguments" bzw. beim String-Workaround „Excluded" auf allen Dateien). Wer mehrere geänderte Dateien in einem Lauf gezielt mutieren will, muss mehrere separate Läufe machen (kleine Zeitkosten). Aufgetreten in run-3, als der Backend-Implementer zwei Dateien in einem Lauf mutieren wollte.
+- Entscheidung/Maßnahme: **Umgesetzt (S109):** beide Wrapper nehmen jetzt eine Kommaliste (`--mutate a,b`) und übersetzen sie in die CLI-Form, die die jeweilige Stryker-Variante tatsächlich versteht – empirisch geklärt statt angenommen, weil die beiden sich hier unterscheiden: **Stryker.NET** akzeptiert mehrere `--mutate`-Flags, aber **keine** Kommaliste (verifiziert: Kommaliste → 0 Mutanten; zwei Flags → 2 Dateien / 13 Mutanten = exakt die Summe der Einzelläufe); **StrykerJS** umgekehrt, es parst `--mutate` selbst als Kommaliste (`createSplitter(',')` in `stryker-cli.js`), ein zweites Flag überschriebe das erste. Die abgelehnte Alternative – die Wrapper-Signatur an die jeweilige Stryker-Syntax anzulehnen – hätte den Unterschied an den Aufrufer durchgereicht; die Kommaliste ist für beide Schichten dieselbe. Brace-Globs bleiben bewusst ungültig (beide splitten am Komma und zerreißen sie) und werden mit Hinweis abgelehnt.
+- Bezug: –
+
+---
+
+## OBS-S108-3 – Mutations-Läufe können erfolgreich aussehen, ohne etwas mutiert zu haben
+- Quelle: Subagent (backend- + frontend-layer-implementer, run-8)
+- Status: UMGESETZT (S109)
+- Impact: HOCH    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Drei unabhängige Wege, auf denen ein Mutations-Lauf als bestanden erscheint, obwohl er nichts oder nur einen Bruchteil geprüft hat. (a) `dotnet-stryker.py --mutate` erwartet einen **projekt**-relativen Pfad (`Endpoints/Foo.cs`); mit einem repo-root-relativen Pfad (`Server/Endpoints/Foo.cs` – die Form, die praktisch jedes andere Script im Repo nutzt) wird die Zieldatei als „Excluded" gewertet und der Lauf endet mit „Score: 100.0 %, Valid: 0". (b) `--mutate` mit Brace-Glob (`"src/{a.tsx,b.ts}"`) wird am Komma zerlegt → ungültige Globs → Dry-Run über 0 Dateien, Exit 0. (c) `qa-check.py` weicht bei einem erkannten konkurrierenden Stryker-Lock auf einen bereits vorhandenen Report aus – auch wenn dieser aus einem `--mutate`-Einzeldatei-Lauf stammt und damit einen ganz anderen Scope hat; der Output war in sich widersprüchlich („Score: 100.0 %" oben, „ACHTUNG: Mutation-Score 100.0 % < 100 %" unten) und kostete den Subagenten mehrere Minuten Diagnose. Gemeinsamer Nenner: In allen drei Fällen ist die ausgegebene Zahl 100 %, und in keinem Fall belegt sie, was sie zu belegen scheint. Der Übergabe-Hash bindet den Report-Inhalt, nicht dessen Umfang – bei (c) wäre er also formal gültig gewesen. Der Orchestrator hat den Report-Scope (Dateizahl, Mutantenzahl) in dieser Session deshalb einmal von Hand nachgezählt; das ist kein Bestandteil des regulären Gates.
+- Entscheidung/Maßnahme: **Umgesetzt (S109) – drei Guards, je einer pro Weg.** (1) *Null-Mutanten-Gate:* die Score-Formel stand wörtlich doppelt (`stryker-summary.py`, `qa-check.py`) und lieferte bei `total_valid == 0` eine 100 %; sie liegt jetzt einmalig in `_stryker_report.py`, gibt in diesem Fall `score = None` aus und lässt das Gate fehlschlagen – `qa-check` bricht dabei VOR dem Übergabe-Hash ab, analog zum bestehenden Veraltet-Report-Abbruch. Damit ist (a) und (b) unabhängig von der Ursache geschlossen. (2) *Ziel-Validierung vor dem Lauf* (`_stryker_target.py`): jedes `--mutate`-Muster muss projekt-relativ real treffen, sonst Exit 2 mit Korrekturvorschlag; Brace-Globs werden mit Begründung abgelehnt. (3) *Lock-Abbruch unterscheidbar:* `_run_lock.py` beendet mit eigenem Code 99 („Lauf gar nicht gestartet"), `qa-check` behandelt das als harten Fehler statt auf den Report des Fremdlaufs auszuweichen. Zusätzlich nennt jede Auswertung den **Umfang** (Dateien / valide Mutanten), weil der Hash den Report-Inhalt bindet, nicht dessen Scope. Verworfen wurde die Alternative „Orchestrator zählt den Scope weiter von Hand nach" – sie war schon einmal nötig und ist genau die Disziplin-Lösung, die der Fall unterläuft. Abgesichert durch `test-stryker-guards.py` (24 Fälle); alle drei Wege zusätzlich real reproduziert (u.a. Kommalisten-Lauf, der vorher „100 %" gemeldet hätte).
+- **Vierter Weg, beim Verifizieren gefunden (S109):** Ein Lauf, dessen Mutanten sämtlich am Checker scheitern (`CompileError`), erzeugt bei StrykerJS einen **NaN**-Score – und Stryker lässt ihn durch das *eigene* break-Threshold: „Final mutation score of NaN is greater than or equal to break threshold 100", Exit 0. Der Fall ist also nicht auf Bedienfehler beschränkt und wäre auch mit korrektem `--mutate`-Pfad aufgetreten; das Null-Mutanten-Gate deckt ihn mit ab, weil es am Ergebnis (0 valide Mutanten) ansetzt statt an der Ursache. Die Fehlermeldung gibt zusätzlich die Status-Verteilung aus, damit „gar keine Mutanten erzeugt" von „alle in einem Nicht-Bewertungs-Bucket" unterscheidbar ist.
+- Bezug: OBS-S102-1
+
+---
+
+## OBS-S108-4 – Wrapper-Ergonomie: kein Fortschritt sichtbar, Pfad-Zwang, verdrehte Log-Reihenfolge
+- Quelle: Subagent (backend- + frontend-layer-implementer, run-8)
+- Status: UMGESETZT (S109)
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Drei kleine Reibungspunkte an den Script-Wrappern, alle ohne Fehlsignal-Risiko. (a) Langlaufende Wrapper geben ihre kuratierte Ausgabe erst am Ende aus; bei Läufen über 120 s bleibt die Task-Output-Datei minutenlang leer, und der Ersatz-Pollpfad `.claude/tmp/stryker_frontend_out.txt` wird am Ende gelöscht – währenddessen ist nicht unterscheidbar, ob der Lauf arbeitet oder hängt. (b) `npm run typecheck` ist nur aus dem `Client/`-Verzeichnis heraus erlaubt, `npm --prefix Client run typecheck` wird geblockt. (c) `dotnet-stryker.py` schreibt seine eigenen `print()`-Ausgaben („Starte: …", „Report verschoben → …") gepuffert, während der `dotnet stryker`-Subprozess ungepuffert auf denselben fd schreibt – im nicht-TTY-Output erscheint der Report-Score dadurch **vor** der „Starte:"-Zeile, was beim schnellen Lesen wie ein Fehlgriff des Aufrufers aussieht.
+- Entscheidung/Maßnahme: **Umgesetzt (S109), alle drei.** (a) Die Live-Log-Datei wird am Laufende **nicht mehr gelöscht** – sie ist der einzige Weg, einen laufenden Wrapper zu beobachten, und enthält danach mehr als die ausgegebenen letzten 30 Zeilen; der nächste Lauf überschreibt sie ohnehin. Die Startzeile weist explizit auf sie hin. Verworfen: eine eigene Fortschritts-Anzeige zu bauen – der Log existiert bereits, er wurde nur weggeräumt. (b) `--prefix <dir>` ist in der Bash-Allow-Liste jetzt zugelassen, damit npm-Scripts kein `cd Client` mehr erzwingen. Dabei fiel eine Falle auf, die den naiven Fix zum Sicherheitsloch gemacht hätte: alle Wrapper-Pflicht-Muster verlangen `npm` und `run` direkt nebeneinander, `npm --prefix Client run test` wäre also an ihnen vorbeigelaufen – Allow- und Wrong-Approach-Muster teilen sich deshalb ein gemeinsames Fragment (`_NPM_RUN`), abgesichert durch neue Fälle in `test-bash-permission.py`. (c) Die Wrapper flushen jetzt vor jedem Subprozess-Aufruf; die verdrehte Reihenfolge kam daher, dass der Python-Puffer erst am Prozessende leerlief, während der Subprozess ungepuffert auf denselben fd schrieb.
+- Bezug: –
+
+---
+
+## OBS-S085-2 – Zu verbose Kommunikation (Orchestrator↔Subagenten) verschwendet Token
+- Quelle: User
+- Status: VERWORFEN (Phase-1-Messung: der vermutete Posten liegt bei 8,6 %, der reale Treiber ist ein anderer)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Agent-Prompt
+- Beobachtung: Kommunikation im implementing-scenario (und ggf. allen Prozessen) ist unnötig verbose.
+- Entscheidung/Maßnahme: Aufgeschoben – Spike mit hoher Gefahr (Knappheit ↔ Subagent-Qualität), kein Schnellschuss. Plan: **Phase 1** an einem realen `implementing-scenario`-Lauf messen, *wo* die Tokens hingehen (Orchestrator→Subagent-Prompts vs. Subagent→Orchestrator-Reports vs. Narration); **Phase 2** nur die verbose Richtung straffen, qualitäts-gegated (Tests/Review/Mutation-Score). **Re-Trigger:** erst nach dem geplanten `implementing-scenario`-Umbau (mehrere Szenarien gleichzeitig) – wenn der stabil läuft (~5–10 Sessions); Backstop bis S105.
+- **S109: Phase 1 durchgeführt** (23 Sessions mit Subagent-Einsatz, 112 Subagent-Logs, ~23,5M Zeichen ≈ 5,9M Token-Proxy; Zeichen als Proxy, es geht um Anteile). Verteilung: **Tool-I/O 82,5 %** (Subagenten 54,1 %, Orchestrator 28,5 %), Orchestrator-Narration 4,5 %, echte User-Eingaben 4,1 %, injizierte Skill-Texte 3,2 %, Subagent-Fließtext 2,9 %. **Orchestrator↔Subagent-Kommunikation gesamt: 8,6 %** – Task-Prompts 1,5 %, Task-Reports 0,6 %, `SendMessage` 6,6 %.
+- **S109-Entscheid: VERWORFEN – die Prämisse trägt nicht.** Phase 2 hätte einen qualitätsriskanten Eingriff in die Subagent-Kommunikation bedeutet (Knappheit ↔ Ergebnisqualität, so im Plan benannt), um an 8,6 % zu sparen – während **`Read` allein 49,5 % des Gesamtvolumens** ausmacht. Das Kosten-Risiko-Verhältnis ist damit gemessen ungünstig, unabhängig davon, wie gut die Straffung gelänge. Der reale Treiber ist in OBS-S109-1 erfasst.
+- **Methodische Warnung für spätere Messungen dieser Art** (drei Fehler, die in S109 nacheinander auffielen und das Ergebnis jeweils verschoben): (1) **Subagent-Logs liegen unter `<projekt>/<session-id>/subagents/agent-*.jsonl`**, nicht flach im Projektverzeichnis – ein Glob auf `*.jsonl` findet sie nicht und suggeriert, es gäbe keine Aufzeichnung; mit ihnen verdoppelt sich das gemessene Volumen. (2) **`role: user` ist nicht „vom Menschen getippt"** – geladene Skill-Texte werden als user-Message injiziert (bis 31k Zeichen pro Aufruf) und dominieren die Kategorie sonst. (3) **`SendMessage` ist Agent-Kommunikation**, nicht Werkzeug-I/O – wer es unter Tool-I/O führt, unterschätzt den Kommunikationsanteil um das Vierfache.
+
+## OBS-S085-12 – Noise-Review skaliert nicht: Archive jede Retro neu zu filtern wird teuer
+- Quelle: Agent
+- Status: UMGESETZT (S109)
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Skill-Nutzung
+- Beobachtung: kaizen-Schritt 0 sah vor, alle Archiv-Dateien jede Retro neu gegen den Filter zu prüfen → Token-Kosten steigen, Grenznutzen gering.
+- Entscheidung/Maßnahme: **B gewählt** — Staffel B (nur zuletzt archivierte Periode doppelprüfen) → (kein Rückfall) → A (Archiv-Scan weglassen). Umsetzung: kaizen Schritt 0 (bereits angewandt). Gekoppelt an CM „Noise als LL" (AKTIV + beobachten).
+- **S109-Abschluss: als UMGESETZT geschlossen, ohne den geplanten Schritt B→A.** Staffel B läuft und ist im Skill verankert (`kaizen/SKILL.md`: „die **zuletzt archivierte Periode**"); das beobachtete Problem – *jede* Retro *alle* Archive neu zu filtern – existiert damit nicht mehr, über mehrere Retros hinweg ohne Rückfall. Der Weiterzug zu A (Archiv-Scan ganz weglassen) wurde bewusst **nicht** gegangen: Er wäre eine zusätzliche Sparmaßnahme ohne belegten Bedarf, erkauft mit dem Risiko, dass Noise im Archiv unentdeckt bleibt. Die Staffel war als Absicherung gedacht, nicht als Fahrplan, der bis zum Ende gegangen werden muss.
+
+## OBS-S092-2 – Dokumentiertes Kommando zum Header-Lesen (statt eigenes Script)
+- Quelle: User
+- Status: VERWORFEN (Re-Trigger seit 14 Sessions nicht eingetreten; Nutzen gering, Kern zur unbearbeiteten Designfrage gewachsen)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Doku/Hook/Script
+- Beobachtung: Viele Doku-Dateien tragen im Header die Meta-Infos inkl. Schema/Format (z.B. lessons_learned, observations, adr, tech-debt). Agenten lesen sie ad-hoc (sed/Read), teils unvollständig. Es genügt ein **dokumentiertes Kommando-Pattern** mit bestehenden Tools (z.B. `sed -n '1,/^-->/p' <datei>` o.ä.), aufgenommen in den Startup-Hinweis bzw. die `--list`-Referenz – **kein eigenes Script** (Wartung) und **nicht** alle Header im Startup injizieren (zu teuer). Ggf. zweigeteilt (Metadaten vs. Schema), aber evtl. besser immer beides gemeinsam, da Schema ohne Metadaten selten nützt.
+- Entscheidung/Maßnahme: Aufgeschoben – beim Drain zur Doku-Architektur-/Progressive-Disclosure-Designfrage gewachsen, kein Quick-Edit mehr: (1) welche Dateien brauchen überhaupt einen Header (vs. Name/Index erklärt sich selbst)? (2) was gehört in den Header (Leitfrage: *wann* liest ein Agent die Datei und *welche* Header-Info braucht er dann)? (3) In-Datei-Header vs. **Wiki-Struktur** (eigene Index-/Header-Dateien mit MD-Links). Der kleine Slice (sed-Pattern + Endmarker-Konvention `-->` vs. `---`) ist durch genau diese offenen Fragen blockiert. Re-Trigger: nächster Doku-Struktur-/`review-docs`-Durchgang.
+- **S109-Entscheid: verworfen.** Der Re-Trigger ist seit dem letzten `review-docs`-Durchgang (S095, 14 Sessions) nicht eingetreten, und ein dritter Aufschub wäre reine Vertagung. Gegen den Kalt-Abwertungs-Bias geprüft („wäre der Punkt heute frisch beobachtet noch wertvoll?"): Nein – Agenten lesen die betreffenden Dateien ohnehin mit `Read` samt Header; ein separates Header-Kommando spart wenig, und die dahinter gewachsene Doku-Architekturfrage (welche Datei braucht überhaupt einen Header, In-Datei vs. Wiki) hat seit 17 Sessions keinen Bedarfsträger gefunden. Fällt der Bedarf doch an, entsteht er im Rahmen des Access-Layers (OBS-S096-3), der Lesen und Schreiben der Tracker-Dateien ohnehin neu ordnet – dort wäre er eine Facette, kein eigener Eintrag.
+
+---
+

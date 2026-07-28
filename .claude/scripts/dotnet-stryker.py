@@ -5,7 +5,12 @@ dotnet stryker (nativ) + automatische Auswertung via stryker-summary.py.
 Verwendung:
   python3 .claude/scripts/dotnet-stryker.py
   python3 .claude/scripts/dotnet-stryker.py --mutate Domain/Foo.cs
+  python3 .claude/scripts/dotnet-stryker.py --mutate Domain/Foo.cs,Endpoints/Bar.cs
   python3 .claude/scripts/dotnet-stryker.py --verbose
+
+Pfade für --mutate: relativ zu Server/ (z.B. Endpoints/Foo.cs) – NICHT repo-root-relativ.
+Mehrere Ziele als Kommaliste. Ein Muster ohne Treffer bricht den Lauf ab, statt still über
+null Dateien zu laufen.
 
 Output wird nach StrykerOutput/Backend/<timestamp>/reports/ verschoben.
 """
@@ -18,12 +23,15 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 from _run_lock import RunLock
+from _stryker_target import resolve_mutate
+from _wrapper_output import error_lines
 
 _SCRIPTS_DIR  = Path(__file__).parent
 _REPO_ROOT    = _SCRIPTS_DIR.parent.parent
 _TMP_FILE     = _SCRIPTS_DIR.parent / "tmp" / "stryker_out.txt"
 _STRYKER_OUT  = _REPO_ROOT / "StrykerOutput"
 _BACKEND_OUT  = _STRYKER_OUT / "Backend"
+_PROJECT_DIR  = _REPO_ROOT / "Server"
 
 
 def _snapshot_run_dirs() -> set[Path]:
@@ -54,7 +62,9 @@ def main() -> None:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--mutate", help="Datei mutieren (z.B. Domain/Foo.cs)")
+    parser.add_argument("--mutate", metavar="GLOB[,GLOB…]",
+                        help="Datei(en) mutieren, relativ zu Server/ (z.B. Domain/Foo.cs "
+                             "oder Domain/Foo.cs,Endpoints/Bar.cs)")
     parser.add_argument("--verbose", action="store_true",
                         help="Alle nicht-getöteten Mutanten (Survived/Ignored/Timeout/NoCoverage) "
                              "mit Status, StatusReason, Zeile, Spalte")
@@ -62,21 +72,28 @@ def main() -> None:
 
     stryker_args = ["dotnet", "stryker"]
     if args.mutate:
-        stryker_args += ["--mutate", args.mutate]
+        for pattern in resolve_mutate(args.mutate, _PROJECT_DIR, _REPO_ROOT):
+            stryker_args += ["--mutate", pattern]
 
     _TMP_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Starte: {' '.join(stryker_args)}")
-    print(f"Output → {_TMP_FILE}")
+    print(f"Live-Output (Fortschritt während des Laufs) → {_TMP_FILE}")
+    # Erzwungen, weil stryker-summary.py als Subprozess denselben stdout ungepuffert beschreibt:
+    # ohne Flush erscheint dessen Score VOR dieser Startzeile (OBS-S108-4 c).
+    sys.stdout.flush()
 
     before = _snapshot_run_dirs()
     with RunLock(_TMP_FILE), open(_TMP_FILE, "w", encoding="utf-8") as out:
         result = subprocess.run(stryker_args, cwd=str(_REPO_ROOT), stdout=out, stderr=subprocess.STDOUT)
 
-    if _TMP_FILE.exists():
+    # Rohoutput nur zeigen, wenn er zur Analyse gebraucht wird: bei Erfolg trägt er nichts bei,
+    # was die Auswertung unten nicht besser sagt. Datei bewusst NICHT löschen – sie ist der
+    # einzige Weg, einen laufenden Lauf zu beobachten, und erlaubt danach das vollständige
+    # Nachlesen. Der nächste Lauf überschreibt sie ohnehin ("w").
+    if _TMP_FILE.exists() and (result.returncode != 0 or args.verbose):
         lines = _TMP_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
-        print("\n".join(lines[-30:]))
-        _TMP_FILE.unlink()
+        print("\n".join(error_lines(lines, verbose=args.verbose)))
 
     # Stryker.NET schreibt den Report vor dem Threshold-Check, daher existiert er auch bei
     # Below-Threshold-Exit. Nur wenn kein neuer Report angelegt wurde, ist es ein echter Lauf-Fehler.
@@ -85,6 +102,7 @@ def main() -> None:
         print(f"\nStryker hat keinen neuen Report erzeugt (Exit {result.returncode}) – Lauf-Fehler.", file=sys.stderr)
         sys.exit(result.returncode or 1)
     print(f"\nReport verschoben → {run_dir}")
+    sys.stdout.flush()
 
     # stryker-summary.py ist das maßgebliche Gate (Score < 100 % → exit 1) und deckt sich mit
     # Strykers eigenem break-Threshold. Bei Abweichung gewinnt das Fail.

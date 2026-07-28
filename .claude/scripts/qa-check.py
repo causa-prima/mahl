@@ -30,11 +30,25 @@ Verwendung (Orchestrator-Verifikation – kein neuer Stryker-Lauf):
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(__file__))
+from _run_lock import LOCK_BUSY_EXIT_CODE
+from _stryker_report import (
+    NO_MUTANTS_HINT,
+    collect_undetected,
+    compute_metrics,
+    format_mutant_group,
+    format_score,
+    format_scope,
+    format_status_breakdown,
+    has_no_mutants,
+)
 
 _SCRIPTS   = Path(__file__).parent
 _REPO_ROOT = _SCRIPTS.parent.parent
@@ -130,6 +144,9 @@ def _worktree_diff(prefixes: tuple[str, ...], unified: int) -> str:
 def _run_stryker(layer: str) -> int:
     """Führt den Layer-spezifischen Stryker-Lauf aus. Gibt Exit-Code zurück."""
     script = _SCRIPTS / ("dotnet-stryker.py" if layer == "backend" else "stryker-frontend.py")
+    # Der Subprozess schreibt ungepuffert auf denselben stdout – ohne Flush erschiene die
+    # gesamte qa-check-Vorlaufausgabe erst NACH dessen Output (OBS-S108-4 c).
+    sys.stdout.flush()
     result = subprocess.run([sys.executable, str(script)])
     return result.returncode
 
@@ -156,11 +173,13 @@ def _is_fresh(report_path: Path, run_started_at: float) -> bool:
         return False
 
 
-def _parse_report(report_path: Path) -> tuple[str, str]:
-    """Gibt (score_string, report_content_hash) zurück.
+def _parse_report(report_path: Path) -> tuple[dict, dict, str]:
+    """Gibt (files, metrics, report_content_hash) zurück.
 
     Der Hash wird über eine normalisierte Form berechnet (Mutanten nach id sortiert),
     damit die Reihenfolge im JSON keinen Einfluss hat (StrykerJS ist nicht deterministisch).
+    Score/Umfang kommen aus `_stryker_report` – dieselbe Auswertung wie in
+    `stryker-summary.py`, damit beide Gates nicht auseinanderdriften können.
     """
     data = json.loads(report_path.read_bytes())
     for file_data in data.get("files", {}).values():
@@ -168,18 +187,8 @@ def _parse_report(report_path: Path) -> tuple[str, str]:
             file_data["mutants"] = sorted(file_data["mutants"], key=lambda m: str(m.get("id", "")))
     normalized = json.dumps(data, sort_keys=True, ensure_ascii=False)
     content_hash = hashlib.sha256(normalized.encode()).hexdigest()[:16]
-    # Standard-Mutation-Score (mutation-testing-elements, identisch zum HTML-Report):
-    #   detected = Killed + Timeout ; undetected = Survived + NoCoverage.
-    # NoCoverage senkt den Score; Ignored/CompileError/RuntimeError zählen nicht in den Nenner.
-    counts: dict[str, int] = {}
-    for file_data in data.get("files", {}).values():
-        for m in file_data.get("mutants", []):
-            s = m.get("status")
-            counts[s] = counts.get(s, 0) + 1
-    detected = counts.get("Killed", 0) + counts.get("Timeout", 0)
-    total_valid = detected + counts.get("Survived", 0) + counts.get("NoCoverage", 0)
-    score = (detected / total_valid * 100) if total_valid > 0 else 100.0
-    return f"{score:.1f}%", content_hash
+    files = data.get("files", {})
+    return files, compute_metrics(files), content_hash
 
 
 # ── Git-Checks (layer-scoped) ─────────────────────────────────────────────────
@@ -443,6 +452,19 @@ def main() -> None:
         #   - Score < 100 % (Below-Threshold): Stryker schreibt trotzdem einen FRISCHEN Report
         #     → rc != 0, aber frischer Report vorhanden → nur Score-Gate (Checks + Hash unten).
         #   - Build/Compile-Fehler: KEIN frischer Report → harter Abbruch, kein Hash.
+        if rc == LOCK_BUSY_EXIT_CODE:
+            # Lock belegt → Stryker lief gar nicht. Der Report-Fallback unten würde hier den
+            # frischen Report des KONKURRIERENDEN Laufs finden (dessen mtime ist naturgemäß
+            # aktuell) und dessen Umfang attestieren – auch wenn der aus einem
+            # `--mutate`-Einzeldatei-Lauf stammt (OBS-S108-3 c). Darum harter Abbruch.
+            print(
+                f"[qa-check] ❌ Stryker gar nicht gestartet – ein konkurrierender Lauf hält den Lock "
+                f"(Exit {rc}). Kein Übergabe-Hash: ein fremder Report belegt diesen Lauf nicht. "
+                f"Konkurrierenden Lauf abwarten und neu starten.",
+                file=sys.stderr,
+            )
+            sys.exit(rc)
+
         if rc != 0:
             stryker_gate_failed = True
             fresh = _find_report(args.layer)
@@ -477,7 +499,15 @@ def main() -> None:
         )
         sys.exit(1)
 
-    score, report_hash = _parse_report(report_path)
+    files, metrics, report_hash = _parse_report(report_path)
+
+    # Ein Report ohne validen Mutanten belegt nichts – analog zum veralteten Report oben ein
+    # harter Lauf-Fehler VOR dem Hash. Ohne diesen Abbruch entstünde ein formal gültiger
+    # Übergabe-Hash über einen Lauf, der nie etwas gemessen hat (OBS-S108-3 a/b).
+    if has_no_mutants(metrics):
+        print(f"[qa-check] ❌ {NO_MUTANTS_HINT}\n{format_status_breakdown(metrics)}\n"
+              f"   Kein Übergabe-Hash. Report: {report_path}", file=sys.stderr)
+        sys.exit(1)
 
     # ── Checks ───────────────────────────────────────────────────────────────
     tree           = _worktree_content_fingerprint(args.layer)
@@ -490,8 +520,19 @@ def main() -> None:
 
     # ── Ausgabe ──────────────────────────────────────────────────────────────
     print(f"\n=== STRYKER ({args.layer.upper()}) ===")
-    print(f"Score:  {score}")
+    print(f"Score:  {format_score(metrics)}")
+    print(f"{format_scope(metrics)}")
     print(f"Report: {report_path}")
+
+    # Survivors direkt hier zeigen: der Lauf HAT die Information, sie separat über
+    # stryker-summary/stryker-frontend nachzuholen ist ein zweiter Lauf für nichts (OBS-S100-3).
+    survivors, nocoverage = collect_undetected(files)
+    if survivors:
+        print(f"\n⚠️  {metrics['counts']['Survived']} Survivor(s):")
+        print("\n".join(format_mutant_group(survivors)))
+    if nocoverage:
+        print(f"\n⚠️  {metrics['counts']['NoCoverage']} NoCoverage (von keinem Test ausgeführt):")
+        print("\n".join(format_mutant_group(nocoverage)))
 
     print("\n=== CHECK 1: GEÄNDERTE TEST-DATEIEN ===")
     print("\n".join(test_files) if test_files else "keine")
@@ -576,11 +617,11 @@ def main() -> None:
     # Score-Gate als Exit-Code – aber erst NACH vollständiger Ausgabe aller Checks + Hash,
     # damit ein zu niedriger Score keine anderen Check-Probleme verdeckt. Der Hash bleibt
     # verifizierbar; der nicht-null Exit-Code signalisiert: keine gültige Übergabe.
-    score_value = float(score.rstrip("%"))
-    if stryker_gate_failed or score_value < 100.0:
+    if stryker_gate_failed or metrics["score"] < 100.0:
         sys.stdout.flush()  # Checks zuerst, damit die Warnung danach erscheint (stderr ist ungepuffert)
-        print(f"\n⚠️  ACHTUNG: Mutation-Score {score} < 100 % – dieser Lauf ist KEINE gültige "
-              f"Übergabe. Survivors/NoCoverage oben klären, bevor übergeben wird.", file=sys.stderr)
+        print(f"\n⚠️  ACHTUNG: Mutation-Score {format_score(metrics)} < 100 % – dieser Lauf ist KEINE "
+              f"gültige Übergabe. Survivors/NoCoverage oben klären, bevor übergeben wird.",
+              file=sys.stderr)
         sys.exit(1)
 
 

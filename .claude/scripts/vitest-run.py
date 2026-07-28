@@ -21,12 +21,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from _util import run_npm
+from _wrapper_output import emit, strip_noise
 
-# npm-interne Zeilen die keinen Informationswert für den Aufrufer haben
-_NPM_NOISE = re.compile(r"^> mahl-client@|^npm (warn|error notice)")
+# vitest-Banner und Zeitstempel – kein Aussagewert für „sind die Tests grün?".
+_VITEST_CHROME = re.compile(r"^\s*RUN\s+v[\d.]|^\s*Start at\s|^\s*Duration\s")
 
 # vitest-Zusammenfassung: "  Tests  3 passed | 13 skipped (16)" (nicht "Test Files …").
 _TESTS_SUMMARY = re.compile(r"^\s*Tests\s+(?P<body>.+?)\s+\((?P<total>\d+)\)\s*$", re.MULTILINE)
+_FILES_SUMMARY = re.compile(r"^\s*Test Files\s+.+?\((?P<total>\d+)\)\s*$", re.MULTILINE)
+_DURATION = re.compile(r"^\s*Duration\s+(?P<value>[\d.]+m?s)", re.MULTILINE)
 
 
 def _parse_counts(output: str) -> dict[str, int] | None:
@@ -70,17 +73,27 @@ def main() -> None:
 
     output, exit_code = run_npm(npm_args)
 
-    if args.verbose or not output.strip():
-        print(output)
+    counts = _parse_counts(output)
+    files = _FILES_SUMMARY.search(output)
+    duration = _DURATION.search(output)
+    if exit_code == 0 and counts and counts["failed"] == 0:
+        skipped = f", {counts['skipped']} übersprungen" if counts["skipped"] else ""
+        scope = f", {files.group('total')} Dateien" if files else ""
+        took = f", {duration.group('value')}" if duration else ""
+        verdict = f"✓ {counts['passed']} Tests grün{skipped}{scope}{took}"
+        emit(verbose=args.verbose, output=output, verdict=verdict)
     else:
-        lines = [l for l in output.splitlines() if not _NPM_NOISE.match(l)]
-        print("\n".join(lines))
+        # Rot: der vitest-Fehlerblock (Diff, Stack, Datei/Zeile) IST die Analyse-Information –
+        # nur Banner und Zeitstempel fallen weg.
+        failed = counts["failed"] if counts else "?"
+        emit(verbose=args.verbose, output=output,
+             verdict=f"✗ {failed} Test(s) rot – Details oben",
+             details=strip_noise(output, _VITEST_CHROME))
 
     # --filter (vitest -t) matcht als Substring gegen den voll-qualifizierten Testnamen.
     # Nicht-passende Tests werden ÜBERSPRUNGEN, nicht gefiltert – matcht das Pattern nichts,
     # läuft vitest grün durch (0 ausgeführt). Das machen wir explizit und fail-closed.
     if args.filter_name:
-        counts = _parse_counts(output)
         print(
             f"\n[filter] --filter '{args.filter_name}' matcht als Substring gegen den "
             f"voll-qualifizierten Testnamen (inkl. describe-Block).",

@@ -14,8 +14,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from _util import run_npm
+from _wrapper_output import emit, strip_noise
 
-_NPM_NOISE = re.compile(r"^> mahl-client@|^npm (warn|error notice)")
+# Playwrights Abschlusszeilen, z.B. "  12 passed (34.5s)" / "  2 failed".
+_PASSED = re.compile(r"^\s*(\d+)\s+passed\b", re.MULTILINE)
+_FAILED = re.compile(r"^\s*(\d+)\s+(?:failed|flaky)\b", re.MULTILINE)
+_DURATION = re.compile(r"passed\s+\(([^)]+)\)")
 
 
 def main() -> None:
@@ -35,11 +39,22 @@ def main() -> None:
 
     output, exit_code = run_npm(npm_args)
 
-    if args.verbose or not output.strip():
-        print(output)
+    passed = _PASSED.search(output)
+    # Nur zusammenfassen, wenn der Lauf grün war UND die Abschlusszeile erkannt wurde –
+    # sonst bleibt es beim vollständigen Output (fail-open, s. _wrapper_output).
+    if exit_code == 0 and passed and not _FAILED.search(output):
+        duration = _DURATION.search(output)
+        took = f", {duration.group(1)}" if duration else ""
+        emit(verbose=args.verbose, output=output,
+             verdict=f"✓ {passed.group(1)} E2E-Tests grün{took}")
     else:
-        lines = [l for l in output.splitlines() if not _NPM_NOISE.match(l)]
-        print("\n".join(lines))
+        # Rot: Playwrights Fehlerblock (Erwartung/Ist, Locator, Screenshot-Pfad) IST die
+        # Analyse-Information und bleibt vollständig erhalten.
+        failed = _FAILED.search(output)
+        count = failed.group(1) if failed else "?"
+        emit(verbose=args.verbose, output=output,
+             verdict=f"✗ {count} E2E-Test(s) rot – Details oben",
+             details=strip_noise(output))
 
     sys.exit(exit_code)
 

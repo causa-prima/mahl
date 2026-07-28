@@ -43,6 +43,27 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 109 – 2026-07-28/29
+
+- **[HOCH] [AGENT] [Kommunikation] LL-S109-1 – Messergebnis dreimal als Befund vorgelegt, bevor die Datenquelle vollständig war**
+  Quelle: User
+  Was: Bei der Phase-1-Token-Messung (OBS-S085-2) wurde dreimal ein Ergebnis mit Prozentzahlen und daraus abgeleiteter Empfehlung präsentiert, das jeweils durch eine User-Rückfrage kippte: (1) Subagent-Logs liegen unter `<session-id>/subagents/` und fehlten im Glob – mit ihnen verdoppelt sich das Gesamtvolumen; (2) injizierte Skill-Texte liefen als „echte User-Eingaben" mit; (3) `SendMessage` war unter Tool-I/O statt unter Agent-Kommunikation einsortiert, was den fraglichen Posten von 8,6 % auf 2,1 % kleingerechnet hätte. Ohne die Rückfragen wäre eine Verwerf-Entscheidung mit falscher Ursachenzuschreibung in `observations.md` gelandet.
+  Warum: Nach jedem Lauf wurde die Plausibilität des *Gesamtbilds* geprüft, nicht die Vollständigkeit der *Quelle* – auffällige Einzelwerte (0,3 % für Subagent-Reports, 17 % „getippte" User-Eingaben) wurden gesehen, aber erst auf Nachfrage verfolgt statt sofort als Kalibrierungs-Signal genommen.
+  Regel: Vor dem Vorlegen einer Messung jeden Wert, der um Größenordnungen von der Erwartung abweicht, als Fehler in der *eigenen Erhebung* behandeln und ihm nachgehen, bevor Anteile berichtet werden; die Vollständigkeit der Datenquelle explizit prüfen (welche Stränge/Verzeichnisse gibt es überhaupt?), nicht nur die Konsistenz des Ergebnisses.
+  Bezug: OBS-S109-1
+
+- **[MITTEL] [AGENT] [Kommunikation] LL-S109-2 – Empfehlung auf Ressourcen-Argument gestützt statt auf die Sache**
+  Quelle: User
+  Was: Für die fällige Wiedervorlage OBS-S085-2 wurde „aufschieben" empfohlen, begründet mit „diese Session hat schon zwei Umbauten geliefert" und „am Stück hätte es mehr Qualität". Auf Nachfrage war beides nicht haltbar – das erste ist kein Sach-Argument, das zweite war unbelegt und eher falsch herum (der Kontext zur Messung war gerade frisch). Die Messung war read-only, die Daten lagen vor, der Re-Trigger war erfüllt.
+  Warum: Der eigene Aufwand wurde unausgesprochen in die Sachabwägung eingerechnet und dann nachträglich mit einem Qualitätsargument verkleidet.
+  Regel: Eine Empfehlung nur auf Eigenschaften der Sache stützen (Risiko, Reversibilität, Datenlage, Abhängigkeiten). Spielt der eigene Aufwand eine Rolle, ihn als solchen benennen statt ihn als Qualitätsargument zu tarnen – und bei einer bereits zweimal aufgeschobenen Wiedervorlage gilt Aufschub ohnehin als begründungspflichtig, nicht als neutrale Option.
+
+- **[MITTEL] [QUALITÄT] [Mutation-Testing] LL-S109-3 – Negativ-Befund aus einem Testfall gezogen, der ihn gar nicht zeigen konnte**
+  Quelle: Orchestrator
+  Was: Ob Stryker.NET mehrere `--mutate`-Flags akzeptiert, wurde an zwei Dateien getestet und aus „nur 1 Datei im Report" geschlossen, das Tool nehme nur das letzte Flag. Die zweite Datei hat jedoch generell 0 Mutanten – der Testfall konnte einen Erfolg gar nicht anzeigen. Mit zwei nachweislich mutantenhaltigen Dateien war das Ergebnis das Gegenteil (2 Dateien, 13 = 10+3 Mutanten).
+  Warum: Der Testfall wurde nach Verfügbarkeit gewählt, ohne vorher zu prüfen, ob er im Erfolgsfall ein unterscheidbares Signal liefert.
+  Regel: Vor einem Verhaltenstest an fremdem Tooling festlegen, wie Erfolg und Misserfolg **unterschiedlich** aussehen, und die Testdaten danach auswählen – sonst ist ein Negativ-Ergebnis nicht vom untauglichen Messaufbau unterscheidbar.
+
 ## Session 107 – 2026-07-22
 
 - **[MITTEL] [PROZESS] [Skill-Nutzung] LL-S107-1 – Retro-Auftakt-Sonde beim Retro-Start übersprungen**

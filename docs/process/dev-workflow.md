@@ -7,7 +7,7 @@ kritische-regeln:
   - Test- und Stryker-Aufrufe: immer Python-Wrapper aus .claude/scripts/ verwenden – Hook erzwingt das und zeigt den richtigen Befehl
   - .NET-Tools (dotnet-ef, dotnet-stryker) sind lokal gepinnt (.config/dotnet-tools.json) – nach Clone: dotnet tool restore
   - Timeouts immer setzen – Richtwerte in der Tabelle unten
-  - Stryker --mutate: Pfad ist projektrelativ (ohne Server/-Präfix für Backend, ohne Client/-Präfix für Frontend)
+  - Stryker --mutate: Pfad ist projektrelativ (ohne Server/-Präfix für Backend, ohne Client/-Präfix für Frontend); mehrere Ziele als Kommaliste, keine Brace-Globs; ein Muster ohne Treffer bricht ab
 -->
 
 ## Inhalt
@@ -302,6 +302,17 @@ python3 .claude/scripts/dotnet-stryker.py --verbose
 > (Migrations, DbTypes etc.) entfallen. Das ist in Ordnung, weil nur die eine Zieldatei
 > getestet wird – die anderen Dateien werden als "Removed by mutate filter" ignoriert.
 > Der Pfad muss **projektrelativ** angegeben werden (ohne `Server/`-Präfix).
+>
+> **Mehrere Ziele** als Kommaliste: `--mutate Domain/Foo.cs,Endpoints/Bar.cs`. Die Wrapper
+> übersetzen das in die jeweils passende CLI-Form (Stryker.NET: mehrere `--mutate`-Flags,
+> StrykerJS: eine Kommaliste – beides in S109 empirisch verifiziert). **Keine Brace-Globs**
+> (`{a,b}`): beide Stryker splitten am Komma und zerreißen sie.
+>
+> **Ein Muster ohne Treffer bricht den Lauf ab** (Exit 2, mit Korrekturvorschlag), und ein
+> Report ohne einen einzigen validen Mutanten gilt als Fehler statt als 100 %: „nichts gemessen"
+> ist kein „alles getötet". Jede Auswertung nennt darum auch den **Umfang** (Dateien / valide
+> Mutanten), nicht nur den Score – der Übergabe-Hash bindet den Report-*Inhalt*, nicht dessen
+> Umfang, ein zu eng gelaufener Report muss also am Umfang auffallen.
 
 **Ziel:** 100% Mutation Score. Ausnahmen (äquivalente Mutanten) dokumentieren in `docs/history/adr.md`.
 

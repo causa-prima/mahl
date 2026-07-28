@@ -14,6 +14,13 @@ import sys
 from pathlib import Path
 
 
+# Eigener Exit-Code für „Lock belegt, Lauf gar nicht gestartet". Ein generisches Exit 1 wäre
+# für den Aufrufer von einem Score-Gate-Fail (Stryker lief, Score < 100 %) nicht unterscheidbar –
+# `qa-check.py` griff deshalb auf den Report eines fremden Laufs zurück und attestierte einen
+# Umfang, der nie geprüft wurde (OBS-S108-3 c).
+LOCK_BUSY_EXIT_CODE = 99
+
+
 def _pid_alive(pid: int) -> bool:
     """True, wenn ein Prozess mit dieser PID existiert (Linux-PID des WSL-Python)."""
     try:
@@ -75,7 +82,7 @@ class RunLock:
             f"   Verwaister Lock? Datei manuell löschen: {self._lock_path}",
             file=sys.stderr,
         )
-        sys.exit(1)
+        sys.exit(LOCK_BUSY_EXIT_CODE)
 
     def __exit__(self, *_exc) -> None:
         try:

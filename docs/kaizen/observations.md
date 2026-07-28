@@ -68,15 +68,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S106-1
 
-## OBS-S106-3 – `dotnet-stryker.py --mutate <Datei>` untauglich für Test-Removal-Gegenprobe
-- Quelle: Subagent
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: Für die Gegenprobe „bleibt der Score 100 %, wenn Test X entfernt wird?" (Gold-Plating-Nachweis) lieferte `dotnet-stryker.py --mutate <Zieldatei>` keine verwertbare Aussage – alle Mutanten wurden als „Excluded" gemeldet (0/0/0). Erst der volle `qa-check.py`-Lauf war belastbar. Der Quick-Check adressiert einen anderen Zweck (eine Zieldatei fokussiert prüfen) und ist für die „Survivor durch Testentfernung"-Frage strukturell ungeeignet.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: OBS-S103-1
-
 ## OBS-S105-2 – C#-String-Ops triggern unter `TreatWarningsAsErrors` kulturbezogene Analyzer
 - Quelle: Subagent + Orchestrator
 - Status: NEU
@@ -85,15 +76,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Naive String-Operationen brechen unter `TreatWarningsAsErrors` den Build über kulturbezogene Analyzer – in S105 zweifach getroffen: (1) `.ToLower()` in einem EF-Core-LINQ-Prädikat → CA1304/CA1311/CA1862/MA0011 (Analyzer nehmen Laufzeit-`CurrentCulture` an, obwohl der Ausdruck zu SQL `LOWER()` übersetzt wird → braucht ein gezieltes `#pragma`); (2) `IndexOf(char)` / `==` / im `.env`-Parser → CA1307/MA0006 (hier ist der Nudge berechtigt → `Split`/`StringComparison.Ordinal`/`string.Equals`). Beide Male kostete es einen Trial-and-Error-Zyklus.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: LL-S105-1
-
-## OBS-S103-1 – `dotnet-stryker.py --mutate` unklar bei Einzeldatei-Ziel / stillem 0-Treffer
-- Quelle: Subagent
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: `dotnet-stryker.py --mutate` akzeptiert nur eine einzelne Datei (keine Kommaliste/Brace-Expansion), und der Pfad muss relativ zu `Server/` sein (`Endpoints/Foo.cs`, nicht `Server/Endpoints/Foo.cs`). Bei falschem Muster oder 0 gefundenen Mutanten für die Zieldatei meldet das Tool stillschweigend `0/0/0` statt einer klaren Fehlermeldung → der Subagent brauchte zwei unnötige Läufe, bis er es per Doku-Beispiel (`--mutate Domain/Foo.cs`) korrigierte.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: –
 
 ## OBS-S103-2 – Stryker 100 % pinnt nicht die Reihenfolge von „erstes-von-N"-Prioritätslogik
 - Quelle: Orchestrator
@@ -142,28 +124,9 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
-## OBS-S100-3 – `qa-check` gibt bei <100 % nur den Score aus, nicht die Survivor-Zeilen
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: Meldet `qa-check` einen Stryker-Score < 100 %, nennt es nur die Prozentzahl, nicht *welche* Zeilen überlebten. Man muss danach separat `stryker-frontend.py` (bzw. den Backend-Pendant) bemühen, um die Survivor-Stellen zu sehen – ein zusätzlicher Lauf für Information, die der eben abgeschlossene Lauf bereits hatte. Konkret in dieser Session beim 98,1-%-Survivor (Fokus-Guard) aufgetreten.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: OBS-S085-3
-
----
-
-## OBS-S085-2 – Zu verbose Kommunikation (Orchestrator↔Subagenten) verschwendet Token
-- Quelle: User
-- Status: IN BEOBACHTUNG bis S105
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: PROZESS    Kontext: Agent-Prompt
-- Beobachtung: Kommunikation im implementing-scenario (und ggf. allen Prozessen) ist unnötig verbose.
-- Entscheidung/Maßnahme: Aufgeschoben – Spike mit hoher Gefahr (Knappheit ↔ Subagent-Qualität), kein Schnellschuss. Plan: **Phase 1** an einem realen `implementing-scenario`-Lauf messen, *wo* die Tokens hingehen (Orchestrator→Subagent-Prompts vs. Subagent→Orchestrator-Reports vs. Narration); **Phase 2** nur die verbose Richtung straffen, qualitäts-gegated (Tests/Review/Mutation-Score). **Re-Trigger:** erst nach dem geplanten `implementing-scenario`-Umbau (mehrere Szenarien gleichzeitig) – wenn der stabil läuft (~5–10 Sessions); Backstop bis S105.
-
 ## OBS-S085-3 – Agenten durchsuchen Tool-Outputs selbst statt unsere gezielten Scripte zu nutzen
 - Quelle: User
-- Status: IN BEOBACHTUNG bis S109 – S087: A (Wrapper-Audit, kein Change) + C (`--list`/SessionStart-Hinweis „ohne tail/grep") + D (`allowed-commands.log`) umgesetzt, B (tail-Deny) zurückgestellt; **S095 wiederaufgegriffen** nach D-Analyse; **S099 (Drain) erneut aufgeschoben bis S109** – Blocker (Wrapper-Fixes OBS-S091-1/-3) in S096 erledigt, aber seit S096 kaum Anwendungsgelegenheit → 10 Sessions Daten sammeln.
+- Status: IN BEOBACHTUNG bis S115 – S087: A (Wrapper-Audit, kein Change) + C (`--list`/SessionStart-Hinweis „ohne tail/grep") + D (`allowed-commands.log`) umgesetzt, B (tail-Deny) zurückgestellt; **S095 wiederaufgegriffen** nach D-Analyse; **S099 (Drain) erneut aufgeschoben bis S109**; **S109: gemessen + Wrapper-Ausgabe umgebaut, Wirkung offen** (s. Entscheidung).
 - Impact: MITTEL    Häufigkeit: häufig
 - Kategorie: PROZESS    Kontext: Mutation-Testing
 - Beobachtung: Agenten greppen/`tail`-en Stryker-&-Co-Output, obwohl unsere Scripte gezielt nur das Relevante ausgeben sollen (Deny-Log S086: 81 head/tail-Zeilen).
@@ -171,10 +134,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - **Rezidiv (S090, Quelle: User):** Trotz Gegenmaßnahme C erneut aufgetreten — `grep` mehrfach auf qa-check-Output, `tail` auf playwright-test. Der Session-Hinweis (C) allein verhindert das Verhalten nicht zuverlässig.
 - **D-Analyse durchgeführt + Neubewertung (S095):** `allowed-commands.log` ausgewertet (~15+ Filter-Instanzen S90–93). Befund: das Filtern ist **nicht** einheitlich Misuse, sondern zerfällt in drei Klassen — (1) **reines Kürzen** auf bereits kuratiertem Output (`vitest-run|tail`, `eslint-run|tail`) → Disziplin-Thema; (2) **gezieltes Feld-Extrahieren**, weil der Wrapper das Verdikt vergräbt (`qa-check --verify | grep | tail`, `stryker | grep Score/Survived`) → Wrapper sollte das Verdikt klar ausgeben; (3) **legitimer Workaround**, weil der Wrapper die relevante Info gar nicht liefert (`dotnet-test` bei RED ohne Assertion-Details → **OBS-S091-1**). Konsequenz (User-Entscheid): **kein pauschales Deny (B)** — es würde Klasse 2+3 bestrafen. Stattdessen **zuerst die Wrapper fixen** (Klasse 2+3, s. OBS-S091-1/-3), *dann* neu bewerten, ob für Restklasse 1 überhaupt noch eine Maßnahme nötig ist.
 - **S099-Drain-Entscheid (erneut aufgeschoben bis S109):** Wrapper-Fixes OBS-S091-1/-3 in S096 erledigt (Blocker weg). User-Korrektur zur Restklasse 1: sie hat **konkreten Schaden** (höherer Token-/Zeitverbrauch, weil der Output anschließend von Hand ausgewertet wird, statt den Tool-Output zu nutzen bzw. eine **Verbesserung am Wrapper** vorzuschlagen) — nicht bloß Disziplin. Da seit S096 kaum Anwendungsgelegenheit bestand, erst ~10 Sessions Post-S096-Daten sammeln, dann Maßnahme neu bewerten (ggf. doch Deny B, ggf. Wrapper-Nachschärfung). Re-Trigger: mehrere Läufe mit realer Wrapper-Nutzung.
+- **S109-Messung (`allowed-commands.log`, 17.06.–28.07., nur echte Wrapper-Ausführungen):** **430 von 517 Läufen (83 %) mit nachgelagertem Filter**, Tendenz steigend (Juni 79 % → Juli 85 %). Damit ist die bisherige Einordnung als „Restklasse 1, ~15 Einzelfälle" widerlegt: Filtern ist der Normalfall, nicht die Ausnahme, und die Wrapper-Fixes aus S096 haben daran nichts geändert. Verteilung: vitest-run 96, qa-check 92, dotnet-test 89, playwright-test 60, eslint-run 40, dotnet-stryker 27.
+- **S109-Ursachentest (User-Vorschlag, entscheidend):** Die naheliegende Erklärung „der Wrapper-Output ist zu lang, also kürzen die Agenten zu Recht" wurde geprüft, indem in den Session-Transkripten die **Reihenfolge** der Wrapper-Aufrufe je Kontext ausgewertet wurde – filterte ein Kontext erst, *nachdem* er einmal die volle Länge gesehen hatte? Ergebnis: **in 13 von 19 Kontexten (68 %) war schon der allererste Wrapper-Aufruf gefiltert, in 11 davon durchgehend jeder.** Nur 4 Kontexte zeigen das Reaktionsmuster. Der Output kann also nicht der Auslöser sein – er war in diesen Kontexten nie sichtbar. Deutlichster Einzelbeleg: `dotnet-test` gibt im Erfolgsfall **drei Zeilen** aus und wurde trotzdem 89× gefiltert. Das Verhalten ist antrainiert, nicht situativ. *(Limitation: die Transkripte enthalten nur Orchestrator-Kontexte – 211 der 517 Läufe; für die ~306 Subagent-Läufe gilt das Argument aber verschärft, da Subagenten immer frisch starten.)*
+- **S109-Maßnahme (unabhängig von der Ursache, User-Vorgabe):** Wrapper-Ausgabe-Politik vereinheitlicht in `_wrapper_output.py`: **im Erfolgsfall nur noch das Verdikt** (ein bis zwei Zeilen), **im Fehlerfall nur das analyse-Relevante**, alles Weitere hinter `--verbose`. Umgesetzt für vitest-run (12 → 2 Zeilen), playwright-test (→ 2), jscpd-run (25 → 6), eslint-run (→ 1 bei sauberem Lauf) und beide Stryker-Wrapper (30 Zeilen Rohoutput im Erfolgsfall entfallen, ~35 → 8). `dotnet-test` blieb unverändert – mit 3 Zeilen bereits optimal. Fail-open-Prinzip: erkennt ein Wrapper sein Muster nicht, gibt er weiter die längere Fassung aus; ein Parser-Fehlgriff darf nie Information verschlucken. Der SessionStart-Hinweis nennt jetzt konkret, dass `tail` das Verdikt **abschneiden** kann, statt nur zu behaupten, der Output sei kuratiert. **Deny (B) weiterhin nicht gebaut** – bei 83 % Quote träfe es zu breit, und die Ursache ist erklärtermaßen nicht Bedarf, sondern Gewohnheit. **Re-Trigger/Bewertung bis S115:** dieselbe Messung wiederholen. Sinkt die Quote trotz Ein-Zeilen-Verdikt nicht, ist die Gewohnheits-These endgültig bestätigt und nur noch ein mechanischer Guard (B) wirksam.
 
 ## OBS-S085-4 – Kein Language-Server für die Agenten-Programmierung im Einsatz
 - Quelle: User
-- Status: IN BEOBACHTUNG bis S105 – **S099 (Drain) erneut aufgeschoben:** seit Aktivierung (2026-06-20) kaum echte TS-Arbeit, Evidenz-Schwelle (≥ ~3 TS-Sessions) nicht erreicht; Bewertung bleibt an die nächste Kaizen-Retro gebunden (Backstop S105). **Pilot durchgeführt & technisch validiert (2026-06-20):** `typescript-lsp`@claude-plugins-official läuft auf **nativem** Claude-Install 2.1.183 (anthropics/claude-code #20050 hier **nicht** relevant – galt für ältere Versionen); `ENABLE_LSP_TOOL` nicht nötig; `/reload-plugins` statt Neustart genügt. Alle Ops ok (hover, documentSymbol, goToDefinition cross-file, workspaceSymbol, findReferences); **semantisch präziser als grep** (Kommentar-/String-Treffer korrekt ausgeschlossen). **CAVEAT:** erster `findReferences` direkt nach Plugin-Load = kalter/unvollständiger Index → erst nach Warmlauf vollständig (bei verdächtig wenigen Treffern wiederholen). Offene Bewertung: realer Nutzen über laufende Arbeit. C# weiter zurückgestellt (#1359). **S101 – Werkzeug-Zugang korrigiert (kritisch für diese Bewertung):** LSP war nur dem Orchestrator zugeteilt, NICHT den Layer-Implementern (die den Code schreiben) noch den Auditoren – die „≥3 Sessions mit LSP verfügbar"-Evidenz wäre gegen Agenten ohne LSP gesammelt worden (Pilot faktisch nur beim Orchestrator, der kaum Layer-Code schreibt). Fix S101: `LSP` in die `tools` von frontend-/backend-layer-implementer + code-quality-/functional-correctness-/test-quality-/ux-ui-/security-auditor aufgenommen (workflow-auditor bewusst NICHT – auditiert Prozess, nicht Code). Konsequenz: Evidenzfenster für Implementer/Auditor-Nutzung startet effektiv ab S101; Backstop-Bewertung entsprechend nicht auf Vor-S101-Sessions stützen.
+- Status: IN BEOBACHTUNG bis S115 – **S109 (Drain): gemessen, Nutzung nahe null → Empfehlung geschärft statt Pilot beendet** (s. unten). **S099 (Drain) erneut aufgeschoben:** seit Aktivierung (2026-06-20) kaum echte TS-Arbeit, Evidenz-Schwelle (≥ ~3 TS-Sessions) nicht erreicht; Bewertung bleibt an die nächste Kaizen-Retro gebunden (Backstop S105). **Pilot durchgeführt & technisch validiert (2026-06-20):** `typescript-lsp`@claude-plugins-official läuft auf **nativem** Claude-Install 2.1.183 (anthropics/claude-code #20050 hier **nicht** relevant – galt für ältere Versionen); `ENABLE_LSP_TOOL` nicht nötig; `/reload-plugins` statt Neustart genügt. Alle Ops ok (hover, documentSymbol, goToDefinition cross-file, workspaceSymbol, findReferences); **semantisch präziser als grep** (Kommentar-/String-Treffer korrekt ausgeschlossen). **CAVEAT:** erster `findReferences` direkt nach Plugin-Load = kalter/unvollständiger Index → erst nach Warmlauf vollständig (bei verdächtig wenigen Treffern wiederholen). Offene Bewertung: realer Nutzen über laufende Arbeit. C# weiter zurückgestellt (#1359). **S101 – Werkzeug-Zugang korrigiert (kritisch für diese Bewertung):** LSP war nur dem Orchestrator zugeteilt, NICHT den Layer-Implementern (die den Code schreiben) noch den Auditoren – die „≥3 Sessions mit LSP verfügbar"-Evidenz wäre gegen Agenten ohne LSP gesammelt worden (Pilot faktisch nur beim Orchestrator, der kaum Layer-Code schreibt). Fix S101: `LSP` in die `tools` von frontend-/backend-layer-implementer + code-quality-/functional-correctness-/test-quality-/ux-ui-/security-auditor aufgenommen (workflow-auditor bewusst NICHT – auditiert Prozess, nicht Code). Konsequenz: Evidenzfenster für Implementer/Auditor-Nutzung startet effektiv ab S101; Backstop-Bewertung entsprechend nicht auf Vor-S101-Sessions stützen.
 - Impact: MITTEL–HOCH (von GERING revidiert)    Häufigkeit: häufig
 - Kategorie: TOOLING    Kontext: Sonstiges
 - Beobachtung: Wir nutzen aktuell **keinen** Language-Server, der Claude Code Code-Intelligence bereitstellt. Recherche (S086): Claude Code v2.1.172 unterstützt LSP (`ENABLE_LSP_TOOL` + Marketplace-Plugin pro Sprache). Nutzen potenziell **hoch** (Auto-Typfehler nach jedem Edit, find-refs, Symbole, Call-Hierarchie → kürzere Edit-Fix-Schleifen) → Impact GERING→MITTEL/HOCH revidiert.
@@ -186,14 +152,8 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - **Pilot-Lauf-Log** (Format `[S<NNN> | Datum] op — HELP|FAIL — Beschreibung`; bei Nicht-Session-Ereignissen Kontext-Label statt Session-Nr.; **Beschreibung ≤ ~100 Zeichen**, länger nur wenn für spätere Nachvollziehbarkeit wirklich nötig; **FAILs immer, HELPs nur bei klarem Counterfactual**; Routine-Calls nicht loggen):
   - [Aktivierungs-Test 2026-06-20] findReferences — FAIL — direkt nach Plugin-Load kalter Index (1 statt 3 Refs); nach Warmlauf korrekt.
   - [Aktivierungs-Test 2026-06-20] findReferences — HELP — schloss Kommentar-/String-Treffer aus, die grep mitzählte (3 statt 4, 12 statt 15).
-
-## OBS-S085-12 – Noise-Review skaliert nicht: Archive jede Retro neu zu filtern wird teuer
-- Quelle: Agent
-- Status: IN BEOBACHTUNG bis S105
-- Impact: GERING    Häufigkeit: häufig
-- Kategorie: PROZESS    Kontext: Skill-Nutzung
-- Beobachtung: kaizen-Schritt 0 sah vor, alle Archiv-Dateien jede Retro neu gegen den Filter zu prüfen → Token-Kosten steigen, Grenznutzen gering.
-- Entscheidung/Maßnahme: **B gewählt** — Staffel B (nur zuletzt archivierte Periode doppelprüfen) → (kein Rückfall) → A (Archiv-Scan weglassen). Umsetzung: kaizen Schritt 0 (bereits angewandt). Gekoppelt an CM „Noise als LL" (AKTIV + beobachten).
+- **S109-Messung (Frequenz, wie oben unter „Messung (a)" vorgesehen):** 41 Transkripte durchsucht (40 davon mit Subagent-Aktivität). **LSP-Nutzung in 2 Sessions, 8 Calls gesamt – davon 7 im Aktivierungstest am 2026-06-20 und genau 1 danach (2026-07-10).** Seit S101, seit dem Implementer und Auditoren das Tool überhaupt haben, also praktisch keine Nutzung. Operationen: findReferences 3, hover 2, documentSymbol/goToDefinition/workspaceSymbol je 1.
+- **S109-Entscheid (User): Empfehlung schärfen, eine Runde verlängern – bis S115.** Das vorab definierte Fehlschlag-Kriterium („kaum genutzt") wäre erfüllt, aber die Nullnutzung ist mehrdeutig: Der Hinweis stand bisher nur in `coding-guideline-typescript.md`, also in einem Dokument, das ein Agent liest *bevor* er arbeitet – nicht dort, wo die Entscheidung „grep oder LSP?" tatsächlich fällt. Zusätzlich ist LSP ein deferred Tool (erst via `ToolSearch select:LSP` ladbar), was eine echte Schwelle darstellt. Beides zusammen macht plausibel, dass „nicht angeboten" statt „nicht nützlich" gemessen wurde. **Maßnahme:** kurzer, konkreter LSP-Block direkt in die Prompts von `frontend-layer-implementer` (schreibt den TS-Code) und `code-quality-auditor` (stellt die „wo wird das noch verwendet?"-Fragen) – inklusive Ladehinweis und Kalt-Index-Caveat. Guideline-Notiz bleibt. **Bewertung S115 mit unveränderten Kriterien; dritte Nullrunde = verwerfen** (dann ist belegt, dass es nicht an der Sichtbarkeit lag). *Randnotiz:* `backend-layer-implementer` führt `LSP` in seinen `tools`, obwohl für C# kein Server läuft (Blocker #1359) – bewusst nicht angefasst, um das Messsetup nicht mitten in der Bewertung zu ändern.
 
 ## OBS-S088-1 – Hook-Registrierung: ein Dispatcher je Matcher/Event statt Einzeleinträge
 - Quelle: User
@@ -206,22 +166,12 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S091-2 – Wrapper-Aufrufpfad cwd-relativ, kollidiert mit Projekt-Tooling-cwd
 - Quelle: Agent
-- Status: NEU
+- Status: IN BEOBACHTUNG bis S115
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: Die Wrapper liegen im Repo-Root (`.claude/scripts/`) und lösen ihren Root intern via `_util.REPO_ROOT` auf — aber der **Aufrufpfad** `python3 .claude/scripts/foo.py` ist cwd-relativ. Projekt-Tooling (`npm`/`dotnet`/`vite`) zieht die Shell in `Client/`/`Server/`-Subdirs; der nächste Wrapper-Aufruf scheitert dann mit „No such file" (S091: beide Subagenten + Orchestrator betroffen).
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: **Aufgeschoben (S109-Drain) bis S115 – die Ursache wurde stattdessen entfernt.** Der mit Abstand häufigste Grund, den Repo-Root zu verlassen, war ein blockiertes `npm --prefix Client run …`, das ein `cd Client` erzwang; `--prefix` ist jetzt erlaubt (s. OBS-S108-4 b), womit der Auslöser wegfällt. Der direkte Fix – der Bash-Hook präfixt Wrapper-Aufrufe via `updatedInput` mit `cd <repo-root> &&` – wurde bewusst **nicht** gebaut: er wäre die Umkehrung der im selben Hook bestehenden Normalisierungsregel (absolute Repo-Pfade → relativ), also zwei gegenläufige Rewrite-Regeln nebeneinander, für ein seit 18 Sessions nie eskaliertes GERING-Problem. Geprüft und verworfen wurde auch der Weg über `$CLAUDE_PROJECT_DIR`: die Variable ist im Bash-Tool leer (nur in Hooks gesetzt), ein Rewrite müsste den Repo-Root literal einsetzen. **Re-Trigger:** ein Wrapper-Aufruf scheitert erneut an falschem cwd, obwohl `--prefix` verfügbar ist – dann ist belegt, dass es noch andere cd-Gründe gibt, und der Hook-Rewrite ist gerechtfertigt.
 - Bezug: —
-
-## OBS-S092-2 – Dokumentiertes Kommando zum Header-Lesen (statt eigenes Script)
-- Quelle: User
-- Status: IN BEOBACHTUNG bis S106
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: TOOLING    Kontext: Doku/Hook/Script
-- Beobachtung: Viele Doku-Dateien tragen im Header die Meta-Infos inkl. Schema/Format (z.B. lessons_learned, observations, adr, tech-debt). Agenten lesen sie ad-hoc (sed/Read), teils unvollständig. Es genügt ein **dokumentiertes Kommando-Pattern** mit bestehenden Tools (z.B. `sed -n '1,/^-->/p' <datei>` o.ä.), aufgenommen in den Startup-Hinweis bzw. die `--list`-Referenz – **kein eigenes Script** (Wartung) und **nicht** alle Header im Startup injizieren (zu teuer). Ggf. zweigeteilt (Metadaten vs. Schema), aber evtl. besser immer beides gemeinsam, da Schema ohne Metadaten selten nützt.
-- Entscheidung/Maßnahme: Aufgeschoben – beim Drain zur Doku-Architektur-/Progressive-Disclosure-Designfrage gewachsen, kein Quick-Edit mehr: (1) welche Dateien brauchen überhaupt einen Header (vs. Name/Index erklärt sich selbst)? (2) was gehört in den Header (Leitfrage: *wann* liest ein Agent die Datei und *welche* Header-Info braucht er dann)? (3) In-Datei-Header vs. **Wiki-Struktur** (eigene Index-/Header-Dateien mit MD-Links). Der kleine Slice (sed-Pattern + Endmarker-Konvention `-->` vs. `---`) ist durch genau diese offenen Fragen blockiert. Re-Trigger: nächster Doku-Struktur-/`review-docs`-Durchgang.
-
----
 
 ## OBS-S093-1 – SonarAnalyzer S125 feuert auf deutsche Kommentare mit Satz-Ende „;"
 - Quelle: Agent
@@ -235,23 +185,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S096-3 – Scripted-Access-Layer für TD/OBS/LL/Doc (Lesen/Schreiben, Metadaten listen/filtern/move)
 - Quelle: User
-- Status: IN BEOBACHTUNG bis S112
+- Status: NEU – **S109 reaktiviert: Re-Trigger (2) eingetreten** (`observations.md` 264 Zeilen > 250; `adr.md` 1.263 Zeilen), zusätzlich Messdaten vorhanden
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Doku/Script
 - Beobachtung: Möglichst viel über Script(e) zugänglich machen: Lesen + Schreiben von TD/OBS/LL etc., idealerweise auch Lesen von Doc-Teilen; ein Auflisten aller Inhalts-Header/Metadaten (schneller Überblick + Suche), Filtern nach Metadaten (wie ADRs via `decisions.py`), ggf. Status-Update/Move wo passend. Vorher bewerten, wo es sich (besonders) lohnt. (`obs-drain.py`/`obs-archive.py` sind ein erster Schritt für OBS.) **Facette (aus OBS-S087-1 konsolidiert, S104):** technische Schuld durchsuchbar/relevanz-gefiltert machen – der Architektur-Check in `implementing-scenario` (oder ein Script) listet die zum bearbeiteten Code-Bereich potentiell relevante TD automatisch auf (kuratierte Bereichs-Keywords pro Eintrag).
 - Entscheidung/Maßnahme: **Aufgeschoben (S104-Drain) bis S112.** YAGNI: Access-Layer/Tag-Vokabular ohne konkreten Abnehmer driftet – der **Abnehmer definiert das Schema** (deshalb nicht spekulativ vorbauen; OBS gibt es schon Scripts, TD/LL nicht, TD heute 15 Einträge/123 Zeilen → grep noch tragbar). **Re-Trigger (event-basiert, Backstop S112):** (1) `implementing-scenario` Schritt 0 (TD-Sichtung, area-basiert) reibt real – grep verfehlt Bereichs-Treffer oder ertrinkt in Fehltreffern → konkreter Abnehmer für Bereichs-Keywords, Script+Schema gemeinsam mit *diesem* Schritt entwerfen; (2) eine Tracker-Datei wächst über Schwelle (TD > ~30 Einträge ODER Datei > ~250 Zeilen); (3) ein manueller Schreib-Mehrschritt für TD/LL reibt (Status/Archiv-Workflow, analog `obs-archive.py` für OBS).
-- Bezug: OBS-S092-2 (Doku-Header lesen, geparkt); OBS-S096-2 (Skill-Mechanisierung, umgesetzt S104)
-
----
-
-## OBS-S102-1 – `dotnet-stryker.py --mutate` akzeptiert nur einen einzelnen Dateipfad
-- Quelle: Subagent
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: `--mutate` nimmt nur einen Dateipfad; ein komma-getrenntes Mehrfach-Argument scheitert („unrecognized arguments" bzw. beim String-Workaround „Excluded" auf allen Dateien). Wer mehrere geänderte Dateien in einem Lauf gezielt mutieren will, muss mehrere separate Läufe machen (kleine Zeitkosten). Aufgetreten in run-3, als der Backend-Implementer zwei Dateien in einem Lauf mutieren wollte.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: –
+- **S109-Reaktivierung (User):** Der beim S104-Aufschub fehlende **konkrete Abnehmer ist jetzt da** – und zwar gemessen statt vermutet. Die Phase-1-Messung (s. OBS-S109-1) zeigt: `docs/kaizen/observations.md` wurde über 23 Sessions mit **759k Zeichen** vollständig gelesen, `docs/history/adr.md` mit 303k, und die `adr.md`-Voll-Reads **steigen** trotz `decisions.py` (1,5k → 12,3k je Session), weil das Script zwar das Suchen abdeckt, nicht aber das Schreiben: Wer eine ADR ergänzt, muss die 1.263-Zeilen-Datei vorher lesen. Damit ist die Schreib-Seite des Access-Layers – beim S104-Aufschub noch als spekulativ eingestuft – als eigener Kostenpunkt belegt. Beide Backstop-Schwellen sind ebenfalls überschritten (`observations.md` 264 Zeilen > ~250). Der Bewertungsauftrag bleibt: **wo lohnt es sich besonders** – die Messung legt Schreib-/Ergänzungs-Operationen auf den großen Tracker-Dateien nahe, weil dort der erzwungene Vor-Edit-Read den eigentlichen Preis ausmacht.
+- Bezug: OBS-S092-2 (Doku-Header lesen, geparkt); OBS-S096-2 (Skill-Mechanisierung, umgesetzt S104); OBS-S109-1 (Messung)
 
 ---
 
@@ -261,28 +201,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: Check 6 (`decisions.py check` / `qa-check.py`) erkennt eine `ADR-SXXX-N`-Referenz nur, wenn ein `//` unmittelbar davorsteht (Kommentar am Zeilenanfang) – nicht, wenn zwei ADRs mid-line in einem Fließtext-/Prosa-Kommentar kombiniert werden. In run-7 blieben dadurch zwei in einem Kommentar kombinierte ADR-Referenzen zunächst unerfasst; sichtbar wurde es erst durch den qa-check-Rerun (ein zusätzlicher Lauf, kein Blocker). Risiko: eine real vorhandene ADR-Referenz bleibt unverlinkt/ungeprüft, wenn sie stilistisch in Prosa eingebettet statt als eigene `//`-Zeile geschrieben wird.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: –
-
----
-
-## OBS-S108-3 – Mutations-Läufe können erfolgreich aussehen, ohne etwas mutiert zu haben
-- Quelle: Subagent (backend- + frontend-layer-implementer, run-8)
-- Status: NEU
-- Impact: HOCH    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Drei unabhängige Wege, auf denen ein Mutations-Lauf als bestanden erscheint, obwohl er nichts oder nur einen Bruchteil geprüft hat. (a) `dotnet-stryker.py --mutate` erwartet einen **projekt**-relativen Pfad (`Endpoints/Foo.cs`); mit einem repo-root-relativen Pfad (`Server/Endpoints/Foo.cs` – die Form, die praktisch jedes andere Script im Repo nutzt) wird die Zieldatei als „Excluded" gewertet und der Lauf endet mit „Score: 100.0 %, Valid: 0". (b) `--mutate` mit Brace-Glob (`"src/{a.tsx,b.ts}"`) wird am Komma zerlegt → ungültige Globs → Dry-Run über 0 Dateien, Exit 0. (c) `qa-check.py` weicht bei einem erkannten konkurrierenden Stryker-Lock auf einen bereits vorhandenen Report aus – auch wenn dieser aus einem `--mutate`-Einzeldatei-Lauf stammt und damit einen ganz anderen Scope hat; der Output war in sich widersprüchlich („Score: 100.0 %" oben, „ACHTUNG: Mutation-Score 100.0 % < 100 %" unten) und kostete den Subagenten mehrere Minuten Diagnose. Gemeinsamer Nenner: In allen drei Fällen ist die ausgegebene Zahl 100 %, und in keinem Fall belegt sie, was sie zu belegen scheint. Der Übergabe-Hash bindet den Report-Inhalt, nicht dessen Umfang – bei (c) wäre er also formal gültig gewesen. Der Orchestrator hat den Report-Scope (Dateizahl, Mutantenzahl) in dieser Session deshalb einmal von Hand nachgezählt; das ist kein Bestandteil des regulären Gates.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: OBS-S102-1
-
----
-
-## OBS-S108-4 – Wrapper-Ergonomie: kein Fortschritt sichtbar, Pfad-Zwang, verdrehte Log-Reihenfolge
-- Quelle: Subagent (backend- + frontend-layer-implementer, run-8)
-- Status: NEU
-- Impact: GERING    Häufigkeit: häufig
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Drei kleine Reibungspunkte an den Script-Wrappern, alle ohne Fehlsignal-Risiko. (a) Langlaufende Wrapper geben ihre kuratierte Ausgabe erst am Ende aus; bei Läufen über 120 s bleibt die Task-Output-Datei minutenlang leer, und der Ersatz-Pollpfad `.claude/tmp/stryker_frontend_out.txt` wird am Ende gelöscht – währenddessen ist nicht unterscheidbar, ob der Lauf arbeitet oder hängt. (b) `npm run typecheck` ist nur aus dem `Client/`-Verzeichnis heraus erlaubt, `npm --prefix Client run typecheck` wird geblockt. (c) `dotnet-stryker.py` schreibt seine eigenen `print()`-Ausgaben („Starte: …", „Report verschoben → …") gepuffert, während der `dotnet stryker`-Subprozess ungepuffert auf denselben fd schreibt – im nicht-TTY-Output erscheint der Report-Score dadurch **vor** der „Starte:"-Zeile, was beim schnellen Lesen wie ein Fehlgriff des Aufrufers aussieht.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 
@@ -318,4 +236,15 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Die Vollständigkeits-Checkliste in `.claude/skills/gherkin-workshop/SKILL.md` (Zeilen ~155-157) fragt „Nach erfolgreicher Aktion", „Abbrechen" und „Feld-Initialisierung" ab – durchgehend dialog- und formularzentriert. Für transiente Feedback-Elemente (Toast/Snackbar) fragt sie nichts: weder Lebensdauer, noch wodurch sie verschwinden, noch was bei mehrfacher Auslösung kurz hintereinander passiert. „Klick außerhalb" kommt vor, aber nur als Abbrechen-Pfad eines Dialogs. In run-8 führte das dazu, dass der Undo-Toast als einzige Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5) ohne jedes Szenario zu seinem Verhalten implementiert wurde. Erst der Review deckte drei beobachtbare Verhaltensaspekte auf, für die Szenarien fehlten (Klick daneben schließt den Toast; zweiter Toast erbt die Restlaufzeit des ersten und verkürzt das Undo-Fenster; nur der letzte Löschvorgang ist rückgängig). Zwei davon waren bereits implementiertes Verhalten ohne Spec, einer ein realer, im Browser reproduzierter Bug. Die Szenarien wurden nachträglich ergänzt – also in umgekehrter Reihenfolge zum Outside-In-Prinzip (ADR-S041-5). Aufgefallen ist die Lücke dem User, nicht dem Workshop und nicht den Review-Agenten.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
+
+---
+
+## OBS-S109-1 – Datei-Lesen ist der mit Abstand größte Token-Posten und wächst mit der Codebasis
+- Quelle: User + Orchestrator
+- Status: NEU
+- Impact: HOCH    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: Agent-Prompt
+- Beobachtung: Aus der Phase-1-Messung zu OBS-S085-2 (23 Sessions mit Subagent-Einsatz inkl. 112 Subagent-Logs, ~23,5M Zeichen ≈ 5,9M Token-Proxy): **`Read` allein macht 49,5 % des gesamten Volumens aus** – mehr als alles andere zusammen. Bei Subagenten sind es 71,4 % ihres Tool-I/O. 1590 Aufrufe, Ø 7.317 Zeichen (Subagenten Ø 8.373). Zum Vergleich: alle Projekt-Wrapper-Scripts zusammen 8 % des Tool-I/O, Orchestrator↔Subagent-Kommunikation 8,6 % des Gesamtvolumens, Edit 7,9 % des Tool-I/O. Drei Detailbefunde: (1) **Nicht die Anzahl treibt das Volumen, sondern die Größe** – Re-Reads derselben Datei im selben Kontext sind nur 10,1 %; die Top-Dateien sind `Client/e2e/ingredients.spec.ts` (816k gelesen), `docs/kaizen/observations.md` (759k), `Client/src/pages/IngredientsPage.test.tsx` (754k), `docs/guidelines/coding-guideline-csharp.md` (694k), `Server.Tests/IngredientsEndpointsTests.cs` (682k). (2) **86,7 % aller Reads sind vollständig, nur 13,3 % gezielt** (`offset`/`limit`) – und im Fall „Datei wird anschließend editiert" ist der gezielte Read im Schnitt 4,6× kleiner (1.943 vs. 8.971 Zeichen) bei identischem Zweck; der Harness verlangt vor einem Edit einen Read, aber keinen vollständigen (in S109 mehrfach praktisch bestätigt). 17 % des Read-Volumens sind solche vollständigen Vor-Edit-Reads. (3) **Der Posten ist nicht stabil, er wächst mit der Codebasis**: pro Session von Juni auf Juli stieg `Client/`-Lesen von 20k auf 79k Zeichen, `Server/` von 22k auf 48k, während die Pflichtlektüre (`docs/guidelines`) mit 40k→48k nahezu flach blieb. Ergänzend: gezielte Extraktions-Scripte ersetzen die Voll-Reads bisher nicht, sondern kommen hinzu – `decisions.py`-Aufrufe stiegen von 34 auf 87 pro Monat, gleichzeitig stiegen die `adr.md`-Voll-Reads von 1,5k auf 12,3k je Session (die Datei hat 1.263 Zeilen, und wer eine ADR ergänzt, muss sie vorher lesen). Risiko: Der Effekt verschärft sich mit jedem Lauf, weil Test- und Codedateien monoton wachsen und jeder frisch startende Subagent sie vollständig liest.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: OBS-S085-2 (Messung stammt aus dessen Phase 1); OBS-S096-3 (Scripted-Access-Layer, Re-Trigger jetzt erfüllt)
 

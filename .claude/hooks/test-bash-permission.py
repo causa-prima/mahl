@@ -161,6 +161,12 @@ def test_deny_patterns() -> int:
         ("npm run lint:duplicates", "npm run lint:duplicates direkt"),
         ("npx eslint .", "npx eslint direkt"),
         ("npx jscpd src/", "npx jscpd direkt"),
+        # --prefix darf die Wrapper-Pflicht NICHT umgehen: die Muster verlangen sonst npm und run
+        # direkt nebeneinander, und --prefix dazwischen hätte sie alle blind gemacht.
+        ("npm --prefix Client run test", "npm --prefix run test (Wrapper-Pflicht)"),
+        ("npm --prefix Client run test:e2e", "npm --prefix run test:e2e (Wrapper-Pflicht)"),
+        ("npm --prefix Client run lint", "npm --prefix run lint (Wrapper-Pflicht)"),
+        ("npm --prefix Client run lint:duplicates", "npm --prefix run lint:duplicates (Wrapper-Pflicht)"),
     ]
 
     for command, desc in deny_cases:
@@ -194,6 +200,10 @@ def test_allow_patterns() -> int:
         ("npm run build", "npm run build"),
         ("npm run dev", "npm run dev"),
         ("npm run test:coverage", "npm run test:coverage (kein Wrapper)"),
+        # --prefix erspart das cd nach Client/, das danach jeden Wrapper-Aufruf scheitern ließ.
+        ("npm --prefix Client run typecheck", "npm --prefix run typecheck"),
+        ("npm --prefix Client run build", "npm --prefix run build"),
+        ("npm --prefix Client ci", "npm --prefix ci"),
         ("npm audit", "npm audit"),
         ("npm outdated", "npm outdated"),
         ("npm update", "npm update"),

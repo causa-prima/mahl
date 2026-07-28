@@ -13,8 +13,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from _util import run_npm
+from _wrapper_output import emit, strip_noise
 
-_NPM_NOISE = re.compile(r"^> mahl-client@|^npm (warn|error notice)")
+# ESLints Abschlusszeile, z.B. "✖ 2 problems (0 errors, 2 warnings)".
+_PROBLEM_SUMMARY = re.compile(r"✖\s*(\d+)\s+problems?")
 
 
 def main() -> None:
@@ -28,11 +30,16 @@ def main() -> None:
 
     output, exit_code = run_npm(["run", "lint"])
 
-    if args.verbose or not output.strip():
-        print(output)
+    # ESLint schreibt bei sauberem Lauf gar nichts – nach dem Noise-Strip bleibt nichts übrig.
+    # Alles andere (Fehler UND Warnungen, die exit 0 liefern) ist analyse-relevant und bleibt.
+    lines = strip_noise(output)
+    if not lines:
+        emit(verbose=args.verbose, output=output, verdict="✓ ESLint: keine Probleme")
     else:
-        lines = [l for l in output.splitlines() if not _NPM_NOISE.match(l)]
-        print("\n".join(lines))
+        summary = _PROBLEM_SUMMARY.search(output)
+        count = summary.group(1) if summary else "?"
+        emit(verbose=args.verbose, output=output,
+             verdict=f"✗ ESLint: {count} Problem(e) – oben aufgelistet", details=lines)
 
     sys.exit(exit_code)
 

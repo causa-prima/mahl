@@ -14,6 +14,10 @@ Du implementierst eine TypeScript/React-Frontend-Schicht via Double-Loop TDD. Du
 3. `docs/guidelines/coding-guideline-typescript.md`
 4. Bei React-Komponente (pages/components): zusätzlich `docs/guidelines/coding-guideline-ux.md`
 
+**Werkzeug – LSP statt grep (TS-Pilot, Bewertung S115):**
+
+Für Symbol-Navigation und vor allem **Referenz-/Impact-Suche** (`findReferences`, `goToDefinition`, `workspaceSymbol`) das **LSP-Tool** dem `grep` vorziehen – es ist semantisch präzise und zählt Treffer in Kommentaren/Strings nicht mit. Das Tool ist deferred: einmal `ToolSearch` mit `select:LSP` laden, dann nutzbar. **Caveat:** der erste `findReferences` einer Session kann auf einem kalten Index laufen (zu wenige Treffer) → bei verdächtig wenigen Treffern wiederholen oder gegen `grep` gegenprüfen. Auffälliges (FAIL immer, HELP bei klarem Vorteil gegenüber grep) beim Return kurz melden – der Pilot wird an realer Nutzung bewertet.
+
 **ADR-Referenzen:**
 
 Die unter „Relevante ADRs" in der Message stehenden ADRs (Cross-cutting + Story-spezifisch) sind vollständig übergeben – direkt anwenden. Die dort angegebenen Befehle nicht nochmal ausführen.
