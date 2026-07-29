@@ -129,12 +129,15 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
 
 type IngredientListProps = {
   readonly ingredients: readonly Ingredient[]
+  readonly deletingId: string | null
   readonly onDelete: (ingredient: Readonly<Ingredient>) => void
 }
 
 // UX-Prinzip 1: die destruktive Aktion steht am Zeilenende (secondaryAction). Das aria-label
 // nennt die Zutat, damit die Aktion auch ohne visuellen Kontext eindeutig ist ("Mehl löschen").
-function IngredientList({ ingredients, onDelete }: Readonly<IngredientListProps>) {
+// run-9: nur die Zeile, deren DELETE gerade läuft, ist deaktiviert (deletingId) – kein globales
+// Sperren der übrigen Zeilen (Scope-Grenze run-9).
+function IngredientList({ ingredients, deletingId, onDelete }: Readonly<IngredientListProps>) {
   return (
     <List data-testid="ingredient-list">
       {ingredients.map((ingredient) => (
@@ -143,6 +146,7 @@ function IngredientList({ ingredients, onDelete }: Readonly<IngredientListProps>
           secondaryAction={
             <IconButton
               aria-label={`${ingredient.name} löschen`}
+              disabled={ingredient.id === deletingId}
               onClick={() => { onDelete(ingredient) }}
             >
               <DeleteIcon />
@@ -222,7 +226,7 @@ export default function IngredientsPage() {
     invalidateIngredients()
   })
 
-  const { deleted, requestDelete, undoDelete, dismissUndo } = useDeleteIngredientWithUndo(invalidateIngredients)
+  const { deleted, deletingId, requestDelete, undoDelete, dismissUndo } = useDeleteIngredientWithUndo(invalidateIngredients)
 
   // Direkter kind-Check statt matchKind (ADR-S056-1) ist hier bewusst aufgeschoben:
   // ADR-S056-1's kanonisches Muster trennt Netzwerk/5xx (werfen -> QueryCache.onError/
@@ -248,7 +252,7 @@ export default function IngredientsPage() {
   return (
     <div>
       {ingredients && ingredients.length > 0
-        ? <IngredientList ingredients={ingredients} onDelete={requestDelete} />
+        ? <IngredientList ingredients={ingredients} deletingId={deletingId} onDelete={requestDelete} />
         : <p>Noch keine Zutaten angelegt.</p>}
       <Button variant="contained" onClick={() => { setIsDialogOpen(true) }}>Zutat anlegen</Button>
       <CreateIngredientDialog

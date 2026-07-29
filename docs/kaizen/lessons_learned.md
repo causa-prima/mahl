@@ -43,6 +43,17 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 110 – 2026-07-29
+
+- **[MITTEL] [PROZESS] [Review] LL-S110-1 – Test-Batch freigegeben, obwohl die Hauptassertion unter dem naheliegenden Mutanten vakuös war**
+  Quelle: Orchestrator
+  Was: Im Test-Review von run-9 wurde der Batch freigegeben; die einzige Then-Assertion (`expect(loeschenButton).toBeDisabled()`) war jedoch unter dem naheliegenden `===`→`!==`-Mutanten bereits **vor** jeder Interaktion erfüllt – ein von Anfang an deaktivierter Button feuert nativ kein `onClick`, der DELETE lief also nie. Der Mutant wurde faktisch von einem nachgelagerten Block gekillt, den der Kommentar als „kein Szenario-Assert, reine Test-Infrastruktur" auswies. Gefunden erst vom `test-quality-auditor` in Schritt 5, danach empirisch bestätigt (Mutant eingesetzt: Fehlschlag lag im Cleanup, nicht an der Assertion).
+  Warum: Der 100-%-Mutation-Score war ein Fehlsignal – er belegt, *dass* ein Mutant stirbt, nicht *wo*. Die Per-Assertion-Pflicht des Test-Reviews fragt „welches Gherkin-Kriterium erzwingt diese Assertion?", aber nicht „welcher Block trägt tatsächlich die Beweislast?"; ein als Infrastruktur deklarierter Block wurde deshalb gar nicht auf Assertion-Wirkung geprüft.
+  Regel: Bei einer Assertion über einen Zustands**übergang** („X ist während Y", „erst nach Z") auch die Vorbedingung explizit assertieren – und im Test-Review prüfen, an welcher Stelle der Test unter dem naheliegenden Mutanten rot wird. Scheitert er woanders als an der Assertion, die das Kriterium trägt, ist die Assertion vakuös, egal wie hoch der Mutation Score ist.
+  Bezug: OBS-S110-2
+
+---
+
 ## Session 109 – 2026-07-28/29
 
 - **[HOCH] [AGENT] [Kommunikation] LL-S109-1 – Messergebnis dreimal als Befund vorgelegt, bevor die Datenquelle vollständig war**

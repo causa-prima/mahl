@@ -743,3 +743,38 @@ test.describe('US904_EdgeCase: Undo-Toast-Verlässlichkeit', () => {
     await expect(list.getByText('Mehl')).toHaveCount(0)
   })
 })
+
+// @US-904-happy-path: run-9 „Löschen·Pending" (Singleton). UX-Guideline Prinzip 3 ("Sperren
+// während Pending"), analog zum Speichern-Dialog (run-2): solange der DELETE unterwegs ist, darf
+// die Aktion nicht erneut auslösbar sein. Der Löschen-Button lebt in der Zeile und bleibt während
+// des Pendings sichtbar (die Liste aktualisiert sich erst nach der Server-Antwort) – genau dieses
+// Fenster ist der Testgegenstand.
+test.describe('US904_HappyPath: Löschen·Pending', () => {
+  // Szenario: Löschen-Button ist während des Löschens deaktiviert
+  test('US904_HappyPath_DeleteInFlight_DeleteButtonIsDisabled', async ({ page, request }) => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    // Given: der DELETE bleibt künstlich verzögert, das Pending-Fenster ist so beobachtbar.
+    //   Glob `*` matcht kein `/`, die Route trifft also nur `/api/ingredients/{id}` – weder das
+    //   Collection-GET (`/api/ingredients`) noch den Restore (`/api/ingredients/{id}/restore`).
+    await page.route('**/api/ingredients/*', async (route) => {
+      if (route.request().method() !== 'DELETE') { await route.continue(); return }
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await route.continue()
+    })
+    await page.goto('/ingredients')
+    await expect(page.getByTestId('ingredient-list').getByText('Mehl')).toBeVisible()
+    // Given (Vorbedingung, Pendant zum Component-Test): vor dem Klick ist der Löschen-Button
+    //   aktiv. "deaktiviert solange die Antwort aussteht" ist ein Übergang – ohne diese Hälfte
+    //   liefe ein dauerhaft deaktivierter Button in Playwrights Actionability-Timeout am
+    //   `.click()` statt in eine sprechende Assertion.
+    await expect(page.getByRole('button', { name: 'Mehl löschen' })).toBeEnabled()
+
+    // When: ich bei "Mehl" auf Löschen klicke
+    await page.getByRole('button', { name: 'Mehl löschen' }).click()
+
+    // Then: der Löschen-Button für "Mehl" ist deaktiviert, solange die Antwort aussteht.
+    //   Der 1000-ms-Delay hält das Fenster offen; danach ersetzt der Empty-State die Zeile.
+    await expect(page.getByRole('button', { name: 'Mehl löschen' })).toBeDisabled()
+  })
+})

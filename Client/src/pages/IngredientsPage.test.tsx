@@ -620,12 +620,28 @@ function useDeleteRestoreMehlAndZuckerHandlers(): void {
   )
 }
 
+// TD-S108-3: gemeinsames Given der drei Löschen-Tests unten (Mehl aktiv, Seite gerendert,
+// Liste da) – Rule-of-Three, analog zum bereits etablierten `renderWithPendingSave`-Muster.
+// Nur das Given wandert hierher; der Löschen-Klick (When) bleibt in den Tests: Test 1 hat
+// zwischen Given und When eine Vorbedingungs-Assertion ("kein Undo-Toast sichtbar"), die sich
+// weder vor den Helper-Aufruf noch danach verschieben lässt, ohne die Given/When-Reihenfolge
+// zu verdrehen. Der verbleibende einzeilige Klick ist keine Duplikation, die einen weiteren
+// Helper rechtfertigt.
+async function renderWithDeletableMehl(): Promise<HTMLElement> {
+  // useDeleteRestoreMehlHandlers ist kein React-Hook, sondern reines MSW-Handler-Setup; das
+  // "use"-Präfix ist die in dieser Datei etablierte Test-Helper-Konvention (analog
+  // useEmptyNameRejectingHandlers etc.). Der Linter kann das nicht unterscheiden und meldet
+  // hier einen False Positive.
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- s. Begründung oben
+  useDeleteRestoreMehlHandlers()
+  renderWithProviders(<IngredientsPage />)
+  return screen.findByTestId('ingredient-list')
+}
+
 describe('IngredientsPage – Zutat löschen', () => {
   it('US904_HappyPath_DeleteIngredient_FromList_ListEmptyAndUndoToastShown', async () => {
     // Given: nur die Zutat "Mehl" (g) existiert
-    useDeleteRestoreMehlHandlers()
-    renderWithProviders(<IngredientsPage />)
-    const list = await screen.findByTestId('ingredient-list')
+    const list = await renderWithDeletableMehl()
     expect(within(list).getByText('Mehl')).toBeInTheDocument()
     // Given (Vorbedingung): vor dem Löschen ist kein Undo-Toast sichtbar – pinnt "Toast erst nach
     //   der Aktion" und killt den Dauer-offen-Mutanten der Snackbar (open immer true).
@@ -646,9 +662,7 @@ describe('IngredientsPage – Zutat löschen', () => {
 
   it('US904_HappyPath_UndoDelete_ViaToast_IngredientReappearsInList', async () => {
     // Given: nur die Zutat "Mehl" (g) existiert
-    useDeleteRestoreMehlHandlers()
-    renderWithProviders(<IngredientsPage />)
-    const list = await screen.findByTestId('ingredient-list')
+    const list = await renderWithDeletableMehl()
     expect(within(list).getByText('Mehl')).toBeInTheDocument()
 
     // When: ich bei "Mehl" auf Löschen klicke
@@ -678,9 +692,7 @@ describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
     //   escapeKeyDown ist eine bewusste Schließen-Geste und schließt weiterhin (deckt den
     //   onClose-Pfad/setDeleted(null) ab, der die Snackbar aus dem DOM nimmt).
     // Given: nur die Zutat "Mehl" (g) existiert
-    useDeleteRestoreMehlHandlers()
-    renderWithProviders(<IngredientsPage />)
-    await screen.findByTestId('ingredient-list')
+    await renderWithDeletableMehl()
 
     // When: ich bei "Mehl" auf Löschen klicke -> Toast erscheint
     fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
@@ -775,5 +787,58 @@ describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
     const restoredList = await screen.findByTestId('ingredient-list')
     expect(await within(restoredList).findByText('Zucker')).toBeInTheDocument()
     expect(within(restoredList).queryByText('Mehl')).not.toBeInTheDocument()
+  })
+})
+
+// run-9 „Löschen·Pending": das DELETE bleibt hängen, bis der Test es per `resolveDelete`
+// auflöst – analog zu `renderWithPendingSave` (deterministisches Pending-Fenster ohne
+// Timer-Race). GET ist zustandsbehaftet (analog `useDeleteRestoreMehlHandlers`), damit der
+// Refetch nach dem aufgelösten DELETE echt auf die leere Liste umschaltet – sonst könnte das
+// Cleanup unten (Warten auf verschwundene Liste) nie zutreffen.
+async function renderWithPendingDelete(): Promise<{ resolveDelete: () => void }> {
+  // eslint-disable-next-line functional/no-let -- Resolver wird im DELETE-Handler befuellt
+  let resolveDelete: () => void = () => {}
+  const deletePending = new Promise<void>((resolve) => { resolveDelete = resolve })
+  // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET vor/nach dem DELETE
+  let isDeleted = false
+  server.use(
+    http.get('/api/ingredients', () => HttpResponse.json(isDeleted ? [] : [mehl])),
+    http.delete('/api/ingredients/:id', async () => {
+      await deletePending
+      isDeleted = true
+      return new HttpResponse(null, { status: 204 })
+    }),
+  )
+  renderWithProviders(<IngredientsPage />)
+  await screen.findByTestId('ingredient-list')
+  return { resolveDelete }
+}
+
+describe('IngredientsPage – Löschen·Pending', () => {
+  // Szenario: Löschen-Button ist während des Löschens deaktiviert
+  it('US904_HappyPath_DeleteInFlight_DeleteButtonIsDisabled', async () => {
+    // Given: nur die Zutat "Mehl" (g) existiert; der DELETE bleibt hängen, bis der Test
+    //   ihn auflöst (Helper)
+    const { resolveDelete } = await renderWithPendingDelete()
+    // Given (Vorbedingung): vor dem Klick ist der Löschen-Button aktiv. "deaktiviert solange
+    //   die Antwort aussteht" ist ein Übergang – ohne diese Hälfte wäre die Then-Assertion
+    //   vakuös erfüllbar: wäre der Button schon beim Rendern deaktiviert, feuerte der Klick
+    //   nativ kein onClick, und `toBeDisabled()` träfe zu, ohne dass je ein DELETE lief.
+    expect(screen.getByRole('button', { name: 'Mehl löschen' })).not.toBeDisabled()
+
+    // When: ich bei "Mehl" auf Löschen klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+
+    // Then: der Löschen-Button für "Mehl" ist deaktiviert, solange die Antwort aussteht
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Mehl löschen' })).toBeDisabled()
+    })
+
+    // Cleanup (kein Szenario-Assert, reine Test-Infrastruktur): DELETE auflösen, damit kein
+    //   hängender Handler in den nächsten Test läuft.
+    resolveDelete()
+    await waitFor(() => {
+      expect(screen.queryByTestId('ingredient-list')).not.toBeInTheDocument()
+    })
   })
 })

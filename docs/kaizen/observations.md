@@ -248,3 +248,23 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S085-2 (Messung stammt aus dessen Phase 1); OBS-S096-3 (Scripted-Access-Layer, Re-Trigger jetzt erfüllt)
 
+---
+
+## OBS-S110-1 – „Done"-Erkennung eines Laufs hängt am Test-Kommentar, nicht am grünen Test
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Testing
+- Beobachtung: `next_run.py` wertet einen Lauf als erledigt, sobald der `// Szenario: <Titel>`-Kommentar in einer E2E-Spec vorkommt (DONE-Erkennung nach ADR-S041-7 Addendum S088); daraus speist sich auch die Auflösung von `{{NEXT_RUN}}` in `AGENT_MEMORY.md`. Der Kommentar entsteht aber bereits im äußeren Loop von `implementing-scenario`, wenn der E2E-Test absichtlich noch rot ist und kein Produktionscode existiert. In S110 real beobachtet: Nach einem WSL-Absturz mitten in run-9 zeigte `AGENT_MEMORY.md` beim Neustart als nächsten Lauf bereits run-11 an, obwohl von run-9 nur ein roter Test existierte – der tatsächlich laufende Lauf war aus dem Zustandssignal verschwunden. Risiko: Ein Agent, der nach einer Unterbrechung neu startet und dem Zustandsdokument folgt, überspringt einen angefangenen Lauf oder hält ihn für fertig; der Fortschritt wird systematisch überschätzt, weil das Signal an einem Artefakt hängt, das am Anfang statt am Ende des Laufs entsteht.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S110-2 – `implementing-scenario` Schritt 4 hat keinen Weg, wenn der Schicht-Subagent nicht zurückkehrt
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Agent-Prompt
+- Beobachtung: Schritt 4 („Mechanische Verifikation") ist vollständig darauf aufgebaut, dass der Schicht-Subagent in seinem Return einen frischen `=== VERIFIKATIONS-HASH ===`-Block liefert, den der Orchestrator per `qa-check.py --verify` prüft. Der Skill beschreibt keinen Fall, in dem dieser Return ausbleibt, weil der Subagent-Prozess endet, bevor er antworten konnte. In S110 eingetreten: ein WSL-Absturz beendete Orchestrator und Subagent gleichzeitig; nach dem Neustart lagen fertiger Produktionscode und ein durchgeführter Refactor im Working Tree, aber kein Hash und keine Aussage darüber, welche Schritte noch offen waren. Der Zustand ließ sich nur rekonstruieren, weil der Test-Freigabe-Anker als git-Blob außerhalb des Agentenkontexts persistiert war und der Refactor-Diff sich nachträglich dagegen auditieren ließ. Risiko: Ohne beschriebenen Weg improvisiert jeder Orchestrator anders – im schlechteren Fall wird der Subagenten-Stand ungeprüft übernommen oder der ganze Lauf verworfen und neu begonnen.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
