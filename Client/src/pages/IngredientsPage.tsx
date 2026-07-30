@@ -14,10 +14,11 @@ import Snackbar from '@mui/material/Snackbar'
 import type { SnackbarCloseReason } from '@mui/material/Snackbar'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { useResultQuery } from '../hooks/useResultQuery'
-import { useResultMutation } from '../hooks/useResultMutation'
 import { useDeleteIngredientWithUndo } from '../hooks/useDeleteIngredientWithUndo'
 import type { DeletedIngredient } from '../hooks/useDeleteIngredientWithUndo'
-import { fetchIngredients, createIngredient } from '../services/ingredientsApi'
+import { useCreateIngredientWithReactivation } from '../hooks/useCreateIngredientWithReactivation'
+import type { ReactivationConflictNotice } from '../hooks/useCreateIngredientWithReactivation'
+import { fetchIngredients } from '../services/ingredientsApi'
 import type { Ingredient } from '../services/ingredientsApi'
 
 const ingredientsKey = ['ingredients'] as const
@@ -160,6 +161,53 @@ function IngredientList({ ingredients, deletingId, onDelete }: Readonly<Ingredie
   )
 }
 
+type ReactivationConflictToastProps = {
+  readonly conflict: ReactivationConflictNotice | null
+  readonly onDismiss: () => void
+}
+
+// ADR-S111-3: Reaktivierungs-Konflikt (Restore antwortet 409 "bereits aktiv", abweichende
+// Werte). Der Anlege-Dialog ist zu diesem Zeitpunkt bereits geschlossen (der Vorgang gilt als
+// abgeschlossen) – diese Snackbar informiert nur noch. Anders als UndoToast ohne Aktions-Button
+// und ohne clickaway-Schutz: kein Szenario verlangt hier einen "Rückgängig"-Pfad, der MUI-
+// Default (jeder Schließen-Grund dismisst) genügt. Der Null-Check liegt hier (statt als `&&` in
+// IngredientsPage), damit dieser Zweig nicht in deren Komplexität einzahlt.
+// run-11-Nachbesserung F2: autoHideDuration 10000ms – bewusst EIGENES Literal, nicht dieselbe
+// Konstante wie UndoToast (6000ms): der Text ist rund zehnmal so lang, besteht aus zwei Sätzen
+// und MUIs Pause-bei-Hover greift auf Touch nicht (ADR-S111-3).
+// run-11-Nachbesserung F4: `key` aus den drei ANGEZEIGTEN Feldern (nicht aus einer id) – erzwingt
+// genau dann einen Remount (und damit einen frischen Auto-Hide-Timer, s. UndoToast-Kommentar
+// unten für den Mechanismus), wenn sich der sichtbare Text ändert. Eine id-basierte Alternative
+// (z.B. savedIngredient.id) würde zwei aufeinanderfolgende Konflikte zur SELBEN Zutat mit
+// UNTERSCHIEDLICHEM gespeichertem Stand fälschlich als identisch behandeln – kein Remount, obwohl
+// der Nutzer einen neuen Text sieht und der Timer neu laufen müsste. Sind alle drei Felder
+// zwischen zwei Konflikten identisch, ist auch der Text identisch – ein ausbleibender Remount ist
+// dann folgenlos.
+function ReactivationConflictToast({ conflict, onDismiss }: Readonly<ReactivationConflictToastProps>) {
+  if (!conflict) return null
+  return (
+    <Snackbar
+      // Kein Test erzwingt den konkreten Aufbau des Remount-`key` (Team-Lead-Review, F4):
+      // die Race-Condition, die einen fehlenden/falschen Remount sichtbar machen würde
+      // (zwei Konflikte direkt hintereinander, zweiter erbt Restlaufzeit des ersten), ist
+      // im Komponenten-Test praktisch nicht mit vertretbarem Aufwand deterministisch
+      // herstellbar (kein Fake-Timer-Muster wie bei UndoToast, weil der zweite Konflikt
+      // selbst einen Restore-Roundtrip braucht statt eines einzelnen Klicks). Analog zum
+      // bereits etablierten `key={deleted.id}` bei UndoToast, dort mit Test.
+      // Stryker disable next-line StringLiteral: kein Test für den Remount-key (s. o.)
+      key={`${conflict.requestedName}|${conflict.savedName}|${conflict.savedUnit}`}
+      open
+      autoHideDuration={10000}
+      onClose={onDismiss}
+      message={
+        `'${conflict.requestedName}' wurde zwischenzeitlich an anderer Stelle wiederhergestellt `
+        + `(z. B. auf einem anderen Gerät). Gespeichert ist '${conflict.savedName}' mit der Einheit `
+        + `'${conflict.savedUnit}'.`
+      }
+    />
+  )
+}
+
 type UndoToastProps = {
   readonly deleted: DeletedIngredient
   readonly onUndo: () => void
@@ -221,28 +269,19 @@ export default function IngredientsPage() {
     setUnit('')
   }
 
-  const [save, saveError, isPending, resetSaveError] = useResultMutation(createIngredient, () => {
-    closeDialog()
-    invalidateIngredients()
-  })
-
   const { deleted, deletingId, requestDelete, undoDelete, dismissUndo } = useDeleteIngredientWithUndo(invalidateIngredients)
 
-  // Direkter kind-Check statt matchKind (ADR-S056-1) ist hier bewusst aufgeschoben:
-  // ADR-S056-1's kanonisches Muster trennt Netzwerk/5xx (werfen -> QueryCache.onError/
-  // Toast) von Domain-Fehlern (matchKind). onError existiert noch nicht (resilience-
-  // Szenario). Bis dahin trägt ApiError den Unexpected-kind und die Komponente liest
-  // FieldErrors geguarded direkt; matchKind wird im resilience-Szenario adoptiert, wenn
-  // die Komponenten-Fehler-Union auf Domain-Fehler-only kollabiert. Tracking: docs/tech-debt.md.
-  // ADR-S090-1: feld-keyed 422-Fehler -> Meldung am betroffenen Feld (UX-Guideline §4: nah
-  // am betroffenen Element). Nur der FieldErrors-kind trägt feldbezogene Meldungen. Der Key
-  // (name / defaultUnit) ist die Request-JSON-Property; ein FieldErrors kann einen Key
-  // weglassen (z.B. nur defaultUnit beim 'leere Einheit'-Szenario), daher liefert der Lookup
-  // dank noUncheckedIndexedAccess (tsconfig.app.json) ehrlich `... | undefined` -> der
-  // `?.`-Guard schützt vor einem Render-Crash bei fehlendem Key.
-  const fieldErrors = saveError?.kind === 'FieldErrors' ? saveError.fields : undefined
-  const nameError = fieldErrors?.name?.[0]
-  const unitError = fieldErrors?.defaultUnit?.[0]
+  // run-11-Nachbesserung F1: `dismissUndo()` verwirft einen noch sichtbaren Undo-Toast einer
+  // vorangegangenen Löschung. Ohne das kann eine Reaktivierung (409 soft-deleted -> transparenter
+  // Restore, ADR-S051-4) dieselbe Zeile wieder aktivieren, während ihr Undo-Toast noch "gelöscht"
+  // behauptet – ein Klick auf "Rückgängig" liefe dann ins Leere (409 ingredient_already_active,
+  // ADR-S111-1).
+  const { save, isPending, nameError, unitError, resetSaveError, conflictNotice, dismissConflictNotice } =
+    useCreateIngredientWithReactivation(() => {
+      closeDialog()
+      invalidateIngredients()
+      dismissUndo()
+    })
 
   const handleCancel = () => {
     resetSaveError()
@@ -270,10 +309,14 @@ export default function IngredientsPage() {
       {deleted && (
         <UndoToast
           deleted={deleted}
-          onUndo={() => { undoDelete(deleted.id) }}
+          onUndo={() => { undoDelete(deleted) }}
           onDismiss={dismissUndo}
         />
       )}
+      <ReactivationConflictToast
+        conflict={conflictNotice}
+        onDismiss={dismissConflictNotice}
+      />
     </div>
   )
 }

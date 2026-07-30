@@ -577,10 +577,13 @@ describe('IngredientsPage – Reopen nach fehlgeschlagenem Speichern und Abbrech
 // den DELETE/Restore-Aufruf – so ist die invalidate-getriebene Listen-Umschaltung echt beobachtbar.
 // Der DELETE-Handler validiert die id (realer Backend-404 bei falscher id, ADR-S000-5): killt den
 // Objekt-Literal-Mutanten am `deleteMutate({ id, etag })`-Aufruf (bei `{}` würde id 'undefined' ->
-// 404 -> Liste bliebe befüllt). Restore antwortet 204 (ADR-S108-2).
-function useDeleteRestoreMehlHandlers(): void {
+// 404 -> Liste bliebe befüllt). Restore antwortet ab run-11 200 + Body (ADR-S111-1-Addendum zu
+// ADR-S108-2, Pflicht-Body auch für den Undo-Fall) und hält den gesendeten Body fest – Grundlage
+// für den Undo-Protokolltest weiter unten (kein eigenes Gherkin-Szenario, strukturell erzwungen).
+function useDeleteRestoreMehlHandlers(): { restoreRequestBody: { current: unknown } } {
   // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET vor/nach Löschen/Restore
   let isDeleted = false
+  const restoreRequestBody: { current: unknown } = { current: undefined }
   server.use(
     http.get('/api/ingredients', () => HttpResponse.json(isDeleted ? [] : [mehl])),
     http.delete('/api/ingredients/:id', ({ params }) => {
@@ -588,12 +591,15 @@ function useDeleteRestoreMehlHandlers(): void {
       isDeleted = true
       return new HttpResponse(null, { status: 204 })
     }),
-    http.post('/api/ingredients/:id/restore', ({ params }) => {
+    http.post('/api/ingredients/:id/restore', async ({ params, request }) => {
       if (params.id !== mehl.id) return new HttpResponse(null, { status: 404 })
       isDeleted = false
-      return new HttpResponse(null, { status: 204 })
+      // eslint-disable-next-line functional/immutable-data -- Capture: Restore-Body für Then-Block festhalten
+      restoreRequestBody.current = await request.json()
+      return HttpResponse.json(mehl, { status: 200 })
     }),
   )
+  return { restoreRequestBody }
 }
 
 // run-8-Nachtrag „Undo-Toast-Verlässlichkeit": Mehl UND Zucker aktiv, unabhängig voneinander
@@ -613,9 +619,11 @@ function useDeleteRestoreMehlAndZuckerHandlers(): void {
       return new HttpResponse(null, { status: 204 })
     }),
     http.post('/api/ingredients/:id/restore', ({ params }) => {
-      if (!allIngredients.some((i) => i.id === params.id)) return new HttpResponse(null, { status: 404 })
+      const found = allIngredients.find((i) => i.id === params.id)
+      if (!found) return new HttpResponse(null, { status: 404 })
       deletedIds = deletedIds.filter((id) => id !== params.id)
-      return new HttpResponse(null, { status: 204 })
+      // run-11: Restore antwortet 200 + Body statt 204 (ADR-S111-1-Addendum zu ADR-S108-2).
+      return HttpResponse.json(found, { status: 200 })
     }),
   )
 }
@@ -839,6 +847,377 @@ describe('IngredientsPage – Löschen·Pending', () => {
     resolveDelete()
     await waitFor(() => {
       expect(screen.queryByTestId('ingredient-list')).not.toBeInTheDocument()
+    })
+  })
+})
+
+// run-11 „Reaktivierung": Der Name existiert bereits soft-deleted -> POST antwortet 409
+// { code: 'ingredient_soft_deleted', id } (ADR-S004-1), der Client ruft daraufhin transparent
+// den Restore mit den EIGENEN Eingaben auf (ADR-S051-4) – ohne Zutun des Nutzers. Der Restore-
+// Mock ECHOT ausschließlich, was der Client im Body sendet (wie der reale Server bei fehlendem
+// Konflikt), nicht die (dem Client unbekannten) alten Werte der gelöschten Zeile – so pinnt jeder
+// Test hier, dass die EIGENE Eingabe reist, nicht ein Zufallswert. GET liefert erst [] (Zeile ist
+// für den Client "nicht da"), nach dem Restore die reaktivierte Zutat.
+function useReactivateSoftDeletedHandlers(
+  id: string,
+): { restoreRequestBody: { current: unknown }; restoreContentType: { current: string | null } } {
+  const restoreRequestBody: { current: unknown } = { current: undefined }
+  const restoreContentType: { current: string | null } = { current: null }
+  server.use(
+    http.get('/api/ingredients', () =>
+      HttpResponse.json(
+        restoreRequestBody.current
+          ? [{ id, ...(restoreRequestBody.current as { name: string; defaultUnit: string }), etag: '"00000001"' }]
+          : [],
+      )),
+    http.post('/api/ingredients', () =>
+      HttpResponse.json({ code: 'ingredient_soft_deleted', id }, { status: 409 })),
+    http.post(`/api/ingredients/${id}/restore`, async ({ request }) => {
+      // eslint-disable-next-line functional/immutable-data -- Capture: Restore-Body/-Header für Then-Block/GET-Echo festhalten
+      restoreRequestBody.current = await request.json()
+      // eslint-disable-next-line functional/immutable-data -- Capture: s.o.
+      restoreContentType.current = request.headers.get('Content-Type')
+      return HttpResponse.json(
+        { id, ...(restoreRequestBody.current as { name: string; defaultUnit: string }), etag: '"00000001"' },
+        { status: 200 },
+      )
+    }),
+  )
+  return { restoreRequestBody, restoreContentType }
+}
+
+describe('IngredientsPage – Zutat reaktivieren', () => {
+  // Szenario: Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese
+  it('US904_EdgeCase_CreateIngredient_SoftDeletedSameName_ReactivatesIngredient', async () => {
+    // Given: die Zutat "Butter" (g) existiert soft-deleted
+    const user = userEvent.setup()
+    const { restoreRequestBody, restoreContentType } = useReactivateSoftDeletedHandlers('butter-id')
+    renderWithProviders(<IngredientsPage />)
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    // When: ich "Butter" als Name eingebe
+    await user.type(screen.getByLabelText(/^Name/), 'Butter')
+    // When: ich "g" als Einheit eingebe
+    await user.type(screen.getByLabelText(/^Einheit/), 'g')
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: ich sehe "Butter" in der Zutaten-Liste mit Einheit "g"
+    const list = await screen.findByTestId('ingredient-list')
+    expect(await within(list).findByText('Butter')).toBeInTheDocument()
+    expect(within(list).getByText('g')).toBeInTheDocument()
+    // Then: der "Zutat anlegen"-Dialog ist geschlossen – der Nutzer merkt von der Reaktivierung
+    //   nichts (der 409/Restore-Umweg ist rein client-intern)
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+    // Then: der Client rief den Restore transparent mit den EIGENEN Eingaben auf
+    expect(restoreRequestBody.current).toEqual({ name: 'Butter', defaultUnit: 'g' })
+    // Then: der Restore-Request sendete JSON (Content-Type), damit das Backend den Pflicht-Body
+    //   bindet (ADR-S111-1)
+    expect(restoreContentType.current).toBe('application/json')
+    // Then: kein Reaktivierungs-Konflikt-Hinweis – der Nutzer merkt von der Reaktivierung
+    //   wirklich nichts, es gibt keinen fremden Stand zu melden (Abgrenzung zu
+    //   US904_Error_ReactivateIngredient_ParallelRestoreDifferentData_ShowsConflictHint)
+    expect(screen.queryByText(/wurde zwischenzeitlich an anderer Stelle wiederhergestellt/)).not.toBeInTheDocument()
+  })
+
+  // Szenario: Reaktivierung übernimmt neue Einheit
+  it('US904_EdgeCase_ReactivateIngredient_NewUnit_ListShowsNewUnit', async () => {
+    // Given: die Zutat "Butter" existiert soft-deleted (frühere Einheit "Würfel" ist dem Client
+    //   unbekannt – der Restore-Mock kennt sie gar nicht, er echot nur den gesendeten Body)
+    const user = userEvent.setup()
+    useReactivateSoftDeletedHandlers('butter-id')
+    renderWithProviders(<IngredientsPage />)
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    // When: ich "Butter" als Name eingebe
+    await user.type(screen.getByLabelText(/^Name/), 'Butter')
+    // When: ich "g" als NEUE Einheit eingebe (weicht von der alten, gelöschten Einheit ab)
+    await user.type(screen.getByLabelText(/^Einheit/), 'g')
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: ich sehe "Butter" in der Zutaten-Liste mit der NEUEN Einheit "g"
+    //   (der Mock echot ausschließlich die gesendeten Werte – "Würfel" kann in keinem
+    //   Ausführungspfad ins DOM gelangen, eine Negativ-Assertion darauf wäre unfähig zu
+    //   scheitern; der reale "alte Wert existiert noch"-Fall ist im E2E-Test gegen das
+    //   echte Backend abgesichert)
+    const list = await screen.findByTestId('ingredient-list')
+    expect(await within(list).findByText('Butter')).toBeInTheDocument()
+    expect(within(list).getByText('g')).toBeInTheDocument()
+  })
+
+  // Szenario: Reaktivierung übernimmt neuen Namen bei abweichender Schreibweise
+  it('US904_EdgeCase_ReactivateIngredient_DifferentCasing_ListShowsNewSpelling', async () => {
+    // Given: die Zutat "mehl" (kleingeschrieben) existiert soft-deleted
+    const user = userEvent.setup()
+    useReactivateSoftDeletedHandlers('mehl-id')
+    renderWithProviders(<IngredientsPage />)
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    // When: ich "Mehl" (großgeschrieben) als Name eingebe – case-insensitiv dieselbe Zutat
+    //   (ADR-S051-3), aber eine abweichende Schreibweise
+    await user.type(screen.getByLabelText(/^Name/), 'Mehl')
+    // When: ich "g" als Einheit eingebe
+    await user.type(screen.getByLabelText(/^Einheit/), 'g')
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: ich sehe "Mehl" (neue Schreibweise) in der Zutaten-Liste mit Einheit "g"
+    //   (der Mock echot ausschließlich die gesendeten Werte – "mehl" kleingeschrieben kann in
+    //   keinem Ausführungspfad ins DOM gelangen, eine Negativ-Assertion darauf wäre unfähig zu
+    //   scheitern; der reale "alte Schreibweise existiert noch"-Fall ist im E2E-Test gegen das
+    //   echte Backend abgesichert)
+    const list = await screen.findByTestId('ingredient-list')
+    expect(await within(list).findByText('Mehl')).toBeInTheDocument()
+  })
+
+  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein treibendes Gherkin-Szenario):
+  // strukturell erzwungen durch den gemeinsamen Restore-Codepfad. Tragende Entscheidung
+  // ADR-S111-1 – der Restore-Body ist ab run-11 Pflichtbestandteil des Contracts, auch für den
+  // Undo-Fall (fachlich ein No-op: unveränderte Werte). Ohne diesen Test bliebe die Verdrahtung
+  // der Werte im Undo-Pfad (useDeleteIngredientWithUndo) ungetestet und ein Stryker-Survivor.
+  it('UndoDelete_RestoreRequestCarriesOriginalNameAndUnit', async () => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    const { restoreRequestBody } = useDeleteRestoreMehlHandlers()
+    renderWithProviders(<IngredientsPage />)
+    await screen.findByTestId('ingredient-list')
+
+    // When: ich bei "Mehl" auf Löschen klicke und danach im Toast auf "Rückgängig"
+    fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }))
+
+    // Then: der Restore-Request trug Name und Einheit der gelöschten Zutat unverändert mit
+    await waitFor(() => {
+      expect(restoreRequestBody.current).toEqual({ name: 'Mehl', defaultUnit: 'g' })
+    })
+  })
+
+  // run-11-Nachbesserung F1: Löschen + sofortiges Neuanlegen unter demselben Namen reaktiviert die
+  // Zeile über den transparenten 409-soft-deleted-Restore-Umweg (ADR-S051-4) – kombiniert GET/DELETE
+  // mit dem für diesen Fall bislang fehlenden POST-/api/ingredients-Pfad (409) + Restore (200).
+  function useDeleteThenRecreateMehlHandlers(): void {
+    // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET/POST vor/nach Löschen/Restore
+    let isDeleted = false
+    server.use(
+      http.get('/api/ingredients', () => HttpResponse.json(isDeleted ? [] : [mehl])),
+      http.delete('/api/ingredients/:id', ({ params }) => {
+        if (params.id !== mehl.id) return new HttpResponse(null, { status: 404 })
+        isDeleted = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+      http.post('/api/ingredients', () =>
+        HttpResponse.json({ code: 'ingredient_soft_deleted', id: mehl.id }, { status: 409 })),
+      http.post(`/api/ingredients/${mehl.id}/restore`, () => {
+        isDeleted = false
+        return HttpResponse.json(mehl, { status: 200 })
+      }),
+    )
+  }
+
+  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein eigenes Gherkin-Szenario):
+  // tragende Entscheidung ADR-S111-1 – der transparente Reaktivierungs-Umweg (409 soft-deleted ->
+  // Restore) macht eine zuvor gelöschte Zeile wieder aktiv, ohne dass der Nutzer den Undo-Weg
+  // benutzt. Der noch sichtbare Undo-Toast der vorangegangenen Löschung muss dabei verworfen
+  // werden – sonst behauptet er weiterhin "gelöscht", obwohl die Zeile längst wieder aktiv ist,
+  // und ein Klick auf "Rückgängig" liefe ins Leere (409 ingredient_already_active, ADR-S111-1).
+  it('UndoToast_ReactivateSameIngredientViaCreate_DismissesUndoToast', async () => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    const user = userEvent.setup()
+    useDeleteThenRecreateMehlHandlers()
+    renderWithProviders(<IngredientsPage />)
+    await screen.findByTestId('ingredient-list')
+
+    // When: ich "Mehl" lösche -> Undo-Toast erscheint
+    fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+    expect(await screen.findByText('Mehl gelöscht')).toBeInTheDocument()
+
+    // When: ich innerhalb der Undo-Frist "Mehl" (g) erneut anlege
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    await user.type(screen.getByLabelText(/^Name/), 'Mehl')
+    await user.type(screen.getByLabelText(/^Einheit/), 'g')
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: der Undo-Toast für die alte Löschung ist verschwunden (die Zeile ist bereits aktiv)
+    await waitFor(() => {
+      expect(screen.queryByText('Mehl gelöscht')).not.toBeInTheDocument()
+    })
+    expect(screen.queryByRole('button', { name: 'Rückgängig' })).not.toBeInTheDocument()
+  })
+})
+
+// run-11 „Reaktivierung", Konfliktfall (ADR-S111-1/-3): Trägt die parallel wiederhergestellte
+// Zeile ABWEICHENDE Daten, antwortet der Restore 409 { code: 'ingredient_already_active',
+// ingredient }. GET liefert erst [] (die Zeile ist für den Client "noch nicht da"), nach dem
+// Restore-Aufruf den bereits aktiven FREMDEN Stand ("Koriander"/"Töpfchen") – unabhängig von der
+// eigenen Eingabe ("Bund"), weil der Client den fremden Schreibvorgang nicht überschreiben darf.
+function useReactivationConflictHandlers(id: string): void {
+  // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET vor/nach dem Restore-Konflikt
+  let isResolved = false
+  const activeIngredient = { id, name: 'Koriander', defaultUnit: 'Töpfchen', etag: '"00000002"' } as const
+  server.use(
+    http.get('/api/ingredients', () => HttpResponse.json(isResolved ? [activeIngredient] : [])),
+    http.post('/api/ingredients', () =>
+      HttpResponse.json({ code: 'ingredient_soft_deleted', id }, { status: 409 })),
+    http.post(`/api/ingredients/${id}/restore`, () => {
+      isResolved = true
+      return HttpResponse.json({ code: 'ingredient_already_active', ingredient: activeIngredient }, { status: 409 })
+    }),
+  )
+}
+
+describe('IngredientsPage – Reaktivierungs-Konflikt', () => {
+  // Szenario: Reaktivierung meldet Konflikt wenn die Zutat parallel mit anderen Daten
+  // wiederhergestellt wurde
+  it('US904_Error_ReactivateIngredient_ParallelRestoreDifferentData_ShowsConflictHint', async () => {
+    // Given: die Zutat "Koriander" (Bund) existiert soft-deleted; parallel wurde sie bereits mit
+    //   Einheit "Töpfchen" wiederhergestellt
+    const user = userEvent.setup()
+    useReactivationConflictHandlers('koriander-id')
+    renderWithProviders(<IngredientsPage />)
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    // When: ich "Koriander" als Name eingebe
+    await user.type(screen.getByLabelText(/^Name/), 'Koriander')
+    // When: ich "Bund" als Einheit eingebe
+    await user.type(screen.getByLabelText(/^Einheit/), 'Bund')
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: ich sehe den Hinweis, der die eigene Eingabe UND den tatsächlich gespeicherten
+    //   Stand nennt (Wortlaut run-11-Nachbesserung F2, ADR-S111-3)
+    expect(await screen.findByText(
+      "'Koriander' wurde zwischenzeitlich an anderer Stelle wiederhergestellt (z. B. auf einem anderen Gerät). Gespeichert ist 'Koriander' mit der Einheit 'Töpfchen'.",
+    )).toBeInTheDocument()
+    // Then: der Dialog ist geschlossen – es gibt nichts zu korrigieren (ADR-S111-3)
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+    // Then: ich sehe "Koriander" in der Zutaten-Liste mit Einheit "Töpfchen"
+    const list = await screen.findByTestId('ingredient-list')
+    expect(await within(list).findByText('Töpfchen')).toBeInTheDocument()
+    // Then: die eigene Eingabe "Bund" erscheint nicht – sie wurde nicht gespeichert
+    expect(within(list).queryByText('Bund')).not.toBeInTheDocument()
+  })
+
+  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein treibendes Gherkin-Szenario):
+  // tragende Entscheidung ADR-S111-3 ("Auto-Hide 10000 ms, bewusst länger als der Undo-Toast") –
+  // ohne einen funktionierenden Dismiss-Callback bliebe die Konflikt-Snackbar nach Ablauf der
+  // Anzeigezeit dauerhaft sichtbar, weil MUI selbst nichts unmountet. Geprüft wird ausschließlich,
+  // dass der Hinweis nach einem Schließen-Grund (hier: Escape, trifft denselben onClose-Callback
+  // wie der Auto-Hide-Timer) wieder verschwindet – keine Timing-Zusicherung, kein Fehlerpfad.
+  it('ReactivationConflictToast_Escape_HidesToast', async () => {
+    // Given: der Reaktivierungs-Konflikt-Hinweis ist sichtbar
+    const user = userEvent.setup()
+    useReactivationConflictHandlers('koriander-id')
+    renderWithProviders(<IngredientsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    await user.type(screen.getByLabelText(/^Name/), 'Koriander')
+    await user.type(screen.getByLabelText(/^Einheit/), 'Bund')
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    await screen.findByText(/wurde zwischenzeitlich an anderer Stelle wiederhergestellt/)
+
+    // When: ich Escape drücke
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
+
+    // Then: der Hinweis verschwindet
+    await waitFor(() => {
+      expect(screen.queryByText(/wurde zwischenzeitlich an anderer Stelle wiederhergestellt/)).not.toBeInTheDocument()
+    })
+  })
+
+  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein eigenes Gherkin-Szenario):
+  // tragende Entscheidung ADR-S051-1/-2 ("jede nutzersichtbare Wiedergabe einer Eingabe ist
+  // getrimmt") angewandt auf den Reaktivierungs-Konflikt-Hinweis (ADR-S111-3). Ohne Trimmen
+  // stünde die Eingabe mit sichtbaren Leerzeichen im Hinweis, obwohl jede andere nutzersichtbare
+  // Wiedergabe einer Eingabe im UI getrimmt ist (analog zur Duplikat-Fehlermeldung).
+  it('ReactivationConflictToast_WhitespacePaddedInput_ShowsTrimmedNameInHint', async () => {
+    // Given: die Zutat "Koriander" (Bund) existiert soft-deleted; parallel wurde sie bereits mit
+    //   Einheit "Töpfchen" wiederhergestellt
+    const user = userEvent.setup()
+    useReactivationConflictHandlers('koriander-id')
+    renderWithProviders(<IngredientsPage />)
+
+    // When: ich auf "Zutat anlegen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    // When: ich "  Koriander  " (mit umgebenden Leerzeichen) als Name eingebe
+    await user.type(screen.getByLabelText(/^Name/), '  Koriander  ')
+    // When: ich "Bund" als Einheit eingebe
+    await user.type(screen.getByLabelText(/^Einheit/), 'Bund')
+    // When: ich auf "Speichern" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: der Hinweis nennt die eigene Eingabe GETRIMMT, nicht mit Leerzeichen
+    expect(await screen.findByText(
+      "'Koriander' wurde zwischenzeitlich an anderer Stelle wiederhergestellt (z. B. auf einem anderen Gerät). Gespeichert ist 'Koriander' mit der Einheit 'Töpfchen'.",
+    )).toBeInTheDocument()
+  })
+
+  // run-11-Nachbesserung F5: Konflikt-Hinweis für "Koriander", gefolgt von einer normal
+  // erfolgreichen Anlage einer ANDEREN Zutat – deckt den null-Zweig von toConflictNotice
+  // (Code-Kommentar dort, tragende Entscheidung ADR-S111-3): räumt einen noch sichtbaren
+  // Hinweis weg, wenn danach ein normales Anlegen gelingt.
+  function useReactivationConflictThenPlainCreateHandlers(id: string): void {
+    // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET vor/nach Konflikt/Erfolg
+    let isResolved = false
+    // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: s.o.
+    let created = false
+    const activeIngredient = { id, name: 'Koriander', defaultUnit: 'Töpfchen', etag: '"00000002"' } as const
+    const zwiebel = { id: 'zwiebel-id', name: 'Zwiebel', defaultUnit: 'Stück', etag: '"00000003"' } as const
+    server.use(
+      http.get('/api/ingredients', () =>
+        HttpResponse.json([...(isResolved ? [activeIngredient] : []), ...(created ? [zwiebel] : [])])),
+      http.post('/api/ingredients', async ({ request }) => {
+        const body = await request.json() as { name: string }
+        if (body.name === 'Koriander') return HttpResponse.json({ code: 'ingredient_soft_deleted', id }, { status: 409 })
+        created = true
+        return HttpResponse.json(zwiebel, { status: 201 })
+      }),
+      http.post(`/api/ingredients/${id}/restore`, () => {
+        isResolved = true
+        return HttpResponse.json({ code: 'ingredient_already_active', ingredient: activeIngredient }, { status: 409 })
+      }),
+    )
+  }
+
+  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein eigenes Gherkin-Szenario):
+  // pinnt den null-Zweig von toConflictNotice – ohne ihn bliebe ein Refactoring zu
+  // `if (kind === 'ReactivationConflict') setConflictNotice(...)` unentdeckt, und ein veralteter
+  // Konflikt-Hinweis stünde fälschlich weiter, obwohl danach ein normales Anlegen gelingt.
+  it('ReactivationConflictToast_SucceedingCreateAfterConflict_HidesToast', async () => {
+    // Given: der Reaktivierungs-Konflikt-Hinweis für "Koriander" ist sichtbar
+    const user = userEvent.setup()
+    useReactivationConflictThenPlainCreateHandlers('koriander-id')
+    renderWithProviders(<IngredientsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    await user.type(screen.getByLabelText(/^Name/), 'Koriander')
+    await user.type(screen.getByLabelText(/^Einheit/), 'Bund')
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    await screen.findByText(/wurde zwischenzeitlich an anderer Stelle wiederhergestellt/)
+
+    // When: ich danach eine ANDERE Zutat erfolgreich anlege
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    await user.type(screen.getByLabelText(/^Name/), 'Zwiebel')
+    await user.type(screen.getByLabelText(/^Einheit/), 'Stück')
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: der Konflikt-Hinweis für "Koriander" ist verschwunden
+    await waitFor(() => {
+      expect(screen.queryByText(/wurde zwischenzeitlich an anderer Stelle wiederhergestellt/)).not.toBeInTheDocument()
     })
   })
 })

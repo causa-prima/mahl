@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 111 | 2026-07-29/30 | SKELETON (US-904 run-11) | run-11 „Reaktivierung" (5 Szenarien, Full-Stack): Restore mit Pflicht-Body, wertebasiert 200/409 (ADR-S111-1/-2/-3); Review 0 ❌, alle 13 ⚠️ umgesetzt; Session-Limit unterbrach beide Fix-Subagenten; LL-S111-1..3, OBS-S111-1..4, TD-S090-3/S108-1/-4/S110-1 nachgezogen. |
 | 110 | 2026-07-29 | SKELETON (US-904 run-9) | run-9 „Löschen·Pending": zeilenbezogener `deletingId`-State sperrt den Löschen-Button während des DELETE; TD-S108-3 behoben, TD-S110-1 neu, TD-S108-1/-2/-4 nachgezogen; LL-S110-1, OBS-S110-1/-2. |
 | 109 | 2026-07-28/29 | SKELETON (OBS-Drain) | 9 OBS aufgelöst (Backlog 21→16): Stryker-Fehlsignal-Guards (`_stryker_report.py`, `_stryker_target.py`, Lock-Exit 99, 24 Tests), Wrapper-Ausgabe auf Verdikt gekürzt, `npm --prefix` erlaubt; Phase-1-Token-Messung → OBS-S085-2 verworfen, OBS-S109-1 neu; LL-S109-1..3. |
 | 108 | 2026-07-23/25 | SKELETON (US-904 run-7 + run-8) | run-7 „Liste" + run-8 „Löschen·Success" inkl. Undo-Toast-Nachtrag (3 Szenarien): per-Zeile-xmin-ETag (ADR-S108-1), Restore-Endpoint (ADR-S108-2), kein Snackbar-Stacking (ADR-S108-3); ADR-S000-3 gelöscht; Code-Edits auto-allow; LL-S108-1..3, OBS-S108-2..6, TD-S108-1..4. |

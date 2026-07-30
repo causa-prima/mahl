@@ -360,16 +360,36 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then sehe ich "Mehl" in der Zutaten-Liste mit Einheit "g"
 
-  # Einheit im Then bewusst nicht spezifiziert: im Parallelfall ist die Einheit der bereits
-  # aktiven Zutat nicht durch diesen Request kontrollierbar (hängt vom parallelen Restore ab).
-  # Given "parallel bereits wiederhergestellt": Step mappt auf direkten POST /api/ingredients um Parallelzustand zu simulieren.
+  # Die beiden Parallelfall-Szenarien unterscheiden sich nur darin, ob der fremde Stand DIESELBEN
+  # Daten trägt (dieses Szenario: nichts wird überschrieben, der Zielzustand ist bereits erreicht)
+  # oder ABWEICHENDE (nächstes Szenario: die eigene Eingabe würde fremde Werte still überschreiben).
+  # "parallel wiederhergestellt": es gibt keinen UI-Weg dafür – der Step stellt den Zustand über die
+  # API her, und zwar im Zeitfenster NACHDEM das Anlegen den Konflikt erkannt hat. Früher gesetzt
+  # liefe der Vorgang in den Duplikat-Fehler statt in die Reaktivierung, und das Szenario prüfte
+  # nicht mehr, was sein Titel behauptet.
   # @run-11 · Reaktivierung · Full-Stack
   @US-904-edge-case
-  Scenario: Reaktivierung gelingt auch wenn Zutat parallel bereits wiederhergestellt wurde
+  Scenario: Reaktivierung gelingt auch wenn Zutat parallel mit denselben Daten wiederhergestellt wurde
     Given die Zutat "Koriander" mit Einheit "Bund" existiert und gelöscht wurde
-    And "Koriander" wurde parallel bereits durch jemand anderen wiederhergestellt
+    And "Koriander" wird parallel durch jemand anderen mit Einheit "Bund" wiederhergestellt
     When ich auf "Zutat anlegen" klicke
     And ich "Koriander" als Name eingebe
     And ich "Bund" als Einheit eingebe
     And ich auf "Speichern" klicke
-    Then sehe ich "Koriander" in der Zutaten-Liste
+    Then sehe ich "Koriander" in der Zutaten-Liste mit Einheit "Bund"
+
+  # Abweichende Daten sind ein echter Konflikt: ohne Hinweis würde die eigene Eingabe die Werte des
+  # anderen still überschreiben (Lost Update). Der Hinweis nennt den tatsächlich gespeicherten Stand,
+  # damit der Nutzer versteht, warum seine Eingabe nicht gilt. Der Dialog schließt trotzdem – die
+  # Zutat existiert ja, es gibt im Dialog nichts zu korrigieren.
+  # @run-11 · Reaktivierung · Full-Stack
+  @US-904-error
+  Scenario: Reaktivierung meldet Konflikt wenn die Zutat parallel mit anderen Daten wiederhergestellt wurde
+    Given die Zutat "Koriander" mit Einheit "Bund" existiert und gelöscht wurde
+    And "Koriander" wird parallel durch jemand anderen mit Einheit "Töpfchen" wiederhergestellt
+    When ich auf "Zutat anlegen" klicke
+    And ich "Koriander" als Name eingebe
+    And ich "Bund" als Einheit eingebe
+    And ich auf "Speichern" klicke
+    Then sehe ich den Hinweis "'Koriander' wurde zwischenzeitlich an anderer Stelle wiederhergestellt (z. B. auf einem anderen Gerät). Gespeichert ist 'Koriander' mit der Einheit 'Töpfchen'."
+    And sehe ich "Koriander" in der Zutaten-Liste mit Einheit "Töpfchen"

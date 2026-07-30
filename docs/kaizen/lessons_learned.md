@@ -43,6 +43,26 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 111 – 2026-07-29/30
+
+- **[MITTEL] [PROZESS] [Agent-Prompt] LL-S111-1 – Doku-Pflicht ausschließlich über den Subagenten-Return transportiert, Return fiel aus**
+  Quelle: Orchestrator
+  Was: Beide Nachbesserungs-Aufträge von run-11 trugen die Auflage „keine neue ADR anlegen – melde mir im Return, was dokumentiert gehört". Das Session-Limit beendete beide Subagenten, bevor sie antworten konnten. Der Backend-Agent hatte zu diesem Zeitpunkt bereits einen Code-Kommentar geschrieben, der auf ein ADR-Addendum verwies – das Addendum selbst existierte nie, weil nur der Orchestrator es hätte schreiben dürfen und die Meldung mit dem Return verschwand. Der tote Verweis wäre in den Commit gegangen: Tests, Stryker und `qa-check` Check 6 waren grün, letzterer prüft nur die Existenz der ADR-ID, nicht die des referenzierten Abschnitts.
+  Warum: Die Auflage trennt Ausführung (Subagent schreibt den Verweis) von Pflicht (Orchestrator schreibt das Ziel) und verbindet beide allein über den Return – einen Kanal ohne Persistenz, dessen Ausfall keine Spur hinterlässt außer dem bereits geschriebenen Verweis.
+  Regel: Verbietet man einem Subagenten das Schreiben eines Dokuments, auf das sein Code verweisen wird, die Pflicht beim Erteilen des Auftrags notieren – nicht erst aus seinem Return erfahren; und einen Verweis auf noch nicht geschriebene Doku vor dem Commit gegen den Zielabschnitt prüfen, nicht nur gegen die ID.
+
+- **[MITTEL] [PROZESS] [Doku] LL-S111-2 – Rein reaktiver tech-debt-Trigger griff nicht, obwohl das Auslöse-Ereignis eintrat**
+  Quelle: Orchestrator
+  Was: `TD-S108-4` (Toast auf Touch nicht manuell schließbar) trug den Trigger „der nächste Lauf, der den Toast ohnehin verändert". run-11 hat genau das getan – den Undo-Toast-Lebenszyklus geändert und einen zweiten Toast eingeführt –, ohne dass der Trigger jemandem auffiel. Der Eintrag blieb liegen, und die Lücke wurde durch den neuen Toast mit 10 s Anzeigedauer sogar ausgeweitet; bemerkt wurde es erst beim TD-Abgleich im Abschluss-Schritt.
+  Warum: Ein Trigger, der auf ein künftiges Code-Ereignis wartet, wird nur wirksam, wenn beim Implementieren jemand `tech-debt.md` nach passenden Triggern durchsucht. Der vorgesehene TD-Abgleich fragt aber „wurde ein Eintrag durch diesen Lauf behoben?" – nicht „ist die Vorbedingung eines Eintrags jetzt erfüllt?".
+  Regel: TD-Trigger an einen Ort hängen, der im Ablauf ohnehin gelesen wird (z. B. als aufzunehmendes Szenario im `gherkin-workshop`), statt auf einen zufällig vorbeikommenden Lauf zu warten.
+
+- **[MITTEL] [QUALITÄT] [Mutation-Testing] LL-S111-3 – Assertions gegen einen Survivor geschrieben, den keine Komponenten-Assertion töten kann**
+  Quelle: Subagent
+  Was: Ein Stryker-Survivor in der Status-Verzweigung von `restoreIngredient` wurde zweimal mit einer Komponenten-Assertion angegangen (Wertevergleich, dann Ternary), beide wirkungslos. Erst der empirische Test – Mutant manuell einsetzen, Einzeltest laufen lassen – zeigte, warum: Der Mutant erzeugt einen `TypeError` **innerhalb** eines React-Query-`onSuccess`-Callbacks, wo das Framework ihn abfängt; der Test bleibt grün, obwohl der Code defekt ist. Laut Bericht des Implementierers die größte Zeitquelle des Laufs.
+  Warum: Die Wahl der Testschicht wurde aus der Vermutung abgeleitet, wo der Effekt sichtbar sein *müsste*, statt aus einer Messung, wo er tatsächlich sichtbar ist – und Frameworks, die Callback-Fehler schlucken, verletzen genau diese Vermutung stillschweigend.
+  Regel: Bei einem Stryker-Survivor in einem Framework-Callback (`onSuccess`, Event-Handler, Effekt) erst empirisch prüfen – Mutant kurz manuell einsetzen, Einzeltest laufen lassen –, ob die geplante Assertion ihn überhaupt töten kann, bevor sie geschrieben wird.
+
 ## Session 110 – 2026-07-29
 
 - **[MITTEL] [PROZESS] [Review] LL-S110-1 – Test-Batch freigegeben, obwohl die Hauptassertion unter dem naheliegenden Mutanten vakuös war**

@@ -213,7 +213,8 @@ Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und pe
 | `unit` leer bei gesetzter `quantity` | `"Einheit darf nicht leer sein."` |
 | `instruction` leer | `"Schritt-Anweisung darf nicht leer sein."` |
 | `ingredientId` nicht gefunden/soft-deleted | `"Eine oder mehrere Zutaten wurden nicht gefunden."` |
-| Restore: bereits aktiv | `"Zutat ist bereits aktiv."` |
+
+**Addendum (S111) – Zeile „Restore: bereits aktiv" gestrichen:** Die Tabelle führte für den Restore-Fall „bereits aktiv" den festen Text `"Zutat ist bereits aktiv."`. Die Zeile stammt aus S051, wurde nie implementiert und ist mit ADR-S111-1/-3 überholt – analog zur „plain text"-Klausel in ADR-S004-1, die Addendum S105 ersetzt hat. Zwei Gründe: (1) Der Fall ist kein 422-Feldfehler, sondern ein `409` mit strukturiertem Body, den der Client **logisch verarbeitet** – genau die Konsum-Art, die ADR-S090-1s Display-only-Strategie ausnimmt. (2) Ein fixer Text erklärt dem Nutzer nicht, *warum* seine Eingabe nicht gilt; die Meldung muss den gespeicherten Stand benennen und wird deshalb im Frontend aus dem 409-Body gebildet (Wortlaut in ADR-S111-3). Der Fall tritt zudem nur noch bei **abweichenden** Werten auf – bei identischen Werten gibt es keinen Fehler mehr (ADR-S111-1).
 
 ---
 
@@ -309,6 +310,8 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Entscheidung:** Wenn `POST /api/ingredients` eine soft-deleted Zutat trifft und der Client daraufhin `POST /api/ingredients/{id}/restore` aufruft, übernimmt der Restore-Endpoint den `name` und die `defaultUnit` aus dem ursprünglichen POST-Request. Die Zutat erscheint anschließend mit dem neuen Namen und der neuen Einheit.
 
 **Parallelfall (Restore antwortet 409 "bereits aktiv"):** Der Client zeigt die Zutat ohne Fehlerhinweis als aktiv an. Name und Einheit der bereits aktiven Zutat sind nicht kontrollierbar (hängen vom parallelen Restore ab) – daher kein Guarantee über die angezeigte Einheit.
+
+**Präzisiert durch ADR-S111-1 (run-11):** Der Parallelfall zerfällt in zwei Fälle. Trägt die parallel wiederhergestellte Zeile **dieselben** Werte, antwortet der Restore `200` und die Einheit ist sehr wohl vorhersagbar. Nur bei **abweichenden** Werten gilt der Absatz oben – dann kommt `409`, und der Client zeigt den Konflikt an, statt ihn zu verschweigen (ADR-S111-3).
 
 ---
 
@@ -408,6 +411,8 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 **Geltungsbereich:** Nur der minimale id-basierte Restore ohne Body. Werte-Übernahme aus einem Request, die POST-409-Orchestrierung und der „bereits aktiv"-409-Fall (ADR-S004-1/S051-4/S051-2) sind nicht Teil dieser Entscheidung.
 
+**Überholt durch ADR-S111-1 (run-11):** Der Body ist inzwischen Pflicht und der Erfolgs-Status `200` + DTO statt `204`. Unverändert gültig bleiben die If-Match-Ausnahme und der 404-Pfad samt Test-Autorisierung unten.
+
 **404-Pfad ist test-autorisiert, obwohl kein Gherkin-Szenario ihn fordert (Addendum S108):** Der Test `RestoreIngredient_NonExistentId_Returns404WithNotFoundDetail` trägt bewusst keinen US-Tag. Begründung: Der Null-Check im Endpoint ist **strukturell erzwungen**, nicht optional – ohne ihn liefe der Restore auf einer nicht existenten id in eine `NullReferenceException` und damit, mangels globalem Exception-Handler, in einen rohen 500. Der Guard muss also existieren, und die 404-Antwort ist oben in dieser ADR bereits als Kontrakt festgelegt. Der Test deckt genau diesen ADR-festgelegten Kontrakt ab und ist damit ein Protokolltest im Sinne von ADR-S106-3 Kategorie 1. **Abgrenzung:** Das ist *keine* Vorwegnahme der Restore-Fehler-UI (späterer Lauf) – getestet wird ausschließlich die Server-Antwort, nicht die Reaktion des Frontends darauf. Der Erfolgspfad-Test des Restore ist demgegenüber szenario-getrieben und trägt deshalb den `US904_HappyPath_`-Tag.
 
 **Verworfen:** Restore mit If-Match – bräuchte ETag-Rücktransport im DELETE-204 ohne Concurrency-Nutzen (Single-User-App). Undo über den POST-409-Reaktivierungs-Flow – das ist Sache der Reaktivierungs-Funktion; ihn für den Undo vorzubauen zöge sie vor. Undo via Neu-Anlegen (neuer POST, neue id) – erzeugt stille Inkonsistenz (ADR-S004-1 verworfen).
@@ -426,6 +431,85 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Bekannte Konsequenz (bewusst getragen):** Für die überschriebene Zutat existiert derzeit **kein** UI-Weg zurück – es gibt keinen Papierkorb und keine Liste gelöschter Zutaten. Die Zeile ist nur soft-deleted (`DeletedAt`, ADR-S000-6), also nicht verloren, aber bis zur Reaktivierungs-Funktion (run-11: erneutes Anlegen unter gleichem Namen reaktiviert die Zeile) nur über die API erreichbar. Das ist eine Abweichung vom Wortlaut der UX-Guideline Prinzip 5 Stufe 1 („Soft-Delete + Wiederherstellungsmöglichkeit im UI") für diesen Sonderfall – hier dokumentiert statt stillschweigend in Kauf genommen. Quelle: functional-correctness-auditor, Review run-8.
 
 **Verworfen:** Snackbar-Stacking via Map (id → DeletedIngredient) – korrekt, aber ein eigener Entwurfsschritt weit über den Lauf hinaus. Undo-Weg über einen Papierkorb-Screen – neue Fläche ohne Story. Zweites Löschen sperren, solange ein Undo offen ist – bestraft den Normalfall für einen Randfall.
+
+---
+
+### ADR-S111-1: Restore-Contract mit Pflicht-Body – idempotent bei gleichen Werten, 409 bei abweichenden
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:ingredients, http:post, http:409, db:soft-delete, arch:validation
+
+**Entscheidung:** `POST /api/ingredients/{id}/restore` verlangt ab run-11 einen **Pflicht-Body** `{ name, defaultUnit }` und antwortet:
+
+| Zustand der Zeile | Antwort |
+|---|---|
+| soft-deleted | `200` + `IngredientDto` – `DeletedAt = null`, Name und Einheit aus dem Request übernommen (ADR-S051-4) |
+| aktiv, Werte **exakt identisch** zum Request | `200` + `IngredientDto` – kein Schreibvorgang nötig, der Zielzustand ist bereits erreicht |
+| aktiv, Werte **abweichend** | `409` + `{ "code": "ingredient_already_active", "ingredient": { id, name, defaultUnit, etag } }` – der aktuelle Stand geht mit, damit der Client ihn benennen kann (ADR-S111-3) |
+| id existiert nicht | `404` (unverändert, ADR-S108-2) |
+
+Der Body durchläuft **dieselbe Validierung wie der POST** (`ToDomain()`, field-keyed 422 nach ADR-S090-1/S051-2/S051-3). Ohne sie ließe sich über den Restore ein leerer oder zu langer Name persistieren, den der POST verbietet – die Invariante aus ADR-S051-3 gälte dann nur für einen der beiden Schreibpfade. Der Validierungs-Zweig ist damit **strukturell erzwungen** und trägt einen Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag), analog zur 404-Autorisierung in ADR-S108-2.
+
+**Prüfreihenfolge im Restore: Body-Validierung (422) vor Ressourcen-Auflösung (404).** Ein kaputter Body wird beantwortet, bevor die id nachgeschlagen wird – die übliche Reihenfolge; liefe die Validierung per Filter/Attribut, käme sie ohnehin zuerst. Das ist **kein** Widerspruch zu ADR-S000-5s Addendum „Not-Found dominiert": Dort ging es um Not-Found vs. **Precondition** (If-Match), und die Begründung war, dass ein `412` fälschlich suggeriert, die Ressource existiere noch und ein Retry mit frischem ETag könne helfen. Ein `422` erhebt diese Suggestion nicht – es redet über den Request-Body, nicht über den Zustand der Ressource. Die Dominanz-Regel gilt also weiterhin gegenüber Preconditions, nicht gegenüber Body-Validierung.
+
+**Gleichheit ist exakt-ordinal auf beiden Feldern.** Auch eine abweichende Schreibweise (`"mehl"` vs. `"Mehl"`) ist ein Konflikt, obwohl der Duplikat-Check case-insensitiv arbeitet (ADR-S051-3). Begründung: Die Case-Insensitivität beantwortet die Frage „ist das dieselbe Zutat?", hier steht aber die andere Frage im Raum – „verändere ich einen Wert, den jemand anders gesetzt hat?". Auf die antwortet nur ein zeichengenauer Vergleich. Eine Ausnahme für Schreibweisen wäre ein Sonderfall ohne scharfe Grenze.
+
+**Warum idempotent statt durchgängig 409 (Abgrenzung zu ADR-S051-4):** Der Endpoint hat kein If-Match (ADR-S108-2), Lost Update ist also nicht generell ausgeschlossen. Ein 409 allein für „Zeile ist bereits aktiv" finge nur einen von mehreren Überschreib-Wegen ab und suggerierte einen Schutz, den der Endpoint konstruktiv nicht bietet. Entscheidend ist nicht der Zustand, sondern ob der Request fremde **Werte** verändert – deshalb löst der Wertevergleich aus, nicht die Zustandsprüfung. Sind die Werte gleich, gibt es nichts zu schützen: der Client wollte genau diesen Zustand und bekommt ihn.
+
+**Addendum zu ADR-S051-4 (Parallelfall präzisiert):** Dort hieß es, im Parallelfall antworte der Restore mit 409 und Name/Einheit der aktiven Zutat seien „nicht kontrollierbar". Das gilt ab hier nur noch für den Fall **abweichender** Werte. Bei identischen Werten ist die Einheit sehr wohl vorhersagbar – das treibende Szenario („Reaktivierung gelingt auch wenn Zutat parallel mit denselben Daten wiederhergestellt wurde") assertiert sie deshalb.
+
+**Addendum zu ADR-S108-2 (Body und Erfolgs-Status revidiert):** Der bodylose Restore mit `204` entfällt. Der Undo-Pfad (run-8/9) schickt die unveränderten Werte der gelöschten Zutat mit – für ihn ein No-op, der aber einen einzigen Codepfad im Endpoint erhält. `DeletedIngredient` trägt dafür zusätzlich `defaultUnit`. Unverändert gültig bleiben aus ADR-S108-2: die If-Match-Ausnahme und der 404-Pfad samt Test-Autorisierung.
+
+**Addendum (run-11-Nachbesserung) – zwei Fehlerzweige des Schreibpfads ergänzt.** Mit diesem ADR wurde der Restore vom bloßen `DeletedAt`-Clear zu einem allgemeinen Schreib-Endpoint und braucht damit dieselbe Exception-Behandlung wie jeder andere Schreibpfad – das Projekt hat keinen globalen Exception-Handler, jeder Schreibpfad behandelt seine DB-Fehler selbst. Zwei Fälle schlugen sonst als roher `500` durch:
+
+- **Zwei überlappende Restores derselben soft-deleted Zeile → `200` oder `409`, nie `500`.** `xmin` ist in `Infrastructure/MahlDbContext.cs` auf **Entity**-Ebene als Concurrency-Token konfiguriert – EF hängt es an *jedes* UPDATE, nicht nur an das des DELETE mit If-Match. Lesen beide Requests die Zeile, bevor der erste committed hat, fliegt der Verlierer mit `DbUpdateConcurrencyException`. Fachlich ist das genau der Fall „aktiv, als der Schreibvorgang ankam": Die Zeile wird neu geladen und die Antwort an dieselbe Wertevergleich-Logik delegiert wie bei einer von vornherein aktiven Zeile, statt sie zu duplizieren. Nur so bekommt der häufigste reale Auslöser – Doppelklick auf „Rückgängig", also identische Werte – korrekt `200` statt eines fälschlichen Konflikts. Das Race-Fenster ist dabei enger, als „Doppelklick" nahelegt: Ist der erste Restore schon committed, wenn der zweite liest, läuft der zweite ohne Exception durch den Aktiv-Zweig.
+- **Request-Name kollidiert mit einer *anderen* Zeile → `422` `name_duplicate`.** Der Restore schreibt auf die eindeutigkeitsbeschränkte Name-Spalte (ADR-S105-2/S051-3); ein Name, der eine andere Zeile trifft, verletzt `IX_Ingredients_Name_Lower` genauso wie beim POST und wird deshalb auf denselben field-keyed 422 abgebildet (ADR-S090-1). Über die aktuelle UI nicht erreichbar – der Client sendet nur LOWER-gleiche Namen –, über die API sehr wohl.
+
+**Kein Test für den Concurrency-Zweig, stattdessen begründete Stryker-Suppression (ADR-S041-9).** Beim DELETE lässt sich ein stale `xmin` von außen über den If-Match-Header injizieren; der Restore nimmt kein If-Match (s. o.), lesendes SELECT und schreibendes UPDATE liegen beide innerhalb **desselben** Requests, ohne Injektionspunkt dazwischen. Ein echter `Task.WhenAll`-Race wäre interleaving-abhängig und damit flaky – ein flaky Test ist schlechter als eine ehrliche, begründete Suppression. Der Index-Kollisions-Zweig ist dagegen direkt testbar und trägt einen Protokolltest nach ADR-S106-3 Kategorie 1. Quelle: functional-correctness-auditor, Review run-11.
+
+**Verworfen:** Optionaler Body (bodylos → 204 für den Undo, mit Body → 200 für die Reaktivierung) – ließe run-8/9 unberührt, kostet aber zwei Erfolgs-Statuscodes und zwei dauerhaft zu testende Zweige an einem Endpoint, dessen zweiter Pfad nur historisch existiert. Durchgängiges 409 bei aktiver Zeile (Wortlaut ADR-S051-4) – dritter Antwort-Zweig, und `createIngredient` könnte im 409-Fall kein `Ingredient` liefern, was den Rückgabetyp zur Lüge machte (dasselbe Argument wie in ADR-S108-1). Idempotenz **ohne** Wertevergleich (immer 200, letzter Schreiber gewinnt) – überschreibt fremde Werte ohne jeden Hinweis.
+
+---
+
+### ADR-S111-2: POST-Konflikt-Verzweigung via Lookup **nach** der Unique-Violation
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:ingredients, http:post, http:409, arch:validation, db:constraint
+
+**Entscheidung:** `POST /api/ingredients` unterscheidet die beiden Duplikat-Fälle (aktiv → 422, soft-deleted → 409 `{ code, id }`, ADR-S004-1/S000-2) anhand eines Lookups, der **erst nach** der abgelehnten Insert-Operation läuft: Die `DbUpdateException` (Postgres `23505` auf `IX_Ingredients_Name_Lower`) wird wie bisher gefangen, das nicht persistierte Entity aus dem ChangeTracker gelöst, dann die konfligierende Zeile über `LOWER(name)` gelesen. `DeletedAt != null` → 409, sonst → 422.
+
+**Begründung:** ADR-S105-2 verwirft einen App-Layer-Check *als Durchsetzungsmechanismus* der Eindeutigkeit (TOCTOU). Dieser Lookup setzt nichts durch – die Eindeutigkeit hat die DB bereits durchgesetzt, der Insert ist abgelehnt. Er entscheidet nur noch, **welche** Fehlerantwort der Client bekommt, und liegt damit außerhalb der von ADR-S105-2 adressierten Race. Der Index umfasst bewusst auch soft-deleted Zeilen (ADR-S000-2), weshalb genau diese Verzweigung nötig ist.
+
+**Bekannte Race (bewusst getragen):** Ändert sich der Zustand der Zeile zwischen Violation und Lookup, bekommt der Client die jeweils andere der beiden Antworten. Beide Zweige sind für ihn behandelbar (422 zeigt die Meldung, 409 startet die Reaktivierung), der Ausgang ist also in beiden Richtungen definiert.
+
+**Findet der Lookup keine Zeile,** obwohl die DB gerade eine Unique-Violation gemeldet hat, ist das strukturell unerreichbar (es gibt keinen Hard-Delete). Der Guard fällt auf die 422-Duplikat-Antwort zurück und trägt eine begründete Stryker-Suppression – ein Test dafür ließe sich nicht schreiben.
+
+**Verworfen:** Vorab-Prüfung „existiert der Name (auch soft-deleted)?" vor dem Insert – genau das Check-then-Insert-Muster, das ADR-S105-2 aus TOCTOU-Gründen verwirft. Partieller Unique-Index nur auf aktive Zeilen (`WHERE DeletedAt IS NULL`) – erlaubte zwei Zeilen gleichen Namens nebeneinander und bricht ADR-S000-2.
+
+---
+
+### ADR-S111-3: Reaktivierungs-Konflikt im UI – Dialog schließt, Snackbar nennt den gespeicherten Stand
+
+**Status:** Accepted
+**Tags:** scope:feature, story:us-904, resource:ingredients, frontend:react, arch:error-handling
+
+**Entscheidung:** Antwortet der Restore mit `409 ingredient_already_active` (ADR-S111-1), **schließt der Anlege-Dialog** wie im Erfolgsfall, die Liste wird neu geladen, und der Nutzer bekommt eine Snackbar mit dem Text:
+
+> `'{eingegebener Name}' wurde zwischenzeitlich an anderer Stelle wiederhergestellt (z. B. auf einem anderen Gerät). Gespeichert ist '{aktueller Name}' mit der Einheit '{aktuelle Einheit}'.`
+
+Die Werte für den zweiten Satz stammen aus dem `ingredient`-Objekt des 409-Bodys; der Text wird im Frontend gebildet (wie bei allen 409-Antworten, die der Client logisch verarbeitet – ADR-S004-1/S090-1). Der eingegebene Name geht **getrimmt** in den Text – jede andere nutzersichtbare Wiedergabe einer Eingabe ist es auch (ADR-S051-1/S051-2), und ein Wert mit unsichtbaren Leerzeichen in Anführungszeichen arbeitet gegen den Zweck der Meldung.
+
+**Der Text nennt bewusst nur den gespeicherten Stand, nicht die eigene Eingabe.** Naheliegend wäre, die Differenz auszuformulieren („…, nicht '{eigene Einheit}'"). Das scheitert an der Generik: Der Konflikt kann ebenso im **Namen** liegen (abweichende Schreibweise bei gleicher Einheit) – dann stünde dort „Einheit 'g', nicht 'g'". Der Nutzer sieht seine eigene Eingabe ohnehin gerade noch im Dialog; was ihm fehlt, ist der fremde Stand.
+
+**Auto-Hide 10000 ms – bewusst länger als der Undo-Toast (6000 ms).** Die ursprüngliche Festlegung „identisch zum Undo-Toast" war ein Konsistenz-Default ohne Blick auf die Textlänge: Diese Meldung ist rund zehnmal so lang wie „X gelöscht", besteht aus zwei Sätzen und führt ein Konzept ein (parallele Reaktivierung), das im UI sonst nirgends vorkommt. MUIs Pause-bei-Hover greift auf dem priorisierten Touch-Gerät nicht. Die Dauern der beiden Toasts sind damit **absichtlich verschieden** – sie gehören nicht in eine gemeinsame Konstante. Quelle: ux-ui-auditor, Review run-11.
+
+**Begründung Dialog schließt:** Der Vorgang ist abgeschlossen – die Zutat existiert danach, nur mit fremden Werten. Im Dialog gäbe es nichts zu korrigieren: erneutes Speichern liefe in den 422-Duplikat-Fehler, weil die Zeile jetzt aktiv ist. Ein offen bleibender Dialog mit Fehlermeldung (das Muster der Feld-Validierung) suggerierte eine Korrekturmöglichkeit, die es nicht gibt. Die Meldung nennt beide Seiten – die eigene Eingabe und den gespeicherten Stand – damit der Nutzer die Differenz selbst sieht, statt nur zu erfahren, dass „etwas schiefging".
+
+**Bekannte Konsequenz (bewusst getragen):** Löscht der Nutzer erst eine Zutat (Undo-Toast steht) und läuft unmittelbar danach in diesen Konflikt, sind zwei Snackbars gleichzeitig sichtbar. Kein Stacking-Konzept – dieselbe Abwägung wie in ADR-S108-3, verschärft weder Datenlage noch Bedienbarkeit.
+
+**Ein erfolgreiches Anlegen verwirft den Undo-Zustand (Addendum run-11-Nachbesserung).** Der `onSuccess` des Anlege-Vorgangs ruft `dismissUndo()`. Grund: Vor run-11 konnte eine soft-deleted Zeile ausschließlich durch den Undo selbst wieder aktiv werden – der Toast konnte gar nicht veralten. Die Reaktivierung ist ein **zweiter** Weg zurück und macht die Aussage „X gelöscht" samt „Rückgängig"-Button falsch, sobald sie greift: Der Toast behauptete einen Zustand, den es nicht mehr gibt (UX-Guideline Prinzip 1), und ein Klick darauf liefe in den `409`-Zweig, den der Client als Erfolg wertet – die Aktion verpuffte ohne Wirkung und ohne Rückmeldung (Prinzip 3). Bemerkenswert: Der Wertevergleich aus ADR-S111-1 verhindert dabei bereits das Schlimmere – ohne ihn würde der veraltete Undo die soeben eingegebene Einheit still durch die alte ersetzen, ein Lost Update auf den eigenen Daten des Nutzers. Quelle: functional-correctness-auditor, Review run-11.
+
+**Verworfen:** Fehlermeldung im geöffneten Dialog (Muster der 422-Feldfehler) – suggeriert eine nicht existierende Korrekturmöglichkeit. Stiller Erfolg ohne Hinweis – der Nutzer glaubte sonst, seine Einheit sei gespeichert. Meldungstext vom Server – der 409 ist eine vom Client logisch verarbeitete Antwort, sein Body trägt Daten, keine Anzeige-Texte (Abgrenzung zu den fixen 422-Texten aus ADR-S051-2).
 
 ---
 
@@ -799,6 +883,8 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Verworfen:** Volle 4er-Union jetzt – erzeugt unausgeübte Zweige + Suppressions vor dem treibenden Szenario (widerspricht der Suppression-Minimierung).
 
+**Addendum (run-11, „Reaktivierung"):** `onSuccess` reicht den Erfolgswert durch – die Signatur wechselt von `() => void` auf `(data: TData) => void`. Getrieben vom Reaktivierungs-Konflikt: die Snackbar braucht den vom Server gespeicherten Stand, den nur der Ok-Wert der Mutation trägt (ADR-S111-3). Das ist **keine** Aufweichung der Aufschub-Entscheidung oben: es entsteht weder ein neuer Zustand noch eine neue Union noch `throwOnError` – der bereits vorhandene Ok-Wert wird lediglich nicht mehr verschluckt. Bestehende Aufrufer mit parameterlosem Callback bleiben typkorrekt zuweisbar. Die volle `MutationState`-Union, `matchState` und `throwOnError` bleiben unverändert aufgeschoben.
+
 **Addendum (run-2, "Speichern-Button deaktiviert während des Speicherns"):** Der `pending`-Teil der oben aufgeschobenen Erweiterung wird **minimal** eingelöst: `useResultMutation` liefert neu ein 3-Tupel `[mutate, error, isPending]`, wobei `isPending = mutation.isPending` (React Query). **Keine** volle `MutationState`-Union, **kein** `matchState`, **kein** `throwOnError` – die Begründung von oben gilt unverändert für diese Teile, weil `throwOnError` weiterhin `QueryCache.onError` voraussetzt (existiert noch nicht) und die volle Union weiterhin unausgeübte `idle`/`error`-Zweige erzeugen würde. Die volle Union + `matchState` + `throwOnError` bleiben mit den @US-904-error/resilience-Szenarien aufgeschoben.
 
 **Begründung:** Bring! ist im Familienshopping-Kontext etabliert und auf Touch-Geräten gut bedienbar. US-304 (Visuelle Darstellung & Varianten) wurde aufgelöst, weil das Layout kein Feature-Increment ist, sondern ein Designprinzip – die Kachel-Entscheidung fällt einmalig und ist kein eigenständiges Implementierungsticket.
@@ -1166,6 +1252,8 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 **Begründung:** react-query macht von Haus aus **keine** HTTP-Conditional-Requests. Ohne diese Schicht hätte der Backend-ETag keinen Konsumenten – der 304-Spareffekt entsteht nur, wenn der Client `If-None-Match` sendet. Eine Frontend-seitige Cache-Invalidierung ist nicht nötig: Nach einem POST ändert sich der Backend-Content-Hash → `If-None-Match` matcht nicht mehr → 200 mit neuem Body → der Cache aktualisiert sich selbst.
 
 **Testung:** Auf der Service-Client-/HTTP-Boundary via MSW (ADR-S041-5-Addendum), nicht E2E – die Conditional-Mechanik ist auf E2E-Ebene nicht beobachtbar (gerenderter Output identisch bei 200 und 304).
+
+**Addendum (S111) – zweite Ursache für „auf der Komponente nicht beobachtbar": React Query verschluckt Fehler aus `onSuccess`.** Bisher lag der Grund für einen Service-Client-Test stets darin, dass die Mechanik im DOM keine Spur hinterlässt (If-None-Match, If-Match). In run-11 kam ein anderer Fall dazu: Ein Mutant in `restoreIngredient`s Status-Verzweigung lässt den Konflikt-Zweig auf eine `200`-Antwort laufen, deren Body das erwartete Feld nicht hat → `TypeError` beim Aufbau der Snackbar. Dieser Fehler wird von React Query **innerhalb** des `onSuccess`-Callbacks abgefangen, erreicht also weder eine Error-Boundary noch den Testlauf; `closeDialog` und der Listen-Refetch sind zu dem Zeitpunkt bereits gelaufen und stammen ohnehin aus dem GET, nicht aus dem geparsten Wert. Der Komponenten-Test bleibt deshalb grün, obwohl der Code defekt ist. Konsequenz: Nicht nur DOM-lose Mechanik, sondern auch **Logik, deren Fehlschlag in einem Framework-Callback verschluckt wird**, gehört auf die Service-Client-Schicht. Quelle: frontend-layer-implementer, run-11.
 
 ---
 

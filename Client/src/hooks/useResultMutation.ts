@@ -7,9 +7,13 @@ import type { Result, ResultAsync } from 'neverthrow'
 // bisher umgesetzten US-904-Szenarien beobachten (Erfolg, Feld-Fehler, Pending, Reset beim
 // Schließen); die volle Union bleibt für @US-904-error/resilience aufgeschoben. Details/
 // Begründung: docs/history/adr.md (ADR-S083-2).
+// run-11: `onSuccess` reicht den Erfolgswert durch (statt ihn zu verschlucken) – kein neuer
+// Zustand, keine neue Union, nur der bereits vorhandene Ok-Wert wird sichtbar. Getrieben vom
+// Reaktivierungs-Konflikt-Szenario, das den gespeicherten Stand für die Snackbar braucht
+// (ADR-S111-3). Bestehende Aufrufer mit 0-Parameter-Callback bleiben typkorrekt zuweisbar.
 export function useResultMutation<TData, TError, TVariables>(
   fn: (variables: TVariables) => ResultAsync<TData, TError>,
-  onSuccess: () => void,
+  onSuccess: (data: TData) => void,
 ): readonly [(variables: TVariables) => void, TError | undefined, boolean, () => void] {
   const [error, setError] = useState<TError | undefined>(undefined)
   const mutation = useMutation<Result<TData, TError>, Error, TVariables>({
@@ -18,9 +22,9 @@ export function useResultMutation<TData, TError, TVariables>(
     mutationFn: (variables: TVariables) => Promise.resolve(fn(variables)),
     onSuccess: (result) => {
       result.match(
-        () => {
+        (data) => {
           setError(undefined)
-          onSuccess()
+          onSuccess(data)
         },
         (e) => { setError(e) },
       )

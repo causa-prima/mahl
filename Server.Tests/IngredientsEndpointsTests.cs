@@ -20,6 +20,10 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     private sealed record CreateIngredientRequest(string Name, string DefaultUnit);
     private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
+    // ADR-S004-1/ADR-S111-2: 409-Body von POST bei soft-deleted-Namenskonflikt.
+    private sealed record SoftDeletedConflictResponse(string Code, Guid Id);
+    // ADR-S111-1: 409-Body vom Restore, wenn die Zeile bereits aktiv ist, aber mit abweichenden Werten.
+    private sealed record AlreadyActiveConflictResponse(string Code, IngredientWithEtagResponse Ingredient);
 #pragma warning restore CA1812
 
     // Helper: sendet DELETE mit optionalem If-Match-Header. HttpClient.DeleteAsync kennt keine
@@ -53,9 +57,13 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         persisted[0].DeletedAt.Should().NotBeNull();
     }
 
-    // ADR-S108-2: Restore ohne Body, ohne If-Match (Single-User-App-Ausnahme von ADR-S058-1).
-    private async Task<HttpResponseMessage> RestoreIngredientAsync(Guid id) =>
-        await Client.PostAsync($"/api/ingredients/{id}/restore", content: null, TestContext.Current.CancellationToken);
+    // ADR-S111-1 (überholt ADR-S108-2): Restore verlangt ab run-11 einen Pflicht-Body { name,
+    // defaultUnit } – ohne If-Match (Single-User-App-Ausnahme von ADR-S058-1 bleibt unverändert gültig).
+    private async Task<HttpResponseMessage> RestoreIngredientAsync(Guid id, string name, string defaultUnit) =>
+        await Client.PostAsJsonAsync(
+            $"/api/ingredients/{id}/restore",
+            new CreateIngredientRequest(Name: name, DefaultUnit: defaultUnit),
+            TestContext.Current.CancellationToken);
 
     [Fact]
     public async Task US904_HappyPath_GetIngredients_EmptyDb_Returns200WithEmptyList()
@@ -598,23 +606,27 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
     // @US-904-happy-path (Szenario 2 "Löschen rückgängig machen via Toast"): pinnt das Backend-
     // Verhalten hinter "Then sehe ich 'Mehl' in der Zutaten-Liste mit Einheit 'g'" – Restore setzt
-    // DeletedAt = null und lässt Name/Einheit unverändert. Szenario-getrieben, daher US-Tag (nicht
-    // Kategorie-1 nach ADR-S106-3 – das wäre nur reine Protokoll-/Infrastruktur-Mechanik ohne
-    // Domänen-Verhalten). ADR-S108-2: Restore läuft ohne Body und ohne If-Match (Single-User-App-
-    // Ausnahme von ADR-S058-1).
+    // DeletedAt = null. Szenario-getrieben, daher US-Tag (nicht Kategorie-1 nach ADR-S106-3 – das wäre
+    // nur reine Protokoll-/Infrastruktur-Mechanik ohne Domänen-Verhalten). ADR-S111-1 (überholt
+    // ADR-S108-2): Restore-Body ist ab run-11 Pflicht und Erfolgs-Status 200 statt 204 – der Undo-Aufruf
+    // schickt Name/Einheit der gelöschten Zeile unverändert mit (fachlich ein No-op, ein Codepfad).
     [Fact]
-    public async Task US904_HappyPath_RestoreIngredient_SoftDeletedIngredient_Returns204AndClearsDeletedAt()
+    public async Task US904_HappyPath_RestoreIngredient_SoftDeletedIngredient_Returns200AndClearsDeletedAt()
     {
         // Given: "Rosmarin" exists and was already deleted (first DELETE succeeds, 204)
         var (created, etag) = await CreateIngredientAsync("Rosmarin", "g");
         var deleteResponse = await DeleteIngredientAsync(created.Id, etag);
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        // When: the soft-deleted ingredient is restored (no body, no If-Match)
-        var response = await RestoreIngredientAsync(created.Id);
+        // When: the soft-deleted ingredient is restored with its own (unchanged) name/unit
+        var response = await RestoreIngredientAsync(created.Id, "Rosmarin", "g");
 
-        // Then: 204 No Content
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        // Then: 200 OK with the restored ingredient (ADR-S111-1)
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Name.Should().Be("Rosmarin");
+        body.DefaultUnit.Should().Be("g");
 
         // Then: the row is active again – DeletedAt cleared, name/unit unchanged (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
@@ -622,16 +634,18 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
             [new IngredientDbType { Id = created.Id, Name = "Rosmarin", DefaultUnit = "g" }]);
     }
 
-    // ADR-S108-2: eine nie existente id liefert 404 mit demselben Body wie DELETE (NotFoundProblem,
-    // ADR-S051-5/ADR-S054-6). Kategorie-1-Protokolltest (ADR-S106-3), kein US-Tag.
+    // ADR-S108-2/ADR-S111-1: eine nie existente id liefert 404 mit demselben Body wie DELETE
+    // (NotFoundProblem, ADR-S051-5/ADR-S054-6). Kategorie-1-Protokolltest (ADR-S106-3), kein US-Tag.
+    // Body ist valide (422 läuft VOR 404, s. Kommentar am Endpoint) – sonst würde dieser Test
+    // fälschlich den 422-Pfad statt den 404-Pfad treffen.
     [Fact]
     public async Task RestoreIngredient_NonExistentId_Returns404WithNotFoundDetail()
     {
         // Given: an id that was never created
         var nonExistentId = Guid.CreateVersion7();
 
-        // When: restoring that id
-        var response = await RestoreIngredientAsync(nonExistentId);
+        // When: restoring that id with a valid body
+        var response = await RestoreIngredientAsync(nonExistentId, name: "Irrelevant", defaultUnit: "g");
 
         // Then: 404 with the fixed German detail and machine-readable errorCode
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -643,5 +657,234 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: nothing was written – the 404 path is read-only, the ingredient list stays empty
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEmpty();
+    }
+
+    // Kategorie-1-Protokolltest (ADR-S106-3): kein treibendes Gherkin-Szenario – der Validierungs-Zweig
+    // im Restore ist strukturell erzwungen (sonst umginge der Restore die Invariante aus ADR-S051-3,
+    // ADR-S111-1). Ein Fall genügt (die Validierungslogik selbst ist über die POST-Tests abgedeckt).
+    [Fact]
+    public async Task RestoreIngredient_InvalidBody_Returns422WithFieldKeyedError()
+    {
+        // Given: an active ingredient (any existing row – the invalid body must be rejected first)
+        var (created, _) = await CreateIngredientAsync("Kurkuma", "g");
+
+        // When: restoring with an empty name
+        var response = await RestoreIngredientAsync(created.Id, name: "", defaultUnit: "g");
+
+        // Then: 422 Unprocessable Entity, field-keyed (ADR-S090-1, same ToDomain() path as POST)
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["name"] = ["Name darf nicht leer sein."],
+        });
+
+        // Then: the row is unchanged (full-state DB assertion) – validation runs before the DB write
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = created.Id, Name = "Kurkuma", DefaultUnit = "g" }]);
+    }
+
+    // Kategorie-1-Protokolltest (ADR-S106-3): kein treibendes Gherkin-Szenario – Restore ist seit
+    // run-11 ein allgemeiner Schreib-Endpoint auf der eindeutigkeitsbeschränkten Name-Spalte
+    // (ADR-S105-2/ADR-S111-2). Ein Request-Name, der mit einer ANDEREN aktiven Zeile kollidiert,
+    // verletzt den Index genauso wie beim POST – über die aktuelle UI nicht erreichbar (der Client
+    // sendet nur LOWER-gleiche Namen), über die API sehr wohl. Derselbe 422-Pfad wie POST
+    // (ADR-S090-1/ADR-S051-2), damit die Invariante aus ADR-S051-3 für BEIDE Schreibpfade gilt.
+    [Fact]
+    public async Task RestoreIngredient_SoftDeletedRowNameCollidesWithActiveRow_Returns422WithNameDuplicateError()
+    {
+        // Given: an active ingredient "Mehl" and a soft-deleted ingredient "Zucker"
+        var (mehl, _) = await CreateIngredientAsync("Mehl", "g");
+        var (zucker, zuckerEtag) = await CreateIngredientAsync("Zucker", "g");
+        var deleteResponse = await DeleteIngredientAsync(zucker.Id, zuckerEtag);
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // When: restoring "Zucker" with a name colliding with the active "Mehl"
+        var response = await RestoreIngredientAsync(zucker.Id, name: "Mehl", defaultUnit: "g");
+
+        // Then: 422 Unprocessable Entity, field-keyed with the same duplicate-name message as POST
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["name"] = ["Eine Zutat mit dem Namen 'Mehl' existiert bereits."],
+        });
+
+        // Then: nothing was overwritten – both rows keep their original state (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [
+                new IngredientDbType { Id = mehl.Id, Name = "Mehl", DefaultUnit = "g" },
+                new IngredientDbType { Id = zucker.Id, Name = "Zucker", DefaultUnit = "g" },
+            ],
+            o => o.Excluding(x => x.DeletedAt)); // Zucker bleibt soft-deleted – exakter Zeitstempel nicht Teil des Szenarios
+        persisted.Single(i => i.Id == zucker.Id).DeletedAt.Should().NotBeNull();
+    }
+
+    // @US-904-edge-case: "Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese" (Szenario 1,
+    // exakte Schreibweise) + "Reaktivierung übernimmt neuen Namen bei abweichender Schreibweise"
+    // (Szenario 3, case-insensitiver Lookup) – gleiche Setup-/Assert-Struktur, nur die Schreibweise
+    // variiert (docs/process/tdd-process.md "Parametrisierte Tests"). ADR-S004-1/ADR-S111-2: POST
+    // unterscheidet den Namenskonflikt gegen eine soft-deleted Zeile (409, strukturiert) von einer
+    // aktiven Zeile (422, field-keyed, s. bestehende DuplicateName-Theory).
+    [Theory]
+    [InlineData("Butter", "Butter")]
+    [InlineData("mehl", "Mehl")]
+    public async Task US904_EdgeCase_CreateIngredient_SoftDeletedDuplicateName_Returns409WithSoftDeletedConflictBody(
+        string existingName, string requestName)
+    {
+        // Given: a soft-deleted ingredient with the existing (possibly differently cased) name
+        var deleted = new IngredientDbType
+        {
+            Id = Guid.CreateVersion7(), Name = existingName, DefaultUnit = "g", DeletedAt = DateTimeOffset.UtcNow,
+        };
+        Db.Ingredients.Add(deleted);
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // When: an ingredient with the (possibly differently cased) duplicate name is created
+        var request = new CreateIngredientRequest(Name: requestName, DefaultUnit: "kg");
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 409 Conflict with the soft-deleted row's id (ADR-S004-1)
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<SoftDeletedConflictResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Code.Should().Be("ingredient_soft_deleted");
+        body.Id.Should().Be(deleted.Id);
+
+        // Then: nothing was written – the soft-deleted row is unchanged (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo([deleted]);
+    }
+
+    // @US-904-edge-case: "Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese" (Szenario 1) +
+    // "Reaktivierung übernimmt neue Einheit" (Szenario 2) + "...abweichender Schreibweise" (Szenario 3)
+    // – dieselbe Invariante (Restore übernimmt Name+Einheit UNBEDINGT aus dem Request, ADR-S051-4/
+    // ADR-S111-1), nur Setup/Erwartung variieren -> ein parametrisierter Test.
+    [Theory]
+    [InlineData("Butter", "g", "Butter", "g")]
+    [InlineData("Butter", "Würfel", "Butter", "g")]
+    [InlineData("mehl", "g", "Mehl", "g")]
+    public async Task US904_EdgeCase_RestoreIngredient_SoftDeletedRow_Returns200AndAppliesRequestValues(
+        string storedName, string storedUnit, string requestName, string requestUnit)
+    {
+        // Given: a soft-deleted ingredient with the stored name/unit
+        var deleted = new IngredientDbType
+        {
+            Id = Guid.CreateVersion7(), Name = storedName, DefaultUnit = storedUnit, DeletedAt = DateTimeOffset.UtcNow,
+        };
+        Db.Ingredients.Add(deleted);
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        // The restore request runs against a DIFFERENT (request-scoped) DbContext instance – clear the
+        // test context's tracker so the later full-state read below reflects the DB, not the stale
+        // in-memory "deleted" instance that EF's identity resolution would otherwise return unchanged.
+        Db.ChangeTracker.Clear();
+
+        // When: the ingredient is restored with the request name/unit
+        var response = await RestoreIngredientAsync(deleted.Id, requestName, requestUnit);
+
+        // Then: 200 OK with the request values (ADR-S111-1)
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Name.Should().Be(requestName);
+        body.DefaultUnit.Should().Be(requestUnit);
+
+        // Then: the row is active again with the request values (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = deleted.Id, Name = requestName, DefaultUnit = requestUnit }]);
+    }
+
+    // @US-904-edge-case: "Reaktivierung gelingt auch wenn Zutat parallel mit denselben Daten
+    // wiederhergestellt wurde" (Szenario 4) – der Server-seitige Teil: ein Restore auf eine bereits
+    // AKTIVE Zeile mit exakt identischen Werten ist idempotent (200, kein Schreibvorgang), weil es
+    // nichts zu schützen gibt (ADR-S111-1). Das E2E erreicht diese Konstellation nur über ein
+    // künstliches Zeitfenster (Route-Interception) – hier direkt: aktive Zeile seeden, Restore mit
+    // identischen Werten aufrufen.
+    [Fact]
+    public async Task US904_EdgeCase_RestoreIngredient_ActiveRowWithIdenticalValues_Returns200()
+    {
+        // Given: an active ingredient
+        var (created, _) = await CreateIngredientAsync("Koriander", "Bund");
+
+        // When: the ingredient is restored with EXACTLY the same name/unit
+        var response = await RestoreIngredientAsync(created.Id, "Koriander", "Bund");
+
+        // Then: 200 OK, no conflict – the target state was already reached
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Name.Should().Be("Koriander");
+        body.DefaultUnit.Should().Be("Bund");
+
+        // Then: the row remains unchanged and active (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = created.Id, Name = "Koriander", DefaultUnit = "Bund" }]);
+    }
+
+    // @US-904-error: "Reaktivierung meldet Konflikt wenn die Zutat parallel mit anderen Daten
+    // wiederhergestellt wurde" (Szenario 5) – ein Restore auf eine bereits AKTIVE Zeile mit
+    // ABWEICHENDEN Werten überschreibt nicht fremde Werte, sondern meldet 409 mit dem gespeicherten
+    // Stand (ADR-S111-1/ADR-S111-3 – der Anzeigetext selbst ist Frontend-Sache).
+    [Fact]
+    public async Task US904_Error_RestoreIngredient_ActiveRowWithDifferentValues_Returns409WithAlreadyActiveConflictBody()
+    {
+        // Given: an active ingredient (its real xmin ETag from creation)
+        var (created, etag) = await CreateIngredientAsync("Koriander", "Töpfchen");
+
+        // When: the ingredient is restored with a DIFFERENT unit ("Bund" vs. stored "Töpfchen")
+        var response = await RestoreIngredientAsync(created.Id, "Koriander", "Bund");
+
+        // Then: 409 Conflict with the SAVED (not the requested) values (ADR-S111-1)
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<AlreadyActiveConflictResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Code.Should().Be("ingredient_already_active");
+        body.Ingredient.Id.Should().Be(created.Id);
+        body.Ingredient.Name.Should().Be("Koriander");
+        body.Ingredient.DefaultUnit.Should().Be("Töpfchen");
+        // The 409 path writes nothing -> xmin is unchanged, so the etag must equal the creation-time one
+        // exactly (not just "look like" an etag – a hardcoded well-formed string must not survive).
+        body.Ingredient.Etag.Should().Be(etag);
+
+        // Then: nothing was overwritten – the saved values stay unchanged (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = created.Id, Name = "Koriander", DefaultUnit = "Töpfchen" }]);
+    }
+
+    // ADR-S108-1: IngredientDto.etag ist ausdrücklich die If-Match-Quelle für ein nachfolgendes DELETE.
+    // Kein bisheriger Test pinnt, dass der Restore-200-Body einen FRISCHEN, brauchbaren ETag liefert –
+    // der Endpoint liest xmin nach SaveChangesAsync und verlässt sich darauf, dass EF/Npgsql die
+    // store-generierte Shadow-Property nachlädt. Hält das nicht mehr, liefert der Restore einen
+    // veralteten ETag und ein Client bekäme beim folgenden DELETE unbemerkt ein 412. Kategorie-1-
+    // Protokolltest (ADR-S106-3): kein treibendes Gherkin-Szenario.
+    [Fact]
+    public async Task RestoreIngredient_SoftDeletedRow_Returns200WithFreshEtagUsableForSubsequentDelete()
+    {
+        // Given: a soft-deleted ingredient
+        var (created, etag) = await CreateIngredientAsync("Liebstöckel", "Bund");
+        var deleteResponse = await DeleteIngredientAsync(created.Id, etag);
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // When: the ingredient is restored
+        var restoreResponse = await RestoreIngredientAsync(created.Id, "Liebstöckel", "Bund");
+        restoreResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var restored = await restoreResponse.Content.ReadFromJsonAsync<IngredientWithEtagResponse>(TestContext.Current.CancellationToken);
+        restored.Should().NotBeNull();
+
+        // When: the ingredient is deleted again using the ETag FROM THE RESTORE RESPONSE BODY
+        var response = await DeleteIngredientAsync(created.Id, restored.Etag);
+
+        // Then: 204 No Content – the restore's etag is a valid If-Match for the row's current state
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Then: the row is soft-deleted again (full-state DB assertion)
+        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Liebstöckel", DefaultUnit = "Bund" });
     }
 }

@@ -3,13 +3,15 @@ import { useResultMutation } from './useResultMutation'
 import { deleteIngredient, restoreIngredient } from '../services/ingredientsApi'
 import type { Ingredient } from '../services/ingredientsApi'
 
-export type DeletedIngredient = { readonly id: string; readonly name: string }
+// run-11: `defaultUnit` ergänzt, weil der Restore-Body ab jetzt Pflicht ist (ADR-S111-1-Addendum
+// zu ADR-S108-2) – der Undo-Aufruf muss Name UND Einheit der gelöschten Zeile mitschicken.
+export type DeletedIngredient = { readonly id: string; readonly name: string; readonly defaultUnit: string }
 
 type DeleteIngredientWithUndo = {
   readonly deleted: DeletedIngredient | null
   readonly deletingId: string | null
   readonly requestDelete: (ingredient: Readonly<Ingredient>) => void
-  readonly undoDelete: (id: string) => void
+  readonly undoDelete: (deleted: DeletedIngredient) => void
   readonly dismissUndo: () => void
 }
 
@@ -35,13 +37,21 @@ export function useDeleteIngredientWithUndo(onChanged: () => void): DeleteIngred
       onChanged()
     },
   )
-  const [restoreMutate] = useResultMutation(restoreIngredient, () => {
-    setDeleted(null)
-    onChanged()
-  })
+  // ADR-S111-1-Addendum zu ADR-S108-2: der Restore-Body ist ab run-11 Pflicht, auch für den
+  // Undo – fachlich ein No-op (dieselben Werte reisen unverändert mit), aber ein einziger
+  // Codepfad im Endpoint. Der Wrapper bündelt die drei Werte zum vars-Objekt, das
+  // restoreIngredient als Positionsparameter erwartet.
+  const [restoreMutate] = useResultMutation(
+    (vars: { readonly id: string; readonly name: string; readonly defaultUnit: string }) =>
+      restoreIngredient(vars.id, vars.name, vars.defaultUnit),
+    () => {
+      setDeleted(null)
+      onChanged()
+    },
+  )
 
   const requestDelete = (ingredient: Readonly<Ingredient>) => {
-    setDeleted({ id: ingredient.id, name: ingredient.name })
+    setDeleted({ id: ingredient.id, name: ingredient.name, defaultUnit: ingredient.defaultUnit })
     setDeletingId(ingredient.id)
     deleteMutate({ id: ingredient.id, etag: ingredient.etag })
   }
@@ -50,7 +60,7 @@ export function useDeleteIngredientWithUndo(onChanged: () => void): DeleteIngred
     deleted,
     deletingId,
     requestDelete,
-    undoDelete: restoreMutate,
+    undoDelete: (target) => { restoreMutate({ id: target.id, name: target.name, defaultUnit: target.defaultUnit }) },
     dismissUndo: () => { setDeleted(null) },
   }
 }

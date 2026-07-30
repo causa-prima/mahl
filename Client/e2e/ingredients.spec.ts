@@ -23,10 +23,34 @@ async function seedIngredientViaApi(request: Readonly<APIRequestContext>, name: 
 // Legt eine Zutat an und löscht sie direkt wieder (soft-delete) – Vorbedingung "die Zutat X
 // existiert und wurde gelöscht". Der ETag aus dem POST-Response geht als If-Match ins DELETE
 // (Plumbing: DELETE verlangt als mutierender Single-Resource-Endpoint einen If-Match, ADR-S058-1).
-async function seedDeletedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, defaultUnit: string): Promise<void> {
+async function seedDeletedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, defaultUnit: string): Promise<{ id: string }> {
   const { id, etag } = await createIngredientViaApi(request, name, defaultUnit)
   const deleteResponse = await request.delete(`${E2E_API_BASE}/api/ingredients/${id}`, { headers: { 'If-Match': etag } })
   expect(deleteResponse.status(), 'Seed-Löschen muss gelingen (204)').toBe(204)
+  return { id }
+}
+
+// Stellt eine soft-deleted Zutat direkt über die API wieder her – der "jemand anderes"-Zugriff der
+// beiden Parallelfall-Szenarien. Body ist Pflicht, Erfolgs-Status 200 (ADR-S111-1).
+async function restoreIngredientViaApi(request: Readonly<APIRequestContext>, id: string, name: string, defaultUnit: string): Promise<void> {
+  const response = await request.post(`${E2E_API_BASE}/api/ingredients/${id}/restore`, { data: { name, defaultUnit } })
+  expect(response.status(), 'Paralleles Wiederherstellen muss gelingen (200)').toBe(200)
+}
+
+// Öffnet das Parallel-Fenster der beiden Nebenläufigkeits-Szenarien: Der Restore, den der Client
+// nach dem 409 des POST absetzt, wird abgefangen; erst DANN stellt der Test die Zutat über die API
+// wieder her und reicht den Request durch. Der Client-Restore trifft damit eine bereits aktive
+// Zeile – genau die Konstellation, die die Szenarien beschreiben. Das Fenster künstlich zu öffnen
+// ist der einzige deterministische Weg dorthin: würde der Test vor `page.goto` wiederherstellen,
+// sähe schon der POST eine aktive Zeile und liefe in den Duplikat-Fehler (422), statt zu reaktivieren.
+// `times: 1` greift nur den einen erwarteten Restore ab.
+async function restoreInFlightBeforeClientRestore(
+  page: Readonly<Page>, request: Readonly<APIRequestContext>, id: string, name: string, defaultUnit: string,
+): Promise<void> {
+  await page.route('**/api/ingredients/*/restore', async (route) => {
+    await restoreIngredientViaApi(request, id, name, defaultUnit)
+    await route.continue()
+  }, { times: 1 })
 }
 
 // Erfasst die Zutaten-Liste samt Ausgangs-Anzahl für "Liste bleibt unverändert"-Assertions.
@@ -776,5 +800,140 @@ test.describe('US904_HappyPath: Löschen·Pending', () => {
     // Then: der Löschen-Button für "Mehl" ist deaktiviert, solange die Antwort aussteht.
     //   Der 1000-ms-Delay hält das Fenster offen; danach ersetzt der Empty-State die Zeile.
     await expect(page.getByRole('button', { name: 'Mehl löschen' })).toBeDisabled()
+  })
+})
+
+// @US-904-edge-case / @US-904-error: run-11 „Reaktivierung". Legt der Nutzer eine Zutat an, deren
+// Name bereits soft-deleted existiert, wird die vorhandene Zeile reaktiviert statt eine zweite
+// anzulegen (ADR-S004-1: POST antwortet 409 mit { code, id }, der Client ruft daraufhin den Restore
+// auf – transparent, ohne Zutun des Nutzers). Der Restore übernimmt dabei Name und Einheit aus dem
+// Anlege-Request (ADR-S051-4/S111-1), weshalb die Szenarien 2 und 3 gezielt abweichende Werte
+// eingeben. Black-box: die Tests klicken nur, die 409-Orchestrierung ist interne Mechanik – ihre
+// Statuscodes prüft Server.Tests. Seed VOR page.goto, damit der initiale GET den Zustand kennt.
+// Namens- und Einheiten-Assertions laufen mit `exact: true`: Playwrights Default-Textmatch ist
+// case-insensitiv und Substring-basiert, womit Szenario 3 („mehl" -> „Mehl") nicht messbar wäre.
+test.describe('US904_EdgeCase: Zutat reaktivieren', () => {
+  // Szenario: Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese
+  test('US904_EdgeCase_CreateIngredient_SoftDeletedSameName_ReactivatesIngredient', async ({ page, request }) => {
+    // Given: die Zutat "Butter" (g) existiert und wurde gelöscht
+    await seedDeletedIngredientViaApi(request, 'Butter', 'g')
+    await page.goto('/ingredients')
+    await expect(page.getByText('Noch keine Zutaten angelegt.')).toBeVisible()
+
+    // When: ich "Butter" (g) über die UI anlege
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Butter')
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+    // Erfolgspfad: der Dialog schließt – erst danach steht die neu geladene Liste.
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    // Then: "Butter" steht mit Einheit "g" in der Liste – reaktiviert, kein Duplikat-Fehler
+    const list = page.getByTestId('ingredient-list')
+    await expect(list.getByText('Butter', { exact: true })).toBeVisible()
+    await expect(list.getByText('g', { exact: true })).toBeVisible()
+  })
+
+  // Szenario: Reaktivierung übernimmt neue Einheit
+  test('US904_EdgeCase_ReactivateIngredient_NewUnit_ListShowsNewUnit', async ({ page, request }) => {
+    // Given: die Zutat "Butter" mit der ALTEN Einheit "Würfel" existiert und wurde gelöscht
+    await seedDeletedIngredientViaApi(request, 'Butter', 'Würfel')
+    await page.goto('/ingredients')
+    await expect(page.getByText('Noch keine Zutaten angelegt.')).toBeVisible()
+
+    // When: ich "Butter" mit der NEUEN Einheit "g" anlege
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Butter')
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    // Then: die Liste zeigt die NEUE Einheit "g"; die alte "Würfel" ist verschwunden. Ohne die
+    //   zweite Assertion bliebe offen, ob die Reaktivierung den Wert wirklich übernommen hat.
+    const list = page.getByTestId('ingredient-list')
+    await expect(list.getByText('Butter', { exact: true })).toBeVisible()
+    await expect(list.getByText('g', { exact: true })).toBeVisible()
+    await expect(list.getByText('Würfel', { exact: true })).toHaveCount(0)
+  })
+
+  // Szenario: Reaktivierung übernimmt neuen Namen bei abweichender Schreibweise
+  test('US904_EdgeCase_ReactivateIngredient_DifferentCasing_ListShowsNewSpelling', async ({ page, request }) => {
+    // Given: die Zutat "mehl" (kleingeschrieben) existiert und wurde gelöscht
+    await seedDeletedIngredientViaApi(request, 'mehl', 'g')
+    await page.goto('/ingredients')
+    await expect(page.getByText('Noch keine Zutaten angelegt.')).toBeVisible()
+
+    // When: ich "Mehl" (großgeschrieben) anlege – case-insensitiv dieselbe Zutat (ADR-S051-3)
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Mehl')
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    // Then: die Liste zeigt die NEUE Schreibweise "Mehl", nicht mehr "mehl"
+    const list = page.getByTestId('ingredient-list')
+    await expect(list.getByText('Mehl', { exact: true })).toBeVisible()
+    await expect(list.getByText('mehl', { exact: true })).toHaveCount(0)
+  })
+
+  // Szenario: Reaktivierung gelingt auch wenn Zutat parallel mit denselben Daten wiederhergestellt wurde
+  test('US904_EdgeCase_ReactivateIngredient_ParallelRestoreSameData_Succeeds', async ({ page, request }) => {
+    // Given: die Zutat "Koriander" (Bund) existiert und wurde gelöscht
+    const { id } = await seedDeletedIngredientViaApi(request, 'Koriander', 'Bund')
+    // Given: "Koriander" wird parallel durch jemand anderen mit DENSELBEN Daten wiederhergestellt –
+    //   im Fenster zwischen dem 409 des POST und dem Restore des Clients (s. Helper-Kommentar).
+    await restoreInFlightBeforeClientRestore(page, request, id, 'Koriander', 'Bund')
+    await page.goto('/ingredients')
+    await expect(page.getByText('Noch keine Zutaten angelegt.')).toBeVisible()
+
+    // When: ich "Koriander" (Bund) anlege
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Koriander')
+    await page.getByLabel('Einheit').fill('Bund')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+    // Der Vorgang gilt als gelungen: der Dialog schließt wie im ungestörten Fall.
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    // Then: "Koriander" steht mit Einheit "Bund" in der Liste. Die Einheit IST hier vorhersagbar,
+    //   weil der parallele Restore dieselben Werte gesetzt hat – es wurde nichts überschrieben.
+    const list = page.getByTestId('ingredient-list')
+    await expect(list.getByText('Koriander', { exact: true })).toBeVisible()
+    await expect(list.getByText('Bund', { exact: true })).toBeVisible()
+  })
+})
+
+// @US-904-error: run-11 „Reaktivierung", Konfliktfall. Trägt die parallel wiederhergestellte Zeile
+// ABWEICHENDE Daten, würde die eigene Eingabe fremde Werte still überschreiben – der Restore
+// antwortet deshalb 409 und der Nutzer bekommt einen Hinweis, der beide Seiten benennt
+// (ADR-S111-1/S111-3). Der Dialog schließt trotzdem: die Zutat existiert, im Dialog gäbe es nichts
+// zu korrigieren.
+test.describe('US904_Error: Reaktivierungs-Konflikt', () => {
+  // Szenario: Reaktivierung meldet Konflikt wenn die Zutat parallel mit anderen Daten wiederhergestellt wurde
+  test('US904_Error_ReactivateIngredient_ParallelRestoreDifferentData_ShowsConflictHint', async ({ page, request }) => {
+    // Given: die Zutat "Koriander" (Bund) existiert und wurde gelöscht
+    const { id } = await seedDeletedIngredientViaApi(request, 'Koriander', 'Bund')
+    // Given: "Koriander" wird parallel durch jemand anderen mit der ABWEICHENDEN Einheit "Töpfchen"
+    //   wiederhergestellt – im Fenster vor dem Restore des Clients (s. Helper-Kommentar).
+    await restoreInFlightBeforeClientRestore(page, request, id, 'Koriander', 'Töpfchen')
+    await page.goto('/ingredients')
+    await expect(page.getByText('Noch keine Zutaten angelegt.')).toBeVisible()
+
+    // When: ich "Koriander" mit MEINER Einheit "Bund" anlege
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Koriander')
+    await page.getByLabel('Einheit').fill('Bund')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: der Hinweis nennt die eigene Eingabe UND den tatsächlich gespeicherten Stand
+    await expect(page.getByText(
+      "'Koriander' wurde zwischenzeitlich an anderer Stelle wiederhergestellt (z. B. auf einem anderen Gerät). Gespeichert ist 'Koriander' mit der Einheit 'Töpfchen'.",
+    )).toBeVisible()
+    // Then: der Dialog ist geschlossen – es gibt nichts zu korrigieren
+    await expect(page.getByRole('dialog')).toBeHidden()
+    // Then: die Liste zeigt den FREMDEN Stand "Töpfchen", nicht die eigene Eingabe "Bund"
+    const list = page.getByTestId('ingredient-list')
+    await expect(list.getByText('Koriander', { exact: true })).toBeVisible()
+    await expect(list.getByText('Töpfchen', { exact: true })).toBeVisible()
+    await expect(list.getByText('Bund', { exact: true })).toHaveCount(0)
   })
 })

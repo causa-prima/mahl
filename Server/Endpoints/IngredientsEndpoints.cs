@@ -36,7 +36,7 @@ internal static class IngredientsEndpoints
         group.MapPost(
             // Stryker disable once String : Route patterns "/" and "" are treated equivalently by ASP.NET Core routing
             "/",
-            async (CreateIngredientDto dto, MahlDbContext db, HttpContext httpContext) =>
+            async (IngredientValuesDto dto, MahlDbContext db, HttpContext httpContext) =>
                 await dto.ToDomain()
                     .MapError<Ingredient, IReadOnlyList<IngredientValidationError>, IResult>(IngredientMappings.ValidationProblemFor)
                     .BindAsync<Ingredient, IngredientDto, IResult>(async ingredient =>
@@ -52,8 +52,7 @@ internal static class IngredientsEndpoints
                         }
                         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
                         {
-                            return OneOf<IngredientDto, IResult>.FromT1(
-                                IngredientMappings.ValidationProblemFor([IngredientValidationError.NameDuplicate(ingredient.Name.Value)]));
+                            return await IngredientMappings.SoftDeletedOrDuplicateConflict(dbType, ingredient, db);
                         }
                         // ADR-S058-3: der ETag der neu angelegten Zeile geht mit dem 201 heraus, damit ein
                         // Client ihn als If-Match auf ein späteres DELETE/PUT/PATCH mitschicken kann.
@@ -105,19 +104,10 @@ internal static class IngredientsEndpoints
 
         group.MapPost(
             "/{id:guid}/restore",
-            // ADR-S108-2: minimaler Undo-Restore – ohne Body, ohne If-Match (Single-User-App-Ausnahme
-            // von ADR-S058-1). Query ohne DeletedAt-Filter: die DELETE-Query (aktiv-only) taugt hier
-            // nicht, Restore muss gerade die soft-deleted Zeile finden.
-            async (Guid id, MahlDbContext db) =>
-            {
-                var ingredient = await db.Ingredients.FirstOrDefaultAsync(i => i.Id == id);
-                if (ingredient is null)
-                    return IngredientMappings.NotFoundProblem();
-
-                ingredient.DeletedAt = null;
-                await db.SaveChangesAsync();
-                return Results.NoContent();
-            });
+            // ADR-S111-1: Pflicht-Body, ohne If-Match (Single-User-App-Ausnahme, ADR-S058-1 unverändert).
+            // Handler-Logik ausgelagert (IngredientMappings.RestoreIngredient) statt inline lambda – hält
+            // die Cognitive Complexity von MapIngredientsEndpoints niedrig (docs/guidelines/coding-guideline-general.md).
+            IngredientMappings.RestoreIngredient);
     }
 }
 
@@ -132,7 +122,7 @@ file static class IngredientMappings
     // name and unit are validated independently and all errors collected, so both-fields-empty reports both
     // field errors at once. The Bind/Map chain carries the validated values on success; MapError replaces the
     // chain's first error with the full collected set.
-    internal static OneOf<Ingredient, IReadOnlyList<IngredientValidationError>> ToDomain(this CreateIngredientDto dto)
+    internal static OneOf<Ingredient, IReadOnlyList<IngredientValidationError>> ToDomain(this IngredientValuesDto dto)
     {
         var name = ValidateName(dto.Name);
         var unit = ValidateUnit(dto.DefaultUnit);
@@ -194,6 +184,141 @@ file static class IngredientMappings
     internal static IngredientDto ToDto(this Ingredient domain, uint xmin) =>
         new(domain.Id, domain.Name.Value, domain.DefaultUnit.Value, XminETag.Format(xmin));
 
+    // ADR-S108-1: derselbe Zeilen-DTO, hier direkt aus der DB-Zeile gebaut (Restore-Pfade lesen den
+    // Stand einer schon existierenden Zeile, nicht eines frisch validierten Domain-Objekts). Bewusste
+    // Abweichung vom kanonischen Read-Pfad DbType -> ToDomain() -> DTO (ADR-S083-1): der ToDomain()-
+    // Roundtrip würde hier einen ungeübten DB-Inkonsistenz-Fehlerzweig einführen, den kein Szenario fordert.
+    private static IngredientDto ToDto(this IngredientDbType row, uint xmin) =>
+        new(row.Id, row.Name, row.DefaultUnit, XminETag.Format(xmin));
+
+    // ADR-S111-2: Lookup NACH der abgelehnten Insert-Operation (kein Vorab-Check, ADR-S105-2) –
+    // entscheidet nur noch, welche Fehlerantwort rausgeht: 409 (soft-deleted) oder 422 (aktives
+    // Duplikat). Das nicht persistierte Entity hängt sonst als Added im ChangeTracker und würde den
+    // Lookup verfälschen -> Detach. AsNoTracking: die gelesene Zeile wird nicht mutiert.
+    internal static async Task<OneOf<IngredientDto, IResult>> SoftDeletedOrDuplicateConflict(
+        IngredientDbType failedInsert, Ingredient ingredient, MahlDbContext db)
+    {
+        db.Entry(failedInsert).State = EntityState.Detached;
+        // Linke Seite (i.Name.ToLower()) läuft NICHT als CLR-Code – EF Core übersetzt den Ausdruck nach
+        // SQL LOWER(), identisch zum funktionalen Unique-Index (ADR-S105-2/ADR-S051-3). Die rechte Seite
+        // hat keinen Bezug zum Query-Root -> EF Core extrahiert sie als Parameter und wertet sie CLR-
+        // seitig aus, deshalb ToLowerInvariant() statt ToLower(): unter einer Locale mit Sonderregeln
+        // (z.B. tr-TR, punktloses ı) läge ein kulturabhängig ausgewerteter Parameter sonst neben dem
+        // SQL-LOWER() der DB-Collation, der Lookup fände nichts. CA1308 (empfiehlt generell
+        // ToUpperInvariant() statt ToLowerInvariant()) greift hier nicht: die Groß-/Kleinschreibung muss
+        // exakt zur linken, SQL-übersetzten LOWER()-Seite passen – ToUpperInvariant() bräche den Vergleich.
+        // CA1862 bleibt auf beiden Seiten berechtigt: der von CA1862 empfohlene Ersatz
+        // (string.Equals(..., StringComparison.X)) ist hier nicht anwendbar, weil die linke Seite als SQL
+        // LOWER()-Prädikat übersetzt wird – ein StringComparison-Overload übersetzt Npgsql nicht in eine
+        // äquivalente SQL-Klausel.
+#pragma warning disable CA1862
+        var conflicting = await db.Ingredients
+            .AsNoTracking()
+#pragma warning disable CA1304, CA1308, CA1311, MA0011 // linke Seite (i.Name.ToLower()) ist SQL-übersetzt, rechte muss LOWER() spiegeln – s. Kommentar oben
+            .Where(i => i.Name.ToLower() == ingredient.Name.Value.ToLowerInvariant())
+#pragma warning restore CA1304, CA1308, CA1311, MA0011
+            .FirstOrDefaultAsync();
+#pragma warning restore CA1862
+
+        var duplicateProblem = OneOf<IngredientDto, IResult>.FromT1(
+            ValidationProblemFor([IngredientValidationError.NameDuplicate(ingredient.Name.Value)]));
+
+        if (conflicting is null)
+            return duplicateProblem;
+
+        return conflicting.DeletedAt is not null
+            ? OneOf<IngredientDto, IResult>.FromT1(SoftDeletedConflict(conflicting.Id))
+            : duplicateProblem;
+    }
+
+    // ADR-S111-1: Pflicht-Body, validiert über denselben Pfad wie POST (ToDomain()) – die sync
+    // Validierungskette läuft VOR dem DB-Lookup, ein invalider Body liefert also 422 auch für eine
+    // nicht existente id. Kein Widerspruch zu ADR-S000-5s Not-Found-Dominanz: die dortige Abwägung
+    // betrifft Not-Found vs. Precondition (If-Match, ein 412 würde fälschlich Ressourcen-Existenz
+    // suggerieren) – ein 422 redet über den Request-Body, nicht über die Ressource. Query ohne
+    // DeletedAt-Filter: Restore muss sowohl aktive als auch soft-deleted Zeilen finden.
+    // ToDomain() wird hier NUR als Validator genutzt, nicht als Id-Factory: die dabei per
+    // Guid.CreateVersion7() (ADR-S030-1) erzeugte Id des `requested`-Ingredient wird nie gelesen –
+    // beide Restore-Zweige identifizieren die Zeile über den `id`-Routenparameter (`row.Id`).
+    internal static async Task<IResult> RestoreIngredient(Guid id, IngredientValuesDto dto, MahlDbContext db) =>
+        await dto.ToDomain()
+            .MapError<Ingredient, IReadOnlyList<IngredientValidationError>, IResult>(ValidationProblemFor)
+            .BindAsync<Ingredient, IngredientDto, IResult>(async requested =>
+            {
+                var row = await db.Ingredients.FirstOrDefaultAsync(i => i.Id == id);
+                if (row is null)
+                    return OneOf<IngredientDto, IResult>.FromT1(NotFoundProblem());
+
+                return row.DeletedAt is null
+                    ? await RestoreActiveRow(row, requested, db)
+                    : await RestoreSoftDeletedRow(row, requested, db);
+            })
+            .MatchAsync(restored => Results.Ok(restored), error => error);
+
+    // ADR-S111-1: aktive Zeile – exakt-ordinaler Wertevergleich entscheidet Idempotenz (200, kein
+    // Schreibvorgang) vs. Konflikt (409, fremde Werte bleiben unangetastet). Der case-insensitive
+    // Duplikat-Check (ADR-S051-3) beantwortet "ist das dieselbe Zutat", hier zählt nur "sind die
+    // WERTE identisch" – deshalb Ordinal, nicht die case-insensitive Namensgleichheit.
+    private static Task<OneOf<IngredientDto, IResult>> RestoreActiveRow(IngredientDbType row, Ingredient requested, MahlDbContext db)
+    {
+        var xmin = (uint) db.Entry(row).Property("xmin").CurrentValue!;
+        var isUnchanged = string.Equals(row.Name, requested.Name.Value, StringComparison.Ordinal)
+            && string.Equals(row.DefaultUnit, requested.DefaultUnit.Value, StringComparison.Ordinal);
+
+        OneOf<IngredientDto, IResult> result = isUnchanged
+            ? row.ToDto(xmin)
+            : OneOf<IngredientDto, IResult>.FromT1(AlreadyActiveConflict(row.ToDto(xmin)));
+        return Task.FromResult(result);
+    }
+
+    // ADR-S111-1/ADR-S051-4: soft-deleted Zeile – Name/Einheit werden UNBEDINGT aus dem Request
+    // übernommen, unabhängig vom vorherigen Stand. Restore ist seit run-11 ein allgemeiner
+    // Schreib-Endpoint (kein bloßes DeletedAt-Clear mehr) und braucht deshalb dieselbe
+    // Exception-Behandlung wie jeder andere Schreibpfad (Review run-11: RestoreSoftDeletedRow war der
+    // einzige Schreibpfad ohne sie, TD-S106-1 – kein globaler Exception-Handler im Projekt).
+    private static async Task<OneOf<IngredientDto, IResult>> RestoreSoftDeletedRow(IngredientDbType row, Ingredient requested, MahlDbContext db)
+    {
+        row.Name = requested.Name.Value;
+        row.DefaultUnit = requested.DefaultUnit.Value;
+        row.DeletedAt = null;
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        // ADR-S111-1 Parallelfall (Addendum, s. dort): zwei überlappende Restores derselben
+        // soft-deleted Zeile – der Verlierer sah beim Lesen eine gelöschte, beim Schreiben (Gewinner
+        // hat committed) eine bereits aktive Zeile. ReloadAsync holt den committeten Gewinner-Stand
+        // (Name/Einheit/xmin/DeletedAt=null); die Entscheidung 200-idempotent-vs-409-Konflikt
+        // delegiert an RestoreActiveRow, statt sie hier zu duplizieren – sonst bekäme der HÄUFIGSTE
+        // reale Auslöser (Doppelklick auf "Rückgängig", identische Werte) fälschlich einen Konflikt
+        // gemeldet, obwohl ADR-S111-1 dafür 200 verlangt (Zielzustand bereits erreicht).
+        // Nicht deterministisch über HTTP testbar: der Restore nimmt kein If-Match (anders als DELETE,
+        // wo ein bewusst stale If-Match-Wert die 412-Kollision ohne echten Race reproduziert) – das
+        // lesende SELECT und das schreibende UPDATE liegen beide innerhalb DIESES einen Requests, ohne
+        // einen von außen erreichbaren Injektionspunkt dazwischen. Ein echter Task.WhenAll-Race wäre
+        // interleaving-abhängig und damit flaky. Begründete Suppression statt Test, analog ADR-S041-9
+        // (Defensive Guards ohne Test, mit begründeter Unterdrückung) – dieselbe Kategorie: strukturell
+        // erreichbarer, aber von außen nicht kontrollierbarer Zweig.
+        // Stryker disable once Block,Statement : DbUpdateConcurrencyException-Zweig nicht deterministisch über HTTP auslösbar (kein If-Match am Restore, Race liegt innerhalb eines einzelnen Requests)
+        catch (DbUpdateConcurrencyException)
+        {
+            await db.Entry(row).ReloadAsync();
+            return await RestoreActiveRow(row, requested, db);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
+        {
+            // Restore ist seit run-11 ein allgemeiner Schreib-Endpoint auf der eindeutigkeitsbeschränkten
+            // Name-Spalte (ADR-S105-2/ADR-S111-2) – ein Request-Name, der mit einer ANDEREN Zeile
+            // kollidiert, verletzt den Index genauso wie beim POST. Über die aktuelle UI nicht
+            // erreichbar (der Client sendet nur LOWER-gleiche Namen), über die API sehr wohl -> derselbe
+            // 422-Pfad wie POST (ADR-S090-1/ADR-S051-2).
+            return OneOf<IngredientDto, IResult>.FromT1(
+                ValidationProblemFor([IngredientValidationError.NameDuplicate(requested.Name.Value)]));
+        }
+        var xmin = (uint) db.Entry(row).Property("xmin").CurrentValue!;
+        return row.ToDto(xmin);
+    }
+
     // ADR-S051-5/ADR-S054-6: fixe deutsche Meldung + maschinenlesbarer errorCode für den DELETE-404-Fall
     // (nicht vorhanden ODER bereits soft-deleted, ADR-S000-5).
     internal static IResult NotFoundProblem() =>
@@ -209,4 +334,14 @@ file static class IngredientMappings
             detail: "Der If-Match-Header ist ungültig.",
             statusCode: StatusCodes.Status400BadRequest,
             extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["errorCode"] = "INVALID_IF_MATCH" });
+
+    // ADR-S004-1/ADR-S111-2: 409-Body für POST, wenn der Namenskonflikt gegen eine soft-deleted Zeile
+    // geht – der Client orchestriert daraufhin automatisch den Restore mit den eigenen Eingaben.
+    private static IResult SoftDeletedConflict(Guid id) =>
+        Results.Conflict(new { code = "ingredient_soft_deleted", id });
+
+    // ADR-S111-1/ADR-S111-3: 409-Body für den Restore, wenn die Zeile bereits aktiv ist, aber mit
+    // abweichenden Werten – der gespeicherte Stand geht mit, damit der Client ihn benennen kann.
+    private static IResult AlreadyActiveConflict(IngredientDto ingredient) =>
+        Results.Conflict(new { code = "ingredient_already_active", ingredient });
 }
