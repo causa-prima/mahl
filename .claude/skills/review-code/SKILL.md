@@ -98,6 +98,18 @@ Ein Finding gilt als false positive wenn die zitierte Guideline im konkreten Cod
 greift (z.B. agenten-eigene Checkliste widerspricht Projektguideline) oder wenn die Begründung
 durch den Code-Kontext widerlegbar ist. False positives aus dem Report herausnehmen und kurz begründen.
 
+**Scope-Prüfung (Pflicht für jedes verbleibende Finding, in dieser Reihenfolge):**
+
+1. **Trivial umsetzbar?** → sofort mit umsetzen. Aufschieben kostet mehr Verwaltung als der Fix.
+2. **Sonst: gehört das geforderte Verhalten in die aktuelle Phase?** Ist es erst in einer späteren
+   Phase gefordert, wird es **nicht jetzt gebaut**, sondern als Schuld mit Phasen-Auslöser abgelegt.
+
+Grund: Ein Finding umzusetzen, dessen Verhalten kein Szenario der aktuellen Phase fordert, erzeugt
+Code ohne treibendes Szenario – und damit regelmäßig mehr Schuld, als es beseitigt. Real passiert:
+Eine Pending-Sperre wurde aus einem Review-Finding gebaut, ohne dass ein Szenario sie forderte;
+weil Fehler- und Mehrfach-Pfade dieser Sperre nun ungetestet mitliefen, entstanden daraus vier neue
+Schuld-Punkte, darunter eine dauerhaft deaktivierbare Schaltfläche ohne Retry-Weg.
+
 **Ausgabe (strukturierte Liste für den Orchestrator):**
 
 ```

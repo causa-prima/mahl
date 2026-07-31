@@ -16,9 +16,11 @@ kritische-regeln:
 |-----------|--------|------------|
 | Verbotene Muster | Verbotene Muster auf einen Blick (Tabelle) | Als schnelle Referenz ohne vollständiges Lesen |
 | 1. Immutability | readonly, as const, kein direktes Mutieren, Spreading statt push/assign | Beim Erstellen von State oder Datenstrukturen |
-| 2. Branded Types | Branded Type Pattern, Factory Function mit Result-Rückgabe | Beim Modellieren von IDs oder Domain-Konzepten |
+| 2. Branded Types | Branded Type Pattern, nominale Brand-Vergabe an der API-Grenze (keine Regelprüfung) | Beim Modellieren von IDs oder Domain-Konzepten |
 | 3. Discriminated Unions | RequestState-Pattern, exhaustive switch, keine Boolean-Flags | Beim Modellieren von Lade-/Fehler-/Erfolgszuständen |
 | 4. Railway-Oriented Programming | neverthrow ok/err/Result/ResultAsync, .andThen()/.match() | Beim Schreiben von Validierungs- oder API-Verkettungen |
+| 4b. React Query | useResultMutation/useResultQuery, MutationState, QueryCache-Setup | Bei jedem Datenzugriff aus einer Komponente |
+| 4c. Validierung | Backend setzt Domänenregeln durch; Ausnahme für offline-schreibfähige Bereiche | Bevor eine Eingabe oder Zustandsänderung geprüft wird |
 | 5. Pure Functions & Separation | src/domain/ für Logik, src/services/ für API, Komponenten nur UI | Beim Anlegen neuer Dateien oder Funktionen |
 | 6. Test-Code | Was gilt, was ist gelockert (_unsafeUnwrap, as, try/catch in Tests OK) | Beim Schreiben von Frontend-Tests |
 
@@ -71,17 +73,13 @@ Alle `string`/`number`/`uuid`-Werte in Domänen-Modellen als Branded Types kapse
 type RecipeId = string & { readonly __brand: 'RecipeId' };
 type IngredientName = string & { readonly __brand: 'IngredientName' };
 
-// Factory Function (analog zu static Create() in C#)
-// Fehlertyp ist immer ValidationError – kein nackter string (selbstdokumentierend,
-// erweiterbar um code/field ohne Breaking Change)
-function makeRecipeId(value: string): Result<RecipeId, ValidationError> {
-  if (!value || value.trim().length === 0)
-    return err({ message: 'RecipeId darf nicht leer sein' });
-  return ok(value as RecipeId);
-}
+// Brand-Vergabe beim Übergang API-Response -> Domänentyp. Prüft KEINE Regeln (ADR-S112-4).
+const asRecipeId = (value: string): RecipeId => value as RecipeId;
 ```
 
-**Fehlertyp:** Factory Functions geben immer `Result<T, ValidationError>` zurück – **kein `Result<T, string>`**.
+**Der Brand ist nominal, die Factory validiert nicht (ADR-S112-4).** Sie vergibt den Brand und prüft keine Regeln – wo Regeln durchgesetzt werden, regelt der Validierungs-Abschnitt, nicht dieser hier. Zweck des Brands ist allein Typ-Unterscheidbarkeit: Er verhindert, dass gleichartige Strings in einer Signatur vertauscht werden (`restoreIngredient(id, name, defaultUnit)`).
+
+**Fehlertyp:** Prüft eine Factory ausnahmsweise doch Regeln (siehe Validierungs-Abschnitt), gibt sie immer `Result<T, ValidationError>` zurück – **kein `Result<T, string>`**.
 `ValidationError` ist in `src/types/validationError.ts` definiert:
 
 ```typescript
@@ -300,6 +298,31 @@ const queryClient = new QueryClient({
     mutationCache: new MutationCache({ onError: (e) => toast.error('Ein Fehler ist aufgetreten') }),
 });
 ```
+
+---
+
+## 4c. Validierung – wo Regeln durchgesetzt werden
+
+**Das Backend setzt Domänenregeln durch.** Das Frontend baut keine zweite Durchsetzung daneben: Es schickt die Zustandsänderung, wertet die Antwort aus und zeigt die Fehler feldbezogen an. Gemeint sind **Domänenregeln** (Pflichtfeld, Längen, Eindeutigkeit) – nicht die semantische Auszeichnung von Feldern: `required` an einem Eingabefeld gehört zur Barrierefreiheit und bleibt. Im bestehenden Code sichtbar an `formNoValidate` am Absende-Button (`IngredientsPage.tsx`), damit der Browser-Check die Server-Meldungen nicht verdeckt.
+
+**Warum:** Eine Regel an zwei Stellen driftet. E2E schützt davor nur begrenzt – lockert das Backend eine Grenze (Max-Länge 30 → 40), während das Frontend weiter auf 30 prüft, erreicht der Request den Server nie; auffallen würde das nur einem Szenario, das genau das Band 31–40 ausübt.
+
+### Ausnahme: offline-schreibfähige Bereiche
+
+Wo Zustandsänderungen entgegengenommen werden, **ohne dass das Backend erreichbar sein muss**, gibt es keinen Server, der ablehnen könnte. Eine erst beim Sync abgelehnte Änderung trifft den Nutzer Stunden später, wenn er sie nicht mehr korrigieren kann. Dort validiert das Frontend selbst.
+
+Zwei Problemklassen, die **nicht** vermischt werden dürfen:
+
+| Klasse | Beispiel | Zuständig |
+|--------|----------|-----------|
+| Nebenläufigkeits-Konflikt | Jemand löscht online, was hier offline geändert wird | ADR-S000-13 (Last-Write-Wins mit Nutzer-Transparenz) – **keine** Validierungsfrage |
+| Invarianten-/Validierungsverstoß | Zwei Einträge gleichen Namens, Ad-hoc-Eintrag ohne Namen | lokal abfangen, soweit möglich |
+
+**Grundlage der lokalen Prüfung** ist ein lokaler Cache der **aktiven** Daten (nichts soft-deleted). Reicht der Platz nicht, wird nur der benötigte Ausschnitt gehalten; reicht auch das nicht, ist die Regel lokal nicht prüfbar und es bleibt bei einer Sync-Fehlerbehandlung.
+
+**Vollständigkeit ist nicht das Ziel.** Der lokal duplizierte Regelsatz darf Abkürzungen nehmen und komplexe Sonderfälle auslassen, solange diese keine erwartbaren Standardfälle sind.
+
+> **Richtwerte – vorläufig, mit US-306 festzulegen, keine beschlossenen Grenzen:** Cache-Größe in der Größenordnung 100 MB; duplizierter Regelcode unter ~200 LOC. Beide Zahlen sind ungeprüfte Anhaltspunkte und ausdrücklich nicht als Gate zu zitieren.
 
 ---
 

@@ -10,6 +10,18 @@ builder.Services.AddDbContext<MahlDbContext>(options =>
 
 var app = builder.Build();
 
+// Bewusst KEIN globaler Exception-Handler / ProblemDetails-Fallback im SKELETON. Was ohne ihn
+// passiert, ergibt sich allein aus Framework-Defaults – hier dokumentiert, weil es sonst nirgends
+// im Code sichtbar ist (verifiziert an learn.microsoft.com, "Handle errors in ASP.NET Core"):
+//   Development: WebApplication.CreateBuilder aktiviert die Developer Exception Page AUTOMATISCH,
+//                ohne UseDeveloperExceptionPage()-Aufruf. Eine unbehandelte Exception liefert dort
+//                Stack-Trace und Quellcode-Ausschnitte im Response-Body. Development wird nur in
+//                Properties/launchSettings.json gesetzt (lokaler Start), nie in einem Deployment.
+//   Production:  Kestrel beantwortet die Exception mit 500 OHNE Response-Body – kein Leak.
+// ADR-S112-1: Ab MVP gehört hierhin ein UNBEDINGT (nicht umgebungsabhängig) registrierter
+// UseExceptionHandler, der unbehandelte Exceptions generisch auf RFC-7807-ProblemDetails mappt
+// und den Stack-Trace serverseitig LOGGT statt ihn auszuliefern. Damit verschwindet der
+// Umgebungs-Zweig oben – und E2E übt denselben Fehlerpfad aus wie Produktion.
 app.UseCollectionETag();
 app.MapIngredientsEndpoints();
 

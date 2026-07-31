@@ -218,6 +218,27 @@ Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und pe
 
 ---
 
+### ADR-S112-1: Fehlerantworten sind umgebungsunabhängig – `UseExceptionHandler` wird unbedingt registriert
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:error-handling, http:500, testing:integration
+
+**Kontext/Problem:** ASP.NET registriert die Developer Exception Page automatisch als **erste** Middleware, sobald `ASPNETCORE_ENVIRONMENT=Development` ist (MS-Doku „ASP.NET Core middleware": „The project templates automatically register this middleware as the first middleware in the pipeline when the environment is `Development`"). Ohne eigenen Handler ist der Fehlerpfad damit umgebungsabhängig: Development liefert Stack-Trace und Quellcode-Ausschnitte im Body, jede andere Umgebung einen 500 **ohne** Body (Kestrel). Das ist doppelt unangenehm. (1) Die E2E-Suite läuft als Umgebung `E2E` und übt damit nie den Pfad aus, der in Produktion liefe – umgebungsabhängiges Verhalten ist per Konstruktion nicht E2E-testbar. (2) Ein Deployment mit versehentlich gesetztem `Development` leakt technische Details.
+
+**Entscheidung:** `UseExceptionHandler` wird in `Server/Program.cs` **unbedingt** registriert – ausdrücklich nicht in einem `if (!IsDevelopment())`. Er mappt unbehandelte Exceptions generisch auf RFC-7807-ProblemDetails ohne technische Details und **loggt** den Stack-Trace serverseitig. Im Fehlerpfad existiert damit kein Umgebungs-Zweig mehr.
+
+**Begründung:** Der explizit registrierte Handler liegt **innerhalb** der Developer Exception Page (die als erste Middleware außen sitzt) und fängt die Exception daher zuerst – nach außen propagiert nichts mehr, die Dev-Seite kommt nie zum Zug. Ein Verhalten ohne Umgebungs-Zweig ist in *jeder* Umgebung dasselbe; damit übt E2E denselben Pfad aus wie Produktion, und die Umgebungs-Divergenz **verschwindet, statt getestet werden zu müssen**. Der Stack-Trace geht nicht verloren, er wandert ins Log – so von `docs/process/nfr.md` (Sektion Security) gefordert.
+
+**Verworfen:**
+- **Handler nur außerhalb Development** (`if (!IsDevelopment())`) – erhält genau den Umgebungs-Zweig, der das Problem ist, und lässt den Leak-Pfad bestehen.
+- **Nur dokumentieren, dass Development nicht deployt wird** – Konvention statt Konstruktion; verlässt sich auf Disziplin.
+
+**Kosten:** Lokal keine Developer Exception Page im Browser; der Stack-Trace steht im Server-Log. Bewusst akzeptiert – einheitliches, testbares Verhalten wiegt schwerer als der Debug-Komfort.
+
+**Grenze / offen:** Das „Log", in das der Stack-Trace wandern soll, **existiert als gestaltete Senke noch nicht**: `appsettings.json` hat keine `Logging`-Sektion, im Backend gibt es keine `ILogger`-Nutzung, und `nfr.md` kennt keine Observability-Anforderung. Vorhanden ist allein der Framework-Default (Console-/Debug-Provider) – flüchtig, unkonfiguriert. Ein Logging-/Observability-Konzept ist Voraussetzung dafür, dass diese Entscheidung ihren Zweck erfüllt, und muss vor der Umsetzung geklärt sein. – Die Reihenfolge-Semantik (expliziter Handler schlägt Developer Page) ist aus der MS-Doku **abgeleitet, nicht empirisch geprüft** – beim Umsetzen mit einem Integrationstest verifizieren. Der Test soll die Zusicherung über **alle** registrierten Umgebungen fahren (`WebApplicationFactory.UseEnvironment(...)`, Umgebungsliste aus ADR-S112-2); er ist dabei kein Vollständigkeitsbeweis, sondern Regressionswächter gegen ein später eingeführtes `if (IsDevelopment())`. Umsetzung ab MVP, weil der tragende Security-NFR ab MVP gilt.
+
+---
+
 ## Ingredients-Endpoints
 
 ### ADR-S004-1: POST /api/ingredients – 409 bei soft-deleted: strukturiertes Objekt + Client-Orchestrierung
@@ -868,6 +889,8 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Entscheidung:** Die Einkaufsliste orientiert sich am UX-Muster von Bring! – Kachel-Layout mit Icon (Strichzeichnung) und zweizeiligem Text (Name inkl. Modifizierer + Menge). Dieses Designprinzip gilt ab SKELETON, nicht erst ab V1.
 
+**Begründung:** Bring! ist im Familienshopping-Kontext etabliert und auf Touch-Geräten gut bedienbar. US-304 (Visuelle Darstellung & Varianten) wurde aufgelöst, weil das Layout kein Feature-Increment ist, sondern ein Designprinzip – die Kachel-Entscheidung fällt einmalig und ist kein eigenständiges Implementierungsticket.
+
 ---
 
 ### ADR-S083-2: useResultQuery/useResultMutation – minimale Modellierung (YAGNI), volle Union aufgeschoben
@@ -887,7 +910,24 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Addendum (run-2, "Speichern-Button deaktiviert während des Speicherns"):** Der `pending`-Teil der oben aufgeschobenen Erweiterung wird **minimal** eingelöst: `useResultMutation` liefert neu ein 3-Tupel `[mutate, error, isPending]`, wobei `isPending = mutation.isPending` (React Query). **Keine** volle `MutationState`-Union, **kein** `matchState`, **kein** `throwOnError` – die Begründung von oben gilt unverändert für diese Teile, weil `throwOnError` weiterhin `QueryCache.onError` voraussetzt (existiert noch nicht) und die volle Union weiterhin unausgeübte `idle`/`error`-Zweige erzeugen würde. Die volle Union + `matchState` + `throwOnError` bleiben mit den @US-904-error/resilience-Szenarien aufgeschoben.
 
-**Begründung:** Bring! ist im Familienshopping-Kontext etabliert und auf Touch-Geräten gut bedienbar. US-304 (Visuelle Darstellung & Varianten) wurde aufgelöst, weil das Layout kein Feature-Increment ist, sondern ein Designprinzip – die Kachel-Entscheidung fällt einmalig und ist kein eigenständiges Implementierungsticket.
+---
+
+### ADR-S112-4: Domänenregeln setzt das Backend durch; Frontend-Brands sind nominal
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, frontend:typescript, arch:validation, story:us-306
+
+**Kontext/Problem:** `coding-guideline-typescript.md` §2 verlangte Branded Types mit **validierender** Factory (Beispiel `makeRecipeId` mit Nicht-leer-Prüfung). Der Code geht seit S083 einen anderen Weg: `formNoValidate` am Speichern-Button schaltet die Browser-Durchsetzung ab, damit die Server-Meldungen sichtbar bleiben (`IngredientsPage.tsx`); durchgesetzt wird allein in `IngredientsEndpoints.ToDomain` (ADR-S051-3). Die Guideline hätte den nächsten Umsetzer also in eine zweite Regel-Durchsetzung im Frontend geführt. Zugleich trugen die Frontend-Domänentypen (`Ingredient`, `NewIngredient`) vier nackte `string`-Felder, obwohl §2 Kapselung fordert – die Guideline wurde in beide Richtungen nicht befolgt.
+
+**Entscheidung:** Die Guideline wird **angepasst statt kommentiert**. §2 beschreibt Brands ab jetzt als rein **nominal** (Vergabe an der API-Grenze, keine Regelprüfung); der neue **§4c** trägt die Validierungs-Regel samt Ausnahme für Bereiche, in denen Zustandsänderungen ohne erreichbares Backend entgegengenommen werden. Die operative Regel steht dort, nicht hier.
+
+**Begründung:** Eine Guideline, deren Beispiel dem gelebten Code widerspricht, ist die Fehlerquelle – eine ADR, die bloß die Abweichung erklärt, würde sie dauerhaft konservieren. Nominale Brands kosten fast nichts und tragen trotzdem: `restoreIngredient(id, name, defaultUnit)` reiht drei gleichartige Strings aneinander, der Compiler fängt Vertauscher ohne einen einzigen Test. Die Offline-Ausnahme folgt nicht aus Bequemlichkeit, sondern aus der Abwesenheit des Servers.
+
+**Verworfen:** Validierende Factories im Frontend als Normalfall – sie duplizieren ADR-S051-3, und E2E deckt Drift in Richtung Lockerung nicht auf: Ein Szenario müsste genau das freigewordene Wertband ausüben, sonst bleibt die zu strenge Frontend-Regel unbemerkt.
+
+**Umfang zum Zeitpunkt der Entscheidung:** Einzig offline-schreibfähiger Bereich ist die Einkaufsliste (US-306, MVP; `docs/stories/szenario_3_einkauf.md`: „Alle Lese- und Schreiboperationen funktionieren offline"). §4c nennt diese Zuordnung bewusst **nicht**, weil sie sich mit dem Funktionsumfang ändert – dort steht das Kriterium, hier der Stand.
+
+**Grenze / offen:** In der Offline-Ausnahme liegen Regeln zwangsläufig doppelt vor. Wie die Duplikate gegen Drift gesichert werden – geteiltes Artefakt, Vertragstest oder bewusst getragenes Restrisiko bei minimalem Regelsatz – ist **offen** und mit US-306 zu entscheiden. Die Richtwerte in §4c (Cache-Größenordnung, LOC-Budget) sind ungeprüfte Anhaltspunkte, keine beschlossenen Grenzen.
 
 ---
 
@@ -1285,6 +1325,83 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 **Mutation-Testing:** `E2ETestSupport.cs` ist aus der Backend-Stryker-`mutate`-Liste ausgeschlossen (analog `Program.cs`-Bootstrap) – E2E-only-Scaffolding, das von den Backend-Unit-Tests nicht ausgeführt wird und keine Domänen-/Applikationslogik trägt; seine Korrektheit wird von der E2E-Suite selbst belegt (die loud `expect(status).toBe(204)`-Reset-Assertion im `beforeEach`).
 
 **Grenze / offen:** Reset ist per-Test bei Single-Worker (aktuelle Config). Seed-Daten (später): idempotenter Insert nach dem Truncate im Reset-Endpoint.
+
+---
+
+### ADR-S112-2: E2E erbt die Produktions-Konfiguration; Umgebungsnamen sind allow-gelistet
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:e2e, tooling:build
+
+**Kontext/Problem:** E2E läuft als eigene Umgebung (`ASPNETCORE_ENVIRONMENT=E2E`, ADR-S084-4 Addendum). Jede Konfigurationsabweichung zwischen E2E und Produktion ist damit ein blinder Fleck: Ein grüner E2E-Lauf sagt über Produktion nur so viel aus, wie beide Konfigurationen übereinstimmen. Der Ist-Zustand ist gut – `appsettings.E2E.json` überschreibt ausschließlich den Connection-String, eine `appsettings.Production.json` existiert gar nicht – beruhte aber allein auf Disziplin und war nirgends festgehalten.
+
+**Entscheidung:**
+1. **Layering:** Alles Gemeinsame steht in `appsettings.json`. Umgebungsspezifische Dateien enthalten **nur Abweichungen**, und zwar nur pfad-artige (Connection-String, Log-Ziele). Jede weitere Abweichung braucht eine Begründung mit ADR-Bezug.
+2. **Prüfung:** Ein Test hält die Schlüssel der umgebungsspezifischen Dateien gegen eine Allow-Liste; ein nicht gelisteter Override schlägt fehl.
+3. **Umgebungs-Allow-Liste:** Beim Start prüft die App ihren `EnvironmentName` gegen eine feste Liste und bricht andernfalls mit einer Meldung ab, die die erlaubten Werte nennt. **Dieselbe Liste** treibt die Umgebungs-Aufzählung im Fehlerpfad-Test aus ADR-S112-1.
+
+**Begründung:** Punkt 1 ist gängige Konfigurations-Praxis und macht Divergenz sichtbar statt möglich. Punkt 3 verhindert, dass eine nie getestete Umgebung überhaupt startet, und koppelt Betrieb und Test an eine einzige Quelle – ohne diese Kopplung driften Test-Aufzählung und Realität auseinander. Ein Umgebungs-Tippfehler wird dadurch zum lauten Startabbruch statt zu stiller Divergenz.
+
+**Kosten:** Eine neue Umgebung erfordert eine Code-Änderung (Eintrag in der Liste). Das ist gewollt: Sie landet damit zwangsläufig auch im Test.
+
+**Grenze / offen:** Das schließt **nicht** aus, dass die Konfigurationsdatei einer erlaubten Umgebung im Betrieb verändert wird – dagegen hülfe nur Konfiguration im Code, was für diese Anwendung unverhältnismäßig ist (bewusst gezogene Grenze: keine Höchstsicherheits-Ansprüche, nur keine unnötigen Lücken). Der Startup-Guard muss auch greifen, wenn der Host von Werkzeugen gebaut wird (`dotnet ef`, `WebApplicationFactory`); beide laufen als `Development` und stehen damit auf der Liste – beim Umsetzen **verifizieren**, nicht annehmen. Umsetzung ab MVP gemeinsam mit ADR-S112-1.
+
+---
+
+### ADR-S112-3: E2E fälscht keine Backend-Antworten – Fehlerzustände werden real ausgelöst
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:e2e, arch:error-handling
+
+**Kontext/Problem:** Die `@NFR-resilience`-Szenarien fordern Fehlerzustände (Backend nicht erreichbar, Serverfehler), die im Normalbetrieb nicht auftreten. Die E2E-Suite nutzt `page.route` bisher **ausschließlich** mit `route.continue()` – sie verzögert echte Anfragen, fabriziert aber nie Antworten. Eine Politik dazu fehlte; damit stand bei jedem neuen Fehler-Szenario neu zur Debatte, ob `route.fulfill()` erlaubt ist.
+
+**Entscheidung:**
+1. **In E2E wird nichts gemockt, soweit möglich.** Ein Fehlerzustand wird **real ausgelöst**, nicht als Antwort fabriziert.
+2. **Test-Support-Endpoints** (E2E-only, gegatet wie `/api/test/reset`) sind zulässig, wenn die realen Alternativen unverhältnismäßig wären.
+3. **Muster für Serverfehler:** ein Fault-Endpoint, der **out-of-band** scharfgestellt wird (`POST /api/test/fault` mit einem Matcher für den nächsten Request); der nächste passende Request wirft dann in der **echten** Pipeline. Das Frontend ruft nichts Künstliches auf – es wird ganz normal bedient und trifft den echten Endpoint.
+4. **Nicht herstellbare Vorbedingungen:** Ist eine Zusicherung in Produktion realistisch, im E2E-Harness aber nicht echt herstellbar, wird sie **nicht** per gefälschter Antwort in E2E erzwungen, sondern als Querschnitts-/Infra-Test unterhalb E2E nachgewiesen (Ausnahme aus ADR-S106-3, Ausweispflicht per Kommentar gilt).
+
+**Begründung:** Eine gefälschte Antwort testet den Client gegen eine Erfindung des Tests, nicht gegen das System – und maskiert genau die Abweichungen zwischen simuliertem und echtem Verhalten, die E2E aufdecken soll. Punkt 3 hält die Fälschungsfreiheit auch für Fehlerpfade aufrecht: Echt sind Request, Pipeline, Exception, Antwort, Netzwerkweg und Frontend-Pfad; gestellt ist allein der Zeitpunkt des Auslösers. Punkt 4 verhindert, dass „lässt sich in E2E nicht herstellen" zur Generalvollmacht fürs Mocken wird – die Alternative ist eine Ebene tiefer, nicht eine Fälschung höher.
+
+**Anwendungsfall (S112):** „Die UI zeigt keine technischen Fehlerdetails an, falls der Server doch welche sendet." In Produktion realistisch (Fehlkonfiguration), in E2E nicht herstellbar – der Server sendet dort nach ADR-S112-1 per Konstruktion keine Details. Fällt damit unter Punkt 4: Infra-Test auf Komponentenebene, **kein** Gherkin-Szenario. Ein zwischenzeitlich in `features/resilience.feature` eingefügter Schritt dafür wurde wieder entfernt.
+
+**Verworfen:**
+- **`route.fulfill()` als Normalfall** – billigste, aber unehrlichste Variante; testet gegen eine Erfindung.
+- **Zweiter Stub-Server, der 500 liefert** – wirkt „echter", weil eigener Prozess, umgeht aber denselben Server, dessen Konfiguration geprüft werden soll. Kein Fake (kein Verhalten), nur ein Out-of-Process-Stub.
+- **DB-Container stoppen** – erzeugte zwar einen echten Fehler, reißt aber die geteilte Dev-DB mit ab (`docker-compose.yml`: ein Postgres für `mahl` und `mahl_e2e`) und macht Folgetests kaputt.
+
+**Grenze / offen:** Für „Backend nicht erreichbar" (F-NET) bleibt die Umsetzung offen; sie wird mit der Offline-Funktionalität entschieden (dann bevorzugt über einen Proxy, der die Verbindung real unterbricht). „Sitzung abgelaufen" (`@NFR-resilience-auth`) wird mit der Auth-Arbeit entschieden und braucht dann entweder eine begründete Konfigurations-Abweichung nach ADR-S112-2 (kurze Token-Lebensdauer) oder ein Test-Support-Mittel nach Punkt 2.
+
+---
+
+### ADR-S112-5: Querschnitts-Verhalten wird durch geteilte Implementierung garantiert, nicht durch wiederholte Szenarien
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:e2e, frontend:react, arch:testing
+
+**Kontext/Problem:** Verhalten wie Pending-Sperren, Undo-Toast oder Fokusführung ist nicht feature-spezifisch – es soll in **jeder** Liste und auf **jeder** Seite gleich sein. Die Konvention der Querschnitts-Feature-Dateien (`resilience.feature`, `interaction.feature`) lautet „eine Seite als Vertreter". Ein Vertreter belegt das Verhalten aber nur für seine eine Instanz; was die übrigen Seiten tun, ist damit nicht gesichert. Solange genau **eine** Liste existiert, fallen Vertreter und Gesamtheit zusammen – die Lücke entsteht erst mit der zweiten Seite (US-602).
+
+**Entscheidung – vier Schichten, jede mit eigener Aufgabe:**
+
+| Ebene | Mittel | Leistet |
+|-------|--------|---------|
+| Implementierung | geteilte Komponente/Hook (`useDeleteWithUndo<T>`, `<PendingButton>`) | verhindert Drift **durch Konstruktion** |
+| Umgehungsschutz | Import-Guard (ESLint `no-restricted-imports`) | verhindert, dass Verhalten danebengebaut wird |
+| Nachweis | eine Testsuite, parametrisiert über ein Page-Object-Interface je Seite | belegt Gleichverhalten dort, wo Konstruktion es nicht erzwingt |
+| Geltungsbereich | Fähigkeits-Deklaration je Seite | nicht jede Seite zeigt jedes Querschnittsverhalten – jede deklariert, welche Verträge für sie gelten |
+
+**Migrationsreihenfolge:** (1) Querschnitts-Szenarien identifizieren – erledigt S112. (2) Page-Object-Interface definieren. (3) Bestehende Tests in die parametrisierte Suite überführen. (4) Implementierung extrahieren. (5) Szenarien umziehen + umtaggen + Tests umbenennen. (6) Import-Guard setzen. **(2) und (3) sind vor der zweiten Seite machbar und werden vorgezogen** – sie strukturieren nur Testcode und erzeugen keine verfrühte Abstraktion im Produktionscode. (4) bis (6) gehören an die zweite Seite; (5) reist mit (4), damit Testnamen nur einmal angefasst werden.
+
+**Verworfen:** *Szenario je Seite ohne geteilte Suite* – N-facher Aufwand, wächst mit jeder Seite und **entdeckt** Drift, statt ihn zu verhindern; genau das, was ADR-S103-1 für Navigation vermeiden wollte. *Konvention/Checkliste als alleinige Absicherung* – hängt daran, dass jemand liest und anwendet.
+
+**Quellenlage (in S112 geprüft, mit unterschiedlichem Ergebnis):**
+- *Shared Examples* – **belegt** (rspec.info): „Shared examples let you describe behaviour of classes or modules"; das Doku-Beispiel lässt eine Gruppe gegen `Array` **und** `Set` laufen. Das ist die Nachweis-Schicht unter ihrem etablierten Namen.
+- *Architectural Fitness Function* – **belegt** (Thoughtworks Radar): „provides an objective integrity assessment of some architectural characteristics"; popularisiert in *Building Evolutionary Architectures*. Das ist die Umgehungsschutz-Schicht.
+- *Page Object* – Definition **belegt** (martinfowler.com), die Verwendung als Parametrisierung für seitenübergreifende Testwiederverwendung jedoch **nicht**: Der Artikel behandelt das gegenteilige Anliegen. Diese Kombination ist eine Ableitung dieses Projekts, keine zitierbare Lehrmeinung.
+- *„Contract Test"* wurde als Bezeichnung **verworfen** – Fowlers `ContractTest` prüft Test-Doubles gegen einen echten externen Service und meint etwas anderes.
+- *Meszaros' „Abstract Test Case"* – **ungeprüft**, xunitpatterns.com ist nur über HTTP erreichbar.
+
+**Grenze / offen:** Für `@CROSS-...`-Szenarien fehlt eine Testnamens-Konvention – `docs/process/e2e-testing.md` (Traceability) kennt nur US-Tags und verlangt sie in `:146` sogar ausdrücklich. Das betrifft bereits die vorhandenen `interaction.feature`-Szenarien und wird mit Schritt (5) entschieden.
 
 ---
 

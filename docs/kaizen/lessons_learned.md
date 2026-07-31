@@ -133,3 +133,19 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Review-Findings wurden als „Fix" behandelt und damit implizit von der Outside-In-Pflicht ausgenommen; ein Auditor hatte das fehlende Szenario sogar gemeldet, es wurde aber als ⚠️ eingeordnet statt als Prozessverstoß. Dass der Test einen US-Tag trug, verdeckte die Lücke zusätzlich.
   Regel: Ein Review-Fix, der **beobachtbares Nutzerverhalten** ändert, braucht dasselbe Gherkin-Fundament wie geplante Funktionalität – erst Szenario, dann Test, dann Code. „Kommt aus einem Review-Finding" ist kein Ausnahmegrund.
   Bezug: OBS-S108-2
+
+## Session 112 – 2026-07-31
+
+- **[MITTEL] [PROZESS] [Doku] LL-S112-1 – Gerade diagnostizierten Trigger-Defekt wenige Schritte später selbst reproduziert**
+  Quelle: User
+  Was: Beim Durchgang durch `docs/tech-debt.md` wurden in Batch A mehrere Einträge als „Phantom-Trigger" identifiziert und korrigiert – Auslöser, die nie eintreten („eigene UX-Foundation-Aufgabe") oder verfallen sind, ohne je gefeuert zu haben („mit run-4"). Wenige Schritte später schrieb der Orchestrator beim Neufassen von TD-S083-2 in Batch B erneut einen Eintrag mit ausformulierter Behebung und ohne jeden Auslöser; der User musste nachfassen: „was ist denn nun der Trigger?".
+  Warum: Die Eintrags-Vorlage definiert ein einziges Feld als „geplante Behebung **oder** auslösende Bedingung". Wer die Behebung ausformuliert, hat die Vorlage formal erfüllt – das Fehlen des Auslösers erzeugt keine sichtbare Lücke. Das kurz zuvor gewonnene Wissen über das Muster reichte nicht, um es im eigenen Text zu bemerken.
+  Regel: Ein gerade diagnostiziertes Muster schützt nicht davor, es selbst zu wiederholen – solange die Vorlage den Fehler zulässt, ist die eigene Aufmerksamkeit die schwächste Absicherung. Beim Schreiben eines Schuld-Eintrags **Behebung und Auslöser getrennt beantworten**, auch wenn das Feld beides zusammenfasst, und den Auslöser daran prüfen, ob ein konkretes Ereignis ihn auslöst.
+  Bezug: OBS-S112-1
+
+- **[MITTEL] [PROZESS] [Doku] LL-S112-2 – Dreimal eine Struktur geändert, ohne vorher deren dokumentierte Regeln zu lesen**
+  Quelle: User
+  Was: Drei Vorschläge des Orchestrators musste der User zurückweisen, jeweils aus demselben Grund. (1) Das Feld „Behebung/Trigger" in `tech-debt.md` wurde in zwei Felder aufgesplittet – das Eintrags-Format steht im Kopf-Kommentar derselben Datei und wurde nicht gelesen. (2) Der Begriff „als Workshop-Input aufnehmen" wurde ab Batch A wiederholt verwendet, ohne zu prüfen, ob der `gherkin-workshop` `tech-debt.md` überhaupt liest – er tut es nicht, die Skill-Datei enthält kein einziges Vorkommen. (3) Eine ADR sollte eine Abweichung von einer Guideline erklären, statt die Guideline zu korrigieren – der User wies darauf hin, dass die Guideline damit dauerhaft falsch bliebe.
+  Warum: In allen drei Fällen wurde auf eine **angenommene** Struktur gebaut statt auf die dokumentierte, obwohl die Regel jeweils in Reichweite lag (Datei-Header, Skill-Datei, die Guideline selbst). Der Auslöser war jedes Mal Schreibdruck: Die Struktur wurde erst beim Schreiben mitgedacht, nicht davor geprüft.
+  Regel: Bevor eine Struktur geändert oder ein Mechanismus in Anspruch genommen wird, dessen Regeln woanders stehen – Eintrags-Format, Skill-Schritt, Konvention –, **erst die Quelle lesen, dann schreiben**. Der Test ist billig: „Wo steht, dass es so funktioniert?" Lässt sich das nicht in einem Satz mit Fundstelle beantworten, ist es eine Annahme.
+  Bezug: OBS-S112-7

@@ -100,7 +100,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: PROZESS    Kontext: gherkin-workshop / scenario-clustering
-- Beobachtung: Dass run-10 den **ersten mutierenden Single-Resource-Endpoint** (DELETE) einführt und damit die Querschnitts-Policy ETag/If-Match/Optimistic-Concurrency (ADR-S058-1/-3) auslöst, wurde nicht in der Run-/Szenario-Planung sichtbar, sondern kam erst als PLANUNG-Eskalation des Backend-Subagenten mitten in der Implementierung hoch → mehrrundige Design-Diskussion über Scope (ETag jetzt vs. aufschieben), die vorab hätte eingeplant werden können. Verallgemeinert: Wenn ein Run den ERSTEN Endpoint eines Typs einführt (erster Single-Resource-Mutator; erste zweite Seite → Navigation; …), zieht das eine Querschnitts-Policy nach, die die feature-orientierte Clusterung nicht abbildet.
+- Beobachtung: Dass run-10 den **ersten mutierenden Single-Resource-Endpoint** (DELETE) einführt und damit die Querschnitts-Policy ETag/If-Match/Optimistic-Concurrency (ADR-S058-1/-3) auslöst, wurde nicht in der Run-/Szenario-Planung sichtbar, sondern kam erst als PLANUNG-Eskalation des Backend-Subagenten mitten in der Implementierung hoch → mehrrundige Design-Diskussion über Scope (ETag jetzt vs. aufschieben), die vorab hätte eingeplant werden können. Verallgemeinert: Wenn ein Run den ERSTEN Endpoint eines Typs einführt (erster Single-Resource-Mutator; erste zweite Seite → Navigation; …), zieht das eine Querschnitts-Policy nach, die die feature-orientierte Clusterung nicht abbildet. **Zweite Ausprägung (S112), Szenario-Autorenschaft statt Run-Planung:** Dieselbe fehlende Unterscheidung trifft die Frage, in welche Feature-Datei ein Szenario gehört. Der Workshop läuft je User Story und legt Szenarien in der Story-Feature-Datei ab; für Querschnitts-Verhalten gibt es genau **eine** hartkodierte Ausnahme (Checklisten-Zeile „Erreichbarkeit (Navigation)" → `features/navigation.feature`, ADR-S103-1). Eine allgemeine Regel, wann ein entdecktes Verhalten querschnittlich ist und eine eigene Feature-Datei bekommt, existiert nicht. Folge in S112: Löschen-mit-Undo, Pending-Sperren und Toast-Bedienbarkeit landeten als US-904-Verhalten in `ingredients.feature`, obwohl keines davon zutatenspezifisch ist – sie wären in jeder Liste identisch zu fordern. Zusatzproblem, das die Ausnahme mitbringt: Eine querschnittliche Feature-Datei nutzt laut eigener Konvention „eine Seite als Vertreter" – wodurch gesichert ist, dass sich die übrigen Seiten ebenso verhalten, ist nirgends festgelegt.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S106-1
 
@@ -270,7 +270,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: PROZESS    Kontext: Gherkin
-- Beobachtung: Die Vollständigkeits-Checkliste in `.claude/skills/gherkin-workshop/SKILL.md` (Zeilen ~155-157) fragt „Nach erfolgreicher Aktion", „Abbrechen" und „Feld-Initialisierung" ab – durchgehend dialog- und formularzentriert. Für transiente Feedback-Elemente (Toast/Snackbar) fragt sie nichts: weder Lebensdauer, noch wodurch sie verschwinden, noch was bei mehrfacher Auslösung kurz hintereinander passiert. „Klick außerhalb" kommt vor, aber nur als Abbrechen-Pfad eines Dialogs. In run-8 führte das dazu, dass der Undo-Toast als einzige Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5) ohne jedes Szenario zu seinem Verhalten implementiert wurde. Erst der Review deckte drei beobachtbare Verhaltensaspekte auf, für die Szenarien fehlten (Klick daneben schließt den Toast; zweiter Toast erbt die Restlaufzeit des ersten und verkürzt das Undo-Fenster; nur der letzte Löschvorgang ist rückgängig). Zwei davon waren bereits implementiertes Verhalten ohne Spec, einer ein realer, im Browser reproduzierter Bug. Die Szenarien wurden nachträglich ergänzt – also in umgekehrter Reihenfolge zum Outside-In-Prinzip (ADR-S041-5). Aufgefallen ist die Lücke dem User, nicht dem Workshop und nicht den Review-Agenten.
+- Beobachtung: Die Vollständigkeits-Checkliste in `.claude/skills/gherkin-workshop/SKILL.md` (Zeilen ~155-157) fragt „Nach erfolgreicher Aktion", „Abbrechen" und „Feld-Initialisierung" ab – durchgehend dialog- und formularzentriert. Für transiente Feedback-Elemente (Toast/Snackbar) fragt sie nichts: weder Lebensdauer, noch wodurch sie verschwinden, noch was bei mehrfacher Auslösung kurz hintereinander passiert. „Klick außerhalb" kommt vor, aber nur als Abbrechen-Pfad eines Dialogs. In run-8 führte das dazu, dass der Undo-Toast als einzige Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5) ohne jedes Szenario zu seinem Verhalten implementiert wurde. Erst der Review deckte drei beobachtbare Verhaltensaspekte auf, für die Szenarien fehlten (Klick daneben schließt den Toast; zweiter Toast erbt die Restlaufzeit des ersten und verkürzt das Undo-Fenster; nur der letzte Löschvorgang ist rückgängig). Zwei davon waren bereits implementiertes Verhalten ohne Spec, einer ein realer, im Browser reproduzierter Bug. Die Szenarien wurden nachträglich ergänzt – also in umgekehrter Reihenfolge zum Outside-In-Prinzip (ADR-S041-5). Aufgefallen ist die Lücke dem User, nicht dem Workshop und nicht den Review-Agenten. **Ursache in S112 genau lokalisiert – und weiter reichend als Toasts:** Die Checkliste selbst enthält den passenden Prüfpunkt („Async-Zustände & Sperren während Pending … **alle** konfliktträchtigen Kontrollen, nicht nur der Auslöser"). Ausgeschlossen wird er durch die Anwendbarkeits-Bedingung direkt über der Tabelle: „Prüfe jeden Punkt für jede Operation aus Schritt 0.A, **die ein Formular oder einen Dialog hat**." Löschen und Rückgängig haben weder Formular noch Dialog – Löschen ist ein IconButton in einer Listenzeile, Rückgängig ein Button im Toast. Betroffen sind damit nicht nur transiente Elemente, sondern **jede** Operation, die über Listen-/Zeilen-Bedienelemente ausgelöst wird. In S112 fehlten dadurch drei beobachtbare Verhaltensweisen ohne Szenario: „Rückgängig" ist während des laufenden Wiederherstellens nicht gesperrt, zwei gleichzeitige Löschvorgänge überschreiben sich, und der Toast ist auf Touch-Geräten nicht manuell schließbar.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 
@@ -303,5 +303,89 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: MITTEL    Häufigkeit: häufig
 - Kategorie: PROZESS    Kontext: Agent-Prompt
 - Beobachtung: Schritt 4 („Mechanische Verifikation") ist vollständig darauf aufgebaut, dass der Schicht-Subagent in seinem Return einen frischen `=== VERIFIKATIONS-HASH ===`-Block liefert, den der Orchestrator per `qa-check.py --verify` prüft. Der Skill beschreibt keinen Fall, in dem dieser Return ausbleibt, weil der Subagent-Prozess endet, bevor er antworten konnte. In S110 eingetreten: ein WSL-Absturz beendete Orchestrator und Subagent gleichzeitig; nach dem Neustart lagen fertiger Produktionscode und ein durchgeführter Refactor im Working Tree, aber kein Hash und keine Aussage darüber, welche Schritte noch offen waren. Der Zustand ließ sich nur rekonstruieren, weil der Test-Freigabe-Anker als git-Blob außerhalb des Agentenkontexts persistiert war und der Refactor-Diff sich nachträglich dagegen auditieren ließ. Risiko: Ohne beschriebenen Weg improvisiert jeder Orchestrator anders – im schlechteren Fall wird der Subagenten-Stand ungeprüft übernommen oder der ganze Lauf verworfen und neu begonnen. **Zweiter Vorfall (S111), andere Ursache, neuer Schadenstyp:** Diesmal kein Absturz, sondern das Session-Limit – es beendete Orchestrator und **beide** Nachbesserungs-Subagenten innerhalb weniger Minuten. Der Backend-Agent hatte seine Arbeit vollständig abgeschlossen und alle Checks grün, kam aber nicht mehr zum Absenden; der Frontend-Agent stand im laufenden `qa-check`. Neu gegenüber S110 ist die Art des Schadens: Beide Aufträge trugen die Auflage „keine neue ADR anlegen – melde mir im Return, was dokumentiert gehört". Mit dem Return ging diese Meldung verloren, und im Produktionscode blieb ein Kommentar zurück, der auf ein ADR-Addendum verwies, das nie geschrieben wurde. Dieser tote Verweis wäre in den Commit gegangen; der Verifikations-Hash hätte ihn nicht aufgedeckt, weil Code, Tests und Stryker grün waren, und auch `qa-check` Check 6 nicht, weil die referenzierte ADR-ID existiert – nur der Abschnitt darin nicht. Die Rekonstruktion gelang, weil die Subagenten-Logs vollständig persistiert sind, kostete aber rund 15 Aufrufe, bevor überhaupt feststand, welche Arbeit noch offen war. Bemerkenswert: Die Auflage „keine ADR selbst anlegen, stattdessen im Return melden" macht den Return zur einzigen Brücke für eine Doku-Pflicht – fällt er aus, verschwindet die Pflicht spurlos, während der Code den Verweis darauf behält.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S112-1 – `tech-debt.md`-Feld „Behebung/Trigger" trägt zwei Bedeutungen in einem
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: tech-debt
+- Beobachtung: Die Eintrags-Vorlage im Kopf von `docs/tech-debt.md` definiert das Feld als „<geplante Behebung **oder** auslösende Bedingung>". Ein Eintrag erfüllt die Vorlage damit bereits, wenn er nur beschreibt, *wie* behoben wird – ohne jede Angabe, *wann* das geschehen soll. Beim vollständigen Durchgang durch die Datei in S112 trat das mehrfach auf: Einträge trugen ausformulierte Behebungswege und als Auslöser entweder eine Formulierung, die keinen realen Zeitpunkt benennt („eigene UX-Foundation-Aufgabe", „bei der ersten Härtungs-/Resilience-Aufgabe" – solche Aufgaben stehen in keinem Plan), oder eine, die verfallen war, ohne je gefeuert zu haben („mit run-4", während alle Läufe der Story längst implementiert sind). Im selben Durchgang ist es dem Orchestrator beim Neuschreiben eines Eintrags erneut unterlaufen, obwohl das Muster kurz zuvor besprochen worden war. Risiko: Einträge sehen vollständig aus, obwohl niemand einen Zeitpunkt schuldet; sie bleiben unbegrenzt liegen, ohne dass beim Lesen etwas auffällt.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S112-2 – Das Prioritätsfeld in `tech-debt.md` steuert nichts
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: tech-debt
+- Beobachtung: TD-S089-1 trägt seit Session 089 die Priorität „Hoch" samt der Feststellung, dass das Branch-Coverage-Gate aus NFR/DoD dadurch wirkungslos ist. Beim Durchgang in S112 – rund 22 Sessions später – war der Eintrag unverändert und unbearbeitet, und seine technische Beschreibung zeigte auf einen Stack-Stand, den es längst nicht mehr gibt. Dieselbe Form zeigte sich außerhalb der Datei: `npm audit` meldete über mehrere Sessions hinweg Advisories, darunter vier für eine Produktions-Dependency, ohne dass daraus etwas folgte. Gemeinsam ist beiden, dass das Signal korrekt, sichtbar und dauerhaft vorlag – nur folgte keine Handlung. Risiko: Das Feld erzeugt den Eindruck einer Steuerung, die es nicht ausübt; „Hoch" und „Niedrig" unterscheiden sich im Ergebnis nicht.
+- Bezug: OBS-S112-1
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S112-3 – Kein anerkannter Weg für Infrastruktur-Arbeit ohne treibendes Szenario
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: TDD
+- Beobachtung: Der Prozess verlangt für jeden Zweig ein ausübendes Szenario – Begründung ausbuchstabiert in TD-S110-1(c): vorab umgesetzt entstünde ein Zweig, den kein Szenario ausübt → Stryker-Survivor → Suppression außerhalb des treibenden Szenarios, genau die Konstellation, die ADR-S083-2 vermeiden will. Für querschnittliche Infrastruktur existiert jedoch keine Kategorie: Ein globaler Exception-Handler, ein Request-Body-Limit oder ein try/finally in einer Middleware werden von keinem Nutzer-Szenario getrieben. In S112 zeigte sich, dass vier solcher Punkte gemeinsam auf eine Aufgabe warteten, die in keinem Plan existiert. ADR-S106-3 kennt eine verwandte Ausnahme (Querschnitts-Protokoll-/Invarianten-Tests ohne US-Tag), sie deckt aber die Tests ab, nicht die Produktionsarbeit, die sie prüfen würden. Risiko: Infrastruktur-Härtung sammelt sich unbegrenzt an, weil der Prozess sie weder verbietet noch einen gangbaren Weg für sie beschreibt.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S112-4 – `eslint-run.py` meldet Fehlschlag bei null Errors
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: dauerhaft
+- Kategorie: TOOLING    Kontext: Wrapper-Scripts
+- Beobachtung: Auf unverändertem `main` endet `python3 .claude/scripts/eslint-run.py` mit „✗ ESLint: 3 Problem(e)" bei **0 Errors** und 3 Warnungen. Die Warnungen sind bewusst so eingestuft: `Client/eslint.config.js` setzt `max-params` und `max-lines-per-function` mit ausbuchstabierter Begründung auf `warn` statt `error`. Der Wrapper macht daraus ein Fehlschlag-Verdikt. Damit widersprechen sich Konfiguration und Werkzeug – entweder sind die Warnungen tolerabel, dann ist das ✗ unzutreffend, oder sie sind es nicht, dann steht die Regel-Einstufung falsch. Risiko: Ein Gate, das im sauberen Ausgangszustand rot ist, verliert seine Signalwirkung; ein echtes neues Problem geht im erwarteten Rot unter.
+- Bezug: OBS-S112-2
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S112-5 – Bash-Allow-Liste hat keinen Weg, eine Dependency-Version zu ändern
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hooks
+- Beobachtung: Die Allow-Liste erlaubt `npm run|audit|outdated|update|ci`. Keiner dieser Befehle kann eine Dependency-Version über die deklarierte Semver-Range hinaus verschieben: `update` bleibt innerhalb der Range, `ci` installiert aus dem Lockfile und schreibt es nicht. In S112 war ein Sprung von `react-router` 7 auf 8 nötig, weil die Advisory-behebende Version außerhalb von `^7` lag; er ließ sich ausschließlich über `# --allow-once` durchführen. Dependency-Aktualisierungen sind kein Einzelfall, sondern wiederkehrende Wartung. Risiko: Der Ausnahmemechanismus wird für Routinearbeit verwendet und stumpft dadurch ab.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S112-6 – Verletzungen geltender Regeln werden als aufschiebbare Schuld geführt
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: tech-debt
+- Beobachtung: Drei Einträge in `docs/tech-debt.md` beschreiben keine bewusst aufgeschobene Schuld, sondern die Verletzung einer bereits geltenden Regel – und wurden trotzdem wie optionale Posten mit weichem Auslöser geführt. TD-S083-2 verletzt die Accessibility-Anforderung „Touch-Targets ≥ 44×44px" aus `nfr.md` und stand als UX-Politur mit dem Auslöser „eigene UX-Foundation-Aufgabe". TD-S083-4 wich von Guideline §2 ab und war als „kein Szenario, YAGNI" eingeordnet. TD-S089-1 hält fest, dass das Branch-Coverage-Gate aus NFR/DoD wirkungslos ist, und lag mit Priorität „Hoch" rund 22 Sessions unbearbeitet. Eine geltende Regel wartet auf keine Bedingung – sie ist erfüllt oder verletzt, und der einzig sinnvolle Zeitpunkt ist „jetzt". Risiko: Die Datei mischt zwei Sorten von Einträgen, deren Dringlichkeit sich grundsätzlich unterscheidet; die dringendere Sorte erbt dabei die Unverbindlichkeit der anderen und wird über viele Sessions mitgeschleppt, während die Anwendung die Regel weiter verletzt.
+- Bezug: OBS-S112-1
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S112-7 – Verweise auf Dokument-Abschnitte sind Prosa und damit nicht maschinell prüfbar
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: TOOLING    Kontext: Doku
+- Beobachtung: Verweise zwischen Projektdokumenten stehen als Prosa – „`coding-guideline-typescript.md` §2", „`nfr.md` Sektion Security", „Checkliste in Schritt 1". Kein Werkzeug kann prüfen, ob das Ziel existiert. In S112 trat das in **beiden** Richtungen auf: Zwei neu geschriebene Abschnitte (E2E-Treue in `e2e-testing.md`, §4c in der TypeScript-Guideline) tauchten im jeweiligen Inhaltsverzeichnis nicht auf und waren damit über den vorgesehenen Einstieg unerreichbar – `implementing-scenario` gibt für `e2e-testing.md` ausdrücklich „TOC zuerst" vor; §4b fehlt dort schon länger unbemerkt. Umgekehrt beschrieb die §2-Zeile im Inhaltsverzeichnis nach einer inhaltlichen Guideline-Änderung weiterhin den alten Stand („Factory Function mit Result-Rückgabe"), ohne dass irgendetwas darauf hinwies. Für volatile IDs (OBS-/TD-/LL-/ADR-) existiert die maschinelle Prüfung bereits – `decisions.py check` fängt tote ADR-Referenzen, `check-ref-direction.py` falschgerichtete –, für Dokument-Abschnitte fehlt das Äquivalent vollständig. Risiko: Verweise sterben unbemerkt in beide Richtungen; ein umbenannter Abschnitt hinterlässt tote Verweise, ein entfernter hinterlässt Verweise ins Leere, und beides fällt erst auf, wenn jemand der Referenz tatsächlich folgt. **Zweite Ausprägung derselben Ursache – erzwungene Nummerierung:** Weil Verweise auf Abschnitts*nummern* zeigen („§2", „§4b"), müssen diese Nummern stabil bleiben. Wächst der Inhalt, entstehen daraus Einschübe statt einer Neunummerierung – in S112 kamen so `4b` und `4c` zwischen `4` und `5` zu liegen. Die Nummer ist damit faktisch zur ID geworden, ohne deren Eigenschaften zu haben: Sie kodiert eine Position, die sich nicht mehr ändern darf, und die Gliederung richtet sich nach der Verweisbarkeit statt nach dem Inhalt. <!-- obs-ok: Die folgende Zielvorstellung stammt vom User als Auftraggeber, nicht aus agentenseitiger Vorwegnahme – sie hier zu tilgen hieße, die Entscheidungsgrundlage des Drains zu verlieren. --> Der User hält echte Markdown-Anker statt Prosa-Verweise für den lohnenswerten Weg, zusammen mit einem Hook plus Script, das bei jedem Schreibvorgang tote Anker meldet und zusätzlich **reversgerichtet** arbeitet: Wird ein Anker entfernt, ist zu prüfen, ob noch Verweise darauf zeigen. Anker sollen kurz bleiben, um vom Text nicht abzulenken – analog zur bestehenden ID-Notation (OBS/TD/LL), für Guidelines etwa `CGT`/`CGC`. Damit entfiele zugleich die Notwendigkeit, Abschnitte überhaupt zu nummerieren: Der Anker trägt die Identität, die Reihenfolge bleibt frei. Der Mehraufwand beim Schreiben gilt als vertretbar.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+---
+
+## OBS-S112-8 – Lösungsfreie OBS-Erfassung erzwingen kostet mehr, als das eigentliche Ziel verlangt
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: Hook/Script
+- Beobachtung: Die Erfassungsregel für neue OBS verbietet jede Lösungsangabe und wird von `check-obs-capture.py` mechanisch durchgesetzt (nur zwei erlaubte Werte im Feld `Entscheidung/Maßnahme`, abschließende Feldliste, Blockade bei Lösungs-Ansagen im Text). Das eigentliche Ziel ist aber enger als die Regel: Beim **Drain** sollen die möglichen Maßnahmen möglichst vollständig und möglichst unvoreingenommen erzeugt und bewertet werden. Die Regel setzt dafür an der Erfassung an – und trifft damit auch Fälle, in denen die Beobachtung vom User kommt und bereits eine konkrete Maßnahme benennt. Dann bleiben nur zwei Wege: die Angabe tilgen (Informationsverlust, die Begründung ist beim späteren Drain nicht mehr rekonstruierbar) oder den `obs-ok`-Marker setzen (Ausnahme wird zur Routine). In S112 trat genau das innerhalb einer Session zweimal auf – bei OBS-S112-7 und bei diesem Eintrag selbst, der die Regel beschreibt, an der er scheitern würde. Risiko: Eine Regel, deren Ausnahme regelmäßig gezogen werden muss, verliert ihre Bindungskraft, und der Marker wird zur Formalie statt zur bewussten Einzelfallentscheidung. <!-- obs-ok: Die folgende Zielrichtung stammt vom User als Auftraggeber, nicht aus agentenseitiger Vorwegnahme – und ihre Tilgung wäre genau der Informationsverlust, den dieser Eintrag beschreibt. --> Der User weist darauf hin, dass die Unvoreingenommenheit des Drains auch anders gesichert werden könnte als über die Erfassung, etwa indem der bewertende Schritt in einem Subagenten läuft, der ausschließlich die dafür nötigen Informationen erhält.
+- Bezug: OBS-S112-7
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 

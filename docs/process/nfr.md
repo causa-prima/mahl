@@ -18,6 +18,7 @@ kritische-regeln:
 | Browser & Device Compatibility | Unterstützte Browser, Viewport-Prioritäten | Bei Frontend-Implementierungen |
 | Security | HTTPS, Hashing, SQL-Injection, XSS, CSRF | Bei Auth/Security-relevantem Code |
 | Reliability | ACID, Offline-Queue, Fehlermeldungen | Bei Fehlerbehandlung oder Offline-Features |
+| Observability | Logging von Fehlern, Ausgabeziel, Abgrenzung zu sensiblen Daten | Bevor Code etwas loggt oder sich auf ein Log beruft |
 | Code-Qualität | Nullable Reference Types, Cyclomatic Complexity, Duplicate Code | Als Hintergrund zu Review-Findings |
 
 > **Wann lesen:** Als Checkliste vor einem PR / Phasen-Abschluss, oder bei Fragen zu Performance/Security/Accessibility.
@@ -125,6 +126,12 @@ Kein WCAG-Compliance-Ziel – aber Best Practices als Nebeneffekt guten Designs:
 - XSS: Framework-Defaults + Content Security Policy
 - CSRF: ASP.NET Core Anti-Forgery Tokens
 - Sensitive Daten nicht loggen
+- Fehlerantworten enthalten keine technischen Details – keine Stack-Traces, internen Pfade
+  oder SQL-Fragmente im Response-Body (ab MVP). Der Stack-Trace **soll** serverseitig geloggt
+  werden (kein Widerspruch zu „Sensitive Daten nicht loggen" – gemeint sind dort Nutzerdaten
+  und Credentials); frei davon bleibt allein die HTTP-Antwort. Das Gegenstück auf Anzeige-Seite
+  steht unter Reliability („Frontend zeigt … keine technischen Stack-Traces") – beide sind
+  nötig: der Server sendet nichts Sensibles, und die UI zeigt nichts an, was doch käme.
 
 ---
 
@@ -134,6 +141,23 @@ Kein WCAG-Compliance-Ziel – aber Best Practices als Nebeneffekt guten Designs:
 - Offline-Queue synchronisiert bei Reconnect (ab MVP)
 - Frontend zeigt nutzerfreundliche Fehlermeldungen, keine technischen Stack-Traces
 - Bei Netzwerk-Fehler: Offline-Bereich zeigt Hinweis, crasht aber nicht
+
+---
+
+## Observability
+
+- **Unbehandelte Exceptions werden serverseitig mit vollständigem Stack-Trace geloggt** (ADR-S112-1).
+  Die HTTP-Antwort bleibt frei davon – siehe Security. Beides gehört zusammen: Der Fehler geht nicht
+  verloren, er geht nur nicht an den Client.
+- **Ausgabeziel ist stdout.** Persistenz, Rotation und Aggregation verantwortet die Laufzeitumgebung
+  (Container-Runtime), nicht die Anwendung – kein selbstverwalteter Dateipfad, keine eigene Rotation.
+- **Abgrenzung zu „Sensitive Daten nicht loggen" (Security):** Dort sind Nutzerdaten und Credentials
+  gemeint. Exception-Meldungen können Eingabewerte mitführen; bei den aktuellen Daten (Zutatennamen,
+  Mengen) ist das unkritisch. **Vor Auth und personenbezogenen Daten neu bewerten.**
+
+**Offen:** Welche Ereignisse über unbehandelte Exceptions hinaus geloggt werden (Requests, DB-Fehler,
+später Auth-Ereignisse) und ob Korrelations-IDs nötig sind – zu entscheiden mit der ersten Aufgabe, die
+Nachvollziehbarkeit über einen einzelnen Request hinaus braucht.
 
 ---
 

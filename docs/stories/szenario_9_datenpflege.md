@@ -40,11 +40,14 @@
 
 *   **US-904 (Zutaten-Verwaltung) [SKELETON]:** Als *Rezept-Sammler* möchte ich neue Zutaten manuell anlegen und bearbeiten (Tags, Basiseinheit), damit ich sie in Rezepten nutzen kann.
     *   **Akzeptanzkriterien (SKELETON-Version):**
-        *   CRUD für Zutaten (Name, Einheit, Tags).
-    *   **Akzeptanzkriterien (MVP-Version – Modifier):**
+        *   Anlegen, Auflisten und Löschen von Zutaten (Name, Einheit). Bearbeiten ist auf MVP verschoben (`docs/reference/skeleton-spec.md`), Tags auf V1.
+    *   **Akzeptanzkriterien (MVP-Version – Bearbeiten + Modifier):**
+        *   Eine Zutat kann bearbeitet werden (`PUT /api/ingredients/{id}` samt Edit-UI).
         *   Pro Zutat können Modifier angelegt und verwaltet werden (z.B. "stückig", "TK", "Dose").
         *   Modifier sind optional – eine Zutat ohne Modifier bleibt gültig.
         *   Gleiche Zutat mit unterschiedlichen Modifiern erzeugt getrennte Einträge auf der Einkaufsliste (konsistent mit US-301).
+    *   **Akzeptanzkriterien (V1-Version – Tags):**
+        *   Zutaten können Tags zugeordnet werden (Grundlage für US-907 Tag-Sortierung und US-901 Tag-Hierarchie).
 
 *   **US-905 (Zutaten-Aliase) [V1]:** Als *Rezept-Sammler* möchte ich Aliase für Zutaten definieren (z.B. "Möhre" -> "Karotte"), um den Import und die Suche robuster zu machen.
     *   **Akzeptanzkriterien:**

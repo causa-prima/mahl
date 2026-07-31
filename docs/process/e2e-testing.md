@@ -16,6 +16,7 @@ kritische-regeln:
 | Outside-In ATDD | Double-Loop TDD, Reihenfolge, Regeln | Vor dem Start jeder User Story |
 | BDD/Gherkin | Feature-Dateien, Given/When/Then, Tags, Namenskonventionen | Beim Schreiben von Feature-Specs |
 | Quality Gate | @US-ID-Tags, CI-Validator, Spec-driven Checklist | Beim Setup von CI oder beim Review |
+| E2E-Treue | Konfigurations-Parität zu Produktion, Mocking-Politik, Test-Support-Endpoints | Bevor ein Fehlerzustand in E2E hergestellt wird |
 | Assertion-Tiefe | Was E2E-Tests prüfen (und was nicht), Full State Assertion | Beim Schreiben von E2E-Test-Steps |
 | Traceability | Bidirektionale Spec↔Test-Verlinkung, Test-Audit | Bei jedem Code-Review |
 
@@ -87,6 +88,19 @@ Ein Feature gilt erst als „Done", wenn sein Gherkin-Szenario grün ist.
 - **Branch/Line-Coverage**: 100% projektübergreifend (alle Schichten: Backend + Frontend + Infrastructure)
 - **Mutation Score**: 100% (Stryker.NET / Stryker-JS) – kein Survivor ohne begründete Suppression
 - **Kein separater Coverage-Gate für E2E allein** – der E2E-Gate ist die Spec-Traceability (alle @US-ID-Szenarien grün)
+
+---
+
+## E2E-Treue: Konfiguration & Mocking
+
+**Konfiguration (ADR-S112-2):** Die E2E-Umgebung erbt die Produktions-Konfiguration. Alles Gemeinsame steht in `appsettings.json`; umgebungsspezifische Dateien enthalten **nur** pfad-artige Abweichungen (Connection-String, Log-Ziele). Jede weitere Abweichung braucht eine Begründung mit ADR-Bezug – ein Test prüft die Schlüssel gegen eine Allow-Liste. Umgebungsnamen sind ebenfalls allow-gelistet: Die App bricht beim Start ab, wenn sie unter einem unbekannten `EnvironmentName` läuft, und dieselbe Liste treibt die Umgebungs-Aufzählung in den Fehlerpfad-Tests.
+
+**Mocking (ADR-S112-3): In E2E wird nichts gemockt, soweit möglich.**
+
+- Fehlerzustände werden **real ausgelöst**, nicht als Antwort fabriziert. `route.fulfill()` ist kein Normalfall.
+- `page.route` mit `route.continue()` (Verzögerung einer echten Anfrage, z.B. um ein Pending-Fenster beobachtbar zu machen) ist davon unberührt – es wird nichts erfunden.
+- **Test-Support-Endpoints** (E2E-only, gegatet wie `/api/test/reset`) sind zulässig, wenn die realen Alternativen unverhältnismäßig wären. Muster für Serverfehler: out-of-band scharfstellen (`POST /api/test/fault` mit einem Matcher), danach ganz normal bedienen – der nächste passende Request wirft in der echten Pipeline. Das Frontend ruft nie einen Test-Endpoint auf.
+- **Vorbedingung in Produktion realistisch, im E2E-Harness aber nicht echt herstellbar?** Dann **nicht** fälschen, sondern eine Ebene tiefer nachweisen: als Querschnitts-/Infra-Test nach der Ausnahme unten (ADR-S106-3), ausweispflichtig per Kommentar. „Lässt sich in E2E nicht herstellen" ist kein Freibrief zum Mocken in E2E.
 
 ---
 
