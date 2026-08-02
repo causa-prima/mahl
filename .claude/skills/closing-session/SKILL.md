@@ -38,9 +38,16 @@ user-invocable: true
 
 3. Dokumentations-Änderungen umsetzen (falls User zugestimmt hat):
    - Dokumente anpassen, dann weiter mit Schritt 4.
-   - **Neue Beobachtungen** (aus dem Beobachtungs-Prompt) → `docs/kaizen/observations.md` schreiben
-     (Format im Header dieser Datei, Status NEU; bei user-gemeldet `Quelle: User`). KEINE Lösung jetzt
-     umsetzen, wenn sie aufgeschoben/nicht-trivial ist – die Retro evaluiert (Evaluierungs-Gate).
+   - **Neue Beobachtungen** (aus dem Beobachtungs-Prompt) → **per Script erfassen**, nicht per Edit:
+     ```
+     python3 .claude/scripts/obs.py add --titel "…" --quelle User --impact MITTEL \
+         --haeufigkeit dauerhaft --kategorie PROZESS --kontext Doku --beobachtung "…"
+     ```
+     Das vergibt die ID, hängt den Eintrag an und setzt das Entscheidungsfeld auf den einzigen bei
+     der Erfassung zulässigen Wert – ein Eintrag kann so nicht in der Form entstehen, die
+     `check-obs-capture.py` blocken müsste. Nebeneffekt: Die Datei muss dafür nicht gelesen werden.
+     KEINE Lösung jetzt umsetzen, wenn sie aufgeschoben/nicht-trivial ist – die Retro evaluiert
+     (Evaluierungs-Gate).
 
 4. `docs/history/sessions/session_NNN.md` – neue Session-Datei anlegen
    Inhalt = **was in dieser Session passierte** (Historie): Implementiertes, Entscheidungen, Probleme, Review-/Subagent-Beobachtungen.
@@ -49,7 +56,14 @@ user-invocable: true
 
 5. `docs/kaizen/lessons_learned.md` – Einträge schreiben:
 
-   Eintrag-Format + Erfassungs-Test + Beispiel: **Header von `docs/kaizen/lessons_learned.md`** (steht beim Schreiben direkt vor dir – kein separates Einlesen nötig). Impact/Kategorie-Definitionen + Reaktionsregeln: `docs/kaizen/process.md`
+   **Per Script schreiben**, nicht per Edit – das vergibt die ID, findet den Session-Abschnitt (oder legt ihn an) und erzeugt die parse-kritische Bullet-Form, die `jenga_score.py` und `retro_report.py` lesen:
+   ```
+   python3 .claude/scripts/lessons.py add --impact HOCH --kategorie PROZESS --kontext Doku \
+       --titel "…" --quelle User --was "…" --warum "…" --regel "…"
+   ```
+   Bestehende Einträge nachlesen: `python3 .claude/scripts/lessons.py get LL-SNNN-N`.
+
+   Eintrag-Format + Erfassungs-Test + Beispiel: **Header von `docs/kaizen/lessons_learned.md`**. Impact/Kategorie-Definitionen + Reaktionsregeln: `docs/kaizen/process.md`
 
    **Andon-Cord:** KRITISCH-Findings wurden bereits behandelt – trotzdem dokumentieren.
 

@@ -1,0 +1,12 @@
+{
+  "_zweck": "Session-ID(-Präfix) → Session-Art für read-breakdown.py. Nur nötig, wo die automatische Erkennung nicht trägt: Logs von vor Einführung des Feldes `attributionSkill` und Sessions ohne jede Aktivität. Diese Zuordnung hat Vorrang vor der automatischen.",
+  "_pruefen": "python3 .claude/scripts/read-breakdown.py --sessions   (Spalte 'Herkunft' zeigt mapping | skill | heuristik)",
+  "_arten": "implementierung | drain | retro | tooling | doku | abschluss | abbruch",
+
+  "1920a809": "abbruch",
+  "41735094": "abbruch",
+  "b0ee9373": "abbruch",
+
+  "08afc860": "abschluss",
+  "49bff6f4": "abschluss"
+}

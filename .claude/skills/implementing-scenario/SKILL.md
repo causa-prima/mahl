@@ -89,22 +89,27 @@ Fragen:
    - `tags` → Übersicht aller Tag-Kategorien
    - `refs` → listet alle `// ADR-SXXX-N`-Kommentare im Code und prüft ob die referenzierten ADRs existieren
 
-   Mechanische Suche (Ergebnisse vollständig in die Subagenten-Message):
+   **`--full` nur auf einen Tag anwenden, der wirklich eingrenzt.** `scope:` tut das nicht – er
+   trägt fast den ganzen Bestand und wächst mit ihm, während der pro Lauf relevante Anteil klein
+   und ungefähr konstant bleibt. Trennschärfe liefern die fachlichen Dimensionen (`arch:`,
+   `http:`, `frontend:`, `db:`, `resource:`); mehrere `--tag` schneiden sich, engen also weiter
+   ein. Prüf im Zweifel erst kompakt, wie viele Treffer ein Filter liefert, bevor du `--full`
+   darauf loslässt.
+
+   Überblick verschaffen – kompakt, nur Kopfzeilen:
    ```
-   python3 .claude/scripts/decisions.py list --tag scope:cross-cutting --full
-   python3 .claude/scripts/decisions.py list --tag story:us-NNN --full    # NNN aus $ARGUMENTS, z.B. story:us-904
+   python3 .claude/scripts/decisions.py tags                    # welche Dimensionen gibt es
+   python3 .claude/scripts/decisions.py list --tag scope:cross-cutting
+   python3 .claude/scripts/decisions.py list --tag story:us-NNN  # NNN aus $ARGUMENTS
    ```
 
-   Eigene Bewertung – intern festhalten, Subagent macht diese unabhängig:
+   Vollständig lesen – nur die Kandidaten, gefiltert über die Dimensionen dieses Laufs:
    ```
-   python3 .claude/scripts/decisions.py tags                              # Überblick Tag-Kategorien
-   python3 .claude/scripts/decisions.py list --tag resource:<X>           # relevante Kategorien listen
-   python3 .claude/scripts/decisions.py get ADR-SXXX-N ADR-SYYY-M ...    # potentiell relevante vollständig lesen
-   # Entscheiden welche davon relevant sind
+   python3 .claude/scripts/decisions.py list --tag arch:<X> --tag http:<Y> --full
+   python3 .claude/scripts/decisions.py get ADR-SXXX-N ADR-SYYY-M ...
    ```
 
    Falls neue Architekturentscheidung nötig: User fragen. Selbst Entschiedenes in `docs/history/adr.md` dokumentieren.
-   Mechanische-Suche-Ergebnisse (`--full`) inklusive der verwendeten Befehle in die Subagenten-Message aufnehmen.
 
 5. **TD-Sichtung & -Entscheidung:** Sieh in `docs/tech-debt.md` nach technischer Schuld, die die von diesem Lauf berührten Code-Bereiche/Dateien betrifft (aus Punkt 2–4: welcher Endpoint/welche UI-Fläche/welche Domain-Typen). Für **jeden** so getroffenen TD-Eintrag *vor* der Umsetzung entscheiden **und schriftlich begründen**:
    - **Mit-erledigen** – nur wenn der Lauf den Code ohnehin anfasst *und* die Behebung kohäsiv + günstig ist (Boy-Scout-Regel, **kein** Gold-Plating; steht im Spannungsfeld zu Punkt 2 – im Zweifel aufschieben). Dann Scope + betroffene TD-ID notieren und im TDD-Zyklus mit umsetzen.
@@ -176,12 +181,20 @@ Scope-Grenzen (nicht implementieren):
 
 Failing E2E-Test(s): <Pfad(e) zur spec.ts>
 
-Relevante ADRs:
-Bereits ausgeführt (nicht nochmal ausführen):
-  python3 .claude/scripts/decisions.py list --tag scope:cross-cutting --full
-  python3 .claude/scripts/decisions.py list --tag story:us-NNN --full
-<Vollständige Ausgabe beider Befehle – oder: "keine Treffer in [Befehl]">
+Relevante ADRs (von mir bewertet, Volltext – nicht nochmal abrufen):
+<Vollständiger Text der ADRs, die du in Schritt 0 als relevant eingestuft hast – oder "keine">
+
+Prüf das unabhängig nach; für deine Schicht einschlägig sind:
+  python3 .claude/scripts/decisions.py list --tag <dimension>:<wert>   # kompakt, zum Scannen
+  python3 .claude/scripts/decisions.py get ADR-SXXX-N                  # Volltext bei Bedarf
+Findest du eine relevante ADR, die oben fehlt – oder hältst du eine der genannten für nicht
+anwendbar –, sag das in deiner PLANUNG.
 ```
+**Warum Volltext statt nur IDs:** Der Orchestrator hat diese ADRs in Schritt 0 ohnehin
+vollständig gelesen; sie in die Message zu schreiben kostet den Subagenten nicht mehr als sein
+eigener `get`, spart aber einen Aufruf. Die Suchbefehle daneben sind kein Ersatz dafür, sondern
+der Weg zur unabhängigen Gegenprobe: Eine zweite Meinung, die nur die Auswahl des Orchestrators
+sieht, ist keine.
 
 Spawn-Regeln:
 - EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin). Ausnahme: der Frontend-Subagent implementiert Komponente und Service-Client sequenziell in einem Aufruf (siehe Schicht-Reihenfolge oben).

@@ -477,6 +477,47 @@ def test_one_time_marker() -> int:
     return failures
 
 
+def test_write_access_scripts() -> int:
+    """Zugriffs-Scripte, die Text in versionierte Dokumente schreiben, brauchen Freigabe.
+
+    Sonst liefe der geschriebene Eintrag nirgends am User vorbei – `Edit`/`Write` zeigen ihn
+    im Freigabe-Dialog, ein Bash-Aufruf nicht.
+    """
+    print(f"\n{Colors.BOLD}=== Schreibende Zugriffs-Scripte (ask statt allow) ==={Colors.RESET}")
+    failures = 0
+
+    ask_cases = [
+        ('python3 .claude/scripts/obs.py add --titel "X" --beobachtung "Y"',
+         "obs.py add → ask"),
+        ('python3 .claude/scripts/obs.py set OBS-S114-1 --status "UMGESETZT (S114)"',
+         "obs.py set → ask"),
+        ('python3 .claude/scripts/lessons.py add --titel "X" --regel "Y"',
+         "lessons.py add → ask"),
+        # Auch als Teil einer Verkettung darf der Text nicht ungesehen durchgehen.
+        ('git status && python3 .claude/scripts/obs.py add --titel "X"',
+         "obs.py add in Compound → ask"),
+    ]
+    for command, description in ask_cases:
+        if not assert_decision(command, "ask", description):
+            failures += 1
+
+    allow_cases = [
+        ('python3 .claude/scripts/obs.py get OBS-S112-7', "obs.py get bleibt allow (read-only)"),
+        ('python3 .claude/scripts/lessons.py get LL-S113-1',
+         "lessons.py get bleibt allow (read-only)"),
+        # Rein mechanisches Verschieben ohne neuen Text – bewusst weiter ohne Freigabe.
+        ('python3 .claude/scripts/obs-archive.py', "obs-archive.py bleibt allow"),
+        ('python3 .claude/scripts/obs-drain.py', "obs-drain.py bleibt allow"),
+        # Kein Fehlalarm auf gleichnamige, aber andere Scripte.
+        ('python3 .claude/scripts/next_run.py --open', "next_run.py bleibt allow"),
+    ]
+    for command, description in allow_cases:
+        if not assert_decision(command, "allow", description):
+            failures += 1
+
+    return failures
+
+
 def test_deny_overrides_allow() -> int:
     print(f"\n{Colors.BOLD}=== Prioritäten: WRONG_APPROACH / DESTRUCTIVE vs. ALLOW ==={Colors.RESET}")
     failures = 0
@@ -657,6 +698,7 @@ def main() -> None:
     total_failures += test_allow_patterns()
     total_failures += test_deny()
     total_failures += test_one_time_marker()
+    total_failures += test_write_access_scripts()
     total_failures += test_deny_overrides_allow()
     total_failures += test_edge_cases()
     total_failures += test_path_normalization()

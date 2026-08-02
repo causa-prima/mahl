@@ -226,6 +226,28 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 #   hint_text:   Deny-Nachricht für den Agenten (mehrzeilig, mit Beispiel)
 #   short_label: Kurze Bezeichnung für --list (leer → kein Eintrag)
 # ---------------------------------------------------------------------------
+# Scripte, die inhaltliche Einträge in versionierte Projektdokumente schreiben.
+#
+# Sie sind fachlich erwünscht – sie garantieren die Eintragsform und ersparen den vom Harness
+# erzwungenen Vor-Edit-Read der ganzen Datei. Genau dadurch umgehen sie aber den Freigabe-Dialog,
+# den `Edit`/`Write` auslösen: Der geschriebene Text liefe sonst nirgends am User vorbei. Deshalb
+# `ask` statt `allow` – der Befehl steht samt Text im Freigabe-Prompt.
+#
+# Bewusst NICHT hier: rein mechanische Umbauten ohne neuen Text (`obs-archive.py` verschiebt
+# aufgelöste Einträge ins Archiv) und alle `get`-Unterbefehle (read-only).
+WRITE_ACCESS_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(r'\.claude/scripts/obs\.py\s+(?:add|set)\b'),
+        'obs.py add/set schreibt einen Eintrag nach docs/kaizen/observations.md. Freigabe wie '
+        'bei einem Edit, damit der Text vor dem Schreiben sichtbar ist.',
+    ),
+    (
+        re.compile(r'\.claude/scripts/lessons\.py\s+add\b'),
+        'lessons.py add schreibt einen Eintrag nach docs/kaizen/lessons_learned.md. Freigabe wie '
+        'bei einem Edit, damit der Text vor dem Schreiben sichtbar ist.',
+    ),
+]
+
 DESTRUCTIVE_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
     (
         re.compile(r'\bfind\b.*\s-delete\b'),
@@ -702,6 +724,13 @@ def check_command(command: str) -> tuple[str, str, str]:
         if pattern.search(command):
             return ("deny", reason, "WRONG_APPROACH")
 
+    # 3b. Schreibende Zugriffs-Scripte → ask. Muss VOR dem Segment-Check liegen, sonst greift
+    #     das generische Allow-Muster für `.claude/scripts/<script>.py` und der Text ginge
+    #     ohne Freigabe durch.
+    for pattern, reason in WRITE_ACCESS_PATTERNS:
+        if pattern.search(command):
+            return ("ask", reason, "WRITE_ACCESS")
+
     # 4. Compound-Split + Segment-Check (check_simple_command ohne WRONG_APPROACH)
     segments = split_compound_command(command)
     is_compound = len(segments) > 1
@@ -794,6 +823,10 @@ def _print_allow_list() -> None:
 
     print()
     print("Verknüpfung mit |, ||, &&, ; ist erlaubt – jedes Segment wird einzeln geprüft.")
+    print()
+    print("Schreiben in Projektdokumente (User-Freigabe nötig, kein Marker):")
+    print("  python3 .claude/scripts/obs.py add|set …       → docs/kaizen/observations.md")
+    print("  python3 .claude/scripts/lessons.py add …       → docs/kaizen/lessons_learned.md")
     print()
     print("Destruktive Befehle (nur mit # --allow-once, User-Freigabe nötig):")
     for _pattern, _hint, label in sorted(

@@ -10,6 +10,7 @@ dann die Feld-Zeilen `- Status:` / `- Impact: … Häufigkeit: …` / `- Bezug:`
 Items tragen ihr Ablauf-Datum in der Status-Zeile: `IN BEOBACHTUNG bis S<NNN>`.
 """
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,6 +37,47 @@ def current_session(root: Path):
             if m:
                 nums.append(int(m.group(1)))
     return (max(nums) + 1) if nums else None
+
+
+def latest_session_file(root: Path):
+    """(Nummer, Pfad) der höchsten `session_NNN.md` – oder None."""
+    d = root / SESSIONS_DIR
+    if not d.is_dir():
+        return None
+    treffer = [
+        (int(m.group(1)), f)
+        for f in d.glob("session_*.md")
+        if (m := re.search(r"session_0*(\d+)", f.name))
+    ]
+    return max(treffer, default=None)
+
+
+def running_session(root: Path):
+    """Nummer der LAUFENDEN Session – robuster als `current_session()` für Schreib-Zugriffe.
+
+    `current_session()` rechnet „höchste Session-Datei + 1". Das stimmt nur, solange die Datei
+    der laufenden Session noch nicht existiert – `closing-session` legt sie aber mitten in der
+    Session an, und danach wäre die Rechnung um eins zu hoch (neue Einträge bekämen die ID der
+    Folge-Session). Unterscheidungsmerkmal: Die Session-Datei wird erst mit dem Abschluss-Commit
+    versioniert. Ist die höchste Datei noch nicht committet, beschreibt sie die laufende Session.
+
+    Fällt der git-Aufruf aus, gilt wieder „+1" – dann ist das Ergebnis höchstens so gut wie
+    vorher, aber nie schlechter.
+    """
+    neueste = latest_session_file(root)
+    if neueste is None:
+        return None
+    nummer, pfad = neueste
+    try:
+        ergebnis = subprocess.run(
+            ["git", "status", "--porcelain", "--", str(pfad)],
+            cwd=str(root), capture_output=True, text=True, timeout=10,
+        )
+        if ergebnis.returncode == 0 and ergebnis.stdout.strip():
+            return nummer  # noch nicht committet → das IST die laufende Session
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return nummer + 1
 
 
 def score_from_keywords(text: str, table: dict, field: str = "Wert") -> float:

@@ -20,7 +20,7 @@ def test_every_registered_check_is_importable_and_has_check():
         assert callable(mod.check)
 
 
-def test_registry_covers_the_six_migrated_checks():
+def test_registry_covers_every_registered_check():
     # Regression: verhindert, dass ein Check bei einem Refactor still aus der
     # Liste fällt und damit wirkungslos wird, ohne dass etwas rot wird.
     assert set(dispatcher.CHECKS) == {
@@ -30,6 +30,7 @@ def test_registry_covers_the_six_migrated_checks():
         "check-e2e-scenario-ref",
         "check-ref-direction",
         "check-obs-capture",
+        "check-td-capture",
     }
 
 

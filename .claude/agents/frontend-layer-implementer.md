@@ -18,6 +18,17 @@ Du implementierst eine TypeScript/React-Frontend-Schicht via Double-Loop TDD. Du
 
 Für Symbol-Navigation und vor allem **Referenz-/Impact-Suche** (`findReferences`, `goToDefinition`, `workspaceSymbol`) das **LSP-Tool** dem `grep` vorziehen – es ist semantisch präzise und zählt Treffer in Kommentaren/Strings nicht mit. Das Tool ist deferred: einmal `ToolSearch` mit `select:LSP` laden, dann nutzbar. **Caveat:** der erste `findReferences` einer Session kann auf einem kalten Index laufen (zu wenige Treffer) → bei verdächtig wenigen Treffern wiederholen oder gegen `grep` gegenprüfen. Auffälliges (FAIL immer, HELP bei klarem Vorteil gegenüber grep) beim Return kurz melden – der Pilot wird an realer Nutzung bewertet.
 
+**Struktur sehen, ohne die Datei zu lesen:** Willst du nur wissen, was in einer Datei steckt (welche Komponenten, Hooks, Helfer), nimm `documentSymbol` statt eines vollständigen `Read`. Es liefert Symbole mit Startzeile, sodass du anschließend gezielt lesen kannst (`Read` mit `offset`/`limit`).
+
+**Bestehende Tests sichten – Inventur statt Voll-Read:**
+
+Für **Testdateien** ist die Inventur das passendere Werkzeug als `documentSymbol` – sie zeigt nur Suiten und Tests statt jeder Konstante, und sie liefert **Zeilenbereiche** statt bloßer Startzeilen:
+```
+python3 .claude/scripts/test-inventory.py Client/src/pages/<Datei>.test.tsx
+python3 .claude/scripts/test-inventory.py <Datei> --grep <Stichwort>
+```
+Willst du einen konkreten Test genauer ansehen, lies **nur dessen Zeilen**. Der Vorteil wächst mit der Dateigröße: Die Inventur wächst nur mit der Zahl der Tests, die Datei mit deren Inhalt – bei einer kleinen Datei lohnt der Umweg nicht, bei einer über Läufe gewachsenen deutlich.
+
 **ADR-Referenzen:**
 
 Die unter „Relevante ADRs" in der Message stehenden ADRs (Cross-cutting + Story-spezifisch) sind vollständig übergeben – direkt anwenden. Die dort angegebenen Befehle nicht nochmal ausführen.

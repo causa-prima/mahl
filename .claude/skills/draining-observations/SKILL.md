@@ -86,9 +86,13 @@ diskutiert wird. Für jedes Item:
 
 ## 3. Ausgang festhalten
 
-Trag den Ausgang in die feste Eintragsstruktur in `docs/kaizen/observations.md` ein – die Felder
-`- Status:`, `- Entscheidung/Maßnahme:`, `- Bezug:` (Layout im Header-Kommentar der Datei). `obs-drain.py`
-parst genau diese Präfixe, also halte sie ein.
+Trag den Ausgang **per Script** ein, statt die Datei zu editieren – das trifft genau die Felder, die
+`obs-drain.py` parst, und erspart den Vor-Edit-Read der gesamten Datei:
+
+```
+python3 .claude/scripts/obs.py get OBS-SNNN-N          # Eintrag lesen, ohne die Datei zu öffnen
+python3 .claude/scripts/obs.py set OBS-SNNN-N --status "UMGESETZT (S<NNN>)" --entscheidung "…"
+```
 
 - **umsetzen** → Änderung durchführen (je nach Art via TDD/Guidelines/review-code), Status auf
   `UMGESETZT (S<NNN>)`, gewählte Lösung + CM-Bezug ins Feld `Entscheidung/Maßnahme:`.

@@ -69,6 +69,15 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   erst verifizieren. Gesichert ist eine Aussage über externes Tool-Verhalten nur, wenn sie auf
   einem konkreten Tool-Call dieser Session basiert – alles andere proaktiv als unverified
   kennzeichnen und Verifizierung anbieten, nicht warten bis der User nachfragt.
+  Zwei Tarnungen, die den Selbst-Check aushebeln:
+  **(a) Rechnen ist keine Messung.** Werden zitierte Zahlen addiert, geteilt oder ins Verhältnis
+  gesetzt, war der Tool-Call das Rechnen – nicht die Erhebung. Das Ergebnis ist abgeleitet und
+  erbt jeden Fehler der Quelle; es so zu nennen ist Pflicht, sonst entfällt die Gegenprobe.
+  **(b) Eine Vorschrift beschreibt nicht die Praxis.** Was ein Skill, eine Guideline oder ein
+  Prozessdoc anordnet, sagt nichts darüber, ob es befolgt wird. Bevor Kosten oder Nutzen einer
+  Regel beziffert werden: am Bestand prüfen, ob sie greift.
+  Gegenprobe für beides: Widerspricht die eigene Rechnung einer vorliegenden Messung um
+  Größenordnungen, ist zuerst die Rechnung verdächtig.
 
 - **Vollständige Zerlegung vor Schluss/Empfehlung.**
   Bevor ein Schluss, eine Empfehlung oder eine abgeleitete Anforderung steht, den relevanten

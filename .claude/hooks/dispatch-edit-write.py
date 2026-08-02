@@ -37,6 +37,7 @@ CHECKS = [
     "check-e2e-scenario-ref",
     "check-ref-direction",
     "check-obs-capture",
+    "check-td-capture",
 ]
 
 

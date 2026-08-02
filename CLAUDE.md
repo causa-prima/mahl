@@ -28,6 +28,9 @@
 | Workflow-/Prozess-Audit durchführen | Skill `review-workflow` verwenden |
 | Projektdokumentation prüfen | Skill `review-docs` verwenden |
 | Learnings dokumentieren | `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/process.md`) |
+| Tracker-Eintrag lesen/schreiben (OBS, LL) | `python3 .claude/scripts/obs.py` bzw. `lessons.py` – statt Read/Edit auf der ganzen Datei |
+| Wohin geht das Read-/Token-Budget? | `python3 .claude/scripts/read-breakdown.py` (nach Session-Art), `tool-usage.py` |
+| Was steht schon in einer Testdatei? | `python3 .claude/scripts/test-inventory.py <datei>` – Testnamen mit Zeilenbereich |
 | Verhaltensprinzipien (immer gültig) | `docs/kaizen/principles.md` |
 | Maßnahmen-Tracking | `docs/kaizen/countermeasures.md` |
 | Retro durchführen | Skill `kaizen` verwenden |

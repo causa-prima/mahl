@@ -28,6 +28,15 @@ Alle so gefundenen ADRs (außer denen bereits in der Message) im **PLANUNG**-Sch
 
 Implementiert eine Zeile eine Entscheidung aus `docs/history/adr.md`, direkt darüber `// ADR-SXXX-N` schreiben.
 
+**Bestehende Tests sichten – Inventur statt Voll-Read:**
+
+Bevor du in eine gewachsene Testdatei schreibst („gibt es das schon?", „wie heißen die Tests hier?", „wo gehört meiner hin?"), nimm die Inventur statt die Datei zu lesen:
+```
+python3 .claude/scripts/test-inventory.py Server.Tests/<Datei>.cs
+python3 .claude/scripts/test-inventory.py <Datei> --grep <Stichwort>
+```
+Sie listet jeden Test **mit Zeilenbereich**. Willst du einen konkreten Test genauer ansehen, lies **nur dessen Zeilen** (`Read` mit `offset`/`limit`). Der Vorteil wächst mit der Dateigröße: Die Inventur wächst nur mit der Zahl der Tests, die Datei mit deren Inhalt – bei einer kleinen Datei lohnt der Umweg nicht, bei einer über Läufe gewachsenen deutlich.
+
 **Test-Einschränkung (Ausnahmen nur nach explizitem Orchestrator-Auftrag):**
 Erlaubt: ausschließlich HTTP-Integrationstests via WebApplicationFactory.
 Verbleibende Stryker-Survivors auf isolierter Logik, die nicht via HTTP beobachtbar sind → Suppression anlegen (Begründung Pflicht). Das QA-Script listet alle Suppressionen in Check 2; der Orchestrator prüft die Begründungen.
