@@ -20,31 +20,27 @@ from _index_length import HARD_CAP, SOFT_TARGET, table_rows  # noqa: E402
 _REL_INDEX = "docs/history/sessions/index.md"
 
 
-def main() -> None:
-    try:
-        inp = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
-        sys.exit(0)
-
-    tool_name = inp.get("tool_name", "")
+def check(data: dict) -> str | None:
+    """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py."""
+    tool_name = data.get("tool_name", "")
     if tool_name not in ("Edit", "Write"):
-        sys.exit(0)
+        return None
 
-    tool_input = inp.get("tool_input", {})
+    tool_input = data.get("tool_input", {})
     file_path = tool_input.get("file_path", "")
     if not file_path:
-        sys.exit(0)
+        return None
 
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
     rel = file_path
     if project_dir and file_path.startswith(project_dir):
         rel = file_path[len(project_dir):].lstrip("/\\")
     if not rel.replace("\\", "/").endswith(_REL_INDEX):
-        sys.exit(0)
+        return None
 
     content = tool_input.get("new_string") if tool_name == "Edit" else tool_input.get("content")
     if not content:
-        sys.exit(0)
+        return None
 
     # Grandfathering: bereits vorhandene Zeilen (unverändert) sind ausgenommen.
     existing: set[str] = set()
@@ -57,14 +53,26 @@ def main() -> None:
 
     violations = [(s, n) for raw, s, n in table_rows(content)
                   if raw not in existing and n > HARD_CAP]
-    if violations:
-        lst = "; ".join(f"S{s}: {n} Zeichen" for s, n in violations)
-        reason = (
-            f"Index-Kurzfassung über dem harten Cap ({HARD_CAP} Zeichen): {lst}.\n"
-            "Regel: ein Satz – was sich änderte, kein Warum (das gehört in die Session-Datei); "
-            f"auf ADR-/Session-IDs verweisen statt Prosa. Soft-Ziel {SOFT_TARGET}. "
-            "Details: closing-session SKILL Schritt 6."
-        )
+    if not violations:
+        return None
+
+    lst = "; ".join(f"S{s}: {n} Zeichen" for s, n in violations)
+    return (
+        f"Index-Kurzfassung über dem harten Cap ({HARD_CAP} Zeichen): {lst}.\n"
+        "Regel: ein Satz – was sich änderte, kein Warum (das gehört in die Session-Datei); "
+        f"auf ADR-/Session-IDs verweisen statt Prosa. Soft-Ziel {SOFT_TARGET}. "
+        "Details: closing-session SKILL Schritt 6."
+    )
+
+
+def main() -> None:
+    try:
+        inp = json.load(sys.stdin)
+    except (json.JSONDecodeError, EOFError):
+        sys.exit(0)
+
+    reason = check(inp)
+    if reason:
         print(json.dumps({
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",

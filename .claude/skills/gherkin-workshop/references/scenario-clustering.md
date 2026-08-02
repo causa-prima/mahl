@@ -48,10 +48,37 @@ Reihenfolge anwenden:
      zurücksetzen, Fokus, Pflichtfeld-Markierung, Pending-Disabled).
    - *full-stack* – behauptet persistierten Zustand / Liste nach realer Mutation.
 
+5. **Zustands-Abhängigkeiten auflösen** – kein weiterer Split, nur Reihenfolge und Zuordnung:
+   Notiere je Cluster, welche Lebenszyklus-Zustände seine `Given` **voraussetzen** (Reader) und
+   welche seine `Then` **herstellen** (Writer). Prüffrage je Cluster: *Lässt sich sein `Given` mit
+   dem, was bis zu diesem Lauf gebaut ist, über die Oberfläche herstellen?* Lautet die Antwort
+   nein, hängt der Cluster an einem Zustand, den bis dahin kein Lauf schreibt.
+   Regel: **Der Writer-Cluster eines Zustands liegt vor jedem Reader-Cluster desselben Zustands.**
+   Bei Verletzung drei Auswege, in dieser Reihenfolge prüfen:
+   - **Umordnen** – wenn die Abhängigkeit nur in eine Richtung läuft.
+   - **Szenario verschieben** – wenn Reader und Writer sich **gegenseitig** voraussetzen (Zyklus;
+     keine Reihenfolge erfüllt dann beide Seiten). Das lesende Szenario gehört in den Lauf, der
+     den Zustand schreibt: Es beschreibt die Wirkung *dieser Mutation*, nicht die Grundfunktion
+     des lesenden Endpoints.
+   - **Zusammenlegen** – wenn beide Cluster ohnehin dieselbe Mutation umkreisen.
+   Ohne diesen Schritt entsteht ein Lauf, dessen E2E-Arrangement keinen Weg über die Oberfläche
+   hat – er erzwingt dann einen Test-only-Endpoint oder das Vorziehen eines späteren Laufs.
+
+6. **Erstmaligkeiten flaggen** – vor der Implementierung, nicht während:
+   Prüfe je Lauf in der festgelegten Reihenfolge: *Was tut dieser Lauf, das noch kein Lauf zuvor
+   getan hat?* Führt er den ersten Vertreter einer Klasse ein (erster mutierender
+   Single-Resource-Endpoint, erste zweite Seite, erste Liste mit Pagination …), zieht das eine
+   **Querschnitts-Policy** nach – Optimistic Concurrency via ETag/If-Match, Navigations-Struktur,
+   Ähnliches –, die die feature-orientierte Clusterung nicht abbildet. Benenne sie beim Lauf und
+   kläre sie **vor** dessen Implementierung; sonst kommt sie als PLANUNG-Eskalation des
+   Schicht-Subagenten mitten im Lauf hoch und erzwingt eine Scope-Diskussion im laufenden
+   Betrieb. Bewusst als offene Frage formuliert statt als feste Klassenliste – eine solche Liste
+   wäre nie vollständig.
+
 ## Hinweise
 
-- **Nach Schritt 4 stoppen.** Nicht weiter nach einzelner Assertion-Form zerschneiden – das
-  erzeugt Mikro-Cluster ohne Mehrwert.
+- **Nach Schritt 4 nicht weiter splitten.** Nicht nach einzelner Assertion-Form zerschneiden – das
+  erzeugt Mikro-Cluster ohne Mehrwert. (Schritte 5–6 splitten nicht, sie ordnen und flaggen.)
 - **Singletons bleiben eigene Läufe.** Ergibt der Algorithmus einen Cluster mit nur einem
   Szenario, ihn *nicht* in einen unähnlichen Cluster zwingen, nur um einen Lauf zu sparen –
   das schleppte genau die Heterogenität ein, die wir vermeiden. Ein Singleton ist gewollt,
@@ -61,10 +88,10 @@ Reihenfolge anwenden:
   aus 1–4 übersprungen – diese anwenden, statt willkürlich zu trennen.
 - **Reihenfolge der Läufe:** zuerst der Full-stack-Success-Cluster der zentralen Mutation
   (er baut den Endpoint), darauf dessen Validierungs-Cluster; übrige Capabilities danach. Die
-  Reihenfolge ist weich – hart ist nur, dass Validierung auf dem Endpoint des Success-Laufs
-  aufsetzt.
-- Der einzige Urteilspunkt ist Schritt 1 (welche Aktion = welche Capability). Den Rest bestimmt
-  die Form.
+  Reihenfolge ist im Übrigen weich – hart sind zwei Bedingungen: Validierung setzt auf dem
+  Endpoint des Success-Laufs auf, und die Zustands-Bedingung aus Schritt 5 (Writer vor Reader).
+- Der einzige Urteilspunkt in 1–4 ist Schritt 1 (welche Aktion = welche Capability). Den Rest
+  bestimmt die Form; Schritte 5–6 kommen danach auf das fertige Clustering.
 
 ## Output: Lauf-Kommentar-Tags
 

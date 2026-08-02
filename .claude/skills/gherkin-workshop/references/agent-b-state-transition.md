@@ -23,6 +23,16 @@ Rest-Fehler beim erneuten Öffnen). Jede Affordance ist eine EIGENE Prüfdimensi
 abgedeckt" heißt NICHT „Backdrop abgedeckt" – auch wenn beide denselben Guard teilen, ist es
 je eigenes beobachtbares Verhalten, das ein Refactor unabhängig brechen kann.
 
+**Nebenläufigkeits-Regel (Vorbedingung kann zwischen Lesen und Schreiben veralten):**
+Prüfe für jede Transition, ob ein paralleler Vorgang ihre Vorbedingung verändert haben kann,
+während der Nutzer die Operation vorbereitet. Ist das möglich, ist der parallele Vorgang eine
+EIGENE Prüfdimension neben Quellzustand und Operation – die Matrix bildet ihn nicht ab, weil sie
+nur den Zustand VOR der Operation kennt, nicht seine Veränderung währenddessen. Je Ausprägung ein
+eigenes Szenario: (a) parallel mit DENSELBEN Daten geschrieben; (b) parallel mit ABWEICHENDEN
+Daten geschrieben; (c) parallel entfernt. „(a) ist abgedeckt" heißt NICHT „(b) ist abgedeckt":
+(b) ist der folgenreichere Fall, weil die Operation dort fremde Werte überschreibt (Lost Update)
+und deshalb eine explizite Entscheidung braucht – übernehmen, melden oder ablehnen.
+
 1. ZUSTANDS-MATRIX: Für jede betroffene Entität:
    - Liste alle möglichen Zustände
    - Liste alle Operationen der US

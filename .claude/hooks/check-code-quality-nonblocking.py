@@ -5,10 +5,10 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from checks.common import parse_input
-from checks import constructors, test_patterns
+from checks import constructors, test_patterns, tooling_tests
 from checks.primitives import check_nonblocking as primitives_nonblocking
 
-CHECKS = [constructors.check, test_patterns.check, primitives_nonblocking]
+CHECKS = [constructors.check, test_patterns.check, primitives_nonblocking, tooling_tests.check]
 
 
 def main() -> None:

@@ -54,6 +54,13 @@ diskutiert wird. Für jedes Item:
    Erfassung die Lösung vor und schwächt die Discovery). Erarbeite die Kandidaten jetzt gemeinsam und
    schlage sie dem User vor – Orchestrator schlägt vor, User entscheidet.
 
+   **Behauptete Fakten am Code prüfen, nicht aus dem Eintrag übernehmen.** Die technischen Aussagen im
+   Eintrag sind eine Momentaufnahme der Erfassung und altern wie jede andere Quelle – ein Item aus der
+   Alters-Lane ist oft ein Dutzend Sessions alt. Pflicht, sobald eine Aussage die **Kostenschätzung oder
+   Machbarkeit** trägt („X ist uneinheitlich", „Y hängt an Z", „das ginge nur mit …"): am aktuellen Stand
+   verifizieren, bevor sie eine Empfehlung stützt. Eine auf veralteten Angaben gefällte Verwerfung
+   schließt den Punkt *und* hinterlässt die falsche Begründung als Präzedenz im Archiv.
+
 3. **Kolokation & Konsolidierung erwägen** (zwei getrennte Fälle):
    - **Same-Artefakt-Kolokation** (gemeinsam *lösen*): Berührt ein Kandidat dieselbe Datei wie ein anderes
      offenes OBS, erwäge die Mitnahme (auch bei verschiedenen Problemen; Begründung: `process.md`). Nur bei

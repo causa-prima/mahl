@@ -39,24 +39,29 @@ def get_denial_reason(file_path: str) -> str | None:
     return None
 
 
+def check(data: dict) -> str | None:
+    """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py."""
+    if data.get("tool_name", "") not in ("Edit", "Write"):
+        return None
+
+    file_path = data.get("tool_input", {}).get("file_path", "")
+    if not file_path:
+        return None
+
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
+    if project_dir and file_path.startswith(project_dir):
+        file_path = file_path[len(project_dir):].lstrip("/\\")
+
+    return get_denial_reason(file_path)
+
+
 def main() -> None:
     try:
         inp = json.load(sys.stdin)
     except (json.JSONDecodeError, EOFError):
         sys.exit(0)
 
-    if inp.get("tool_name", "") not in ("Edit", "Write"):
-        sys.exit(0)
-
-    file_path = inp.get("tool_input", {}).get("file_path", "")
-    if not file_path:
-        sys.exit(0)
-
-    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
-    if project_dir and file_path.startswith(project_dir):
-        file_path = file_path[len(project_dir):].lstrip("/\\")
-
-    reason = get_denial_reason(file_path)
+    reason = check(inp)
     if reason:
         print(json.dumps({
             "hookSpecificOutput": {

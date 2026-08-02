@@ -142,6 +142,49 @@ def compute_post_content(tool: str, tool_input: dict, pre: str) -> str | None:
     return None
 
 
+def check(data: dict) -> str | None:
+    """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py.
+
+    Fail-open (Exception → None) liegt beim Dispatcher, damit ein Hook-Fehler
+    nie einen Edit blockiert.
+    """
+    tool = data.get("tool_name", "")
+    tool_input = data.get("tool_input", {})
+    file_path = tool_input.get("file_path", "")
+    if tool not in ("Edit", "Write") or not file_path or not is_obs_file(file_path):
+        return None
+
+    pre = read_file_text(file_path)
+    post = compute_post_content(tool, tool_input, pre)
+    if post is None:
+        return None
+
+    violations = find_violations(pre, post)
+    if not violations:
+        return None
+
+    lines = "\n".join(f"  - {oid}: {reason}" for oid, reason in violations)
+    allowed = "\n".join(f"    - Entscheidung/Maßnahme: {v}" for v in CANONICAL_OPEN_VALUES)
+    return (
+        "❌ OBS-Erfassung (Poka-Yoke): neu erfasster Eintrag verletzt die Erfassungs-Regeln:\n"
+        f"{lines}\n"
+        "  Ein neu erfasster OBS beschreibt NUR, was beobachtet wurde – die Entscheidung trifft "
+        "der Drain mit frischem Blick, und jeder hier notierte Kandidat ankert ihn.\n"
+        "  1. `- Entscheidung/Maßnahme:` trägt GENAU einen dieser zwei Werte – nichts davor, "
+        f"nichts dahinter:\n{allowed}\n"
+        f"  2. Nur diese Felder sind zulässig: {', '.join(f'`- {f}:`' for f in ALLOWED_FIELDS)} "
+        "(`- Bezug:` optional, der Rest Pflicht). Ein eigenes Feld für Kandidaten/Lösungsideen "
+        "ist genau die Umgehung, die hier verhindert wird.\n"
+        "  3. Keine Lösungs-Ansage im Eintrags-Text (`Lösungsvorschlag:`, `Idee:`, `Kandidat:` …). "
+        "Ein Risiko zu beschreiben (`X könnte passieren`) ist ausdrücklich erlaubt – gemeint ist "
+        "nur die vorweggenommene Abhilfe.\n"
+        "  Was dir aufgefallen ist, gehört in `- Beobachtung:` – dort darf es beliebig ausführlich "
+        "stehen, inklusive der Frage, die sich dir stellt und der Kosten, die es verursacht hat. "
+        "Bewusster Einzelfall (z.B. Umnummerierung eines Bestands-Eintrags) → `obs-ok`-Marker "
+        "irgendwo in den Eintrag."
+    )
+
+
 def main() -> None:
     try:
         data = json.load(sys.stdin)
@@ -149,40 +192,9 @@ def main() -> None:
         sys.exit(0)  # kein parsbarer Input → nichts blocken
 
     try:
-        tool = data.get("tool_name", "")
-        tool_input = data.get("tool_input", {})
-        file_path = tool_input.get("file_path", "")
-        if tool not in ("Edit", "Write") or not file_path or not is_obs_file(file_path):
-            sys.exit(0)
-
-        pre = read_file_text(file_path)
-        post = compute_post_content(tool, tool_input, pre)
-        if post is None:
-            sys.exit(0)
-
-        violations = find_violations(pre, post)
-        if violations:
-            print("❌ OBS-Erfassung (Poka-Yoke): neu erfasster Eintrag verletzt die Erfassungs-Regeln:", file=sys.stderr)
-            for oid, reason in violations:
-                print(f"  - {oid}: {reason}", file=sys.stderr)
-            allowed = "\n".join(f"    - Entscheidung/Maßnahme: {v}" for v in CANONICAL_OPEN_VALUES)
-            print(
-                "  Ein neu erfasster OBS beschreibt NUR, was beobachtet wurde – die Entscheidung trifft "
-                "der Drain mit frischem Blick, und jeder hier notierte Kandidat ankert ihn.\n"
-                "  1. `- Entscheidung/Maßnahme:` trägt GENAU einen dieser zwei Werte – nichts davor, "
-                f"nichts dahinter:\n{allowed}\n"
-                f"  2. Nur diese Felder sind zulässig: {', '.join(f'`- {f}:`' for f in ALLOWED_FIELDS)} "
-                "(`- Bezug:` optional, der Rest Pflicht). Ein eigenes Feld für Kandidaten/Lösungsideen "
-                "ist genau die Umgehung, die hier verhindert wird.\n"
-                "  3. Keine Lösungs-Ansage im Eintrags-Text (`Lösungsvorschlag:`, `Idee:`, `Kandidat:` …). "
-                "Ein Risiko zu beschreiben (`X könnte passieren`) ist ausdrücklich erlaubt – gemeint ist "
-                "nur die vorweggenommene Abhilfe.\n"
-                "  Was dir aufgefallen ist, gehört in `- Beobachtung:` – dort darf es beliebig ausführlich "
-                "stehen, inklusive der Frage, die sich dir stellt und der Kosten, die es verursacht hat. "
-                "Bewusster Einzelfall (z.B. Umnummerierung eines Bestands-Eintrags) → `obs-ok`-Marker "
-                "irgendwo in den Eintrag.",
-                file=sys.stderr,
-            )
+        reason = check(data)
+        if reason:
+            print(reason, file=sys.stderr)
             sys.exit(2)  # exit 2 = Edit blockieren
     except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
         print(f"check-obs-capture: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)

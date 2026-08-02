@@ -33,24 +33,52 @@ def _write_report(tmp_path, *statuses):
 
 # --- Standard-Score (inkl. NoCoverage, Timeout als detected) ---
 
+def _score(tmp_path, *statuses) -> float | None:
+    """Score des Reports. `_parse_report` liefert (files, metrics, hash);
+    der Score ist ein float in `metrics`, nicht mehr ein formatierter String."""
+    _, metrics, _ = qa._parse_report(_write_report(tmp_path, *statuses))
+    return metrics["score"]
+
+
 def test_all_killed_is_100(tmp_path):
-    score, _ = qa._parse_report(_write_report(tmp_path, "Killed", "Killed"))
-    assert score == "100.0%"
+    assert _score(tmp_path, "Killed", "Killed") == 100.0
 
 
 def test_nocoverage_lowers_score(tmp_path):
-    score, _ = qa._parse_report(_write_report(tmp_path, "Killed", "NoCoverage"))
-    assert score == "50.0%"
+    assert _score(tmp_path, "Killed", "NoCoverage") == 50.0
 
 
 def test_timeout_counts_as_detected(tmp_path):
-    score, _ = qa._parse_report(_write_report(tmp_path, "Killed", "Timeout"))
-    assert score == "100.0%"
+    assert _score(tmp_path, "Killed", "Timeout") == 100.0
 
 
 def test_ignored_excluded(tmp_path):
-    score, _ = qa._parse_report(_write_report(tmp_path, "Killed", "Ignored"))
-    assert score == "100.0%"
+    # Ignored ist kein valider Mutant und darf den Nenner nicht vergrößern.
+    assert _score(tmp_path, "Killed", "Ignored") == 100.0
+
+
+# --- Lauf ohne validen Mutanten: kein definierter Score (OBS-S108-3) ---
+# Der gefährliche Fehlerfall ist nicht „falscher Score", sondern ein leerer Lauf,
+# der als 100 % durchgeht und damit ein grünes Gate vortäuscht.
+
+def test_no_mutants_at_all_has_no_score(tmp_path):
+    assert _score(tmp_path) is None
+
+
+def test_only_ignored_mutants_has_no_score(tmp_path):
+    # Alle Mutanten in einem Nicht-Bewertungs-Bucket: Nenner 0, nicht 100 %.
+    assert _score(tmp_path, "Ignored", "Ignored") is None
+
+
+def test_compile_error_only_has_no_score(tmp_path):
+    assert _score(tmp_path, "CompileError") is None
+
+
+def test_all_survived_scores_zero_and_is_not_confused_with_empty(tmp_path):
+    # Grenze gegen die Tests oben: „alles überlebt" ist ein definierter Score (0.0),
+    # kein leerer Lauf. Ohne diesen Fall bliebe offen, ob None nur der generische
+    # Rückgabewert für „ungünstiger Report" ist.
+    assert _score(tmp_path, "Survived", "Survived") == 0.0
 
 
 # --- Hash + Verify (Q2/Q3) ---

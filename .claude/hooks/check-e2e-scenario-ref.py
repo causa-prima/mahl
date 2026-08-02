@@ -155,6 +155,41 @@ def _all_spec_titles() -> set[str]:
     return titles
 
 
+def check(data: dict) -> str | None:
+    """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py.
+
+    Fail-open (Exception → None) liegt beim Dispatcher, damit ein Hook-Fehler
+    nie einen Edit blockiert.
+    """
+    tool = data.get("tool_name", "")
+    tool_input = data.get("tool_input", {})
+    file_path = tool_input.get("file_path", "")
+    if tool not in ("Edit", "Write"):
+        return None
+
+    post = compute_post_content(tool, file_path, tool_input)
+    if post is None:
+        return None
+
+    if is_e2e_spec(file_path):
+        violations = validate(post, _feature_titles(), _other_spec_titles(file_path))
+    elif is_feature(file_path):
+        violations = validate_feature(post, _other_feature_titles(file_path), _all_spec_titles())
+    else:
+        return None
+
+    if not violations:
+        return None
+
+    lines = "\n".join(f"  - {v}" for v in violations)
+    return (
+        "❌ E2E-Szenario-Mapping (Poka-Yoke):\n"
+        f"{lines}\n"
+        "  Feature-Szenario-Titel und E2E-`// Szenario:`-Kommentare müssen gleich sein "
+        "(Szenario via /gherkin-workshop anlegen/umbenennen; seltenen Rename-Deadlock per Hand-Edit lösen)."
+    )
+
+
 def main() -> None:
     try:
         data = json.load(sys.stdin)
@@ -162,32 +197,9 @@ def main() -> None:
         sys.exit(0)  # kein parsbarer Input → nichts blocken
 
     try:
-        tool = data.get("tool_name", "")
-        tool_input = data.get("tool_input", {})
-        file_path = tool_input.get("file_path", "")
-        if tool not in ("Edit", "Write"):
-            sys.exit(0)
-
-        post = compute_post_content(tool, file_path, tool_input)
-        if post is None:
-            sys.exit(0)
-
-        if is_e2e_spec(file_path):
-            violations = validate(post, _feature_titles(), _other_spec_titles(file_path))
-        elif is_feature(file_path):
-            violations = validate_feature(post, _other_feature_titles(file_path), _all_spec_titles())
-        else:
-            sys.exit(0)
-
-        if violations:
-            print("❌ E2E-Szenario-Mapping (Poka-Yoke):", file=sys.stderr)
-            for v in violations:
-                print(f"  - {v}", file=sys.stderr)
-            print(
-                "  Feature-Szenario-Titel und E2E-`// Szenario:`-Kommentare müssen gleich sein "
-                "(Szenario via /gherkin-workshop anlegen/umbenennen; seltenen Rename-Deadlock per Hand-Edit lösen).",
-                file=sys.stderr,
-            )
+        reason = check(data)
+        if reason:
+            print(reason, file=sys.stderr)
             sys.exit(2)  # exit 2 = Edit blockieren
     except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
         print(f"check-e2e-scenario-ref: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)

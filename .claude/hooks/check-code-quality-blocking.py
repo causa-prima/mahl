@@ -18,10 +18,12 @@ CHECKS = [
 ]
 
 
-def main() -> None:
-    inp = parse_input()
+def check(data: dict | None = None) -> str | None:
+    """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py.
+    Ohne `data` wird von stdin gelesen (Standalone-Aufruf)."""
+    inp = parse_input(data)
     if inp is None:
-        sys.exit(0)
+        return None
 
     violations: list[str] = []
     for check_fn in CHECKS:
@@ -30,10 +32,17 @@ def main() -> None:
         except Exception as e:
             print(f"check-code-quality-blocking: Fehler in {check_fn.__module__}: {e}", file=sys.stderr)
 
-    if violations:
-        separator = "\n" + "─" * 60 + "\n"
-        msg = separator.join(violations) + "\n" + BLOCKING_DISCUSSION_NOTE
-        print(msg, file=sys.stderr)
+    if not violations:
+        return None
+
+    separator = "\n" + "─" * 60 + "\n"
+    return separator.join(violations) + "\n" + BLOCKING_DISCUSSION_NOTE
+
+
+def main() -> None:
+    reason = check()
+    if reason:
+        print(reason, file=sys.stderr)
         sys.exit(2)  # exit 2 = Claude soll Aktion überdenken/korrigieren
 
     sys.exit(0)

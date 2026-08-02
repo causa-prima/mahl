@@ -58,13 +58,16 @@ class HookInput:
     is_domain_excluded: bool
 
 
-def parse_input() -> HookInput | None:
-    """Liest und parsed den Hook-Input von stdin. Gibt None zurück bei Fehler."""
-    try:
-        data = json.load(sys.stdin)
-    except Exception as e:
-        print(f"check-code-quality: JSON-Parsing fehlgeschlagen: {e}", file=sys.stderr)
-        return None
+def parse_input(data: dict | None = None) -> HookInput | None:
+    """Parsed den Hook-Input. Ohne `data` wird von stdin gelesen (Standalone-Aufruf);
+    mit `data` wird das bereits gelesene Dict verwendet (Dispatcher-Aufruf – stdin
+    ist dann schon konsumiert und kann nicht erneut gelesen werden)."""
+    if data is None:
+        try:
+            data = json.load(sys.stdin)
+        except Exception as e:
+            print(f"check-code-quality: JSON-Parsing fehlgeschlagen: {e}", file=sys.stderr)
+            return None
 
     tool = data.get("tool_name", "")
     tool_input = data.get("tool_input", {})

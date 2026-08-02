@@ -43,6 +43,26 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ---
 
+## Session 113 – 2026-08-01
+
+- **[HOCH] [PROZESS] [Doku] LL-S113-1 – Behauptung aus einem projekteigenen Dokument ungeprüft zur Entscheidungsgrundlage gemacht**
+  Quelle: User
+  Was: Beim Drain von OBS-S088-1 (Hook-Dispatcher) stützte sich die Verwerfungs-Empfehlung auf die im Eintrag notierte Aussage „uneinheitlicher Input-Vertrag (Fragment-`HookInput` vs. voller Post-Edit-Inhalt + Datei-Reads)". Erst nach Widerspruch des Users wurde geprüft: Alle sechs Scripts lasen bereits identisch (`json.load(sys.stdin)` → `tool_name` → `tool_input` → `file_path`); die Uneinheitlichkeit betraf nicht den Input, sondern eine daraus abgeleitete Berechnung, die drei Scripts fast wortgleich duplizierten. Der Umbau war danach in einer Sitzung erledigt. Ohne den Widerspruch wäre ein umsetzbarer Punkt mit falscher Begründung geschlossen worden – und die Begründung wäre als Präzedenz im Archiv gelandet.
+  Warum: `principles.md` verlangt Empirie vor Behauptung ausdrücklich für „Aussagen über externes Tool-Verhalten"; projekteigene Dokumente wurden als bereits verifiziert behandelt. Ein OBS-Eintrag ist aber eine Momentaufnahme der Lage bei der Erfassung – hier 25 Sessions alt – und altert wie jede andere Quelle.
+  Regel: Vor einer Drain-Entscheidung die im Eintrag behaupteten technischen Fakten am aktuellen Code prüfen, nicht aus dem Eintrag übernehmen – besonders wenn sie die Kostenschätzung tragen und der Eintrag mehrere Sessions alt ist.
+
+- **[MITTEL] [TOOLING] [Hook/Script] LL-S113-2 – Hook-Test mit absichtlich ungültigem Edit ist falsch-negativ**
+  Quelle: Orchestrator
+  Was: Um zu prüfen, ob `check-dependency-allowlist` über den neuen Dispatcher noch blockt, wurde ein Edit auf `Client/package.json` mit einem `old_string` abgesetzt, der garantiert nicht in der Datei steht – die Absicht war, bei ausbleibendem Deny keine echte Änderung zu riskieren. Der Aufruf endete in „String to replace not found", **ohne** Deny. Die naheliegende Lesart wäre gewesen, der Check sei durch den Umbau kaputt.
+  Warum: Die Gültigkeitsprüfung von `old_string` läuft vor dem PreToolUse-Hook; ein absichtlich ungültiger Edit erreicht den Hook nie. Der vermeintlich sichere Test hat genau den Mechanismus umgangen, den er prüfen sollte.
+  Regel: Einen PreToolUse-Hook nur mit einem Aufruf testen, der ohne den Hook tatsächlich durchliefe – für Datei-Werkzeuge also mit echtem `old_string` bzw. per `Write`; ausbleibendes Blocken sonst erst als Hook-Befund werten, nachdem derselbe Input über die CLI gegengeprüft wurde.
+
+- **[MITTEL] [PROZESS] [Testing] LL-S113-3 – Die Testsuite der eigenen Werkzeuge lief in keinem Gate**
+  Quelle: Orchestrator
+  Was: Beim ersten Testlauf dieser Session waren vier Tests in `test_qa_check.py` rot – auf unverändertem `main`. Eine Signaturänderung an `_parse_report` (Rückgabe von 2 auf 3 Werte, Score als float statt formatiertem String) war ohne Anpassung der Tests eingecheckt worden. `pytest` kam weder in `qa-check.py` noch in der Definition of Done, im TDD-Prozess oder in `implementing-scenario` vor; die Suite lief nur, wenn jemand sie von Hand startete.
+  Warum: Die Suite sichert Hooks und Wrapper-Scripts ab – also genau die Mechanismen, die alle anderen Gates durchsetzen –, war selbst aber durch keines gedeckt. Ein Sicherungsmechanismus ohne eigene Sicherung fällt lautlos aus, weil sein Ausfall per Definition nichts auslöst.
+  Regel: Beim Bauen oder Ändern eines Gates prüfen, wodurch dieses Gate selbst abgesichert ist – und die Prüfung an den Auslöser hängen, der es brechen kann, nicht an einen Ablauf, den die betreffende Arbeit gar nicht durchläuft.
+
 ## Session 111 – 2026-07-29/30
 
 - **[MITTEL] [PROZESS] [Agent-Prompt] LL-S111-1 – Doku-Pflicht ausschließlich über den Subagenten-Return transportiert, Return fiel aus**

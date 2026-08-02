@@ -59,15 +59,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S085-3
 
-## OBS-S111-1 – gherkin-workshop fand die Konflikt-Variante eines Nebenläufigkeits-Szenarios nicht
-- Quelle: User
-- Status: NEU
-- Impact: HOCH    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: gherkin-workshop
-- Beobachtung: US-904 run-11 („Reaktivierung") kam mit vier abgenommenen Szenarien in die Implementierung. Eines davon deckt den Nebenläufigkeitsfall „Zutat wurde parallel bereits wiederhergestellt" ab – aber nur in der Variante, in der die parallel wiederhergestellte Zutat **dieselben** Daten trägt. Die Variante mit **abweichenden** Daten fehlte, obwohl sie fachlich die folgenreichere ist: dort überschreibt der Request stillschweigend fremde Werte (Lost Update), also ein Fall mit Datenwirkung und eigenem UI-Verhalten. Gefunden hat die Lücke der User beim Lesen der Implementierungs-Rückfragen – nicht der Workshop, nicht sein Review-Agent. Ohne den Zufallsfund wäre ein Contract entstanden, der fremde Daten ohne Hinweis überschreibt. Zu klären ist, warum die drei RE-Techniken (Example Mapping, State-Transition-Analyse, Input-Partition-Analyse) und der Review-Agent diese Variante nicht erzeugt haben; auffällig ist, dass der Workshop im übersehenen Punkt selbst eine Spur hinterließ – das abgenommene Szenario trägt den Kommentar „Einheit im Then bewusst nicht spezifiziert, weil im Parallelfall nicht kontrollierbar", also eine bewusst hingenommene Unbestimmtheit im Then genau an der Stelle, an der die fehlende Partition saß. Ob dieselbe Blindstelle andere Storys betrifft, ist offen.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: –
-
 ## OBS-S111-2 – ADR-Übergabe an Schicht-Subagenten skaliert nicht mehr mit der Zahl der ADRs
 - Quelle: User + Orchestrator
 - Status: NEU
@@ -85,24 +76,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Zwei Backend-Subagenten legten neue ADRs mit der jüngsten bestehenden Serien-Nummer (S105-3/-4) statt der laufenden Session (106) an → nachträgliche Umnummerierung inkl. ~7 Code-/Doku-Referenzen (LL-S106-2). Ein Subagent mitten in der Session hat kein klares Signal für die laufende Session-Nummer (der Index zeigt die letzte ABGESCHLOSSENE) und setzt naiv die höchste bestehende ADR-Serie fort. Bislang 1× beobachtet; die auslösende Klasse (Subagent legt ADR mitten in Session an) wiederholt sich potentiell in jedem Lauf.
 - Entscheidung/Maßnahme: Aufgeschoben (S107-Retro) bis zum 2. Vorkommen – 1× liegt unter der 2×-Muster-Schwelle für eine stehende CM. Lösungsrichtung bewusst offen (Drain/Retro entscheidet frisch). Re-Trigger: 2. Auftreten einer mit falscher Session nummerierten ADR-ID.
 - Bezug: LL-S106-2
-
-## OBS-S106-1 – Szenario-Clustering (Run-Generierung) modelliert Cross-Run-State-Abhängigkeiten nicht
-- Quelle: User + Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: gherkin-workshop / scenario-clustering
-- Beobachtung: Beim Einstieg in US-904 run-7 fiel auf, dass die Run-Generierung (gherkin-workshop Schritt 6, `.claude/skills/gherkin-workshop/references/scenario-clustering.md`) Cross-Run-**Zustands-Abhängigkeiten** nicht abbildet. Konkret der Soft-Delete-Lebenszyklus: (1) run-7 S3 „Soft-deleted Zutat erscheint nicht in der Liste" ist ein **Reader** von `DeletedAt`, aber **kein vorausgehender Run schreibt** `DeletedAt` (der DELETE-Writer ist run-8/run-10) → das E2E-Arrangement „existiert und gelöscht wurde" hat keinen echten Vordertür-Weg, erzwingt entweder einen Test-only-Endpoint oder das Vorziehen eines späteren Runs. (2) run-8 Sz.1 fordert „Then ist die Zutaten-Liste leer" nach dem Löschen – das **setzt run-7's GET-Filter voraus**, run-8 kann also nicht vor run-7. Das Clustering ordnet/splittet also einen Zustands-Lebenszyklus so, dass Reader vor Writer landen bzw. eine Reihenfolge entsteht, die eine echte Abhängigkeit verletzt. Kostete diese Session eine mehrrundige Design-Diskussion.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: –
-
-## OBS-S106-2 – Run-Planung flaggt Querschnitts-Policy-Rollout beim ersten Endpoint-Typ nicht vorab
-- Quelle: Orchestrator + Subagent
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: gherkin-workshop / scenario-clustering
-- Beobachtung: Dass run-10 den **ersten mutierenden Single-Resource-Endpoint** (DELETE) einführt und damit die Querschnitts-Policy ETag/If-Match/Optimistic-Concurrency (ADR-S058-1/-3) auslöst, wurde nicht in der Run-/Szenario-Planung sichtbar, sondern kam erst als PLANUNG-Eskalation des Backend-Subagenten mitten in der Implementierung hoch → mehrrundige Design-Diskussion über Scope (ETag jetzt vs. aufschieben), die vorab hätte eingeplant werden können. Verallgemeinert: Wenn ein Run den ERSTEN Endpoint eines Typs einführt (erster Single-Resource-Mutator; erste zweite Seite → Navigation; …), zieht das eine Querschnitts-Policy nach, die die feature-orientierte Clusterung nicht abbildet. **Zweite Ausprägung (S112), Szenario-Autorenschaft statt Run-Planung:** Dieselbe fehlende Unterscheidung trifft die Frage, in welche Feature-Datei ein Szenario gehört. Der Workshop läuft je User Story und legt Szenarien in der Story-Feature-Datei ab; für Querschnitts-Verhalten gibt es genau **eine** hartkodierte Ausnahme (Checklisten-Zeile „Erreichbarkeit (Navigation)" → `features/navigation.feature`, ADR-S103-1). Eine allgemeine Regel, wann ein entdecktes Verhalten querschnittlich ist und eine eigene Feature-Datei bekommt, existiert nicht. Folge in S112: Löschen-mit-Undo, Pending-Sperren und Toast-Bedienbarkeit landeten als US-904-Verhalten in `ingredients.feature`, obwohl keines davon zutatenspezifisch ist – sie wären in jeder Liste identisch zu fordern. Zusatzproblem, das die Ausnahme mitbringt: Eine querschnittliche Feature-Datei nutzt laut eigener Konvention „eine Seite als Vertreter" – wodurch gesichert ist, dass sich die übrigen Seiten ebenso verhalten, ist nirgends festgelegt.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: OBS-S106-1
 
 ## OBS-S105-2 – C#-String-Ops triggern unter `TreatWarningsAsErrors` kulturbezogene Analyzer
 - Quelle: Subagent + Orchestrator
@@ -192,15 +165,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - **S109-Messung (Frequenz, wie oben unter „Messung (a)" vorgesehen):** 41 Transkripte durchsucht (40 davon mit Subagent-Aktivität). **LSP-Nutzung in 2 Sessions, 8 Calls gesamt – davon 7 im Aktivierungstest am 2026-06-20 und genau 1 danach (2026-07-10).** Seit S101, seit dem Implementer und Auditoren das Tool überhaupt haben, also praktisch keine Nutzung. Operationen: findReferences 3, hover 2, documentSymbol/goToDefinition/workspaceSymbol je 1.
 - **S109-Entscheid (User): Empfehlung schärfen, eine Runde verlängern – bis S115.** Das vorab definierte Fehlschlag-Kriterium („kaum genutzt") wäre erfüllt, aber die Nullnutzung ist mehrdeutig: Der Hinweis stand bisher nur in `coding-guideline-typescript.md`, also in einem Dokument, das ein Agent liest *bevor* er arbeitet – nicht dort, wo die Entscheidung „grep oder LSP?" tatsächlich fällt. Zusätzlich ist LSP ein deferred Tool (erst via `ToolSearch select:LSP` ladbar), was eine echte Schwelle darstellt. Beides zusammen macht plausibel, dass „nicht angeboten" statt „nicht nützlich" gemessen wurde. **Maßnahme:** kurzer, konkreter LSP-Block direkt in die Prompts von `frontend-layer-implementer` (schreibt den TS-Code) und `code-quality-auditor` (stellt die „wo wird das noch verwendet?"-Fragen) – inklusive Ladehinweis und Kalt-Index-Caveat. Guideline-Notiz bleibt. **Bewertung S115 mit unveränderten Kriterien; dritte Nullrunde = verwerfen** (dann ist belegt, dass es nicht an der Sichtbarkeit lag). *Randnotiz:* `backend-layer-implementer` führt `LSP` in seinen `tools`, obwohl für C# kein Server läuft (Blocker #1359) – bewusst nicht angefasst, um das Messsetup nicht mitten in der Bewertung zu ändern.
 
-## OBS-S088-1 – Hook-Registrierung: ein Dispatcher je Matcher/Event statt Einzeleinträge
-- Quelle: User
-- Status: IN BEOBACHTUNG bis S110
-- Impact: GERING–MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Pro Tool-Matcher stehen mehrere Hook-Scripts einzeln in `settings.json` (PreToolUse `Edit|Write`: dependency-allowlist, code-quality-blocking, index-length, e2e-scenario-ref). Ein neuer/entfernter Check erfordert eine `settings.json`-Änderung → **Claude-Code-Reload** nötig, bevor er greift. `check-code-quality-blocking.py` ist bereits ein In-Process-Dispatcher (`CHECKS`-Liste + `checks/`-Package) – Checks dort sind reload-frei. Verallgemeinert man das (ein Dispatcher je Matcher *und* Event, der die Einzel-Checks aufruft), würde künftiges Hinzufügen/Entfernen eines Checks nur den Dispatcher-Inhalt ändern → sofort live, ohne Reload. Designpunkte: Pre (blocking, exit 2) vs. Post (non-blocking) getrennt; uneinheitlicher Input-Vertrag (Fragment-`HookInput` vs. voller Post-Edit-Inhalt + Datei-Reads bei e2e-scenario-ref → Dispatcher gibt rohes JSON, Checks adaptieren); Output-Stil je Dispatcher einheitlich (Bash nutzt JSON-`permissionDecision`); fail-open je Check.
-- Entscheidung/Maßnahme: aufgeschoben (S102-Drain) bis S110 – **der Enabler-Zug ist entfallen:** OBS-S095-3 wurde als eigenständiges PreToolUse-Script gebaut (nicht in den Dispatcher gehängt), also braucht der Referenz-Hook den Dispatcher-Refactor nicht mehr. Eigenwert laut Fable-Audit (S099) gering (kein Poka-Yoke), und die Reload-Friktion bei Hook-Wartung ist selten (mehrere Sessions). Re-Trigger: nächster realer Bedarf an reload-freiem Check-Management (z.B. mehrere neue Checks gleichzeitig in Sicht); Backstop bis S110.
-- Bezug: OBS-S085-16 (Reload-Friktion-Familie)
-
 ## OBS-S091-2 – Wrapper-Aufrufpfad cwd-relativ, kollidiert mit Projekt-Tooling-cwd
 - Quelle: Agent
 - Status: IN BEOBACHTUNG bis S115
@@ -209,16 +173,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Die Wrapper liegen im Repo-Root (`.claude/scripts/`) und lösen ihren Root intern via `_util.REPO_ROOT` auf — aber der **Aufrufpfad** `python3 .claude/scripts/foo.py` ist cwd-relativ. Projekt-Tooling (`npm`/`dotnet`/`vite`) zieht die Shell in `Client/`/`Server/`-Subdirs; der nächste Wrapper-Aufruf scheitert dann mit „No such file" (S091: beide Subagenten + Orchestrator betroffen).
 - Entscheidung/Maßnahme: **Aufgeschoben (S109-Drain) bis S115 – die Ursache wurde stattdessen entfernt.** Der mit Abstand häufigste Grund, den Repo-Root zu verlassen, war ein blockiertes `npm --prefix Client run …`, das ein `cd Client` erzwang; `--prefix` ist jetzt erlaubt (s. OBS-S108-4 b), womit der Auslöser wegfällt. Der direkte Fix – der Bash-Hook präfixt Wrapper-Aufrufe via `updatedInput` mit `cd <repo-root> &&` – wurde bewusst **nicht** gebaut: er wäre die Umkehrung der im selben Hook bestehenden Normalisierungsregel (absolute Repo-Pfade → relativ), also zwei gegenläufige Rewrite-Regeln nebeneinander, für ein seit 18 Sessions nie eskaliertes GERING-Problem. Geprüft und verworfen wurde auch der Weg über `$CLAUDE_PROJECT_DIR`: die Variable ist im Bash-Tool leer (nur in Hooks gesetzt), ein Rewrite müsste den Repo-Root literal einsetzen. **Re-Trigger:** ein Wrapper-Aufruf scheitert erneut an falschem cwd, obwohl `--prefix` verfügbar ist – dann ist belegt, dass es noch andere cd-Gründe gibt, und der Hook-Rewrite ist gerechtfertigt.
 - Bezug: —
-
-## OBS-S093-1 – SonarAnalyzer S125 feuert auf deutsche Kommentare mit Satz-Ende „;"
-- Quelle: Agent
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Build/Analyzer
-- Beobachtung: SonarAnalyzer S125 („Sections of code should not be commented out") interpretiert deutschsprachige Kommentare, die mit „…;" enden, als auskommentierten Code und bricht den Build. In dieser Session musste ein korrekter Erklär-Kommentar nur umformuliert werden, um S125 zu beruhigen – inhaltlich unnötiger Eingriff.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
----
 
 ## OBS-S096-3 – Scripted-Access-Layer für TD/OBS/LL/Doc (Lesen/Schreiben, Metadaten listen/filtern/move)
 - Quelle: User
@@ -260,17 +214,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: MITTEL    Häufigkeit: dauerhaft
 - Kategorie: PROZESS    Kontext: Doku
 - Beobachtung: Alle Verweise auf `docs/open-questions.md` in Skills, Hooks und Prozessdocs sind **Schreib**-Verweise („dort eintragen"): `gherkin-workshop` legt nicht lösbare Fragen ab (Schritt ~292), `kaizen` und `closing-session` verweisen aufs Eintragen, `implementing-scenario` ebenso. Kein Prozessschritt liest die Datei, legt Einträge zur Klärung vor oder erzwingt eine Wiedervorlage. Alle anderen Tracker haben einen solchen Trigger: `tech-debt.md` wird in `implementing-scenario` Schritt 0.5 gesichtet und in 6.1 abgeglichen, `observations.md` treibt der Drain-Vorschlag am Session-Start, `lessons_learned.md` die Retro über den Jenga-Score. Folge im Bestand: OQ-S083-1/-2 liegen seit 25 Sessions offen, OQ-S094-1/-2 seit 14. Konkret in dieser Session: OQ-S083-1 fragt „ADR vs. technische Schuld: Taxonomie klären" – genau diese Abgrenzung wurde hier dreimal ad hoc neu verhandelt (ADR-S000-3 löschen statt Superseded; Undo-Toast-Touch-Punkt als TD statt OBS; CORS-Punkt als OBS statt OQ), ohne dass die offene Frage konsultiert wurde. Sichtbar wurde sie nur, weil der User sie beiläufig erwähnte. Anders als bei OBS-Einträgen (Feld `Status: IN BEOBACHTUNG bis S<NNN>`) gibt es im OQ-Format zudem kein Feld für einen Wiedervorlage-Termin.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: –
-
----
-
-## OBS-S108-2 – gherkin-workshop-Checkliste deckt transiente Feedback-Elemente (Toast/Snackbar) nicht ab
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Gherkin
-- Beobachtung: Die Vollständigkeits-Checkliste in `.claude/skills/gherkin-workshop/SKILL.md` (Zeilen ~155-157) fragt „Nach erfolgreicher Aktion", „Abbrechen" und „Feld-Initialisierung" ab – durchgehend dialog- und formularzentriert. Für transiente Feedback-Elemente (Toast/Snackbar) fragt sie nichts: weder Lebensdauer, noch wodurch sie verschwinden, noch was bei mehrfacher Auslösung kurz hintereinander passiert. „Klick außerhalb" kommt vor, aber nur als Abbrechen-Pfad eines Dialogs. In run-8 führte das dazu, dass der Undo-Toast als einzige Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5) ohne jedes Szenario zu seinem Verhalten implementiert wurde. Erst der Review deckte drei beobachtbare Verhaltensaspekte auf, für die Szenarien fehlten (Klick daneben schließt den Toast; zweiter Toast erbt die Restlaufzeit des ersten und verkürzt das Undo-Fenster; nur der letzte Löschvorgang ist rückgängig). Zwei davon waren bereits implementiertes Verhalten ohne Spec, einer ein realer, im Browser reproduzierter Bug. Die Szenarien wurden nachträglich ergänzt – also in umgekehrter Reihenfolge zum Outside-In-Prinzip (ADR-S041-5). Aufgefallen ist die Lücke dem User, nicht dem Workshop und nicht den Review-Agenten. **Ursache in S112 genau lokalisiert – und weiter reichend als Toasts:** Die Checkliste selbst enthält den passenden Prüfpunkt („Async-Zustände & Sperren während Pending … **alle** konfliktträchtigen Kontrollen, nicht nur der Auslöser"). Ausgeschlossen wird er durch die Anwendbarkeits-Bedingung direkt über der Tabelle: „Prüfe jeden Punkt für jede Operation aus Schritt 0.A, **die ein Formular oder einen Dialog hat**." Löschen und Rückgängig haben weder Formular noch Dialog – Löschen ist ein IconButton in einer Listenzeile, Rückgängig ein Button im Toast. Betroffen sind damit nicht nur transiente Elemente, sondern **jede** Operation, die über Listen-/Zeilen-Bedienelemente ausgelöst wird. In S112 fehlten dadurch drei beobachtbare Verhaltensweisen ohne Szenario: „Rückgängig" ist während des laufenden Wiederherstellens nicht gesperrt, zwei gleichzeitige Löschvorgänge überschreiben sich, und der Toast ist auf Touch-Geräten nicht manuell schließbar.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: –
 
@@ -379,6 +322,14 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
 ---
+
+## OBS-S113-1 – Der Drain-Satz kennt keine extern gesetzten Gates und kann sie nicht anzeigen
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: `docs/AGENT_MEMORY.md` führte vier OBS (OBS-S111-1, OBS-S106-1, OBS-S106-2, OBS-S108-2) ausdrücklich als **Gate** vor dem nächsten `gherkin-workshop` – „Gate, nicht nur Priorität". Der Drain-Satz, den `obs-drain.py` am Session-Start ausgibt, sortiert die Wert-Lane rein nach Impact × Häufigkeit; alle vier tragen `× gelegentlich` und fielen deshalb aus der Top-6. Der vorgeschlagene Satz enthielt **keinen** von ihnen, und nichts im Satz wies darauf hin, dass eine externe Vorrangregel existiert. Aufgefallen ist der Konflikt nur, weil in dieser Session beide Quellen nebeneinander gelesen wurden – der Hook injiziert `AGENT_MEMORY.md` und den Drain-Satz zwar gemeinsam, aber unverbunden. Wer dem Drain-Vorschlag folgt, arbeitet einen fachlich korrekt priorisierten Satz ab und lässt das Gate trotzdem stehen; der nächste Workshop liefe dann in genau die Blindstellen, deretwegen das Gate gesetzt wurde. Verallgemeinert: Priorität wird an zwei Orten gebildet – im Script nach einer festen Formel, in `AGENT_MEMORY.md` nach Projektlage –, ohne dass der eine Ort vom anderen weiß.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
 ## OBS-S112-8 – Lösungsfreie OBS-Erfassung erzwingen kostet mehr, als das eigentliche Ziel verlangt
 - Quelle: User

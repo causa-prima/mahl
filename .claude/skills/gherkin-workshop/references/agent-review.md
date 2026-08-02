@@ -30,6 +30,11 @@ HIGH (muss vor Output behoben werden):
 - Mutierende Szenarien ohne vollständigen Then-Zustand
 - Fehlermeldungstext fehlt im Szenario obwohl explizit in der US genannt
 - Then-Assertion trivial wahr: Given kann keinen Gegenfall produzieren (z.B. Sortierungsbehauptung mit nur einem Listeneintrag – immer true)
+- Then lässt einen beobachtbaren Wert bewusst offen („nicht kontrollierbar", „bewusst nicht
+  spezifiziert", „hängt vom Timing ab"): Das ist kein zulässiger Verzicht, sondern der Hinweis auf
+  eine unpartitionierte Eingangsdimension – der Wert ist unbestimmt, WEIL mehrere Fälle in einem
+  Szenario zusammenfallen. Benenne die Dimension und fordere je Partition ein eigenes Szenario mit
+  bestimmtem Then.
 
 MEDIUM (beheben wenn möglich, sonst dokumentieren):
 - Mutierende Operation mit Server-Wartezeit ohne Ladezustand-Szenario (Guideline 3): kein Szenario das beschreibt was der Nutzer während des Wartens sieht – nur wenn die Operation typischerweise spürbar lange dauert

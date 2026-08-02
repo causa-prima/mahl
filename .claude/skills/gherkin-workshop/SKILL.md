@@ -146,7 +146,10 @@ Der Dialog ist abgeschlossen, wenn:
 ### UI-Verhaltens-Checkliste (Pflichtprüfung vor Abschluss von Schritt 1)
 
 Diese Aspekte werden sonst als Implementierungsdetails entschieden — ohne Gherkin-Deckung.
-Prüfe jeden Punkt für jede Operation aus Schritt 0.A, die ein Formular oder einen Dialog hat.
+Prüfe jeden Punkt für **jede** Operation aus Schritt 0.A – auch für Operationen ohne Formular
+und ohne Dialog (Bedienelement in einer Listenzeile, Button in einem Toast). Trifft ein Punkt
+auf eine Operation nicht zu, wird er unten als „Nicht relevant" notiert; das ist der vorgesehene
+Weg – nicht der stille Ausschluss der ganzen Tabelle für diese Operation.
 Für jeden relevanten Aspekt ohne vorhandenes Szenario: jetzt ein Szenario formulieren,
 nicht später als Implementierungsdetail überlassen.
 
@@ -156,16 +159,37 @@ nicht später als Implementierungsdetail überlassen.
 | **Abbrechen** | Gibt es einen Abbrechen-Pfad (Button, Escape, Klick außerhalb)? Wohin führt er? Gehen Eingaben verloren? | Szenario formulieren, das die Abbrechen-Navigation und den Endzustand beschreibt |
 | **Feld-Initialisierung** | Welche Werte **und Fehler-/Validierungszustände** zeigen Felder beim Öffnen — beim *ersten* Öffnen (Leer, Defaults, vorausgefüllt?) **und beim erneuten Öffnen nach einem abgebrochenen oder fehlgeschlagenen Versuch** (bleibt eine alte Fehlermeldung/Markierung stehen?) | Szenario je relevantem Öffnungs-Kontext, das den sichtbaren Zustand beschreibt — inkl. „kein Rest-Fehler nach Abbrechen + erneutem Öffnen" |
 | **Async-Zustände & Sperren während Pending** | Welche Bedienelemente lassen sich während einer laufenden mutierenden Aktion auslösen? **Alle** konfliktträchtigen/schließenden Kontrollen (auslösender Button, **Abbrechen, Escape, Backdrop**) müssen gesperrt sein — nicht nur der Auslöser (UX-Guideline Prinzip 3 „Sperren während Pending"). | Szenario je Kontrolle, das die Sperre während der laufenden Aktion beobachtet |
+| **Transientes Feedback (Toast/Snackbar)** | Zeigt die Operation eine Rückmeldung, die von selbst wieder verschwindet? Dann je eigene Prüffrage: Wie lange bleibt sie stehen? Wodurch verschwindet sie außer durch Zeitablauf (Klick daneben, Klick auf eine Aktion darin)? Lässt sie sich manuell schließen (auf Touch Pflicht – dort gibt es kein Hover, das die Zeit anhält)? Was passiert, wenn die Operation ein zweites Mal ausgelöst wird, bevor die erste Rückmeldung weg ist – erbt die zweite die Restlaufzeit der ersten? Trägt die Rückmeldung eine Aktion (z.B. Rückgängig): auf welchen Vorgang wirkt sie, wenn mehrere kurz nacheinander liefen? | Szenario je beobachtbarem Aspekt – Lebensdauer, Schließbarkeit und der Wirkbereich einer Aktion darin sind je eigene Fehlergründe |
 | **Pflichtfeld-Affordance** | Hat das Formular Pflichtfelder? Sind sie als solche markiert (statisch, vor jeder Eingabe sichtbar)? | Eigenes Happy-Path-Szenario „Pflichtfelder sind als solche markiert" (getestet **beim Öffnen**, nicht im Error-Szenario) |
 | **Autofokus beim Öffnen** | Liegt der Fokus beim Öffnen auf dem visuell ersten Feld? | Eigenes Happy-Path-Szenario (E2E: visuell oberstes Input hat Fokus) + Guideline-Invariant „kein CSS-Reorder von Formularfeldern" |
 | **Fokus nach Validierungsfehler** | Springt der Fokus nach Submit-Fehler aufs erste fehlerhafte Feld? | **Asserts an bestehende Error-Szenarien** (kein neues Szenario): ein Fall „erstes Feld fehlerhaft" + ein Fall „nur späteres Feld fehlerhaft" |
 | **Tastatur & Dialog-Fokus** (Enter-Submit, Escape, Fokus-Falle/-Rückkehr) | Liefert das Framework/HTML-native das Verhalten (echtes `<form>`, MUI `Dialog`)? | **Kein Szenario** — per UX-Guideline Prinzip 8 + Review erzwingen |
-| **Erreichbarkeit (Navigation)** | Entsteht durch diese Story eine neue Seite/Route, **und** existiert bereits mindestens eine andere Seite in der Anwendung? | Szenario „Wie kommt der Nutzer zu [Seite]" formulieren — aber **nicht** in diesem Feature-File: gehört in `features/navigation.feature` (Tag `@CROSS-navigation`, siehe `docs/process/e2e-testing.md`), damit bestehende Feature-Dateien beim Hinzufügen einer neuen Seite nicht nachträglich angepasst werden müssen. Ist diese Story die **erste** Seite der Anwendung (keine andere Seite existiert), gibt es noch nichts, wohin navigiert werden könnte: „Nicht relevant" notieren. Strukturelle Vorgabe (Nav-Eintrag je Route): UX-Guideline Prinzip 9. |
+| **Erreichbarkeit (Navigation)** | Entsteht durch diese Story eine neue Seite/Route, **und** existiert bereits mindestens eine andere Seite in der Anwendung? | Szenario „Wie kommt der Nutzer zu [Seite]" formulieren. Es ist querschnittlich (siehe Ablage-Regel unten) und gehört daher in `features/navigation.feature`, Tag `@CROSS-navigation`. Ist diese Story die **erste** Seite der Anwendung (keine andere Seite existiert), gibt es noch nichts, wohin navigiert werden könnte: „Nicht relevant" notieren. Strukturelle Vorgabe (Nav-Eintrag je Route): UX-Guideline Prinzip 9. |
 
-**Träger-Regel (Formular-/Dialog-Baseline — welcher Mechanismus bekommt ein Szenario?):**
+**Träger-Regel (welcher Mechanismus bekommt ein Szenario?):**
 Frage pro Mechanismus zuerst: *Liefert das Framework / HTML-native das Verhalten?*
 - **Ja → kein Szenario**, per UX-Guideline Prinzip 8 + Review erzwingen (sonst testet das Szenario nur das Framework).
 - **Nein (eigene Logik) → Szenario/Assert.** Dabei: statische Affordance (Markierung) → **eigenes** Szenario beim Öffnen (one-behavior, eigener Fehlergrund). Nur im Fehlerzustand beobachtbare Mechanik (Fokus aufs erste fehlerhafte Feld) → **Asserts an bestehende Error-Szenarien**, weil „erstes fehlerhaftes Feld" mehrere Input-Partitionen braucht, die die Error-Szenarien schon liefern. Begründung + Details: UX-Guideline Prinzip 8.
+
+**Ablage-Regel (gehört das Szenario in die Story-Feature-Datei?):**
+Der Workshop läuft je User Story und legt Szenarien standardmäßig in deren Feature-Datei ab.
+Prüfe jedes Szenario aus dieser Checkliste vorher gegen den **Querschnitts-Test**:
+
+> Lässt sich sein Given/When/Then ohne Bezug auf die konkrete Entität formulieren, und würde es
+> auf einer zweiten Seite identisch gefordert?
+
+Beide Teile ja → das Verhalten ist querschnittlich und gehört **nicht** in die Story-Feature-Datei,
+sondern in eine `@CROSS-<domain>`-Datei (Tag-Schema: `docs/process/e2e-testing.md`). Sonst
+sammelt sich in der Story-Datei Verhalten, das mit der Story nichts zu tun hat, und muss beim
+Hinzufügen jeder weiteren Seite nachträglich angefasst werden. Typische Treffer: Navigation,
+Sperren während Pending, Undo-/Toast-Verhalten, Fokusführung.
+
+Nicht hier zu klären ist, wodurch gesichert ist, dass sich die **übrigen** Seiten ebenso
+verhalten (eine Querschnitts-Datei nutzt eine Seite als Vertreter) – das regelt **ADR-S112-5**
+über geteilte Implementierung, Import-Guard, eine parametrisierte Suite und eine
+Fähigkeits-Deklaration je Seite. Der Umzug **bestehender** Szenarien ist dort ebenfalls verortet
+(Migrationsschritt 5, gebunden an die zweite Seite) – dieser Skill entscheidet nur über
+**neu entdeckte** Szenarien.
 
 Notiere das Ergebnis der Checkliste schriftlich — für jeden Aspekt entweder:
 - „Relevant – Szenario formuliert: [Titel]"

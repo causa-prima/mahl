@@ -94,6 +94,39 @@ def compute_post_content(tool: str, file_path: str, tool_input: dict) -> str | N
     return None
 
 
+def check(data: dict) -> str | None:
+    """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py.
+
+    Fail-open (Exception → None) liegt beim Dispatcher, damit ein Hook-Fehler
+    nie einen Edit blockiert.
+    """
+    tool = data.get("tool_name", "")
+    tool_input = data.get("tool_input", {})
+    file_path = tool_input.get("file_path", "")
+    if tool not in ("Edit", "Write") or not file_path:
+        return None
+    if not is_protected(file_path):
+        return None
+
+    post = compute_post_content(tool, file_path, tool_input)
+    if post is None:
+        return None
+
+    refs = find_volatile_refs(post)
+    if not refs:
+        return None
+
+    lines = "\n".join(f"  - Zeile {lineno}: {ident}" for lineno, ident in refs)
+    return (
+        "❌ Referenz-Richtung (Poka-Yoke): stabile Datei referenziert volatile ID(s):\n"
+        f"{lines}\n"
+        "  Prinzip „Referenzen laufen volatil → stabil, nie umgekehrt“ (principles.md): volatile IDs "
+        "(OBS-/OQ-/LL-/TD-) verschwinden beim Erledigen/Archivieren → der Verweis dangelt. "
+        "Nötige Info hier inlinen oder nur auf stabile Artefakte (ADR/Guideline) verweisen. "
+        "Bewusster Einzelfall → `ref-ok`-Marker in die Zeile."
+    )
+
+
 def main() -> None:
     try:
         data = json.load(sys.stdin)
@@ -101,30 +134,9 @@ def main() -> None:
         sys.exit(0)  # kein parsbarer Input → nichts blocken
 
     try:
-        tool = data.get("tool_name", "")
-        tool_input = data.get("tool_input", {})
-        file_path = tool_input.get("file_path", "")
-        if tool not in ("Edit", "Write") or not file_path:
-            sys.exit(0)
-        if not is_protected(file_path):
-            sys.exit(0)
-
-        post = compute_post_content(tool, file_path, tool_input)
-        if post is None:
-            sys.exit(0)
-
-        refs = find_volatile_refs(post)
-        if refs:
-            print("❌ Referenz-Richtung (Poka-Yoke): stabile Datei referenziert volatile ID(s):", file=sys.stderr)
-            for lineno, ident in refs:
-                print(f"  - Zeile {lineno}: {ident}", file=sys.stderr)
-            print(
-                "  Prinzip „Referenzen laufen volatil → stabil, nie umgekehrt“ (principles.md): volatile IDs "
-                "(OBS-/OQ-/LL-/TD-) verschwinden beim Erledigen/Archivieren → der Verweis dangelt. "
-                "Nötige Info hier inlinen oder nur auf stabile Artefakte (ADR/Guideline) verweisen. "
-                "Bewusster Einzelfall → `ref-ok`-Marker in die Zeile.",
-                file=sys.stderr,
-            )
+        reason = check(data)
+        if reason:
+            print(reason, file=sys.stderr)
             sys.exit(2)  # exit 2 = Edit blockieren
     except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
         print(f"check-ref-direction: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)

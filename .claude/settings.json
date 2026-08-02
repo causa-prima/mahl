@@ -2,19 +2,12 @@
   "permissions": {
     "allow": [
       "Edit(Server/**/*.cs)",
-      "Write(Server/**/*.cs)",
       "Edit(Server.Tests/**/*.cs)",
-      "Write(Server.Tests/**/*.cs)",
       "Edit(Infrastructure/**/*.cs)",
-      "Write(Infrastructure/**/*.cs)",
       "Edit(Client/src/**/*.ts)",
-      "Write(Client/src/**/*.ts)",
       "Edit(Client/src/**/*.tsx)",
-      "Write(Client/src/**/*.tsx)",
       "Edit(Client/src/**/*.css)",
-      "Write(Client/src/**/*.css)",
-      "Edit(Client/e2e/**/*.ts)",
-      "Write(Client/e2e/**/*.ts)"
+      "Edit(Client/e2e/**/*.ts)"
     ]
   },
   "hooks": {
@@ -43,27 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-dependency-allowlist.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-blocking.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-index-length.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-e2e-scenario-ref.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-ref-direction.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-obs-capture.py"
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/dispatch-edit-write.py"
           }
         ]
       }
