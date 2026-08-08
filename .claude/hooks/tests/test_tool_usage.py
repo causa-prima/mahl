@@ -75,3 +75,36 @@ def test_measure_counts_runs_and_quote(tmp_path):
 def test_measure_tolerates_a_missing_log(tmp_path):
     runs, filtered, by_wrapper, examples = tu.measure_filter_quote(tmp_path / "fehlt.log")
     assert (runs, filtered, by_wrapper, examples) == ({}, {}, {}, [])
+
+
+# --- Datumsfenster -----------------------------------------------------------
+# Die Wirkung einer Maßnahme zeigt sich nur an den Läufen NACH ihrem Stichtag. Die
+# Monats-Buckets allein können das nicht trennen, wenn der Stichtag mitten im Monat liegt
+# (S109: 29.07.) – dann mischt der Juli-Bucket Vor- und Nach-Maßnahme.
+def test_line_date_yields_the_full_day():
+    assert tu.line_date(f"{STAMP}python3 .claude/scripts/vitest-run.py") == "2026-07-15"
+
+
+def test_line_date_is_none_without_a_timestamp():
+    assert tu.line_date("    --filter Foo | head -3") is None
+
+
+def test_since_skips_earlier_runs(tmp_path):
+    log = tmp_path / "allowed-commands.log"
+    log.write_text(
+        "[2026-07-28 09:00:00] python3 .claude/scripts/vitest-run.py | tail -3\n"
+        "[2026-07-30 09:00:00] python3 .claude/scripts/vitest-run.py | tail -3\n"
+        "[2026-08-01 09:00:00] python3 .claude/scripts/qa-check.py\n",
+        encoding="utf-8",
+    )
+    runs, filtered, _, _ = tu.measure_filter_quote(log, since="2026-07-30")
+    assert sum(runs.values()) == 2
+    assert sum(filtered.values()) == 1
+
+
+def test_since_includes_the_stichtag_itself(tmp_path):
+    """Inklusiv – sonst fiele der Stichtag selbst aus beiden Fenstern heraus."""
+    log = tmp_path / "allowed-commands.log"
+    log.write_text("[2026-07-30 09:00:00] python3 .claude/scripts/vitest-run.py\n", encoding="utf-8")
+    runs, _, _, _ = tu.measure_filter_quote(log, since="2026-07-30")
+    assert sum(runs.values()) == 1

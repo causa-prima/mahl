@@ -76,7 +76,13 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   **(b) Eine Vorschrift beschreibt nicht die Praxis.** Was ein Skill, eine Guideline oder ein
   Prozessdoc anordnet, sagt nichts darüber, ob es befolgt wird. Bevor Kosten oder Nutzen einer
   Regel beziffert werden: am Bestand prüfen, ob sie greift.
-  Gegenprobe für beides: Widerspricht die eigene Rechnung einer vorliegenden Messung um
+  **(c) Redaktionsarbeit fühlt sich nicht wie eine Behauptung an.** Doku schreiben, Zustand
+  ablegen, Information platzieren – dort springt der Selbst-Check nicht an, obwohl jeder
+  dokumentierte Befehl eine Behauptung ist und jede Ablage eine über ihre Wiedervorlage. Drei
+  Fragen: Befehl in dieser Session ausgeführt (sonst als ungeprüft kennzeichnen)? Bezeugt die
+  Quelle einen *Versuch* oder eine *Ausführung*? Welcher Mechanismus legt das Abgelegte wieder
+  vor – verträgt der Zielstatus ihn?
+  Gegenprobe für alle drei: Widerspricht die eigene Rechnung einer vorliegenden Messung um
   Größenordnungen, ist zuerst die Rechnung verdächtig.
 
 - **Vollständige Zerlegung vor Schluss/Empfehlung.**

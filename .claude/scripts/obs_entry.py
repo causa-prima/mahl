@@ -45,10 +45,33 @@ def entry_spans(text: str) -> dict[str, tuple[int, int]]:
     return spans
 
 
-def get(text: str, oid: str) -> str | None:
-    """Vollständiger Text eines Eintrags (None, wenn es ihn nicht gibt)."""
+VORPRAEGUNG_FELD = "Vorprägung"
+_VORPRAEGUNG_RE = re.compile(rf"^- {VORPRAEGUNG_FELD}:.*$", re.M)
+
+
+def get(text: str, oid: str, mit_vorpraegung: bool = False) -> str | None:
+    """Vollständiger Text eines Eintrags (None, wenn es ihn nicht gibt).
+
+    Das Feld `Vorprägung` wird standardmäßig **nicht** ausgegeben, sondern durch einen Hinweis
+    ersetzt (OBS-S112-8). Grund: Es enthält Lösungsideen, Ursachenvermutungen oder
+    Analogieschlüsse, die die Kandidatenbildung im Drain prägen. Eine Regel „erst eigene
+    Kandidaten, dann bewerten" käme zu spät – wer den Volltext gelesen hat, ist geprägt.
+    Der Hinweis ist Pflicht und kein Schmuck: Ein stumm verborgenes Feld wäre so verloren wie
+    ein getilgtes, nur unauffälliger.
+    """
     span = entry_spans(text).get(oid)
-    return text[span[0]:span[1]].rstrip() if span else None
+    if not span:
+        return None
+    block = text[span[0]:span[1]].rstrip()
+    if mit_vorpraegung or not _VORPRAEGUNG_RE.search(block):
+        return block
+
+    hinweis = (
+        f"- ⚠ {VORPRAEGUNG_FELD} vorhanden (Lösungsideen/Ursachenvermutungen) – erst eigene "
+        f"Kandidaten bilden und dem User vorlegen, dann abrufen:\n"
+        f"    python3 .claude/scripts/obs.py get {oid} --vorprägung"
+    )
+    return _VORPRAEGUNG_RE.sub(lambda _: hinweis, block, count=1)
 
 
 def next_id(text: str, session: int) -> str:
@@ -67,8 +90,14 @@ def _pruefe(name: str, wert: str, erlaubt: tuple[str, ...]) -> None:
 
 
 def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: str,
-                 kategorie: str, kontext: str, beobachtung: str, bezug: str | None) -> str:
-    """Baut einen formatgetreuen Eintrag. `Entscheidung/Maßnahme` ist bewusst nicht setzbar."""
+                 kategorie: str, kontext: str, beobachtung: str, bezug: str | None,
+                 vorpraegung: str | None = None) -> str:
+    """Baut einen formatgetreuen Eintrag. `Entscheidung/Maßnahme` ist bewusst nicht setzbar.
+
+    `vorpraegung` nimmt auf, was die Kandidatenbildung prägen würde – genannte Lösungen,
+    vermutete Ursachen, Analogieschlüsse. Es ersetzt den früheren Ausnahme-Marker: Die
+    Information geht nicht verloren, wird beim Standardzugriff aber nicht mitgelesen (s. `get`).
+    """
     _pruefe("Impact", impact, IMPACT_WERTE)
     _pruefe("Häufigkeit", haeufigkeit, HAEUFIGKEIT_WERTE)
     _pruefe("Kategorie", kategorie, KATEGORIE_WERTE)
@@ -82,6 +111,12 @@ def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: st
         f"- Impact: {impact}    Häufigkeit: {haeufigkeit}",
         f"- Kategorie: {kategorie}    Kontext: {kontext.strip()}",
         f"- Beobachtung: {beobachtung.strip()}",
+    ]
+    # Zwischen Beobachtung und Entscheidung: Beim Lesen der Datei ist damit sichtbar, wo die
+    # neutrale Schilderung endet und das Vorgeprägte beginnt.
+    if vorpraegung and vorpraegung.strip():
+        zeilen.append(f"- {VORPRAEGUNG_FELD}: {vorpraegung.strip()}")
+    zeilen += [
         f"- Entscheidung/Maßnahme: {KANON_OFFEN}",
     ]
     if bezug and bezug.strip():
@@ -110,8 +145,40 @@ def set_fields(text: str, oid: str, status: str | None = None,
         muster = re.compile(rf"^- {re.escape(feld)}:.*$", re.M)
         if not muster.search(block):
             raise ValueError(f"{oid} hat kein Feld `- {feld}:` – Datei von Hand prüfen.")
-        block = muster.sub(f"- {feld}: {wert}", block, count=1)
+        # Ersetzung als Funktion, nicht als String: Ein String-Argument wäre ein
+        # Regex-Ersetzungs-Template, in dem `\s` mit „bad escape“ abbricht und `\1`
+        # still durch eine Regex-Gruppe ersetzt würde. Entscheidungstexte zitieren
+        # regelmäßig Muster und Pfade – der Wert muss literal bleiben.
+        neuer_wert = f"- {feld}: {wert}"
+        block = muster.sub(lambda _: neuer_wert, block, count=1)
 
+    return text[:span[0]] + block + text[span[1]:]
+
+
+def append_beobachtung(text: str, oid: str, zusatz: str) -> str:
+    """Hängt `zusatz` an die Beobachtung eines bestehenden Eintrags an.
+
+    Für die Konsolidierung aus dem Drain-Skill: Tritt dasselbe Problem an anderer Stelle
+    erneut auf, wird der tragende Eintrag erweitert statt ein zweiter angelegt. Ohne diesen
+    Weg bliebe dafür nur der Hand-Edit der ganzen Datei – also genau der Pfad, den die
+    Script-Pflicht vermeidet.
+
+    Die Beobachtung ist EIN Feld auf EINER Zeile; der Zusatz wird deshalb mit Leerzeichen
+    angefügt, nicht mit Zeilenumbruch.
+    """
+    span = entry_spans(text).get(oid)
+    if not span:
+        raise ValueError(f"{oid} existiert nicht in {OBS_FILE}.")
+
+    block = text[span[0]:span[1]]
+    muster = re.compile(r"^- Beobachtung:.*$", re.M)
+    treffer = muster.search(block)
+    if not treffer:
+        raise ValueError(f"{oid} hat kein Feld `- Beobachtung:` – Datei von Hand prüfen.")
+
+    # Ersetzung als Funktion: der Text bleibt literal (kein Regex-Template, s. set_fields).
+    erweitert = f"{treffer.group(0).rstrip()} {zusatz.strip()}"
+    block = muster.sub(lambda _: erweitert, block, count=1)
     return text[:span[0]] + block + text[span[1]:]
 
 

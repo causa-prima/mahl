@@ -1,9 +1,11 @@
 # Offene Fragen / geparkte Diskussionen
 
 <!--
-wann-lesen: Wenn eines der Themen wieder aufkommt bzw. bevor verwandte Arbeit beginnt
-            (z.B. Taxonomie-Frage vor der nächsten ADR-/Suppression-Entscheidung;
-            getypte IDs vor ID-naher Domain-Arbeit / US-602).
+wann-lesen: Wird vom Drain-Vorschlag am Session-Start vorgelegt, sobald ein `Fällig`-Termin
+            erreicht oder ein Eintrag überaltert ist (`obs-drain.py`, Sektion „Offene
+            Fragen"). Zusätzlich weiterhin, wenn eines der Themen aufkommt bzw. bevor
+            verwandte Arbeit beginnt (z.B. Taxonomie-Frage vor der nächsten ADR-/
+            Suppression-Entscheidung; getypte IDs vor ID-naher Domain-Arbeit / US-602).
 wann-schreiben: Wenn eine Architektur-/Produkt-Diskussion mit dem User ohne Auflösung
             geparkt wird. Bei Klärung: Eintrag entfernen (Ergebnis ggf. als ADR/Tech-Schuld).
 
@@ -12,9 +14,16 @@ Sortierung: nach ID (Session) aufsteigend – neue Einträge unten anfügen.
 Eintrag-Format:
   ## OQ-S<NNN>-<n> — <Kurztitel>
   **Frage:** <die offene, mit dem User zu klärende Frage>
+  **Fällig:** S<NNN>          (optional – wann soll die Frage vorgelegt werden?)
   **Hintergrund:** <Auslöser / Kontext / betroffene Artefakte>
 
   ID: OQ-S<NNN>-<n> – 3-stellige Session (geparkt), laufende Nummer innerhalb der Session.
+
+  `Fällig` ist optional und steuert die Vorlage: Ist ein Termin gesetzt, erscheint die Frage
+  genau dann (und vorher nicht – ein Termin unterdrückt die Alters-Regel, sonst wäre er
+  wirkungslos). Ohne Termin gilt eine Frage nach ~10 Sessions als überaltert und wird
+  vorgelegt. Ein Termin lohnt, wenn die Frage an ein Ereignis gebunden ist („vor US-602");
+  ohne Termin genügt das Alter.
 -->
 
 ## OQ-S083-1 — ADR vs. technische Schuld: Taxonomie klären

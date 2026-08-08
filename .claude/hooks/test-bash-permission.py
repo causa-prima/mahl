@@ -663,6 +663,98 @@ def test_path_normalization() -> int:
     return failures
 
 
+def test_cd_npm_deny() -> int:
+    """OBS-S091-2: `cd <dir> && npm …` blocken, weil der Wechsel die FOLGENDEN
+    Wrapper-Aufrufe zerstört (deren Pfad ist repo-root-relativ). `--prefix` ist der Ersatz.
+    """
+    print(f"\n{Colors.BOLD}=== cd + npm → deny (OBS-S091-2) ==={Colors.RESET}")
+    failures = 0
+
+    R = REPO_ROOT
+    cases = [
+        # Der belegte S111-Fall: einziger cd-Grund, der keine Deny-Regel hatte.
+        ("cd Client && npm run typecheck", "deny", "cd + npm run typecheck"),
+        ("cd Client && npm run typecheck 2>&1 | tail -30", "deny", "dito mit Filter"),
+        ("cd Client && npm ci", "deny", "cd + npm ci"),
+        ("cd Server && npm outdated", "deny", "cd + npm outdated"),
+        # Der Ersatzweg muss erlaubt bleiben – sonst gibt es keinen Weg mehr.
+        ("npm --prefix Client run typecheck", "allow", "--prefix statt cd → allow"),
+        ("npm --prefix Client audit", "allow", "--prefix audit → allow"),
+        # cd auf den Repo-Root ist harmlos: das cwd bleibt dort, wo die Wrapper es erwarten.
+        ("cd . && npm --prefix Client run typecheck", "allow", "cd . (Repo-Root) → allow"),
+        (f"cd {R} && npm --prefix Client run typecheck", "allow", "cd bare-root → allow"),
+        # Kein npm im Compound → unberührt.
+        ("cd Client && git status", "allow", "cd + git bleibt erlaubt"),
+    ]
+    for command, expected, desc in cases:
+        if not assert_decision(command, expected, desc):
+            failures += 1
+
+    return failures
+
+
+def test_wrapper_filter_strip() -> int:
+    """OBS-S085-3: Nachgelagerte Filter auf Wrapper-Ausgaben entfernen statt blocken.
+
+    Gemessene Quote nach dem S109-Umbau: 95 % (110 Läufe). Ein Deny kostet jeden frisch
+    startenden Subagenten eine Runde, ohne dass er über Sessions lernen kann – der Rewrite
+    kostet keine.
+    """
+    print(f"\n{Colors.BOLD}=== Wrapper-Filter entfernen (OBS-S085-3) ==={Colors.RESET}")
+    failures = 0
+
+    # (command, expected_stripped, expected_changed, description)
+    cases = [
+        ("python3 .claude/scripts/vitest-run.py | tail -50",
+         "python3 .claude/scripts/vitest-run.py", True, "tail nach Wrapper"),
+        ("python3 .claude/scripts/qa-check.py --layer frontend 2>&1 | grep OK",
+         "python3 .claude/scripts/qa-check.py --layer frontend 2>&1", True, "grep, 2>&1 bleibt"),
+        ("python3 .claude/scripts/dotnet-test.py | head -3 | grep x",
+         "python3 .claude/scripts/dotnet-test.py", True, "mehrere Filter hintereinander"),
+        # Filter VOR dem Wrapper filtert dessen Ausgabe nicht – unberührt lassen.
+        ("grep -r foo . | python3 .claude/scripts/qa-check.py --layer backend",
+         "grep -r foo . | python3 .claude/scripts/qa-check.py --layer backend", False,
+         "Filter vor dem Wrapper bleibt"),
+        # Analyse-Scripte sind zum Zerschneiden gedacht (dieselbe Abgrenzung wie tool-usage.py).
+        ("python3 .claude/scripts/read-breakdown.py | head -20",
+         "python3 .claude/scripts/read-breakdown.py | head -20", False,
+         "Analyse-Script bleibt filterbar"),
+        # Kein Wrapper im Spiel → unberührt.
+        ("git log --oneline | head -5", "git log --oneline | head -5", False, "fremder Befehl"),
+        ("python3 .claude/scripts/vitest-run.py --verbose",
+         "python3 .claude/scripts/vitest-run.py --verbose", False, "Wrapper ohne Filter"),
+    ]
+    for command, expected, expected_changed, desc in cases:
+        result, changed = hook.strip_wrapper_filter(command)
+        if result == expected and changed == expected_changed:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [strip      ] {desc}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [strip      ] {desc}: {command}")
+            print(f"       Expected: {expected!r} (changed={expected_changed})")
+            print(f"       Got:      {result!r} (changed={changed})")
+            failures += 1
+
+    # Der Rewrite muss beim Agenten ankommen: updatedInput + sichtbarer Hinweis.
+    out = build_allow_output("python3 .claude/scripts/vitest-run.py | tail -50")
+    if (out.get("updatedInput", {}).get("command") == "python3 .claude/scripts/vitest-run.py"
+            and out.get("permissionDecision") == "allow"
+            and "verbose" in (out.get("additionalContext") or "")):
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [output     ] updatedInput + Hinweis auf --verbose")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] updatedInput/Hinweis fehlt: {out}")
+        failures += 1
+
+    # Beide Rewrites zusammen: absoluter Pfad UND Filter in einem Befehl.
+    both = build_allow_output(f"python3 {REPO_ROOT}/.claude/scripts/eslint-run.py | tail -5")
+    if both.get("updatedInput", {}).get("command") == "python3 .claude/scripts/eslint-run.py":
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [output     ] Pfad-Normalisierung + Filter-Strip kombiniert")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] Kombination fehlerhaft: {both}")
+        failures += 1
+
+    return failures
+
+
 def test_allowed_logging() -> int:
     print(f"\n{Colors.BOLD}=== Allowed-Command-Logging (OBS-3 D) ==={Colors.RESET}")
     import tempfile
@@ -702,6 +794,8 @@ def main() -> None:
     total_failures += test_deny_overrides_allow()
     total_failures += test_edge_cases()
     total_failures += test_path_normalization()
+    total_failures += test_cd_npm_deny()
+    total_failures += test_wrapper_filter_strip()
     total_failures += test_allowed_logging()
 
     print(f"\n{'=' * 60}")

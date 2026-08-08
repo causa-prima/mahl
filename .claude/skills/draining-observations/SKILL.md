@@ -33,9 +33,15 @@ Meldet das Script „Backlog leer", bestätige das kurz und beende – nichts zu
 **drainbare** OBS – Status `NEU` – und ist daher kleiner als die Liste in `observations.md`.)
 
 Der Satz liefert **Wert-Lane** + **Alters-Lane**, dazu ggf. **fällige Wiedervorlagen** (geparkte Items, deren
-Termin erreicht ist) und einen **Hygiene-Reminder** (aufgelöst, aber noch nicht archiviert). Definitionen:
-`process.md`. Ein **`+Koloc:`-Marker** an
+Termin erreicht ist), **offene Fragen** und einen **Hygiene-Reminder** (aufgelöst, aber noch nicht archiviert).
+Definitionen: `process.md`. Ein **`+Koloc:`-Marker** an
 einer Zeile nennt offene OBS an derselben Datei (Kandidaten für Same-Artefakt-Mitnahme, s. Schritt 3).
+
+**Offene Fragen sind kein Drain-Item.** Erscheint die Sektion „Offene Fragen", leg die Einträge dem **User
+zur Klärung** vor (Volltext: `docs/open-questions.md`) – sie werden nicht wie OBS selbst entschieden, denn
+sie haben Business-/Architektur-Impact. Ergebnis: Frage geklärt → Eintrag entfernen und das Ergebnis am
+stabilen Ort festhalten (ADR, Guideline, `tech-debt.md`); noch nicht klärbar → `Fällig: S<NNN>` setzen, damit
+sie zum passenden Zeitpunkt statt nach Alter wiederkommt.
 
 ## 2. Pro Item: Discovery → Entscheidung
 
@@ -53,6 +59,16 @@ diskutiert wird. Für jedes Item:
 2. **Kandidaten frisch generieren.** OBS werden ohne vorab notierte Kandidaten erfasst (sonst nudgt die
    Erfassung die Lösung vor und schwächt die Discovery). Erarbeite die Kandidaten jetzt gemeinsam und
    schlage sie dem User vor – Orchestrator schlägt vor, User entscheidet.
+
+   **Trägt der Eintrag eine `Vorprägung` (Marker `+Vorprägung` im Drain-Satz, Hinweis im `get`), dann in
+   dieser Reihenfolge:** erst eigene Kandidaten bilden und **dem User vorlegen**, danach
+   `python3 .claude/scripts/obs.py get OBS-SNNN-N --vorprägung` abrufen und die dortigen Angaben als
+   *weiteren* Kandidaten behandeln. Das Feld enthält, was schon genannt oder vermutet wurde – genannte
+   Lösungen, Ursachenvermutungen, Analogieschlüsse. Zwei Gründe für die Reihenfolge: Vorher gelesen, prägt es
+   die Discovery (deshalb ist es beim Standardzugriff verborgen); und der Text ist **agentenformuliert** – er
+   kann den ursprünglichen Wunsch verschoben haben. **Also nicht als Auftrag lesen, sondern das Ziel beim User
+   verifizieren** (in S115 belegt: eine so konservierte „Zielvorstellung" hatte das eigentliche Ziel verfehlt
+   und den Drain in die falsche Richtung gelenkt, bis der User korrigierte).
 
    **Behauptete Fakten am Code prüfen, nicht aus dem Eintrag übernehmen.** Die technischen Aussagen im
    Eintrag sind eine Momentaufnahme der Erfassung und altern wie jede andere Quelle – ein Item aus der

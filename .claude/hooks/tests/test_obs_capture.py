@@ -183,6 +183,27 @@ def test_missing_mandatory_field_is_blocked():
     assert [v[0] for v in hook.find_violations("", post)] == ["OBS-S100-1"]
 
 
+# --- Vorprägung (OBS-S112-8) -------------------------------------------------
+# Genanntes Lösungswissen bekommt ein eigenes Feld statt eines Ausnahme-Markers: Es wird
+# erfasst, beim normalen `get` aber nicht mitgelesen. Kennt der Hook das Feld nicht, blockt
+# er jeden Eintrag, der es nutzt – dann wäre der ganze Weg versperrt.
+def test_vorpraegung_is_an_allowed_field():
+    assert "Vorprägung" in hook.ALLOWED_FIELDS
+    assert "Vorprägung" not in hook.REQUIRED_FIELDS  # optional, wie Bezug
+
+
+def test_new_entry_with_vorpraegung_passes():
+    post = _obs("OBS-S100-1", extra="- Vorprägung: Der User hält Ansatz Z für richtig.\n")
+    assert hook.find_violations("", post) == []
+
+
+def test_vorpraegung_does_not_unlock_the_decision_field():
+    """Das Feld ist ein Ort für Lösungswissen – kein Freibrief für das Entscheidungsfeld."""
+    post = _obs("OBS-S100-1", "Richtung: Hook bauen",
+                extra="- Vorprägung: Ansatz Z.\n")
+    assert [v[0] for v in hook.find_violations("", post)] == ["OBS-S100-1"]
+
+
 def test_bezug_is_optional():
     assert hook.find_violations("", _obs("OBS-S100-1", bezug=None)) == []
 

@@ -102,6 +102,113 @@ def test_render_empty_backlog():
     assert "Backlog leer" in od.render(od.Path("."), parse())
 
 
+# --- Vorprägungs-Marker (OBS-S112-8) -----------------------------------------
+# Das Feld ist beim normalen `get` verborgen, damit es die Kandidatenbildung nicht prägt.
+# Genau dadurch kann es vergessen werden – deshalb muss der Drain-Satz auf seine Existenz
+# hinweisen, analog zum `+Koloc:`-Marker.
+def test_parse_flags_an_entry_with_vorpraegung():
+    entries = parse(make("OBS-S090-1") + "- Vorprägung: Ansatz Z.\n")
+    assert entries[0]["vorpraegung"] is True
+
+
+def test_parse_flags_absence_too():
+    assert parse(make("OBS-S090-1"))[0]["vorpraegung"] is False
+
+
+def test_render_marks_entries_with_vorpraegung(monkeypatch):
+    monkeypatch.setattr(od, "current_session", lambda root: 96)
+    out = od.render(od.Path("."), parse(make("OBS-S090-1") + "- Vorprägung: Ansatz Z.\n"))
+    assert "+Vorprägung" in out
+
+
+def test_render_leaves_plain_entries_unmarked(monkeypatch):
+    monkeypatch.setattr(od, "current_session", lambda root: 96)
+    assert "+Vorprägung" not in od.render(od.Path("."), parse(make("OBS-S090-1")))
+
+
+# --- Offene Fragen (OBS-S108-6) ----------------------------------------------
+# `open-questions.md` hatte keinen Lese-Trigger: Alle Verweise darauf sind Schreib-Verweise,
+# kein Prozessschritt legt Fragen vor. Folge im Bestand: vier Fragen lagen 14–25 Sessions.
+# Der Drain-Vorschlag ist der bestehende Vorlage-Mechanismus – kein neues Script nötig.
+def oq(oid, title="Frage?", faellig=None):
+    block = f"## {oid} — {title}\n**Frage:** Was gilt?\n"
+    if faellig:
+        block += f"**Fällig:** S{faellig}\n"
+    return block + "**Hintergrund:** Kontext.\n"
+
+
+def parse_oq(*blocks):
+    return od.parse_open_questions("\n".join(blocks))
+
+
+def test_parses_id_session_and_title():
+    fragen = od.parse_open_questions(oq("OQ-S083-1", title="Taxonomie klären"))
+    assert len(fragen) == 1
+    assert fragen[0]["id"] == "OQ-S083-1"
+    assert fragen[0]["session"] == 83
+    assert fragen[0]["title"] == "Taxonomie klären"
+    assert fragen[0]["faellig"] is None
+
+
+def test_parses_the_optional_due_session():
+    fragen = od.parse_open_questions(oq("OQ-S094-1", faellig=120))
+    assert fragen[0]["faellig"] == 120
+
+
+def test_due_question_by_reached_date():
+    fragen = od.parse_open_questions(oq("OQ-S114-1", faellig=115))
+    assert [f["id"] for f in od.due_questions(fragen, 115)] == ["OQ-S114-1"]
+
+
+def test_future_date_is_not_due_yet():
+    """Ein gesetzter Termin unterdrückt die Alters-Regel – sonst wäre er wirkungslos."""
+    fragen = od.parse_open_questions(oq("OQ-S080-1", faellig=200))
+    assert od.due_questions(fragen, 115) == []
+
+
+def test_stale_question_without_date_is_presented():
+    fragen = od.parse_open_questions(oq("OQ-S083-1"))
+    assert [f["id"] for f in od.due_questions(fragen, 115)] == ["OQ-S083-1"]
+
+
+def test_young_question_without_date_stays_quiet():
+    fragen = od.parse_open_questions(oq("OQ-S114-1"))
+    assert od.due_questions(fragen, 115) == []
+
+
+def test_oldest_questions_come_first_and_are_capped():
+    fragen = parse_oq(
+        oq("OQ-S090-1"), oq("OQ-S080-1"), oq("OQ-S085-1"), oq("OQ-S070-1"))
+    ids = [f["id"] for f in od.due_questions(fragen, 115)]
+    assert ids[0] == "OQ-S070-1"
+    assert len(ids) <= od.OQ_MAX
+
+
+def test_render_shows_due_questions(monkeypatch):
+    monkeypatch.setattr(od, "current_session", lambda root: 115)
+    out = od.render(od.Path("."), parse(make("OBS-S090-1")),
+                    od.parse_open_questions(oq("OQ-S083-1", title="Taxonomie klären")))
+    assert "Offene Fragen" in out
+    assert "OQ-S083-1" in out and "Taxonomie klären" in out
+    assert "32 Sessions" in out  # 115 - 83
+
+
+def test_render_omits_the_section_without_due_questions(monkeypatch):
+    monkeypatch.setattr(od, "current_session", lambda root: 115)
+    out = od.render(od.Path("."), parse(make("OBS-S090-1")),
+                    od.parse_open_questions(oq("OQ-S114-1")))
+    assert "Offene Fragen" not in out
+
+
+def test_due_questions_alone_prevent_the_empty_verdict(monkeypatch):
+    """Ohne NEU-Backlog, aber mit liegender Frage darf nicht „Backlog leer" gemeldet werden –
+    sonst bleibt die Frage genau so unsichtbar wie vorher."""
+    monkeypatch.setattr(od, "current_session", lambda root: 115)
+    out = od.render(od.Path("."), parse(), od.parse_open_questions(oq("OQ-S083-1")))
+    assert "Backlog leer" not in out
+    assert "OQ-S083-1" in out
+
+
 def test_render_b1_no_empty_value_lane_header(monkeypatch):
     # B=1: nur Alters-Lane, KEIN leerer "Wert-Lane:"-Header.
     monkeypatch.setattr(od, "current_session", lambda root: 96)

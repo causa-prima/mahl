@@ -17,6 +17,11 @@ Beispiele:
   python3 .claude/scripts/tool-usage.py --filter     # nur die Filter-Quote
   python3 .claude/scripts/tool-usage.py --lsp        # nur die LSP-Nutzung
   python3 .claude/scripts/tool-usage.py --verbose    # zusätzlich Beispielzeilen
+  python3 .claude/scripts/tool-usage.py --since 2026-07-30   # nur nach dem S109-Umbau
+
+`--since` trennt Vor- und Nach-Maßnahme: Die Monats-Buckets allein können das nicht, wenn der
+Stichtag mitten im Monat liegt (der S109-Wrapper-Umbau fiel auf den 29.07.). Ohne den Filter
+ließe sich die Wirkung nur aus Monatssummen ableiten – rechnen statt messen.
 """
 import argparse
 import os
@@ -47,7 +52,18 @@ WRAPPERS = ("dotnet-test", "dotnet-stryker", "vitest-run", "playwright-test",
             "stryker-frontend", "eslint-run", "jscpd-run", "qa-check", "stryker-summary")
 RUN_RE = re.compile(r"python3\s+\S*\.claude/scripts/(" + "|".join(WRAPPERS) + r")\.py")
 FILTER_RE = re.compile(r"\|\s*(tail|head|grep|sed|awk)\b")
-STAMP_RE = re.compile(r"^\[(\d{4}-\d{2})-\d{2} ")
+STAMP_RE = re.compile(r"^\[((\d{4}-\d{2})-\d{2}) ")
+
+
+def line_date(line: str) -> str | None:
+    """Der Tag der Zeile als `YYYY-MM-DD` – oder None, wenn sie keinen Zeitstempel trägt.
+
+    Das Log schreibt den vollen Zeitstempel; die Monats-Aggregation unten wirft den Tag weg.
+    Für ein Vor/Nach-Urteil über eine Maßnahme braucht es ihn aber (ein Stichtag mitten im
+    Monat lässt sich sonst nicht schneiden), deshalb hier getrennt zugänglich.
+    """
+    stamp = STAMP_RE.match(line)
+    return stamp.group(1) if stamp else None
 
 
 def classify_line(line: str) -> tuple[str, str, bool] | None:
@@ -63,11 +79,15 @@ def classify_line(line: str) -> tuple[str, str, bool] | None:
     match = RUN_RE.search(line)
     if not match:
         return None
-    return stamp.group(1), match.group(1), bool(FILTER_RE.search(line, match.end()))
+    return stamp.group(2), match.group(1), bool(FILTER_RE.search(line, match.end()))
 
 
-def measure_filter_quote(path=None) -> tuple[Counter, Counter, Counter, list[str]]:
-    """(Läufe je Monat, gefiltert je Monat, gefiltert je Wrapper, Beispielzeilen)."""
+def measure_filter_quote(path=None, since=None) -> tuple[Counter, Counter, Counter, list[str]]:
+    """(Läufe je Monat, gefiltert je Monat, gefiltert je Wrapper, Beispielzeilen).
+
+    `since` (`YYYY-MM-DD`, inklusiv) beschränkt auf Läufe ab diesem Tag – so wird die Quote
+    nach einem Maßnahmen-Stichtag messbar statt aus Monatssummen abgeleitet.
+    """
     runs: Counter = Counter()
     filtered: Counter = Counter()
     by_wrapper: Counter = Counter()
@@ -79,6 +99,11 @@ def measure_filter_quote(path=None) -> tuple[Counter, Counter, Counter, list[str
 
     with open(log, encoding="utf-8", errors="replace") as handle:
         for line in handle:
+            if since:
+                day = line_date(line)
+                # ISO-Datum: lexikographischer Vergleich ist chronologisch.
+                if day is None or day < since:
+                    continue
             result = classify_line(line)
             if not result:
                 continue
@@ -93,13 +118,16 @@ def measure_filter_quote(path=None) -> tuple[Counter, Counter, Counter, list[str
     return runs, filtered, by_wrapper, examples
 
 
-def print_filter_quote(verbose: bool) -> None:
-    runs, filtered, by_wrapper, examples = measure_filter_quote()
+def print_filter_quote(verbose: bool, since: str | None = None) -> None:
+    runs, filtered, by_wrapper, examples = measure_filter_quote(since=since)
     print("=" * 78)
     print("OBS-S085-3: nachgelagert gefilterte Wrapper-AUSFÜHRUNGEN")
+    if since:
+        print(f"  (nur Läufe ab {since})")
     print("=" * 78)
     if not runs:
-        print(f"  Keine Daten – {ALLOWED_LOG} fehlt oder enthält keine Wrapper-Läufe.")
+        quelle = f"keine Wrapper-Läufe ab {since}" if since else "enthält keine Wrapper-Läufe"
+        print(f"  Keine Daten – {ALLOWED_LOG} fehlt oder {quelle}.")
         return
 
     print(f"  {'Monat':<10} {'Läufe':>8} {'gefiltert':>11} {'Quote':>7}")
@@ -179,11 +207,16 @@ def main() -> None:
     parser.add_argument("--filter", action="store_true", help="nur die Filter-Quote (OBS-S085-3)")
     parser.add_argument("--lsp", action="store_true", help="nur die LSP-Nutzung (OBS-S085-4)")
     parser.add_argument("--verbose", action="store_true", help="Beispielzeilen zeigen")
+    parser.add_argument("--since", metavar="YYYY-MM-DD",
+                        help="nur Läufe ab diesem Tag (inklusiv) – trennt Vor/Nach einer Maßnahme")
     args = parser.parse_args()
+
+    if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
+        parser.error(f"--since braucht das Format YYYY-MM-DD, nicht {args.since!r}")
 
     beide = not (args.filter or args.lsp)
     if args.filter or beide:
-        print_filter_quote(args.verbose)
+        print_filter_quote(args.verbose, args.since)
     if beide:
         print()
     if args.lsp or beide:

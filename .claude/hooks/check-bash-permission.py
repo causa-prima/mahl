@@ -87,6 +87,24 @@ _NORMALIZE_HINT = (
     "das vermeidet unnötige Permission-Denies."
 )
 
+# OBS-S085-3: Rewrite statt Deny, damit ein frisch startender Subagent keine Runde verliert.
+_FILTER_STRIPPED_HINT = (
+    "Der nachgelagerte Filter wurde entfernt – dieser Wrapper gibt im Erfolgsfall nur das "
+    "Verdikt aus (ein bis zwei Zeilen), im Fehlerfall nur das zur Analyse Nötige. Ein "
+    "`| tail`/`| head` kann das Verdikt sogar abschneiden. Brauchst du mehr Tiefe, nutze "
+    "`--verbose` statt eines Filters. Liefert der Wrapper etwas Nötiges gar nicht, ist das "
+    "eine Beobachtung für docs/kaizen/observations.md – dann verbessern wir den Wrapper."
+)
+
+# OBS-S091-2: Der Wechsel überlebt den Befehl und zerstört die folgenden Wrapper-Aufrufe.
+_CD_NPM_HINT = (
+    "npm-Befehle ohne Verzeichniswechsel aufrufen:\n"
+    "  npm --prefix Client run typecheck   (statt: cd Client && npm run typecheck)\n"
+    "  npm --prefix Client ci\n"
+    "Grund: Ein `cd` überlebt den Befehl, und die folgenden Wrapper-Aufrufe scheitern dann "
+    "an ihrem repo-root-relativen Pfad (`.claude/scripts/…` → „No such file“)."
+)
+
 
 def _strip_repo_root(text: str) -> str:
     """Ersetzt den Repo-Root in einem Textstück durch relative Pfade.
@@ -106,6 +124,77 @@ def normalize_repo_paths(command: str) -> tuple[str, bool]:
     """
     result = _strip_repo_root(command)
     return result, result != command
+
+
+# ---------------------------------------------------------------------------
+# Nachgelagerte Filter auf Wrapper-Ausgaben (OBS-S085-3)
+# ---------------------------------------------------------------------------
+# Gemessene Quote nach dem S109-Wrapper-Umbau: 95 % (110 Läufe ab dem Umbau-Commit) gegen
+# eine Basislinie von 83 %. Drei Soft-Maßnahmen (Hinweis S087, Rezidiv S090, Output-Umbau
+# S109) haben daran nichts geändert – das Verhalten ist antrainiert, nicht bedarfsgetrieben.
+# Gewählt wurde der Rewrite statt eines Deny, weil Subagenten immer frisch starten und über
+# Sessions nicht lernen können: ein Deny kostet sie jedes Mal eine Runde, der Rewrite keine.
+#
+# Bewusst NUR die Gate-/Test-Wrapper, deren Ausgabe im Erfolgsfall schon das Verdikt ist.
+# Analyse-Scripte (read-breakdown.py, tool-usage.py …) sind zum Zerschneiden gedacht – ein
+# Filter darauf ist bestimmungsgemäß. Dieselbe Abgrenzung zieht `tool-usage.py` (WRAPPERS).
+_FILTERABLE_WRAPPERS = ("dotnet-test", "dotnet-stryker", "vitest-run", "playwright-test",
+                        "stryker-frontend", "eslint-run", "jscpd-run", "qa-check",
+                        "stryker-summary")
+_WRAPPER_RUN_RE = re.compile(r'python3\s+\S*\.claude/scripts/('
+                             + "|".join(_FILTERABLE_WRAPPERS) + r')\.py')
+_FILTER_CMD_RE = re.compile(r'(?:tail|head|grep|sed|awk)\b')
+
+
+def strip_wrapper_filter(command: str) -> tuple[str, bool]:
+    """Entfernt nachgelagerte Filter-Pipes hinter einem Wrapper-Aufruf.
+
+    Gibt (neuer_befehl, geändert) zurück. Zwei Abgrenzungen tragen die Korrektheit:
+    Ein Filter **vor** dem Wrapper filtert dessen Ausgabe nicht (`grep … | python3 … .py`)
+    und bleibt unberührt; und alles zwischen Wrapper und erstem Filter bleibt erhalten,
+    damit Argumente und Redirects (`--layer frontend 2>&1`) nicht verlorengehen.
+    """
+    match = _WRAPPER_RUN_RE.search(command)
+    if not match:
+        return command, False
+
+    parts = command[match.end():].split("|")
+    keep = [parts[0]]
+    for part in parts[1:]:
+        if _FILTER_CMD_RE.match(part.strip()):
+            break  # ab hier ist der Rest reine Filterung
+        keep.append(part)
+
+    if len(keep) == len(parts):
+        return command, False
+    return (command[:match.end()] + "|".join(keep)).rstrip(), True
+
+
+# ---------------------------------------------------------------------------
+# Verzeichniswechsel vor npm (OBS-S091-2)
+# ---------------------------------------------------------------------------
+_CD_TARGET_RE = re.compile(r'^cd\s+(\S+)')
+_NPM_SEGMENT_RE = re.compile(r'^npm\b')
+
+
+def cd_npm_conflict(segments: list[str]) -> bool:
+    """Verlässt ein Segment den Repo-Root, und nutzt ein späteres Segment `npm`?
+
+    Der Wechsel selbst wäre harmlos – aber er überlebt den Befehl, und die FOLGENDEN
+    Wrapper-Aufrufe scheitern dann an ihrem repo-root-relativen Pfad (`.claude/scripts/…`).
+    In S111 belegt: vier Wrapper-Fehlschläge nach einem `cd Client`. `npm --prefix <dir>`
+    erreicht dasselbe ohne Wechsel, es gibt also keinen Bedarf, den die Regel bestraft.
+    """
+    left_root = False
+    for segment in segments:
+        stripped = segment.strip()
+        target = _CD_TARGET_RE.match(stripped)
+        if target:
+            # `cd .` (auch der normalisierte bare-root) bleibt im Repo-Root → unkritisch.
+            left_root = target.group(1).rstrip("/") not in (".", "")
+        elif left_root and _NPM_SEGMENT_RE.match(stripped):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -734,6 +823,12 @@ def check_command(command: str) -> tuple[str, str, str]:
     # 4. Compound-Split + Segment-Check (check_simple_command ohne WRONG_APPROACH)
     segments = split_compound_command(command)
     is_compound = len(segments) > 1
+
+    # 4a. Verzeichniswechsel vor npm (OBS-S091-2): braucht die Segmente, deshalb erst hier
+    #     und nicht als WRONG_APPROACH-Regex auf dem Gesamtbefehl.
+    if cd_npm_conflict(segments):
+        return ("deny", _CD_NPM_HINT, "WRONG_APPROACH")
+
     for segment in segments:
         decision, reason, log_type = check_simple_command(segment)
         if decision == "deny":
@@ -850,10 +945,20 @@ def _build_allow_output(command: str) -> dict:
         "permissionDecisionReason": _ALLOW_REASON,
     }
     if ONE_TIME_MARKER not in command:
-        normalized, changed = normalize_repo_paths(command)
+        rewritten, changed = normalize_repo_paths(command)
+        hint = _NORMALIZE_HINT if changed else ""
+
+        # Filter-Strip auf dem bereits normalisierten Befehl: so greift das Wrapper-Muster
+        # auch bei absolut geschriebenen Pfaden, und beide Rewrites landen in EINEM
+        # updatedInput (zwei würden sich gegenseitig überschreiben).
+        rewritten, filtered = strip_wrapper_filter(rewritten)
+        if filtered:
+            changed = True
+            hint = (hint + "\n\n" if hint else "") + _FILTER_STRIPPED_HINT
+
         if changed:
-            hso["updatedInput"] = {"command": normalized}
-            hso["additionalContext"] = _NORMALIZE_HINT
+            hso["updatedInput"] = {"command": rewritten}
+            hso["additionalContext"] = hint
     return hso
 
 

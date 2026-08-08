@@ -165,22 +165,22 @@ dotnet run --project Server -- --seed-data
 
 ## Frontend
 
-Node wird von `fnm` verwaltet (Version in `Client/.nvmrc`); npm/npx laufen nativ. npm-Befehle im `Client/`-Verzeichnis ausführen:
+Node wird von `fnm` verwaltet (Version in `Client/.nvmrc`); npm/npx laufen nativ. npm-Befehle **mit `--prefix Client` aus dem Repo-Root** ausführen, nicht per `cd Client` – ein Verzeichniswechsel überlebt den Befehl, und die folgenden Wrapper-Aufrufe scheitern dann an ihrem repo-root-relativen Pfad (`.claude/scripts/…`). Der Hook blockt `cd … && npm …` deshalb:
 
 ```bash
 # Dependencies installieren (reproduzierbar aus package-lock.json)
-cd Client && npm ci
+npm --prefix Client ci
 
 # Dev-Server
-cd Client && npm run dev
+npm --prefix Client run dev
 # → http://localhost:5173
 
 # Produktions-Build (Output → Server/wwwroot/)
-cd Client && npm run build
+npm --prefix Client run build
 
 # Update / Audit
-cd Client && npm update
-cd Client && npm audit fix
+npm --prefix Client update
+npm --prefix Client audit fix
 ```
 
 > **Playwright-Browser** (einmalig nach `npm ci` bzw. nach einem Playwright-Bump):
@@ -199,7 +199,7 @@ Updates – auch reine In-Range-Bumps via `npm update` – können Regressionen 
 python3 .claude/scripts/vitest-run.py      # Laufzeit
 python3 .claude/scripts/eslint-run.py      # Typ-Auflösung + Lint
 python3 .claude/scripts/jscpd-run.py       # Config-Kompatibilität (v.a. nach Major-Bumps)
-cd Client && npm run build                 # tsc + Vite-Build
+npm --prefix Client run build              # tsc + Vite-Build
 ```
 
 Bei Major-Bumps zusätzlich auf **Config-Warnungen** achten (nicht nur Exit-Code) – Tools ändern still ihr Config-Schema (z.B. jscpd 5: Feld `languages` → `format`).

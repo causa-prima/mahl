@@ -127,13 +127,64 @@ def collect_undetected(files: dict) -> tuple[dict[str, list], dict[str, list]]:
     return survivors, nocoverage
 
 
+def _line_span(mutant: dict) -> str:
+    """`304` bei einzeiligen Mutanten, `304-312` bei mehrzeiligen.
+
+    Die Endzeile trägt den Unterschied bei `Block removal mutation`: Liegt die Startzeile in
+    einem `try`/`catch` mit verschachtelten Blöcken, sagt „Zeile 304 → {}" nicht, welcher
+    Block entfernt wurde (OBS-S111-3).
+    """
+    start = mutant["location"]["start"]["line"]
+    end = (mutant["location"].get("end") or {}).get("line", start)
+    return f"{start}-{end}" if end != start else f"{start}"
+
+
+def _coverage_note(mutant: dict) -> str:
+    """`   (3 Tests decken ab)` – oder leer, wenn der Report nichts dazu sagt.
+
+    Trennt „ein Test deckt ab und tötet nicht" von „zwölf decken ab und keiner tötet". Leere
+    oder fehlende Angabe bleibt stumm: `coveredBy` ist im Report null bei Ignored- und
+    NoCoverage-Mutanten, und „0 Tests" wäre in der NoCoverage-Gruppe nur Rauschen.
+    """
+    covered = mutant.get("coveredBy") or []
+    if not covered:
+        return ""
+    anzahl = len(covered)
+    return f"   ({anzahl} Test deckt ab)" if anzahl == 1 else f"   ({anzahl} Tests decken ab)"
+
+
+_MAX_REASON = 110
+
+
+def _status_reason(mutant: dict) -> str:
+    """Erste Zeile des `statusReason`, auf `_MAX_REASON` Zeichen gekürzt – oder leer.
+
+    Im Bestand steht dort meist der Suppression-Grund aus dem Code („kein Test für den
+    Remount-key"), also genau die gesuchte Information. Am echten Report zeigte sich aber
+    (S115), dass das Feld auch einen Assertion-Diff mit komplettem DOM-Dump tragen kann –
+    hunderte Zeilen. Ungekürzt widerspräche das der Wrapper-Politik „im Fehlerfall nur das
+    Analyse-Relevante".
+    """
+    rohtext = (mutant.get("statusReason") or "").strip()
+    if not rohtext:
+        return ""
+    erste = rohtext.splitlines()[0].strip()
+    mehr_zeilen = len(rohtext.splitlines()) > 1
+    if len(erste) > _MAX_REASON:
+        return erste[:_MAX_REASON] + "…"
+    return erste + "…" if mehr_zeilen else erste
+
+
 def format_mutant_group(by_file: dict[str, list]) -> list[str]:
     """Formatiert eine Mutanten-Gruppe (Datei → Zeile/Mutator/Ersetzung) als Ausgabezeilen."""
     lines: list[str] = []
     for file, mutants in sorted(by_file.items()):
         lines.append(f"  {file} ({len(mutants)})")
         for m in sorted(mutants, key=lambda x: x["location"]["start"]["line"]):
-            lines.append(f"    Zeile {m['location']['start']['line']:>4}  {m['mutatorName']}")
-            lines.append(f"           → {m.get('replacement', '?')}")
+            lines.append(f"    Zeile {_line_span(m):>4}  {m['mutatorName']}")
+            lines.append(f"           → {m.get('replacement', '?')}{_coverage_note(m)}")
+            grund = _status_reason(m)
+            if grund:
+                lines.append(f"             ({grund})")
         lines.append("")
     return lines

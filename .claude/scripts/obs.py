@@ -26,6 +26,7 @@ from obs_entry import (  # noqa: E402
     IMPACT_WERTE,
     KATEGORIE_WERTE,
     add,
+    append_beobachtung,
     get,
     laufende_session,
     obs_path,
@@ -37,7 +38,7 @@ def cmd_get(args) -> int:
     text = obs_path().read_text(encoding="utf-8")
     fehlend = []
     for i, oid in enumerate(args.ids):
-        eintrag = get(text, oid)
+        eintrag = get(text, oid, mit_vorpraegung=args.vorpraegung)
         if eintrag is None:
             fehlend.append(oid)
             continue
@@ -64,6 +65,7 @@ def cmd_add(args) -> int:
         kontext=args.kontext,
         beobachtung=args.beobachtung,
         bezug=args.bezug,
+        vorpraegung=args.vorpraegung,
     )
     path.write_text(neu, encoding="utf-8")
     print(f"✓ {oid} erfasst.")
@@ -71,15 +73,22 @@ def cmd_add(args) -> int:
 
 
 def cmd_set(args) -> int:
-    if args.status is None and args.entscheidung is None:
-        print("Nichts zu ändern – --status und/oder --entscheidung angeben.", file=sys.stderr)
+    if args.status is None and args.entscheidung is None and args.beobachtung_anhaengen is None:
+        print("Nichts zu ändern – --status, --entscheidung und/oder "
+              "--beobachtung-anhängen angeben.", file=sys.stderr)
         return 1
     path = obs_path()
-    neu = set_fields(path.read_text(encoding="utf-8"), args.id,
-                     status=args.status, entscheidung=args.entscheidung)
-    path.write_text(neu, encoding="utf-8")
+    inhalt = path.read_text(encoding="utf-8")
+    if args.status is not None or args.entscheidung is not None:
+        inhalt = set_fields(inhalt, args.id,
+                            status=args.status, entscheidung=args.entscheidung)
+    if args.beobachtung_anhaengen is not None:
+        inhalt = append_beobachtung(inhalt, args.id, args.beobachtung_anhaengen)
+    path.write_text(inhalt, encoding="utf-8")
     geaendert = ", ".join(n for n, v in (("Status", args.status),
-                                         ("Entscheidung", args.entscheidung)) if v is not None)
+                                         ("Entscheidung", args.entscheidung),
+                                         ("Beobachtung erweitert",
+                                          args.beobachtung_anhaengen)) if v is not None)
     print(f"✓ {args.id}: {geaendert} aktualisiert.")
     return 0
 
@@ -94,6 +103,10 @@ def main() -> None:
 
     p_get = sub.add_parser("get", help="Volltext eines oder mehrerer Einträge")
     p_get.add_argument("ids", nargs="+", metavar="OBS-ID")
+    p_get.add_argument("--vorprägung", dest="vorpraegung", action="store_true",
+                       help="das Feld `Vorprägung` mit ausgeben – erst NACH eigener "
+                            "Kandidatenbildung abrufen (es enthält Lösungsideen und "
+                            "Ursachenvermutungen, die die Bewertung prägen)")
     p_get.set_defaults(func=cmd_get)
 
     p_add = sub.add_parser("add", help="neuen Eintrag erfassen (Form garantiert)")
@@ -107,6 +120,10 @@ def main() -> None:
     p_add.add_argument("--beobachtung", required=True,
                        help="Was ist nicht ideal? Ausführlich – Lösungen gehören NICHT hierher, "
                             "die entstehen im Drain.")
+    p_add.add_argument("--vorprägung", dest="vorpraegung", metavar="TEXT",
+                       help="optional: was die Bewertung prägen würde – genannte Lösungen, "
+                            "vermutete Ursachen, Analogieschlüsse. Wird erfasst, aber beim "
+                            "normalen `get` nicht mitgelesen (nur als Hinweis)")
     p_add.add_argument("--bezug", help="optional: LL-/OBS-/CM-IDs")
     p_add.add_argument("--session", type=int, help="überschreibt die erkannte Session-Nummer")
     p_add.set_defaults(func=cmd_add)
@@ -116,6 +133,11 @@ def main() -> None:
     p_set.add_argument("--status", help='z.B. "UMGESETZT (S114)", "VERWORFEN (Grund)", '
                                         '"IN BEOBACHTUNG bis S120"')
     p_set.add_argument("--entscheidung", help="gewählte Lösung + warum statt der Alternativen")
+    p_set.add_argument("--beobachtung-anhängen", dest="beobachtung_anhaengen",
+                       metavar="TEXT",
+                       help="Text an die Beobachtung anhängen – für die Konsolidierung, wenn "
+                            "dasselbe Problem an anderer Stelle erneut auftritt (statt einen "
+                            "zweiten Eintrag anzulegen)")
     p_set.set_defaults(func=cmd_set)
 
     args = parser.parse_args()

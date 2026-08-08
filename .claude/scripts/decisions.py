@@ -33,8 +33,29 @@ CODE_DIRS = [
 ]
 CODE_EXTENSIONS = {".cs", ".ts", ".tsx"}
 
-# Regex to match ADR reference comments in code: // ADR-SXXX-N or // ADR-SXXX-N-DEP etc.
-CODE_REF_RE = re.compile(r"//\s*(ADR-S\d{3}-\d+(?:-(?:DEP|SUP))?)")
+# ADR-IDs im Kommentarteil einer Codezeile (OBS-S108-1).
+#
+# Früher verlangte das Muster die ID unmittelbar nach `//` (`//\s*ADR-…`). Damit war jede in
+# Prosa eingebettete Referenz unsichtbar – `// siehe ADR-S111-1` ergab keinen Treffer, und
+# `// ADR-S111-1 und ADR-S111-2` nur den ersten. Unsichtbar heißt hier „gilt als nicht
+# vorhanden", also stilles Grün statt eines Befunds: In run-7 blieben zwei kombinierte
+# Referenzen unerfasst und fielen erst durch einen zweiten qa-check-Lauf auf.
+#
+# Deshalb jetzt: Kommentarbeginn suchen, dann ALLE IDs dahinter einsammeln. Bewusst ohne
+# echtes Kommentar-Parsing – ein `//` in einem String-Literal (`"https://…"`) könnte formal
+# als Kommentarbeginn gelten, aber nur eine unmittelbar folgende gültige ADR-ID erzeugt
+# einen Treffer, und die wäre dort ohnehin eine Referenz. Blockkommentare (`/* … */`) sind
+# wie bisher nicht abgedeckt; im Bestand wird ausschließlich `//` verwendet.
+COMMENT_MARKER = "//"
+ADR_ID_RE = re.compile(r"ADR-S\d{3}-\d+(?:-(?:DEP|SUP))?")
+
+
+def adr_refs_in_line(line: str) -> list[str]:
+    """Alle ADR-IDs im Kommentarteil der Zeile, in Vorkommensreihenfolge."""
+    start = line.find(COMMENT_MARKER)
+    if start < 0:
+        return []
+    return ADR_ID_RE.findall(line, start)
 
 # Regex to parse ADR entry headers
 ENTRY_HEADER_RE = re.compile(r"^### (ADR-S\d{3}-\d+(?:-(?:DEP|SUP))?): (.+)$")
@@ -233,8 +254,8 @@ def find_code_refs() -> list[tuple[str, int, str]]:
             except OSError:
                 continue
             for lineno, line in enumerate(content.splitlines(), 1):
-                for m in CODE_REF_RE.finditer(line):
-                    refs.append((str(path.relative_to(REPO_ROOT)), lineno, m.group(1)))
+                for adr_id in adr_refs_in_line(line):
+                    refs.append((str(path.relative_to(REPO_ROOT)), lineno, adr_id))
     return refs
 
 

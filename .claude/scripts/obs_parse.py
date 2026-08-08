@@ -126,6 +126,10 @@ def parse_entries(text: str):
             "id": oid, "session": session, "sub": sub, "status": status,
             "title": title, "bezug": bezug, "files": files,
             "wiedervorlage": wiedervorlage,
+            # Nur die Existenz, nicht der Inhalt: Das Feld ist beim Standardzugriff bewusst
+            # verborgen (OBS-S112-8), damit es die Kandidatenbildung nicht prägt. Genau
+            # deshalb braucht der Drain-Satz einen Hinweis darauf – sonst wird es vergessen.
+            "vorpraegung": bool(re.search(r"^- Vorprägung:", body, flags=re.M)),
             "impact": score_from_keywords(impact, IMPACT, "Impact"),
             "freq": score_from_keywords(freq, FREQ, "Häufigkeit"),
             "impact_raw": impact.split("(")[0].strip(), "freq_raw": freq.split("(")[0].strip(),

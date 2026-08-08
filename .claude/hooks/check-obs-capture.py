@@ -38,8 +38,11 @@ _OBS_OK = "obs-ok"
 
 # Feld-Zeile = uneingerückt, benannt, mit Doppelpunkt. Eingerückte Bullets sind Prosa.
 _FIELD_RE = re.compile(r"^- ([^:\n]{1,40}?):", re.M)
-ALLOWED_FIELDS = ("Quelle", "Status", "Impact", "Kategorie", "Beobachtung", "Entscheidung/Maßnahme", "Bezug")
-REQUIRED_FIELDS = tuple(f for f in ALLOWED_FIELDS if f != "Bezug")  # Bezug ist laut Header optional
+ALLOWED_FIELDS = ("Quelle", "Status", "Impact", "Kategorie", "Beobachtung", "Vorprägung",
+                  "Entscheidung/Maßnahme", "Bezug")
+# `Vorprägung` und `Bezug` sind laut Header optional.
+_OPTIONAL_FIELDS = ("Vorprägung", "Bezug")
+REQUIRED_FIELDS = tuple(f for f in ALLOWED_FIELDS if f not in _OPTIONAL_FIELDS)
 
 # Explizite Vorschlags-Ansagen. Bewusst NICHT enthalten: modale Wendungen (sollte/müsste/könnte) –
 # die beschreiben am Bestand überwiegend ein Risiko, nicht einen Vorschlag (zu viele Fehlalarme).
