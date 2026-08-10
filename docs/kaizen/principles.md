@@ -85,6 +85,16 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Gegenprobe für alle drei: Widerspricht die eigene Rechnung einer vorliegenden Messung um
   Größenordnungen, ist zuerst die Rechnung verdächtig.
 
+- **Die Gegenprobe: das Gegenteil herstellen und prüfen, ob es auffällt.**
+  Ein grünes Ergebnis belegt nur, dass der Aufbau lief – nicht, dass er das Fragliche geprüft hat.
+  **Vor dem Messen/Testen:** Wie sähe es aus, wenn das Gegenteil wahr wäre? Zeigt der Aufbau
+  Erfolg und Misserfolg nicht **unterscheidbar**, trägt das Ergebnis nichts – Testdaten, Mutant
+  und Fixture danach wählen, nicht nach Verfügbarkeit.
+  **Nach dem Bauen oder Ändern eines Prüfmechanismus** (Hook, Gate, Wrapper, Audit, Guard-Test):
+  ihn einmal absichtlich brechen und bestätigen, dass er anspringt – und fragen, wodurch er selbst
+  abgesichert ist. Ein Mechanismus, der nichts prüft, fällt lautlos aus: Sein Ausfall löst per
+  Definition nichts aus.
+
 - **Vollständige Zerlegung vor Schluss/Empfehlung.**
   Bevor ein Schluss, eine Empfehlung oder eine abgeleitete Anforderung steht, den relevanten
   Raum **explizit zerlegen** und jede Dimension prüfen – nicht den auffälligsten Teil für das

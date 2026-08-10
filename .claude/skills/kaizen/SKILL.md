@@ -183,7 +183,7 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
 3. `docs/kaizen/countermeasures.md` aktualisieren (Verweise auf principles.md oder Guideline-Änderungen aus Schritt 1+2 ergänzen)
 4. `docs/kaizen/process.md` aktualisieren falls neue Kontext-Tags vereinbart
 5. `docs/kaizen/observations.md` + `docs/kaizen/archive/observations_archive.md`: freigegebene OBS-Status/Entscheidungen aus Schritt 4 schreiben; aufgelöste Einträge (UMGESETZT/VERWORFEN) ins Archiv verschieben.
-6. `docs/AGENT_MEMORY.md` unter „Nächste Prioritäten": Für jeden neuen OFFEN-Eintrag einen Punkt ergänzen (Kurzbeschreibung, Verweis auf countermeasures.md). Falls zutreffend auch als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`) eintragen.
+6. Neue OFFEN-Einträge sichtbar machen – **nach der Weiche in `docs/kaizen/process.md`, Regel 1 („Umsetzung offener Maßnahmen")**, nicht pauschal nach AGENT_MEMORY: Ist die Maßnahme **definiert** (konkreter nächster Schritt + Done-Kriterium) → Punkt unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md`, als Kurzzusammenfassung mit Verweis auf `countermeasures.md`. Steht dagegen die **Antwort selbst** noch aus (mehrere ernsthafte Kandidaten) → CM bleibt OFFEN, Ausgestaltung als `observations.md`-Eintrag mit `Bezug:` in den Drain, Grund im CM-Eintrag notieren. Falls zutreffend zusätzlich als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`) eintragen.
 
 ---
 
@@ -191,7 +191,7 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
 
 1. Prüfe ob mindestens ein Session-Header (Format: `## Session NNN – YYYY-MM-DD`) in `docs/kaizen/lessons_learned.md` vorhanden ist.
    Falls nicht: Archivierung überspringen, User informieren ("Keine Sessions in lessons_learned.md – Archivierung nicht nötig.").
-2. Ersten und letzten Session-Header ablesen → X und Y bestimmen.
+2. **Kleinste und größte** Session-Nummer aller Header ablesen → X und Y (`grep -n "^## Session " docs/kaizen/lessons_learned.md`). Nicht erster/letzter Header – die Einträge stehen in Erfassungs-, nicht in Session-Reihenfolge.
 3. Datei verschieben (nicht kopieren):
    ```bash
    mv docs/kaizen/lessons_learned.md docs/kaizen/archive/session_<X>_to_<Y>.md

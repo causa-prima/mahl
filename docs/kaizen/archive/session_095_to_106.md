@@ -78,7 +78,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
 
 ## Session 102 – 2026-07-11
 
-- **[MITTEL] [PROZESS] [Kaizen] LL-S102-1 – Lösungskandidaten bei der OBS-Erfassung biasen den späteren Drain**
+- **[MITTEL] [PROZESS] [Skill-Nutzung] LL-S102-1 – Lösungskandidaten bei der OBS-Erfassung biasen den späteren Drain**
   Quelle: User
   Was: Beim `closing-session`-Erfassen dreier neuer OBS (S102-1/-2/-3) schrieb ich jeweils einen Lösungs-„Kandidat: …" ins Maßnahme-Feld, obwohl die Erfassung nur Problem/Ziel + „offen (Drain)" tragen soll; der User korrigierte es als wiederkehrendes Muster.
   Warum: Die zum Verständnis gerade präsente Lösungsidee wurde miterfasst, obwohl `closing-session` Schritt 2 und der `observations.md`-Header ausdrücklich „bei Erfassung offen, keine vermutete Lösung" verlangen – Regel gelesen, im selben Schritt nicht angewandt.
@@ -127,7 +127,7 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Das Handoff framte den Mechanismus rein über seinen Mangel; ich übernahm das Framing, ohne zu prüfen, welche Funktion das Stagen sonst noch erfüllte.
   Regel: Bevor ein Mechanismus, der in einer Beobachtung/im Handoff nur über seinen Fehler beschrieben ist, ersetzt oder entfernt wird: seine ursprünglichen Funktionen explizit auflisten und jede beim Neuentwurf bewusst erhalten oder verwerfen – ein Fehler-Framing beweist nicht, dass der Mangel die einzige Funktion war.
 
-- **[MITTEL] [PROZESS] [Kaizen] LL-S099-1 – Rename-Scope auf unverifizierter Struktur-Annahme verankert**
+- **[MITTEL] [PROZESS] [Skill-Nutzung] LL-S099-1 – Rename-Scope auf unverifizierter Struktur-Annahme verankert**
   Quelle: User
   Was: Bei OBS-S085-10 (Schwere→Impact) empfahl ich zunächst „verwerfen bzw. riskanter Cross-Parser-Rename inkl. Archiv-Migration", weil ich annahm, der Feld-Key `**Schwere:**` läge in den geparsten LL-Archiven. Tatsächlich lebt er nur in `countermeasures.md`; LL-Einträge nutzen `[HOCH]`-Bracket-Tags. Erst die User-Nachfrage („was spricht gegen Archiv-Rename?") löste den Grep aus, der es korrigierte – danach war der Rename klein und sicher.
   Warum: Kosten/Risiko/Empfehlung standen, bevor die tatsächlichen Token-Formen über den Baum gegreppt waren – die Struktur-Annahme wurde für Empirie gehalten.
@@ -140,12 +140,6 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: In der Playwright-`webServer.env` gesetztes `ASPNETCORE_ENVIRONMENT=E2E` wurde von `launchSettings.json` (`dotnet run` nutzt per Default das Launch-Profil) still auf `Development` überschrieben → der E2E-Reset-Endpoint war nie gemappt (404) → verwirrende Akkumulations-Debuggerei (ich konnte anfangs nicht erklären, warum ein Empty-State-Test grün war). Fix: `--no-launch-profile`.
   Warum: Angenommen, das im Runner gesetzte Env erreiche die App 1:1 – ohne zu prüfen, dass eine gelagerte Konfigurationsquelle (Launch-Profil) Vorrang hat.
   Regel: Hängt ein Mechanismus daran, dass eine Env-Variable/Config einen gespawnten Prozess erreicht, empirisch mit einer **lauten** Laufzeit-Assertion absichern, dass sie wirklich griff – nicht auf Propagierung vertrauen (gelagerte Config/Profile können lautlos gewinnen).
-
-- **[MITTEL] [QUALITÄT] [C#-Code] LL-S098-2 – Provider-spezifische API direkt in Program.Main bricht den InMemory-Test-Host**
-  Quelle: Orchestrator
-  Was: Ein `MigrateAsync()`-Aufruf (EF-Relational) direkt in `Program.<Main>$` – hinter einem `if E2E`-Guard, der in Tests nie läuft – ließ **alle** 15 Backend-Integrationstests mit `FileNotFoundException` (Relational-Assembly) scheitern, weil der Test-Host (WebApplicationFactory, InMemory-Provider) beim JIT von `Main` alle Methodrefs auflösen muss, auch die des ungenommenen Zweigs.
-  Warum: JIT ist per-Methode lazy, aber innerhalb einer Methode werden alle referenzierten Assemblies beim Kompilieren aufgelöst – ein untaken Branch schützt nicht.
-  Regel: Provider-/Assembly-spezifische Aufrufe (Relational, Npgsql o.ä.), die nur unter einer bestimmten Umgebung laufen, nicht inline in `Program.Main` setzen, sondern in eine eigene Methode auslagern – deren Body JITtet erst beim tatsächlichen Aufruf, sodass Test-Hosts mit anderem Provider nicht am fehlenden Assembly scheitern.
 
 - **[MITTEL] [PROZESS] [Skill-Nutzung] LL-S098-3 – Fällige Infra-Schuld im Architektur-Check nicht proaktiv gefunden**
   Quelle: User

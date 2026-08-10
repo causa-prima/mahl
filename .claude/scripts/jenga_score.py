@@ -32,6 +32,9 @@ FINDING_RE = re.compile(
     r"\[(?P<kontext>[\w/-]+)\]"
 )
 SESSION_RE = re.compile(r"^##\s+Session\s+\d+")
+# Der Datei-Header dokumentiert das Eintrags-Format mit einem Beispiel-Finding.
+# Ohne dieses Strippen zählt es als echter Eintrag mit (Periodenstart 90 statt 100).
+KOMMENTAR_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
 def parse(path: str) -> tuple[int, list[dict]]:
@@ -40,17 +43,19 @@ def parse(path: str) -> tuple[int, list[dict]]:
     findings: list[dict] = []
 
     with open(path, encoding="utf-8") as f:
-        for line in f:
-            if SESSION_RE.match(line):
-                sessions += 1
-                continue
-            m = FINDING_RE.match(line)
-            if m:
-                findings.append({
-                    "impact": m.group("impact"),
-                    "kategorie": m.group("kategorie"),
-                    "kontext": m.group("kontext"),
-                })
+        inhalt = KOMMENTAR_RE.sub("", f.read())
+
+    for line in inhalt.splitlines():
+        if SESSION_RE.match(line):
+            sessions += 1
+            continue
+        m = FINDING_RE.match(line)
+        if m:
+            findings.append({
+                "impact": m.group("impact"),
+                "kategorie": m.group("kategorie"),
+                "kontext": m.group("kontext"),
+            })
 
     return sessions, findings
 

@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 116 | 2026-08-10 | SKELETON (Kaizen-Retro S107–115) | Retro: CM-S116-1 + Prinzip „Gegenprobe"; CM-S078-2 reaktiviert; CM-S102-2/S107-1 BEWÄHRT; 7 CM-Nachträge; 1 Noise gelöscht, 2 Impacts, 3 Tags korrigiert. Test-Wrapper in beide Layer-Implementer; process.md Regel 1; jenga_score-Kommentar-Bug; LL-S116-1/-2, OBS-S116-1..5. |
 | 115 | 2026-08-08/09 | SKELETON (OBS-Drain) | 5 OBS aufgelöst (22→16): Filter-Rewrite + `tool-usage --since`; `cd`+npm-Deny; offene Fragen im Drain-Satz (`Fällig`-Feld); `Vorprägung`-Feld; Stryker-Survivor-Ausgabe; ADR-Refs mid-line. Gate-Lücke `test-bash-permission` geschlossen, `set_fields`-Regex-Bug, 494 Tests; LL-S115-1. |
 | 114 | 2026-08-02/03 | SKELETON (OBS-Drain) | 5 OBS aufgelöst (26→20): tech-debt-Format auf `Fällig`/`Problem`/`Behebung` + `check-td-capture.py`; ADR-Filter in implementing-scenario; neue Scripte `read-breakdown`, `tool-usage`, `test-inventory`, `obs`, `lessons`; CM-S114-1/-2, LL-S114-1..3, OBS-S114-1/-2. |
 | 113 | 2026-08-01 | SKELETON (OBS-Drain) | 6 OBS aufgelöst (30→25), Workshop-Gate erfüllt: gherkin-workshop um Nebenläufigkeits-/Ablage-Regel, Unbestimmtheits-Detektor, Toast-Zeile, Clustering 5/6 erweitert; PreToolUse-Dispatcher (6→1); Tooling-Tests als Gate; 298 Tests grün; LL-S113-1..3, OBS-S113-1. |

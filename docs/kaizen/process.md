@@ -239,9 +239,17 @@ Der Jenga-Score startet automatisch neu – `jenga_score.py` liest immer nur die
 
 ## Umsetzung offener Maßnahmen
 
-**Regel 1 – Sichtbarkeit:** Jede neue OFFEN-Maßnahme wird in derselben Retro-Session unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md` eingetragen. Falls inhaltlich zutreffend auch als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`). Ablauf: Schritt 4 des `kaizen`-Skills.
+**Regel 1 – Sichtbarkeit:** Die **Countermeasure entsteht immer in der Retro** – sie ist der Tracking-Anker (Impact-Tupel + Status), ohne den `retro_report.py` weder Rückfall noch BEWÄHRT zählen kann. Die Frage ist nur, wo ihre **Umsetzung** wieder vorgelegt wird.
 
-**Regel 2 – Eskalation:** Eine Maßnahme die nach 2 Retros noch OFFEN ist, wird in der nächsten Retro (Schritt 3, Abschnitt F) als ESKALIERT präsentiert. Der User entscheidet dann: Umsetzung priorisieren oder bewusst verwerfen (Begründung in der Maßnahme notieren).
+**Default: die Maßnahme in derselben Retro definieren.** Das Abwägen der Kandidaten für ein LL-Muster gehört laut Evaluierungs-Gate (Abschnitt „Gefahr & Kandidaten-Bewertung") ausdrücklich in die **CM-Wahl**, also hierher – nicht in den Drain. Ist sie definiert (konkreter nächster Schritt + überprüfbares Done-Kriterium), bekommt sie einen Punkt unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md`, als **Kurzzusammenfassung mit Verweis** auf `countermeasures.md` – keine Kopie, das Dokument wird bei jedem Session-Start vollständig injiziert.
+
+**Ausnahme, begründungspflichtig:** Steht nicht die Umsetzung aus, sondern die **Antwort selbst** – es gibt mehrere ernsthafte Kandidaten, deren Abwägung eigene Recherche braucht –, bleibt die CM auf OFFEN und die Ausgestaltung geht als Eintrag in `docs/kaizen/observations.md` (mit `Bezug:` auf die CM) in den Drain. Der Grund ist im CM-Eintrag zu notieren; „ist noch nicht definiert" allein zählt nicht, sonst wird die Ausnahme zum bequemen Standardweg. **Preis dieser Route bewusst mitdenken:** Der Drain ist ratenbegrenzt und nach Impact × Häufigkeit priorisiert – ein Eintrag kann dort viele Sessions liegen. Für KRITISCH/HOCH-Findings, die laut „Wann gehört etwas wohin?" *sofort* eine Maßnahme verlangen, ist das in aller Regel zu langsam.
+
+**Nicht** nach `AGENT_MEMORY.md` gehört eine unfertige Maßnahme: Die Datei hat außer der Injektion **keinen** Wiedervorlage-Mechanismus, ein Punkt ohne nächsten Schritt belastet dort nur die Prioritätenliste – das verwechselt Sichtbarkeit mit Wiedervorlage. (Diese Unterscheidung fehlte bis S116; die Regel stammt aus der Zeit vor dem kontinuierlichen Drain und kannte nur einen Ablageort.)
+
+Falls inhaltlich zutreffend zusätzlich als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`). Ablauf: `kaizen`-Skill, Schritt „Änderungen umsetzen".
+
+**Regel 2 – Eskalation:** Eine Maßnahme die nach 2 Retros noch OFFEN ist, wird in der nächsten Retro als ESKALIERT präsentiert – im Skill-Schritt „Findings präsentieren & Freigabe einholen", Abschnitt F (gespeist aus dem Abschnitt „Eskalierte Maßnahmen" des `retro_report.py`-Outputs). Der User entscheidet dann: Umsetzung priorisieren oder bewusst verwerfen (Begründung in der Maßnahme notieren).
 
 ---
 
