@@ -42,6 +42,13 @@ Auswahl. TD-Einträge mit
 
 - **Nominale Brands für die Frontend-Domänentypen (TD-S083-4)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S083-4 · Done: `Client/src` führt in Domänentypen keine nackten `string`-Felder mehr, alle Tests grün.
 
+- **Getypte Ingredient-Id + Wegwerf-ID beseitigen (TD-S118-1)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S118-1 · Done: `Ingredient` trägt keinen rohen `Guid` mehr, `ToDomain()` erzeugt keine ungelesene Id, alle Tests grün.
+
+- **Domänentypen für Ingredient-Name und -Einheit (TD-S118-2)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S118-2 · Done: `MaxNameLength`/`MaxUnitLength` liegen im Typ statt im Endpoint, `Ingredient.Create` ist nicht mehr mit ungültigen Werten aufrufbar.
+
+- **Ablage-Taxonomie ADR/TD/OQ verankern** — `Fällig: jetzt` · Quelle: `docs/history/sessions/session_118.md` (Abschnitte E1, T1/T2/T3/T11) · Done: Die drei Datei-Header tragen ihre Aufnahmebedingung, `CLAUDE.md` die Übersicht, `check-adr-capture.py` läuft mit bestandener Gegenprobe.
+  Prozess-Artefakt, deshalb kein TD-Eintrag. Nicht als OBS, weil der ratenbegrenzte Drain genau der Fehler wäre, den LL-S118-1 beschreibt.
+
 - **Zwei fehlende Szenarien mitschreiben: „DB nicht erreichbar" und Fehlerpfad Löschen/Undo** — `Fällig: Phase:MVP` · Quelle: `docs/tech-debt.md` → TD-S108-1 · Done: `features/resilience.feature` übt auch DELETE aus.
   Kein Workshop nötig – beide entstehen bei der Resilience-Arbeit ohnehin.
 

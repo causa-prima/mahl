@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 118 | 2026-08-12 | SKELETON (offene Fragen) | Alle 3 fälligen OQ geklärt: Ablage-Taxonomie ADR/TD/OQ (E1), Domänentyp vs. Constraint-Typ (E2), ID als Union über `Uuid7` (E3), OQ-`Fällig` auf Anker-Grammatik (E4). OQ-S083-1/-2 entfernt → TD-S118-1/-2 (beide `jetzt`); LL-S118-1, OBS-S118-1. Kein Code. |
 | 117 | 2026-08-11 | SKELETON (OBS-Drain) | 2 OBS aufgelöst: Infra-TDD ohne Szenario in `tdd-process.md`; Anker-Grammatik `td_anchors.py` + 17 `Fällig:`-Zeilen migriert, `td_due.py`. `session-agenda.py` ersetzt `session-start.sh` (10 Module, `open_questions.py` herausgelöst); Injektion 18.812→12.380 Bytes; LL-S117-1, OBS-S117-1..4. |
 | 116 | 2026-08-10 | SKELETON (Kaizen-Retro S107–115) | Retro: CM-S116-1 + Prinzip „Gegenprobe"; CM-S078-2 reaktiviert; CM-S102-2/S107-1 BEWÄHRT; 7 CM-Nachträge; 1 Noise gelöscht, 2 Impacts, 3 Tags korrigiert. Test-Wrapper in beide Layer-Implementer; process.md Regel 1; jenga_score-Kommentar-Bug; LL-S116-1/-2, OBS-S116-1..5. |
 | 115 | 2026-08-08/09 | SKELETON (OBS-Drain) | 5 OBS aufgelöst (22→16): Filter-Rewrite + `tool-usage --since`; `cd`+npm-Deny; offene Fragen im Drain-Satz (`Fällig`-Feld); `Vorprägung`-Feld; Stryker-Survivor-Ausgabe; ADR-Refs mid-line. Gate-Lücke `test-bash-permission` geschlossen, `set_fields`-Regex-Bug, 494 Tests; LL-S115-1. |
