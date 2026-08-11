@@ -332,7 +332,13 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor Schritt 6.
    - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return durchsehen und **pro Subagent explizit ausweisen**, ob er Feedback gab (Inhalt) oder nicht („keine"). Wird daraus ein OBS/LL erfasst, die **Quelle präzise** eintragen (`Subagent` vs. `Orchestrator`), damit später beobachtbar bleibt, woher das Feedback stammt.
    - **Zurückgestellte ⚠️-Findings** aus dem Review-Loop (Schritt 5).
    - **Während des Ablaufs entdeckte technische Schuld / Tooling-Reibung.**
-   - **TD-Abgleich:** Prüfe, ob ein bestehender `docs/tech-debt.md`-Eintrag durch diesen Lauf behoben wurde – bewusst mit-erledigt (Schritt 0, Punkt 5) **oder** unbewusst nebenbei → den Eintrag schließen. Verhindert, dass `tech-debt.md` längst erledigte Posten weiterschleppt.
+   - **TD-Abgleich (mechanisch, nicht aus dem Gedächtnis):**
+     ```
+     python3 .claude/scripts/td_due.py --szenarien "<Titel 1>" "<Titel 2>" …
+     ```
+     (die Szenario-Titel dieses Laufs, exakt aus der Feature-Datei). Das Script listet jeden `docs/tech-debt.md`-Eintrag, der per `Szenario:`-Anker auf ein Szenario dieses Laufs zeigt. Für **jeden** Treffer entscheiden: behoben → Eintrag entfernen; nicht behoben → begründen, warum der Lauf ihn nicht mit-erledigt hat.
+     Prüfe zusätzlich, ob ein Eintrag **unbewusst nebenbei** behoben wurde (den fängt kein Anker) → ebenfalls schließen. Verhindert, dass `tech-debt.md` längst erledigte Posten weiterschleppt.
+     Warum mechanisch statt als Lese-Aufforderung: Ein TD-Eintrag wurde nachweislich übersehen, während genau der von ihm beschriebene Bereich in einem Lauf verändert wurde. Unvergesslich ist das aber nicht dieser Schritt, sondern das `td-due`-Modul der `session-agenda.py` – es meldet einen Anker, dessen Szenario implementiert ist, auch dann, wenn dieser Schritt übersprungen wurde.
 
    Lege dem User **jeden** Punkt vor – mit genug **Kontext** zum Entscheiden und einer **begründeten Empfehlung**. Der User entscheidet pro Punkt:
    1. **Direkt umsetzen** → jetzt erledigen (ggf. eigener TDD-Zyklus / Schicht-Subagent).

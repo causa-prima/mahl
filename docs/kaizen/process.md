@@ -73,7 +73,7 @@ Offene OBS (Status `NEU`) werden **kontinuierlich pro Session** abgebaut, **nich
 - **Wert-Lane:** Top nach Impact × Häufigkeit (Hauptbudget).
 - **Alters-Lane:** das **älteste** `NEU`-Item (1 Slot), gezwungen zur Entscheidung → Anti-Starvation (reine Prioritäts-Ordnung verhungert das Tail sonst dauerhaft). Alter = aktuelle Session − Erfassungs-Session (aus der OBS-ID). Max. Verweildauer ≈ B Sessions.
 - **Wiedervorlage-Lane:** fällige geparkte Items (s. „Drei Ausgänge"), garantiert und außerhalb des Rate-Budgets.
-- **Offene Fragen:** liegende Einträge aus `docs/open-questions.md` (max. 3, älteste zuerst) – fällig, wenn ihr optionales `Fällig: S<NNN>` erreicht oder der Eintrag ~10 Sessions alt ist; ein gesetzter Termin unterdrückt die Alters-Regel. Keine Lane im Rate-Budget, sondern ein Vorlage-Trigger: Diese Fragen werden mit dem **User** geklärt, nicht im Drain entschieden. Grund für die Ankopplung hier (S115): `open-questions.md` hatte als einziger Tracker keinen Lese-Trigger – alle Verweise darauf waren Schreib-Verweise –, weshalb vier Fragen 14–25 Sessions unbeantwortet lagen. Angehängt statt als eigener Mechanismus, weil dieser Vorschlag der bestehende Vorlage-Weg ist.
+*(Offene Fragen hingen bis S116 als vierte Lane hier mit dran; seit S117 sind sie ein eigenes Modul der Session-Agenda – s. unten.)*
 
 **Same-Artefakt-Kolokation:** Berührt ein anderes offenes OBS dieselbe Datei (Skript/Hook *oder* Skill/Doc), Mitnahme erwägen – spart Kontext-Laden, vermeidet Konflikt-Fixes über Sessions, bündelt teure Doc-QA.
 
@@ -91,6 +91,74 @@ Offene OBS (Status `NEU`) werden **kontinuierlich pro Session** abgebaut, **nich
 
 Die Retro behandelt OBS nicht (das macht der Drain), berührt sie aber an einer Stelle:
 - **Verlinkte OBS als LL-Input:** Beim Root-Causing eines LLs die per `Bezug: LL-…` daran hängenden OBS als **Design-Input** mitdenken (Zwei-Brillen-Quer-Bewegung). Die Suche ist **ID-gezielt** (`Bezug: LL-<diese-ID>`), daher auch im Archiv (`docs/kaizen/archive/observations_archive.md`) eindeutig – kein Relevanz-Scan über alle Einträge, nur die Treffer auf genau dieses LL.
+
+---
+
+## Session-Agenda: was verlangt zum Session-Start eine Entscheidung?
+
+Der SessionStart-Hook ruft `python3 .claude/scripts/session-agenda.py` (Module: `--list`,
+einzeln abrufen: `--only <name>`). Ziel ist **Fokus**, nicht Tokensparen – ein Session-Start mit
+mehreren konkurrierenden Aufträgen zeigt in keine Richtung.
+
+Ausgegeben wird erst der **Rahmen** (`principles`, Allow-Liste) – über Sessions unverändert und
+beim Lesen überspringbar –, danach die **Agenda**. Sie steht am Schluss, direkt vor der ersten
+Nachricht des Users: Das einzig session-spezifische Stück gehört an die Stelle, an der es am
+ehesten wirkt. Die Agenda enthält zusammenhängend:
+
+1. **Zustand** – Phase, Story, nächster Lauf. Drei Zeilen, ohne Titel und ohne Kurzfassung.
+2. **Nächste Aufgabe** – genau *eine*, nach der Rangfolge unten. Ihr Text ist **buchstäblich**
+   die Ausgabe von `--only <name>` für dieses Modul; keine zusammenfassende Kopfzeile davor,
+   die den Inhalt darunter doppelte. Umgekehrt heißt das: Jeder Modulinhalt muss ohne
+   Rahmenzeile sagen, worum es geht und was zu tun ist.
+3. **Einzeiler** – je unterdrücktem Modul eine Zeile **mit seinem Messwert** (`Backlog 21
+   drainbar`, `Jenga 89`). Ein unterdrückter Block darf nie verschwinden: Man kann nicht
+   anfordern, wovon man nicht weiß, dass es existiert, und der User übersteuert regelmäßig.
+   Der Rang steht im **Label** des Abschnitts („Nachrangig – nicht Gegenstand dieser Session,
+   außer der User sagt es an"), nicht in der Trennerform: Trenner markieren die *Grenze* (ohne
+   den unteren liefe der Abschnitt optisch in der Aufgabe weiter), Labels den *Rang*. Ein
+   neutrales Label wie „Ebenfalls offen" las sich dagegen gleichrangig zur Aufgabe.
+
+**Rangfolge** (hier kanonisch, mechanisch in der `MODULE`-Liste des Scripts):
+
+| Rang | Modul | Beansprucht, wenn |
+|------|-------|-------------------|
+| 1 | `retro` | Jenga ≤ 0 |
+| 2 | `obs-drain` | B ≥ 13 |
+| 3 | `priorities` | ein AGENT_MEMORY-Punkt trägt `Fällig: jetzt` |
+| 4 | `next-run` | die aktuelle Story hat einen offenen Lauf |
+
+`open-questions`, `td-due` und `ungeplante-szenarien` beanspruchen **nie** – sie verlangen eine
+Entscheidung, keinen Arbeitstag; als Aufgabe verdrängte eine 34 Sessions alte Frage eine
+laufende Story.
+
+**`priorities` zeigt nur den obersten Punkt voll**, den Rest als Titel + Fälligkeit mit Zeiger
+auf `AGENT_MEMORY.md`. Die Liste ist ein Terminplan, kein Auftrag: Neun Punkte im Volltext –
+davon aktuell fünf mit `Fällig: jetzt` – wären wieder genau die konkurrierenden Aufträge, gegen
+die die Rangfolge gebaut ist. Voll gezeigt wird der erste `jetzt`-Punkt, weil `jetzt` der
+Auslöser ist; ohne einen solchen (Übersteuerungs-Pfad `--only priorities`) der erste überhaupt.
+
+**Warum `next-run` story-gebunden auflöst und trotzdem nichts verschwindet:** Ein Szenario ohne
+`# @run-N` gilt in `next_run.py` als eigener Einzel-Lauf (Rückwärtskompatibilität für
+ungeclusterte Storys). Ohne Story-Filter meldete die Agenda deshalb querschnittliche Szenarien
+als offene Läufe, obwohl ihre Feature-Datei den Scope ausdrücklich zurückstellt – eine
+behauptete Arbeit. Mit Filter fielen sie ganz heraus – eine behauptete Vollständigkeit. Deshalb
+beides: `next-run` beansprucht nur für die aktuelle Story, und `ungeplante-szenarien` macht
+sichtbar, was geschrieben ist, aber auf keinem Weg vorgelegt wird. Der Status dort ist
+**ungeklärt**, nicht „fällig".
+
+**Warum B ≥ 13 und nicht ≥ 9 (Gleichgewicht):** Nicht die Backlog-Größe entscheidet, sondern die
+**Satzgröße**. `clamp(round(0,4·B), 3, 7)` schlägt bei B=8 drei Items vor (Nebentätigkeit), ab
+B=13 fünf und mehr (Sessionarbeit). Politik-Regler, keine Messgröße: Bei ≥ 9 gewänne der Drain
+fast immer und Produktarbeit käme nie dran.
+
+**Keine Extremschwellen** (etwa „sehr volles Backlog schlägt fällige Retro"): nicht
+kalibrierbar – in S116 zeigten Backlog-Rückgang und tiefer Jenga-Stand gleichzeitig auf die
+Retro, die Erklärungen sind konfundiert. Eine falsch gesetzte Schwelle kostet dasselbe wie keine
+(eine formlose Übersteuerung), zusätzlich aber Pflege. Der User übersteuert informiert – die
+Messwerte stehen in den Stubs.
+
+**Ausfallverhalten:** Jedes Modul scheitert einzeln und sichtbar (Warnzeile mit Einzelabruf);
+die Agenda läuft weiter. Ein Totalausfall wäre von „nichts zu tun" ununterscheidbar.
 
 ---
 

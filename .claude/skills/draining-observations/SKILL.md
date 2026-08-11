@@ -4,7 +4,7 @@ description: >
   Behandelt einen Satz offener Beobachtungen (OBS) aus docs/kaizen/observations.md –
   Discovery, Kandidaten-Findung und Entscheidung (umsetzen / verwerfen / aufschieben).
   Wird ausgelöst wenn der SessionStart-Hook einen OBS-Drain-Satz vorschlägt (Trigger-Text:
-  "OBS-Drain vorgeschlagen") oder wenn der User OBS abarbeiten/drainen/durchgehen will
+  "OBS-Drain – Backlog:") oder wenn der User OBS abarbeiten/drainen/durchgehen will
   ("OBS drainen", "Beobachtungen abarbeiten", "Backlog abbauen", "lass uns ein paar OBS angehen").
   NICHT für das Erfassen neuer OBS (das ist billig und passiert in closing-session) und NICHT
   für die Kaizen-Retro (die berührt OBS nur als verlinkten LL-Input).
@@ -21,7 +21,8 @@ Marker unklar ist.
 
 ## 1. Drain-Satz holen
 
-Der SessionStart-Hook blendet den Satz bereits ein (Block „OBS-Drain vorgeschlagen"). Ist er noch im
+Der SessionStart-Hook blendet den Satz bereits ein (als „Nächste Aufgabe" der Session-Agenda, beginnend
+mit „OBS-Drain – Backlog:"). Ist er noch im
 Kontext und aktuell, nutze ihn direkt. Berechne ihn neu, sobald er fehlt oder veraltet ist (mitten/spät in
 der Session, oder nachdem schon Items aufgelöst wurden):
 

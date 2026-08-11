@@ -2,28 +2,54 @@
 
 **Phase:** SKELETON 🔄
 **Aktuelle Story:** US-904 (Zutaten)
+**Nächster Lauf:** {{NEXT_RUN}}
 
 ---
 
+<!--
+„Nächste Prioritäten" ist der **Terminplan**, nicht der Inhalt. Jeder Eintrag hat genau vier
+Teile und passt in zwei bis drei Zeilen:
+
+  - **<Titel>** — `Fällig: <Anker>` · Quelle: <Zeiger auf den besitzenden Tracker> · Done: <Kriterium>
+
+  1. **Titel** – fettgesetzter Vorspann, wird von `session-agenda.py` als Kurzform gelesen.
+  2. **Fällig** – dieselbe Anker-Grammatik wie in `docs/tech-debt.md` (kanonisch dort im Header
+     und in `.claude/scripts/td_anchors.py`). `jetzt` = vor dem Beginn der nächsten Story.
+  3. **Quelle** – ein Befehl oder Pfad, unter dem der Volltext liegt. **Kein Volltext hier.**
+     Bis S116 trug diese Liste die vollständige Begründung jedes Punktes (6.395 Bytes, bei
+     jedem Session-Start injiziert), obwohl je Session höchstens einer bearbeitet wird – und
+     verletzte damit die Regel „Kurzzusammenfassung ja, Kopie nein" (OBS-S116-2).
+  4. **Done** – woran man erkennt, dass der Punkt erledigt ist.
+
+Ein Punkt mit `Fällig: jetzt` beansprucht die „Nächste Aufgabe" der Session (Rang 3, hinter
+Retro und vollem OBS-Drain). Gezeigt wird dann der erste `jetzt`-Punkt in Dokumentreihenfolge
+im Volltext, alle übrigen nur als Titel + Fälligkeit – die Reihenfolge hier ist also die
+Auswahl. TD-Einträge mit
+`**Fällig:** jetzt` MÜSSEN hier auftauchen – `check-td-capture.py` prüft das.
+-->
+
 ## Nächste Prioritäten
 
-- **US-904 nächster Lauf:** {{NEXT_RUN}}. Offene/erledigte: `python3 .claude/scripts/next_run.py --open|--done --story US-904`.
+- **Abschnitts-Anker einführen und Verweise prüfbar machen** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/obs.py get OBS-S112-7` (gekoppelt: OBS-S114-2) · Done: Verweise in lebenden Dokumenten zeigen auf Anker, der Prüfer läuft grün und meldet Brüche beim Editieren.
+  Eigene Session (User-Entscheid S115: vollständig migrieren, zu groß für einen Drain-Block).
 
-- **Als eigene Session: Abschnitts-Anker einführen und Verweise prüfbar machen (OBS-S112-7).** Ziel: zwischen Referenzen navigieren können und beim Editieren sofort merken, wenn ein Verweis ins Leere führt. User-Entscheid S115: vollständig migrieren – zu groß für einen Drain-Block, deshalb eigene Session. Umfang, Befunde und empfohlene Reihenfolge stehen vollständig im Eintrag: `python3 .claude/scripts/obs.py get OBS-S112-7` (gekoppelt: OBS-S114-2). — Done: Verweise in lebenden Dokumenten zeigen auf Anker, der Prüfer läuft grün und meldet Brüche beim Editieren.
+- **Querschnitts-Testfundament aufsetzen (ADR-S112-5, Schritte 2+3)** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/decisions.py get ADR-S112-5` · Done: Ein Page-Object-Interface existiert, die Suite läuft parametrisiert gegen die Zutaten-Seite, alle bisherigen Tests sind grün.
+  Berührt nur Testcode. Jetzt, weil die Umformung teurer wird, sobald neue Seitenarbeit dazwischenliegt.
 
-- **Mit der Resilience-/MVP-Arbeit zwei fehlende Szenarien mitschreiben:** „DB nicht erreichbar → Nutzer sieht einen Hinweis, die App crasht nicht", und den **Fehlerpfad Löschen/Undo** – die vorhandenen `@NFR-resilience`-Szenarien üben nur GET und POST aus, DELETE bliebe sonst ohne treibendes Szenario (Voraussetzung für die Delete/Restore-Fehler-Union). Kein Workshop nötig: Beide entstehen bei dieser Arbeit ohnehin, und der `gherkin-workshop` läuft je User Story und liest `tech-debt.md` nicht selbst.
+- **Backend-Branch-Coverage-Gate reaktivieren (TD-S089-1)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S089-1 · Done: `collect_coverage` ist reaktiviert und `dotnet-test.py` meldet 100% Branch-Coverage grün.
 
-- **Vor dem Beginn der nächsten Story: Querschnitts-Testfundament aufsetzen (ADR-S112-5, Schritte 2+3).** Page-Object-Interface definieren und die bestehenden Tests der acht Querschnitts-Szenarien (Pending-Sperren, Undo-Toast) in eine darüber parametrisierte Suite überführen. Berührt **nur Testcode** – keine verfrühte Abstraktion im Produktionscode. Warum jetzt und nicht erst vor US-602: Dies ist der Abschluss der ersten Seite; die Umformung wird teurer, sobald neue Seitenarbeit dazwischenliegt, und die Lauf-Clusterung des nächsten Workshops plant sonst gegen eine Teststruktur, die sich kurz darauf ändert. Nicht strikt workshop-blockierend – die Frage, *wohin* der Workshop querschnittliche Szenarien legt, ist seit S113 beantwortet (Ablage-Regel mit Querschnitts-Test in `gherkin-workshop`, Schritt 1); offen ist hier allein die Teststruktur. Extraktion der geteilten Komponente, Szenario-Umzug samt Testumbenennung und Import-Guard folgen erst **mit** der zweiten Seite. — Done: Ein Page-Object-Interface existiert, die Suite läuft parametrisiert gegen die Zutaten-Seite, alle bisherigen Tests sind grün.
+- **Theme-Foundation ziehen (TD-S083-2)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S083-2 · Done: Alle interaktiven Controls messen ≥ 44×44px, der Infra-Test hält das fest.
 
-- **Vor dem Beginn der nächsten Story: Backend-Branch-Coverage-Gate reaktivieren (TD-S089-1).** Das Gate aus NFR/DoD ist seit Session 89 wirkungslos: `collect_coverage = False` in `.claude/scripts/dotnet-test.py`, weil unter dem Microsoft.Testing.Platform-Runner keine funktionierende Coverage-Engine aufgesetzt ist. Bewusst terminiert statt an einen Code-Trigger gehängt – der Eintrag lag ~22 Sessions mit Priorität „Hoch" unbearbeitet, ein passiver Trigger bewegt ihn nachweislich nicht. Ausgangspunkt der Recherche ist der **tatsächlich aufgelöste** Stack (MTP 1.9.1, `xunit.v3` 3.2.2 in der `mtp-v1`-Variante, `Microsoft.CodeCoverage` 18.3.0 bereits transitiv vorhanden) – **nicht** die in TD-S089-1 dokumentierten MTP-2.x-Sackgassen, die auf einen nicht mehr vorliegenden Stand zielen. — Done: `collect_coverage` ist reaktiviert und `dotnet-test.py` meldet 100% Branch-Coverage grün.
+- **Nominale Brands für die Frontend-Domänentypen (TD-S083-4)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S083-4 · Done: `Client/src` führt in Domänentypen keine nackten `string`-Felder mehr, alle Tests grün.
 
-- **Vor dem Beginn der nächsten Story: Theme-Foundation ziehen (TD-S083-2).** `Client/src` hat weder `ThemeProvider` noch `CssBaseline`; dadurch liegen alle sechs interaktiven Controls in `IngredientsPage.tsx` auf MUIs Defaults (Button ~36,5px, IconButton 40×40) und verletzen die Accessibility-Anforderung „Touch-Targets ≥ 44×44px" aus `docs/process/nfr.md`. Kein Auslöser, auf den zu warten wäre – die Anforderung gilt bereits, deshalb terminiert. Umfang: `ThemeProvider` + `CssBaseline` in `main.tsx` mit Mindestgrößen als Komponenten-Defaults; Nachweis als ausgewiesener Infra-Test nach ADR-S106-3 über die Bounding-Box (NFR-Eigenschaft, kein Nutzer-Szenario). — Done: Alle interaktiven Controls messen ≥ 44×44px, der Infra-Test hält das fest.
+- **Zwei fehlende Szenarien mitschreiben: „DB nicht erreichbar" und Fehlerpfad Löschen/Undo** — `Fällig: Phase:MVP` · Quelle: `docs/tech-debt.md` → TD-S108-1 · Done: `features/resilience.feature` übt auch DELETE aus.
+  Kein Workshop nötig – beide entstehen bei der Resilience-Arbeit ohnehin.
 
-- **Vor dem Beginn der nächsten Story: nominale Brands für die Frontend-Domänentypen ziehen (TD-S083-4).** `ingredientsApi.ts` definiert `Ingredient` und `NewIngredient` mit nackten `string`-Feldern; `coding-guideline-typescript.md` §2 verlangt die Kapselung und nennt als Motivation genau die Signatur `restoreIngredient(id, name, defaultUnit)`, die drei gleichartige Strings aneinanderreiht. Terminiert statt an einen Code-Trigger gehängt, weil die Guideline heute gilt und heute verletzt wird – der bisherige Auslöser („die nächste Frontend-Story, die eigene Domänentypen einführt") nennt keinen Zeitpunkt. Umfang klein: Brand-Vergabe an der API-Grenze, keine Regelprüfung (ADR-S112-4). — Done: `Client/src` führt in Domänentypen keine nackten `string`-Felder mehr, alle Tests grün.
+- **gherkin-workshop US-904, weitere Stufen** — `Fällig: Phase:MVP` · Quelle: `docs/stories/szenario_9_datenpflege.md` · Done: Feature-Datei trägt die MVP-Stufe (Modifier + Bearbeiten), Läufe sind geclustert.
+  V1-Stufe danach: Tags für Zutaten (Grundlage für US-907/US-901).
 
-- **gherkin-workshop US-904, weitere Stufen:** Separater Schritt vor der jeweiligen Implementierung: Feature-Datei und Szenarien ergänzen. **MVP-Stufe = Modifier** (`docs/stories/szenario_9_datenpflege.md`: pro Zutat anlegbar, optional, getrennte Einkaufslisten-Einträge). Die MVP-Zuordnung ist bestätigt, nicht verschiebbar: US-301 (Intelligente Artikelerfassung, ebenfalls MVP) führt „Modifizierer-Trennschärfe" als eigenes Akzeptanzkriterium. Rezepte brauchen Modifier erst in V2 (US-604). Zur MVP-Stufe gehört außerdem das **Bearbeiten** einer Zutat – `docs/reference/skeleton-spec.md` führt `PUT /api/ingredients/{id}` (Edit-UI) ausdrücklich als „Verschoben auf MVP". **V1-Stufe:** Tags für Zutaten (Grundlage für US-907/US-901).
+- **Deep-Link-Anforderung klären** — `Fällig: US-602, Phase:V1` · Quelle: `docs/open-questions.md` · Done: Entschieden und als ADR festgehalten, welche Entitäten deep-linkbar sind.
+  US-602 ist zugleich die erste Story mit zweiter Seite → Navigations-Szenario nach ADR-S103-1.
 
-- **Deep-Link-Anforderung klären:** Vor US-602 (Rezept-Detailansicht) – welche Entitäten, Hintergründe, Architektur-Implikationen. US-602 ist zugleich die erste Story mit einer zweiten Seite – damit greift erstmals der Checklisten-Punkt „Erreichbarkeit (Navigation)" im `gherkin-workshop` (Schritt 1): Navigations-Szenario gehört nach ADR-S103-1 in `features/navigation.feature` (`@CROSS-navigation`), nicht ins Rezepte-Feature; strukturelle Nav-Vorgabe siehe UX-Guideline Prinzip 9.
-
-- **Visuelle Konsistenz-Guideline:** `docs/guidelines/coding-guideline-ux.md` um Spacing/Hierarchie/Farbe erweitern, sobald >3 Komponenten dieselben visuellen Entscheidungen treffen.
-
+- **Visuelle Konsistenz-Guideline erweitern** — `Fällig: TD-S083-2` · Quelle: `docs/guidelines/coding-guideline-ux.md` · Done: Spacing/Hierarchie/Farbe sind dort geregelt.
+  Das Theme aus TD-S083-2 ist der Mechanismus, den die Guideline vorschreiben würde.

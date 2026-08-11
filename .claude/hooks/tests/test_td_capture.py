@@ -16,7 +16,7 @@ hook = import_module("check-td-capture")
 
 def _td(
     tid: str = "TD-S120-1",
-    faellig: str | None = "mit US-602",
+    faellig: str | None = "Phase:MVP",
     problem: str | None = "Irgendwas ist Schuld.",
     behebung: str | None = "Irgendwie beheben.",
     extra: str = "",
@@ -146,7 +146,7 @@ def test_now_with_memory_entry_passes():
 
 
 def test_event_trigger_needs_no_memory_entry():
-    body = hook.parse_td_entries(_td(faellig="ab MVP"))["TD-S120-1"]
+    body = hook.parse_td_entries(_td(faellig="Phase:MVP"))["TD-S120-1"]
     assert hook.check_entry("TD-S120-1", body, "") == []
 
 
@@ -220,7 +220,7 @@ def test_check_simulates_an_edit(tmp_path):
         "tool_name": "Edit",
         "tool_input": {
             "file_path": str(td),
-            "old_string": "**Fällig:** mit US-602",
+            "old_string": "**Fällig:** Phase:MVP",
             "new_string": "**Fällig:**",
         },
     }

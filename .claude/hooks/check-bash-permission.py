@@ -861,7 +861,7 @@ _PROJECT_TASK_SCRIPTS: list[str] = [
 ]
 
 # Nutzungshinweis zu den Wrapper-Scripts (OBS-S085-3 C). Erscheint via --list auch in
-# der SessionStart-Injection (session-start.sh ruft --list auf) → eine Quelle.
+# der SessionStart-Injection (session-agenda.py, Modul `bash-allowlist`, ruft --list auf) → eine Quelle.
 _SCRIPT_USAGE_HINT: str = (
     "Im Erfolgsfall geben diese Wrapper nur noch das VERDIKT aus – meist ein bis zwei\n"
     "Zeilen (z.B. „✓ 29 Tests grün, 3 Dateien, 9.2s“). Im Fehlerfall nur das, was zur\n"

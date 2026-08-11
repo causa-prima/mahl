@@ -15,7 +15,6 @@ Drei Lanes + zwei Zusatz-Marker (Begriffe kanonisch in process.md, Abschnitt "Ba
 """
 import argparse
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -89,83 +88,30 @@ def _vtag(entry) -> str:
     return "  +Vorprägung" if entry.get("vorpraegung") else ""
 
 
-# --- Offene Fragen (OBS-S108-6) ----------------------------------------------
-# `open-questions.md` hatte keinen Lese-Trigger: Sämtliche Verweise darauf sind Schreib-
-# Verweise („dort eintragen"), kein Prozessschritt legt Fragen vor. Alle anderen Tracker haben
-# einen: tech-debt.md wird in implementing-scenario gesichtet, observations.md treibt dieser
-# Drain, lessons_learned.md die Retro über den Jenga-Score. Folge im Bestand (S115): vier
-# Fragen lagen 14–25 Sessions unbeantwortet, und eine davon (Taxonomie ADR vs. Tech-Debt)
-# wurde mehrfach ad hoc neu verhandelt, ohne dass die offene Frage konsultiert wurde.
-#
-# Bewusst hier angehängt statt als eigenes Script mit eigener SessionStart-Injektion: Dieser
-# Vorschlag ist der bestehende Vorlage-Mechanismus, und die Script-Zahl wächst nicht weiter
-# (OBS-S114-1).
-OQ_FILE = "docs/open-questions.md"
-OQ_STALE = 10   # ohne Termin gilt eine Frage ab diesem Alter als überaltert → vorlegen
-OQ_MAX = 3      # Deckel: der Session-Start-Block soll nicht von Fragen überschwemmt werden
-
-_OQ_HEADER_RE = re.compile(r"^## (OQ-S(\d{3})-\d+)\s+[—–-]\s+(.+)$", re.M)
-_OQ_FAELLIG_RE = re.compile(r"^\*\*Fällig:\*\*\s*S(\d+)", re.M)
+# Offene Fragen hingen bis S116 hier mit dran – als der Drain-Vorschlag der einzige
+# Session-Start-Vorlage-Mechanismus war. Seit `session-agenda.py` sind sie ein eigenes
+# Geschwister-Modul (`open_questions.py`): anderer Tracker, anderer Ausgang (mit dem User
+# klären statt im Drain entscheiden). Dieses Script trägt wieder nur den OBS-Drain.
 
 
-def parse_open_questions(text: str) -> list[dict]:
-    """Einträge aus open-questions.md als (id, session, title, faellig).
-
-    `Fällig: S<NNN>` ist optional – fehlt es, entscheidet das Alter (s. `due_questions`).
-    """
-    treffer = list(_OQ_HEADER_RE.finditer(text))
-    fragen = []
-    for i, m in enumerate(treffer):
-        ende = treffer[i + 1].start() if i + 1 < len(treffer) else len(text)
-        block = text[m.end():ende]
-        termin = _OQ_FAELLIG_RE.search(block)
-        fragen.append({
-            "id": m.group(1),
-            "session": int(m.group(2)),
-            "title": m.group(3).strip(),
-            "faellig": int(termin.group(1)) if termin else None,
-        })
-    return fragen
-
-
-def due_questions(questions, cur) -> list[dict]:
-    """Vorzulegende Fragen: Termin erreicht – oder ohne Termin überaltert. Älteste zuerst.
-
-    Ein gesetzter Termin unterdrückt die Alters-Regel: Sonst wäre eine bewusst weit geparkte
-    Frage trotzdem sofort fällig, und der Termin damit wirkungslos.
-    """
-    if cur is None:
-        return []
-    faellige = []
-    for f in questions:
-        if f["faellig"] is not None:
-            if f["faellig"] <= cur:
-                faellige.append(f)
-        elif cur - f["session"] >= OQ_STALE:
-            faellige.append(f)
-    return sorted(faellige, key=lambda f: f["session"])[:OQ_MAX]
-
-
-def render(root: Path, entries, questions=()):
+def render(root: Path, entries):
     wert, oldest, b, drainable = compute(entries)
     cur = current_session(root)
     warn_far_parks(entries, cur)
     due = due_parked(entries, cur)
     resolved = [e for e in entries if is_resolved(e["status"])]
-    fragen = due_questions(questions, cur)
 
-    # "Leer" nur wenn es WIRKLICH nichts zu tun gibt – fällige Wiedervorlagen,
-    # aufgelöst-aber-unarchivierte Items und liegende offene Fragen müssen auch ohne
-    # NEU-Backlog erscheinen (sonst bleibt eine Frage so unsichtbar wie vor OBS-S108-6).
-    if b == 0 and not due and not resolved and not fragen:
-        return "=== OBS-Drain ===\nBacklog leer (keine drainbaren NEU-Items) – kein Drain nötig.\n================="
+    # "Leer" nur wenn es WIRKLICH nichts zu tun gibt – fällige Wiedervorlagen und
+    # aufgelöst-aber-unarchivierte Items müssen auch ohne NEU-Backlog erscheinen.
+    if b == 0 and not due and not resolved:
+        return "OBS-Drain – Backlog leer (keine drainbaren NEU-Items), kein Drain nötig."
 
     count = len(wert) + (1 if oldest else 0)
     selected = {e["id"] for e in wert} | ({oldest["id"]} if oldest else set())
-    lines = ["=== OBS-Drain vorgeschlagen ===",
-             f"Backlog: {b} drainbar (NEU; gesund ≤ 8) → heute {count} vorgeschlagen."]
-    if b > 12:  # 1,5× Gleichgewicht: der Drain ist advisory → Überfüllung sichtbar machen.
-        lines.append(f"  ⚠ Backlog überfüllt (B={b}, gesund ≤ 8) – Drain-Ausführung priorisieren.")
+    # Eine Eskalationszeile („⚠ Backlog überfüllt … priorisieren") stand hier bis S117. Sie
+    # sollte den Drain zum Tagesauftrag machen und hat das nie geschafft – das leistet jetzt
+    # die Rangfolge in `session-agenda.py`, die den Drain ab B≥13 als einzige Aufgabe zeigt.
+    lines = [f"OBS-Drain – Backlog: {b} drainbar (NEU; gesund ≤ 8) → heute {count} vorgeschlagen."]
     if wert:
         lines += ["", "Wert-Lane (nach Impact × Häufigkeit):"]
         for e in wert:
@@ -183,18 +129,11 @@ def render(root: Path, entries, questions=()):
         for e in due:
             bis = f"bis S{e['wiedervorlage']}" if e["wiedervorlage"] else "ohne Datum"
             lines.append(f"  - {e['id']}  (war geparkt {bis})  {e['title']}")
-    if fragen:
-        lines += ["", "Offene Fragen (Termin erreicht / überaltert → mit dem User klären):"]
-        for f in fragen:
-            wann = f"Termin S{f['faellig']}" if f["faellig"] else f"~{_age(cur, f['session'])} Sessions"
-            lines.append(f"  - {f['id']}  ({wann})  {f['title']}")
-        lines.append(f"  Volltext: {OQ_FILE}")
     if resolved:
         lines += ["", "Aufgelöst, noch in observations.md → ins Archiv verschieben"
                   " (`python3 .claude/scripts/obs-archive.py`): "
                   + ", ".join(e["id"] for e in resolved) + "."]
-    lines += ["", "→ Skill `draining-observations` zum Abarbeiten (umsetzen / verwerfen / aufschieben).",
-              "==============================="]
+    lines += ["", "→ Skill `draining-observations` zum Abarbeiten (umsetzen / verwerfen / aufschieben)."]
     return "\n".join(lines)
 
 
@@ -209,11 +148,7 @@ def main():
         # eine leere Ausgabe wäre sonst von "Backlog leer" ununterscheidbar.
         print(f"FEHLER: {obs} nicht gefunden – OBS-Drain übersprungen.", file=sys.stderr)
         return 1
-    # Offene Fragen sind optional: fehlt die Datei, entfällt nur deren Sektion – ein fehlendes
-    # open-questions.md darf den Drain-Vorschlag nicht ausfallen lassen.
-    oq_path = root / OQ_FILE
-    fragen = parse_open_questions(oq_path.read_text(encoding="utf-8")) if oq_path.is_file() else []
-    print(render(root, parse_entries(obs.read_text(encoding="utf-8")), fragen))
+    print(render(root, parse_entries(obs.read_text(encoding="utf-8"))))
     return 0
 
 

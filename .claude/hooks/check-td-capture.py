@@ -34,10 +34,15 @@ Format-Kopplung: Eintrags-Heading `## TD-S<NNN>-<n>` und die Feld-Präfixe sind 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt und prüft ihn.
 Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockiert nie einen Edit.
 """
+import dataclasses
 import json
+import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+import td_anchors  # noqa: E402
 
 TD_FILE = "docs/tech-debt.md"
 MEMORY_FILE = "docs/AGENT_MEMORY.md"
@@ -89,7 +94,8 @@ def is_now(faellig: str) -> bool:
     return bool(_NOW_RE.match(faellig.strip()))
 
 
-def check_entry(td_id: str, body: str, memory_text: str) -> list[str]:
+def check_entry(td_id: str, body: str, memory_text: str,
+                ktx: td_anchors.Kontext | None = None) -> list[str]:
     """Begründungen, warum dieser Eintrag die Format-Regeln verletzt."""
     reasons = []
     names = field_names(body)
@@ -102,22 +108,27 @@ def check_entry(td_id: str, body: str, memory_text: str) -> list[str]:
     if faellig is not None and not faellig:
         reasons.append("`**Fällig:**` ist leer – zulässig ist `jetzt` oder ein benennbares "
                        "auslösendes Ereignis")
-    elif faellig and is_now(faellig) and td_id not in memory_text:
-        reasons.append(
-            f"`**Fällig:** jetzt`, aber {td_id} steht nicht in `{MEMORY_FILE}` – "
-            "ohne Eintrag in „Nächste Prioritäten\" wird der Posten nie vorgelegt"
-        )
+    elif faellig:
+        if is_now(faellig) and td_id not in memory_text:
+            reasons.append(
+                f"`**Fällig:** jetzt`, aber {td_id} steht nicht in `{MEMORY_FILE}` – "
+                "ohne Eintrag in „Nächste Prioritäten\" wird der Posten nie vorgelegt"
+            )
+        # Anker-Grammatik: Kopf maschinenlesbar, mindestens ein terminierter Anker,
+        # Referenziertes existiert. Kanonisch in `.claude/scripts/td_anchors.py`.
+        reasons += td_anchors.validiere(td_id, faellig, ktx or td_anchors.Kontext())
 
     return reasons
 
 
-def find_violations(pre: str, post: str, memory_text: str) -> list[tuple[str, str]]:
+def find_violations(pre: str, post: str, memory_text: str,
+                    ktx: td_anchors.Kontext | None = None) -> list[tuple[str, str]]:
     """(TD-ID, Begründung) für jeden neuen oder geänderten Eintrag, der die Regeln verletzt."""
     before = parse_td_entries(pre)
     return [
         (tid, " · ".join(reasons))
         for tid, body in parse_td_entries(post).items()
-        if before.get(tid) != body and (reasons := check_entry(tid, body, memory_text))
+        if before.get(tid) != body and (reasons := check_entry(tid, body, memory_text, ktx))
     ]
 
 
@@ -125,6 +136,23 @@ def read_file_text(file_path: str) -> str:
     """Aktueller Datei-Inhalt; "" wenn die Datei (noch) nicht existiert."""
     path = Path(file_path)
     return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def repo_root_for(td_path: str) -> Path:
+    """Repo-Wurzel, abgeleitet aus dem Pfad der bearbeiteten `tech-debt.md`."""
+    posix = Path(td_path).as_posix()
+    return Path(posix[: -len(TD_FILE)] if posix.endswith(TD_FILE) else ".")
+
+
+def kontext_for(td_path: str, post: str) -> td_anchors.Kontext:
+    """Auflöse-Kontext für die Anker-Prüfung.
+
+    Die TD-Fälligkeiten kommen aus dem **simulierten Post-Inhalt**, nicht von der Platte:
+    Fügt ein Edit einen Eintrag hinzu, auf den ein anderer per `TD-`-Anker zeigt, wäre er im
+    Vor-Zustand noch nicht da und der Anker fälschlich als dangling gemeldet.
+    """
+    ktx = td_anchors.lade_kontext(repo_root_for(td_path))
+    return dataclasses.replace(ktx, td_faelligkeiten=td_anchors.td_faelligkeiten(post))
 
 
 def memory_text_for(td_path: str) -> str:
@@ -169,7 +197,8 @@ def check(data: dict) -> str | None:
     if post is None:
         return None
 
-    violations = find_violations(pre, post, memory_text_for(file_path))
+    violations = find_violations(pre, post, memory_text_for(file_path),
+                                 kontext_for(file_path, post))
     if not violations:
         return None
 
@@ -178,20 +207,28 @@ def check(data: dict) -> str | None:
         "❌ TD-Format (Poka-Yoke): Eintrag ohne belastbare Fälligkeit:\n"
         f"{lines}\n"
         "  Die Vorlage lautet:\n"
-        "    **Fällig:** jetzt | <auslösendes Ereignis>\n"
+        "    **Fällig:** <Anker>[, <Anker>…] – <Freitext-Erläuterung>\n"
         "    **Problem:** <was ist die Schuld>\n"
         "    **Behebung:** <wie behoben wird>\n"
         "  1. `**Fällig:**` ist Pflicht. Ein Eintrag, der nur sagt, WIE behoben wird, schuldet "
         "niemandem einen Zeitpunkt.\n"
-        "  2. `jetzt` verlangt einen Punkt in `docs/AGENT_MEMORY.md` unter „Nächste "
+        "  2. Der Kopf vor dem Gedankenstrich ist maschinenlesbar. Anker-Vokabular:\n"
+        "       jetzt            sofort\n"
+        "       Phase:MVP        Phasenwechsel (auch V1/V2)\n"
+        "       S130             Spätestens-Termin (Session)\n"
+        "       Szenario:„…\"     ein Gherkin-Szenario aus features/ (Titel exakt)\n"
+        "       US-602           eine Story – nur solange sie noch keine Szenarien hat\n"
+        "       TD-S089-1        ein anderer Eintrag (Kette muss terminieren, zyklenfrei)\n"
+        "     Alles Erklärende gehört HINTER den Gedankenstrich und bleibt dort erhalten.\n"
+        "  3. Mindestens ein Anker muss **terminiert** sein, also sagen WANN. Terminiert: "
+        "`jetzt`, `Phase:`, `S<NNN>`, `Szenario:` mit `# @run-N`-Zuordnung. Nicht terminiert: "
+        "`US-NNN` und ein Szenario ohne Lauf – die brauchen einen Backstop dazu "
+        "(`Szenario:„…\", Phase:MVP`). Ein Anker, der nur eintreten *kann*, lässt den Eintrag "
+        "verwaisen (OBS-S099-1).\n"
+        "  4. `jetzt` verlangt einen Punkt in `docs/AGENT_MEMORY.md` unter „Nächste "
         "Prioritäten\" – nur das wird bei jedem Session-Start gelesen. Trag ihn dort zuerst "
         "ein, dann greift diese Prüfung.\n"
-        "  3. Ein Ereignis muss nicht nur eintreten *können*, sondern eintreten, solange der "
-        "Plan nicht geändert wird – also so konkret wie möglich: eine US, ein Phasenwechsel, "
-        "ein anderer TD-Eintrag, ein Code-Bereich, den ein geplanter Lauf anfasst. Wo das "
-        "nicht sicher ist, gehört ein Fallback dazu („mit US-602, spätestens ab MVP\"). "
-        "Unzulässig ist, was in keinem Plan steht.\n"
-        "  4. Verletzt der Eintrag eine HEUTE geltende Regel (NFR, Guideline, DoD), ist die "
+        "  5. Verletzt der Eintrag eine HEUTE geltende Regel (NFR, Guideline, DoD), ist die "
         "Fälligkeit immer `jetzt` – eine geltende Regel wartet auf keine Bedingung. Soll sie "
         "doch warten, ist das eine Entscheidung über die Regel: Regel ändern oder Ausnahme "
         "als ADR dokumentieren (so ADR-S083-2 für TD-S101-1). Ein ungeprüfter Verdacht ist "

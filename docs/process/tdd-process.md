@@ -86,6 +86,8 @@ Langsame Stryker-Läufe durch eine wachsende Integration-Test-Suite sind ein akz
 - Das Gherkin-Szenario ist die Spec – nachträgliche Anpassungen zur Implementierungsbestätigung sind unzulässig
 - Coding-Subagenten schreiben keine Unit Tests (außer MSW-Komponenten-Tests für React). Jede Unit-Test-Ausnahme erfordert einen schriftlichen Stryker-Survivor-Report.
 
+**Infrastruktur-Arbeit ohne treibendes Szenario:** Querschnittliche Infrastruktur (globaler Exception-Handler, Request-Body-Limit, Theme-Foundation) wird von keinem Nutzer-Szenario getrieben, ist aber legitime Arbeit, wenn NFR, ADR oder Guideline sie fordern. TDD läuft dann unverändert – nur die äußere Schleife entfällt: Statt sie aus einem Gherkin-Szenario zu lesen, **leitest du die prüfbare Anforderung aus der fordernden Quelle ab**; das RED liefert ein ausgewiesener Querschnitts-/Infra-Test nach ADR-S106-3 (kein US-Tag, Kategorie per Kommentar). Terminiert wird solche Arbeit über `**Fällig:**` in `docs/tech-debt.md`.
+
 **Vollständige BDD/Gherkin-Dokumentation:** `docs/process/e2e-testing.md`
 
 ---

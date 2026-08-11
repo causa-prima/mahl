@@ -10,7 +10,7 @@ Sortierung: nach ID (Session) aufsteigend – neue Einträge unten anfügen (kei
 
 Eintrag-Format:
   ## TD-S<NNN>-<n> — <Bereich/Kurztitel>
-  **Fällig:** jetzt | <auslösendes Ereignis>
+  **Fällig:** <Anker>[, <Anker>…] – <Freitext-Erläuterung>
   **Problem:** <was ist die Schuld>
   **Behebung:** <wie behoben wird>
 
@@ -18,36 +18,55 @@ Eintrag-Format:
   Freie fettgesetzte Absätze (`**Zusammenhang:**`, `**Reichweite präzisiert:**` …) sind erlaubt,
   die drei Felder oben sind Pflicht.
 
-Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `.claude/hooks/check-td-capture.py`):
+Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `.claude/hooks/check-td-capture.py`,
+Grammatik und Auflösung kanonisch in `.claude/scripts/td_anchors.py`):
 
   1. Pflicht. Ein Eintrag, der nur sagt, WIE behoben wird, schuldet niemandem einen Zeitpunkt.
 
-  2. `jetzt` verlangt einen Punkt in `docs/AGENT_MEMORY.md` unter „Nächste Prioritäten" – der
+  2. Der **Kopf** vor dem Gedankenstrich ist maschinenlesbar, der Rest bleibt Prosa und trägt
+     weiter die Nuance. Anker-Vokabular:
+
+       jetzt              sofort
+       Phase:MVP          Phasenwechsel (auch V1/V2) – tritt ein, wenn AGENT_MEMORY sie erreicht
+       S130               Spätestens-Termin (Session-Nummer)
+       Szenario:„…"       ein Gherkin-Szenario aus features/ (Titel exakt, muss existieren)
+       US-602             eine Story – nur gültig, SOLANGE sie keine Szenarien hat
+       TD-S089-1          ein anderer Eintrag – tritt ein, wenn jener behoben (entfernt) ist
+
+  3. Mindestens ein Anker muss **terminiert** sein, also sagen WANN. Terminiert sind `jetzt`,
+     `Phase:`, `S<NNN>` und ein `Szenario:` mit `# @run-N`-Zuordnung. NICHT terminiert sind
+     `US-NNN` (die Story kann beliebig lange ungeplant bleiben) und ein `Szenario:` ohne
+     Lauf-Zuordnung; eine `TD-`-Kette erbt die Terminierung und muss zyklenfrei sein. Fehlt sie,
+     gehört ein Backstop dazu: `Szenario:„…", Phase:MVP`. Grund: Ein Anker, der nur eintreten
+     *kann*, lässt den Eintrag lautlos verwaisen (OBS-S099-1).
+
+  4. `jetzt` verlangt einen Punkt in `docs/AGENT_MEMORY.md` unter „Nächste Prioritäten" – der
      Hook prüft, ob die TD-ID dort vorkommt. Diese Datei hier wird nur situativ gelesen
      (Architektur-Check in `implementing-scenario`), `AGENT_MEMORY.md` bei jedem Session-Start.
 
-  3. Ein Ereignis muss nicht nur eintreten *können*, sondern eintreten, solange der Plan nicht
-     geändert wird – also so konkret wie möglich: eine US, ein Phasenwechsel, ein anderer
-     TD-Eintrag, ein Code-Bereich, den ein geplanter Lauf anfasst. Wo das nicht sicher ist,
-     gehört ein Fallback dazu („mit US-602, spätestens ab MVP"). Unzulässig ist, was in keinem
-     Plan steht: „bei der ersten Härtungsaufgabe" nennt keinen Zeitpunkt.
-
-  4. Verletzt der Eintrag eine HEUTE geltende Regel (NFR, Guideline, DoD), ist die Fälligkeit
+  5. Verletzt der Eintrag eine HEUTE geltende Regel (NFR, Guideline, DoD), ist die Fälligkeit
      immer `jetzt` – eine geltende Regel wartet auf keine Bedingung. Soll sie doch warten, ist
      das eine Entscheidung über die Regel: Regel ändern oder Ausnahme als ADR dokumentieren
      (so ADR-S083-2 für TD-S101-1). Ein ungeprüfter Verdacht ist keine Verletzung – dann ist
      die Prüfung die Behebung und bekommt eine eigene Fälligkeit.
+
+  6. **Story-Anker umhängen, sobald die Story Szenarien hat.** Vor dem `gherkin-workshop` ist
+     `US-NNN` die feinste verfügbare Granularität; danach steht fest, zu welchem Szenario die
+     Schuld gehört – oder die ehrliche Antwort ist `jetzt` (vor Implementierungsbeginn zu
+     erledigen). Der Übergang wird nicht vom `gherkin-workshop` erzwungen (der soll ohne Wissen
+     über TD-Tracking funktionieren), sondern vom `td-due`-Modul der `session-agenda.py`: Es
+     meldet jeden Story-Anker, dessen Story inzwischen Szenarien trägt.
 -->
 
 ## TD-S044-1 — STJ/Deserialisierung
-**Fällig:** mit US-602 (URI-Felder)
+**Fällig:** US-602, Phase:V1 – URI-Felder. Der Story-Anker gilt nur, solange US-602 keine Szenarien hat; danach auf das tragende Szenario umhängen.
 **Problem:** 400 vs. 500 bei ungültigem URI; STJ via `OriginalString` unverifiziert.
 **Behebung:** STJ-Pfad verifizieren und 400 statt 500 erzwingen.
 
 ---
 
 ## TD-S077-1 — `IngredientsPage`: manuelles State-Sync, fehlende UX-Baseline, überlange Komponenten
-**Fällig:** mit TD-S083-2 (Theme-Foundation, dort `jetzt`) – (a) und (c) auch früher, sobald die Datei ohnehin angefasst wird
+**Fällig:** TD-S083-2 – Theme-Foundation (dort `jetzt`). (a) und (c) auch früher, sobald die Datei ohnehin angefasst wird.
 **Problem:** Drei Befunde in derselben Datei, alle auf zu grob geschnittene Komponenten zurückgehend:
 (a) **Manuelles State-Sync.** `closeDialog` setzt drei `useState`-Slices von Hand zurück (`isDialogOpen`, `name`, `unit`) – jeder künftige Feld-Zustand muss dort mitgepflegt werden, sonst bleibt ein Rest stehen.
 (b) **Fehlende UX-Baseline.** Der Leerzustand ist ein nacktes `<p>Noch keine Zutaten angelegt.</p>` statt `Typography`; die TextFields tragen weder `fullWidth` noch `margin`; der Seitenrumpf ist ein blankes `<div>` ohne Layout-Container und ohne Überschrift.
@@ -57,14 +76,14 @@ Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `.claude/hooks/check-td-
 ---
 
 ## TD-S080-1 — Frontend Deps: `qs`-DoS (dev-only, akzeptiert)
-**Fällig:** mit dem nächsten Stryker-Major-Bump; Fallback: ab MVP neu bewerten, falls der Bump bis dahin ausbleibt
+**Fällig:** Phase:MVP – primär der nächste Stryker-Major-Bump; ein Dependency-Bump ist kein maschinenlesbarer Anker, deshalb trägt hier der Backstop: ab MVP neu bewerten, falls der Bump bis dahin ausbleibt.
 **Problem:** `qs`-DoS (moderate) via `@stryker-mutator/core`→`typed-rest-client`→`qs` – dev-only, kein untrusted-Input-Pfad, akzeptiert.
 **Behebung:** Entfällt mit dem Bump von selbst; bis dahin bewusst getragen.
 
 ---
 
 ## TD-S083-1 — Frontend GET-Pfad: kein `response.ok`-Check, Err wird verschluckt
-**Fällig:** mit den `@NFR-resilience`-„Laden"-Szenarien („Backend nicht erreichbar/Serverfehler beim Laden", MVP)
+**Fällig:** Szenario:„Backend nicht erreichbar beim Laden einer Seite", Szenario:„Backend liefert Serverfehler beim Laden einer Seite", Phase:MVP – die beiden `@NFR-resilience`-„Laden"-Szenarien existieren, sind aber keinem Lauf zugeordnet; daher der Phasen-Backstop.
 **Problem:** Zwei Lücken im GET-Pfad (der POST/Mutation-Pfad ist davon nicht betroffen):
 (a) **Kein `response.ok`-Check.** `conditionalGet.ts` parst die Antwort unbedingt – ein 4xx/5xx-Body wird als Erfolg geparst und als Daten zurückgegeben. Nicht gecacht: `cache200` schreibt nur bei vorhandenem ETag-Header, und `ETagMiddleware` setzt den ausschließlich bei Status 200. Zusätzlich `cached!` im 304-Pfad (YAGNI).
 (b) **`useResultQuery` schluckt den `Err`** via `unwrapOr(undefined as TData)` (Type-Lie) → ein GET-Fehler ist nicht von „noch keine Daten"/Leerzustand unterscheidbar.
@@ -80,7 +99,7 @@ Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `.claude/hooks/check-td-
 ---
 
 ## TD-S083-3 — Frontend: Cold-Start-Race beim ersten GET
-**Fällig:** mit TD-S083-1 (Query-Zustand in `useResultQuery`, ADR-S083-2) – vorher technisch nicht umsetzbar
+**Fällig:** TD-S083-1 – Query-Zustand in `useResultQuery` (ADR-S083-2); vorher technisch nicht umsetzbar.
 **Problem:** Feuert der POST/`invalidateQueries`, während der initiale Listen-GET noch in-flight ist, koalesziert react-query und nutzt das stale leere Ergebnis (kein zweiter GET) → gerade angelegte Zutat erscheint nicht. Nur bei kaltem Server / langsamem erstem GET (warm: unkritisch). **Vorher nicht umsetzbar:** `useResultQuery` liefert ausschließlich `TData | undefined` und exponiert keinerlei Lade-/Fehlerzustand – die Seite *kann* nicht wissen, ob der initiale GET gesettled ist.
 **Behebung:** Speichern sperren, solange die Ingredients-Query nicht gesettled ist. **Achtung:** Das vorhandene `disabled={isPending}` löst das nicht – dessen `isPending` stammt aus `useCreateIngredientWithReactivation` und ist der Zustand der *POST-Mutation*, greift also erst, nachdem der POST bereits feuerte.
 
@@ -94,7 +113,7 @@ Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `.claude/hooks/check-td-
 ---
 
 ## TD-S084-1 — HTTP/ETag-Middleware (BE): vollständige Response-Pufferung
-**Fällig:** (a) vor File-/Image-Serving bzw. paginierungsfreien Collections; (b) mit TD-S106-1 (Error-Handling-Middleware); (c) vor MVP-Auth + Reverse-Proxy – alle drei spätestens ab MVP
+**Fällig:** TD-S106-1, Phase:MVP – (a) vor File-/Image-Serving bzw. paginierungsfreien Collections; (b) mit TD-S106-1 (Error-Handling-Middleware); (c) vor MVP-Auth + Reverse-Proxy. Alle drei spätestens ab MVP.
 **Problem:** `ETagMiddleware` puffert **jede** GET-Response komplett in einen `MemoryStream` (+`ToArray()`-Kopie) → (a) DoS-/Speicher-Risiko sobald große/paginierungsfreie Collections oder File-/Image-GETs dazukommen (Buffering+Hash zwingt Nicht-Streaming); (b) `next()` ist nicht in try/finally → bei Endpoint-Exception wird `Response.Body` nicht auf den Original-Stream zurückgesetzt (heute folgenlos – keine Error-Handling-Middleware); (c) 304 setzt kein `Cache-Control: private`/`Vary` → ab MVP-Auth + Reverse-Proxy Cross-User-Leak über Shared-Caches.
 **Behebung:** (a) Größen-Cap oder Routen-/Content-Type-Whitelist; (b) `next()` in try/finally; (c) `Cache-Control: private`/`Vary` beim 304. Derzeit Survivor-/Scope-frei nicht umsetzbar.
 
@@ -109,35 +128,35 @@ Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `.claude/hooks/check-td-
 ---
 
 ## TD-S090-2 — Frontend: `matchKind` für Discriminated Unions noch nicht adoptiert
-**Fällig:** mit dem `QueryCache.onError`-Setup der `@NFR-resilience`-„Speichern/Laden"-Szenarien (MVP), gemeinsam mit TD-S101-1
+**Fällig:** Phase:MVP – das `QueryCache.onError`-Setup der `@NFR-resilience`-„Speichern/Laden"-Szenarien. Gemeinsam mit TD-S101-1 zu behandeln, aber **nicht** darauf verankert: beide hingen wechselseitig aneinander, während real beide an MVP hängen.
 **Problem:** Drei Stellen lesen eine Discriminated Union per direktem `kind`-Vergleich statt über `matchKind` (ADR-S056-1): der Fehler-Union-Zugriff in `useCreateIngredientWithReactivation.ts:67` (`saveError?.kind === 'FieldErrors' ? …`) sowie zwei Erfolgs-Unions – `:21` (`ReactivationConflict`) und `ingredientsApi.ts:114` (`Restored`). **Kein formaler Guideline-Verstoß:** Die Guideline verbietet den direkten Zugriff unter „Verbotene Muster" ausdrücklich nur *in Komponenten*, und alle drei Stellen liegen in Hooks bzw. im Service-Layer. Es geht um Konsistenz mit dem Zielbild, nicht um eine verletzte Regel. Bewusst aufgeschoben (Code-Kommentar an der Stelle): Das kanonische Muster trennt Netzwerk/5xx (werfen → `QueryCache.onError`/Toast) von Domain-Fehlern (`matchKind`); `onError` existiert noch nicht, daher trägt `ApiError` aktuell den `Unexpected`-kind. `matchKind` jetzt über `FieldErrors|Unexpected` bräuchte eine Suppression auf dem ungetesteten `Unexpected`-Arm, den die resilience-Arbeit wieder entfernt (Churn).
 **Behebung:** `QueryCache.onError` einführen → Netzwerk/5xx wirft dorthin, die Komponenten-Fehler-Union kollabiert auf Domain-Fehler-only (`FieldErrors`), dann `matchKind` mit einem voll getriebenen Arm (kein Survivor).
 
 ---
 
 ## TD-S090-3 — Backend: `IngredientValuesDto` non-nullable → fehlendes JSON-Property evtl. 400 statt 422
-**Fällig:** sobald ein **anderer Client als unser Frontend** das API nutzt (bis dahin strukturell unerreichbar); spätestens mit dem öffentlich erreichbaren API ab MVP
+**Fällig:** Phase:MVP – primär, sobald ein **anderer Client als unser Frontend** das API nutzt (bis dahin strukturell unerreichbar); das ist kein maschinenlesbarer Anker, daher trägt der Backstop: spätestens mit dem öffentlich erreichbaren API ab MVP.
 **Problem:** `IngredientValuesDto(string Name, string DefaultUnit)` ist non-nullable und wird von **zwei** Endpoints per Body gebunden: `POST /api/ingredients` und `POST /{id}/restore`. Lässt ein Client ein Property **ganz weg** (statt `""`), kann ASP.NET Minimal API je nach STJ-Konfiguration `null` binden (Warnung) oder **400** vor dem Handler werfen — nicht das vertragliche **422** mit `{"errors":{…}}`. Beide Client-Pfade werten den 400 nicht aus: `toIngredientResult` erkennt nur `status === 422`, `toRestoreOutcome` nur den `409`; ein 400 würde in beiden Fällen als Erfolg geparst → stiller Fehlzustand. Über unser eigenes Frontend nicht auslösbar, weil es beide Properties immer sendet.
 **Behebung:** `string?`-Properties + bewusste Null-Behandlung in `ToDomain`, oder ein einheitlicher 4xx→`{"errors"}`-Mapper.
 
 ---
 
 ## TD-S101-1 — Frontend Hook: `useResultMutation` weicht von der kanonischen Wrapper-Form ab
-**Fällig:** mit TD-S090-2 (`QueryCache.onError`-Setup der `@NFR-resilience`-Szenarien, MVP) – erst dann ist `throwOnError` möglich und die Zustands-Union hat ausgeübte Zweige
+**Fällig:** Phase:MVP – das `QueryCache.onError`-Setup der `@NFR-resilience`-Szenarien; erst dann ist `throwOnError` möglich und die Zustands-Union hat ausgeübte Zweige. Gemeinsam mit TD-S090-2, aber nicht darauf verankert (s. dort: wechselseitiger Verweis aufgelöst).
 **Problem:** Der Hook liefert `[mutate, error, isPending, reset]`. Kanonisch nach `coding-guideline-typescript.md` §4b wäre `[mutate, MutationState<TData, TError>]` mit voller Zustands-Union. Die Abweichung ist bewusst; Entscheidung, Begründung und die bekannten Konsequenzen stehen in **ADR-S083-2**. Sie wächst mit jedem Addendum weiter (run-2 hängte `isPending` an, run-11 den `onSuccess`-Wert).
 **Behebung:** Auf `[mutate, MutationState<TData, TError>]` umstellen; vorher entstünden Survivor und Suppressions außerhalb des treibenden Szenarios.
 
 ---
 
 ## TD-S102-1 — Backend: kein explizites app-weites Request-Body-Size-Limit
-**Fällig:** vor MVP-Auth; spätestens sobald ein Endpoint authentifizierte oder größere Payloads annimmt
+**Fällig:** Phase:MVP – vor MVP-Auth; spätestens sobald ein Endpoint authentifizierte oder größere Payloads annimmt.
 **Problem:** `POST /api/ingredients` deserialisiert/bindet den vollständigen Request-Body, BEVOR die Feld-Validierung greift (`name.Value.Length > 30` läuft erst nach Model-Binding). Ein anonymer Client kann daher wiederholt große Bodies (bis Kestrels implizitem ~30-MB-Default, in `Program.cs` nirgends explizit gesetzt) senden → Parsing-/Trimming-Last vor jeder Ablehnung. Heute entschärft durch SKELETON ohne Auth und Kestrels impliziten Default; kein durch run-3 verschärftes Risiko – der Zustand ist ggü. vorher unverändert. (Die fehlende `defaultUnit`-Längenbegrenzung ist Teil von TD-S083-4, nicht hier.) Quelle: security-auditor (Review run-3, SR-2).
 **Behebung:** Explizites app-weites `MaxRequestBodySize` in `Program.cs`, statt sich auf den impliziten Framework-Default zu verlassen.
 
 ---
 
 ## TD-S106-1 — Backend: kein globaler Exception-Handler / ProblemDetails-Fallback
-**Fällig:** ab MVP – dort greift die tragende Anforderung (`docs/process/nfr.md`, Sektion Security: „Fehlerantworten enthalten keine technischen Details"). **Vorbedingung:** ein geklärtes Logging-Konzept (s. TD-S112-2); der Stack-Trace soll ins Log wandern, ein gestaltetes Log existiert noch nicht
+**Fällig:** Phase:MVP – dort greift die tragende Anforderung (`docs/process/nfr.md`, Sektion Security: „Fehlerantworten enthalten keine technischen Details"). **Vorbedingung:** ein geklärtes Logging-Konzept (s. TD-S112-2); der Stack-Trace soll ins Log wandern, ein gestaltetes Log existiert noch nicht.
 **Problem:** `Server/Program.cs` registriert keinen `app.UseExceptionHandler(...)` / kein `AddProblemDetails`. Eine unbehandelte Exception in irgendeinem Endpoint schlägt daher als roher 500 durch. DELETE war der erste Endpoint mit client-steuerbarem Input, der das sichtbar machte; der konkrete run-10-Pfad (malformed If-Match) ist mit `XminETag.TryParse` → 400 (ADR-S106-2) geschlossen, aber die systemische Verteidigungslinie fehlt weiterhin. Quelle: security-auditor (Review run-10, SEC-2).
 **Reichweite präzisiert (an learn.microsoft.com verifiziert, Kommentar an der Stelle in `Server/Program.cs`):** Ohne Handler liefert Kestrel in Production einen **500 ohne Response-Body** – dort leakt nichts. Der Stack-Trace-Leak über die Developer-Exception-Page setzt `ASPNETCORE_ENVIRONMENT=Development` voraus, was ausschließlich `Server/Properties/launchSettings.json` beim lokalen Start setzt, nie ein Deployment. Zu korrigieren ist außerdem die frühere Begründung: Der NFR „keine Stack-Traces für User" (`nfr.md`, Reliability) ist eine **Frontend**-Anforderung – die UI zeigt nichts Technisches an – und trägt diesen Backend-Eintrag nicht.
 **Behebung:** Unbedingte Registrierung von `UseExceptionHandler`, damit der Fehlerpfad keinen Umgebungs-Zweig mehr hat – Entscheidung, Begründung, Verworfenes und offene Punkte stehen in **ADR-S112-1**. Prüfbar als Backend-Integrationstest (`WebApplicationFactory`), nicht per E2E – die Eigenschaft ist an der Oberfläche nicht beobachtbar. Zieht `TD-S084-1(b)` (try/finally in der ETag-Middleware) unmittelbar nach sich.
@@ -145,7 +164,7 @@ Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `.claude/hooks/check-td-
 ---
 
 ## TD-S108-1 — Frontend Delete/Restore-Pfad: optimistischer Undo-Toast + kein Status-Check
-**Fällig:** mit den `@NFR-resilience`-Szenarien (MVP) und dem dort mitzuschreibenden **Delete-Fehler-Szenario** – die vorhandenen Szenarien üben GET und POST aus, **nicht DELETE**; das fehlende Szenario ist in `docs/AGENT_MEMORY.md` als aufzunehmen vermerkt
+**Fällig:** Phase:MVP – die `@NFR-resilience`-Szenarien und das dort mitzuschreibende **Delete-Fehler-Szenario**. Kein `Szenario:`-Anker möglich: Die vorhandenen Szenarien üben GET und POST aus, **nicht DELETE**; das treibende Szenario existiert noch nicht und ist in `docs/AGENT_MEMORY.md` als aufzunehmen vermerkt.
 **Problem:** Zwei zusammenhängende Lücken im Löschen-/Undo-Pfad (`useDeleteIngredientWithUndo.ts`, `ingredientsApi.ts`):
 (a) **Optimistischer Toast.** `requestDelete` setzt `deleted` **synchron vor** dem Mutation-Call – der Toast „X gelöscht" erscheint also, bevor der DELETE-Request überhaupt beantwortet ist, während die Liste erst nach Server-Antwort + `invalidateQueries` aktualisiert wird. Folgen: bei spürbarer Latenz zeigt die UI gleichzeitig „X gelöscht" **und** X unverändert in der Liste (inkl. klickbarem Löschen-Button); bei einem Netzwerkfehler bleibt eine **falsche Erfolgsmeldung** samt Undo-Button für eine Löschung stehen, die nie stattfand. Der Restore-Pfad macht es bereits richtig (`setDeleted(null)` + `onChanged()` gemeinsam im `onSuccess`).
 (b) **Kein ausreichender Status-Check.** `deleteIngredient` wertet `response.status` **überhaupt nicht** aus (`ResultAsync.fromPromise(fetch(...))`) – ein 404/412/428 gilt als Erfolg. `restoreIngredient` wertet über `toRestoreOutcome` ausschließlich den `409` aus; jeder andere Status fällt in den Erfolgszweig und wird als `Ingredient` geparst. Bei einem `404` entsteht so ein `Restored`-Outcome mit einem ProblemDetails-Objekt als vermeintlicher Zutat, ohne dass irgendwo ein Fehler sichtbar würde. Der Restore-Endpoint kann zudem mit `422` antworten (Namenskollision mit einer anderen Zeile, ADR-S111-1-Addendum) – ein Statuscode, den der Client nicht kennt; über die aktuelle UI nicht auslösbar, weil pro LOWER-Name nur eine Zeile existieren kann, aber der Pfad besteht. Derselbe Defekt wie in TD-S083-1 für den GET-Pfad.
@@ -157,7 +176,7 @@ Alle drei Punkte sind im Erfolgsfall bei schnellem Netz unbeobachtbar – deshal
 ---
 
 ## TD-S108-2 — Frontend: kein Fokus-Management nach Löschen und nach Undo
-**Fällig:** mit US-602 (erster Navigations-/Mehrseiten-Schritt) – dann liegt ein realistischer Tab-Kontext zur Bewertung vor
+**Fällig:** US-602, Phase:V1 – erster Navigations-/Mehrseiten-Schritt; dann liegt ein realistischer Tab-Kontext zur Bewertung vor. Der Story-Anker gilt nur, solange US-602 keine Szenarien hat.
 **Problem:** Nach dem Löschen einer Zutat unmountet das fokussierte Element (der Löschen-`IconButton` bzw. bei der letzten Zutat die ganze Liste), ohne dass der Fokus gezielt weitergeführt wird – der Browser setzt ihn auf `<body>` zurück. Dasselbe passiert nach einem Undo-Klick, wenn die Snackbar unmountet. Tastatur- und Screenreader-Nutzer müssen den „Rückgängig"-Weg danach per Tab suchen. Entschärfend: `SnackbarContent` setzt `role="alert"` (MUI-Default), die Meldung samt Undo-Möglichkeit wird also **angesagt**; MUI pausiert zudem den Auto-Hide-Timer, sobald der Button Fokus erhält – wer ihn erreicht, verliert die Zeit nicht. Heute sind es 1–2 Tab-Stopps, das wächst aber mit jeder weiteren Seite. Quelle: ux-ui-auditor (Review run-8, Runde 2).
 **Früher noch als beim Unmount:** Weil der Löschen-Button während des laufenden DELETE `disabled` wird (`IngredientsPage.tsx`), verliert er den Fokus bereits **beim Disable** – also unmittelbar nach dem Tastendruck und **vor** jedem Ergebnis, nicht erst beim Unmount nach Abschluss. Ein `disabled`-Element kann den Fokus per HTML-Semantik nicht halten; der Browser setzt ihn auf `<body>`. Anders als im Anlege-Dialog fängt hier keine MUI-Fokusfalle den Rücksprung ab, weil die Liste kein Modal ist. Ein Tastatur-/Screenreader-Nutzer verliert damit die DOM-Orientierung, während die Aktion noch läuft. Quelle: ux-ui-auditor (Review run-9).
 **Behebung:** Als bewusste Fokus-Strategie entscheiden, nicht als Schnellfix – die naheliegende Lösung (Autofokus auf „Rückgängig") hat echte Nebenwirkungen: Fokus-Stealing in ein selbstschließendes Element reißt den Nutzer aus dem Arbeitsfluss, und weil MUI bei Fokus den Timer pausiert, bliebe der Toast für Tastaturnutzer stehen, bis er aktiv weggedrückt wird. Strukturelle Nav-Vorgabe: UX-Guideline Prinzip 9.
@@ -165,7 +184,7 @@ Alle drei Punkte sind im Erfolgsfall bei schnellem Netz unbeobachtbar – deshal
 ---
 
 ## TD-S108-4 — Frontend: Undo-Toast auf Touch-Geräten nicht manuell schließbar
-**Fällig:** mit dem Gherkin-Szenario für den Schließen-Button (in `docs/AGENT_MEMORY.md` als aufzunehmen vermerkt); spätestens ab MVP. Ein rein reaktiver Auslöser („der nächste Lauf, der den Toast ohnehin verändert") ist ausdrücklich **nicht** ausreichend – er wurde bereits einmal übersehen, während der Toast-Bereich verändert wurde (LL-S111-2)
+**Fällig:** Szenario:„Der Undo-Toast lässt sich manuell schließen", Phase:MVP – das Szenario existiert inzwischen (`features/interaction.feature`), ist aber keinem Lauf zugeordnet, daher der Phasen-Backstop. Ein rein reaktiver Auslöser („der nächste Lauf, der den Toast ohnehin verändert") ist ausdrücklich **nicht** ausreichend – er wurde bereits einmal übersehen, während der Toast-Bereich verändert wurde (LL-S111-2).
 **Problem:** Seit der Undo-Toast `clickaway` bewusst ignoriert (damit ein beiläufiger Klick den einzigen Weg zurück nicht wegnimmt, `IngredientsPage.tsx`), bleiben als Schließ-Wege nur Timeout und Escape. Auf Touch-Geräten ist Escape praktisch nicht auslösbar und ein Schließen-Button existiert nicht – dort verschwindet der Toast ausschließlich nach Ablauf der 6 Sekunden. Kein Datenverlust und keine Blockade (die Snackbar ist nicht-blockierend), aber auf dem primären Zielgerät der App (Mobile-First) kann der Nutzer die Meldung nicht aktiv wegräumen. Quelle: functional-correctness-auditor (Review run-8).
 **Schärfer beim zweiten Toast:** Der `ReactivationConflictToast` (ADR-S111-3) schließt zwar bei clickaway (kein Aktions-Button, der geschützt werden müsste), steht aber **10 Sekunden** statt 6 – bewusst so entkoppelt, weil der Text rund zehnmal so lang ist. Genau das Argument, das die längere Dauer rechtfertigt, verschärft die Lücke: MUIs Pause-bei-Hover greift auf Touch nicht, und auf dem primären Zielgerät bleibt die Meldung damit am längsten stehen, ohne dass der Nutzer sie aktiv wegräumen kann.
 **Behebung:** Zusätzliche Schließen-Action (`CloseIcon`) neben „Rückgängig" – ein expliziter Button ist eine bewusste Geste und kollidiert nicht mit dem clickaway-Guard, der nur beiläufige Klicks abfängt. Weil es sichtbares Nutzerverhalten ist, muss ein Gherkin-Szenario davor liegen.
@@ -173,7 +192,7 @@ Alle drei Punkte sind im Erfolgsfall bei schnellem Netz unbeobachtbar – deshal
 ---
 
 ## TD-S110-1 — Frontend: Sperr-States im Löschen-/Undo-Pfad decken nur den Erfolgspfad ab
-**Fällig:** (a) und (b) mit TD-S108-1 (dessen Fehler-Union bringt den Fehler-Zweig ohnehin mit); (c) und (d) je mit ihrem Gherkin-Szenario („mehrere gleichzeitige Löschvorgänge" bzw. „Rückgängig ist während des laufenden Wiederherstellens gesperrt", beide in `docs/AGENT_MEMORY.md` als aufzunehmen vermerkt) – alle spätestens ab MVP
+**Fällig:** TD-S108-1, Szenario:„Zwei gleichzeitige Löschvorgänge sperren beide Zeilen", Szenario:„Rückgängig ist während des Wiederherstellens deaktiviert", Phase:MVP – (a) und (b) mit TD-S108-1 (dessen Fehler-Union bringt den Fehler-Zweig ohnehin mit); (c) und (d) je mit ihrem Szenario, beide inzwischen in `features/interaction.feature` geschrieben, aber keinem Lauf zugeordnet. Alle spätestens ab MVP.
 **Problem:** `useDeleteIngredientWithUndo.ts` führt seit run-9 einen `deletingId: string | null`-State, der die gerade löschende Zeile sperrt (`disabled={ingredient.id === deletingId}` in `IngredientsPage.tsx`). Er wird ausschließlich in `requestDelete` gesetzt und ausschließlich im `onSuccess` von `deleteMutate` zurückgesetzt. Daraus folgen drei Lücken – gemeinsam erfasst, weil sie denselben State, dieselbe Datei und denselben Fix-Ort betreffen:
 (a) **Kein Reset im Fehlerpfad.** `useResultMutation`s `onSuccess` feuert nur bei `Ok`. Ein Netzwerkfehler (`Err`) lässt `deletingId` für immer stehen → der Löschen-Button dieser Zeile ist **dauerhaft** deaktiviert, ohne Fehlermeldung und ohne Retry-Weg; nur ein Reload hilft. Quelle: ux-ui-auditor (Review run-9).
 (b) **Kein Reset im Restore-Pfad.** `restoreMutate`s `onSuccess` setzt `deleted` zurück, aber nicht `deletingId`. Klickt der Nutzer „Rückgängig", während der DELETE noch läuft (das Fenster aus TD-S108-1(c)), erscheint die Zeile durch das Refetch wieder – mit weiterhin gesperrtem Löschen-Button und ohne Toast, also ohne jeden sichtbaren Grund für die Sperre. Quelle: functional-correctness-auditor (Review run-9). **Hinweis:** Die in TD-S108-1 beschriebene Behebung (`setDeleted` in den Erfolgs-Callback verschieben) schließt dieses Fenster als Nebeneffekt mit, weil „Rückgängig" dann erst klickbar ist, wenn `deletingId` bereits `null` ist – beim Umsetzen von TD-S108-1 verifizieren, statt es separat zu fixen.
@@ -185,13 +204,13 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 ---
 
 ## TD-S112-1 — Konfigurations-Parität E2E↔Produktion und Umgebungs-Allow-Liste nicht umgesetzt
-**Fällig:** ab MVP, gemeinsam mit TD-S106-1 – (c) hängt an (b), und der Wächter ist ohne den Exception-Handler gegenstandslos
+**Fällig:** TD-S106-1, Phase:MVP – gemeinsam mit TD-S106-1: (c) hängt an (b), und der Wächter ist ohne den Exception-Handler gegenstandslos.
 **Problem:** ADR-S112-2 ist entschieden, aber nichts davon existiert im Code: (a) kein Test, der die Schlüssel umgebungsspezifischer `appsettings.*.json` gegen eine Allow-Liste prüft – heute hält allein Disziplin `appsettings.E2E.json` auf den Connection-String beschränkt; (b) keine Umgebungs-Allow-Liste beim App-Start – die App läuft unter jedem beliebigen `ASPNETCORE_ENVIRONMENT` an; (c) folglich auch keine Liste, aus der der Umgebungs-Regressionswächter aus ADR-S112-1 seine Aufzählung ziehen könnte.
 **Behebung:** (a)–(c) nach ADR-S112-2 umsetzen. Beim Umsetzen verifizieren, dass der Startup-Guard die werkzeuggebauten Hosts (`dotnet ef`, `WebApplicationFactory`) nicht bricht.
 
 ---
 
 ## TD-S112-2 — Observability-Anforderung ohne Umsetzung: Backend loggt nirgends aktiv
-**Fällig:** mit TD-S106-1 (ab MVP) – die Anforderung selbst gilt bereits, ungeprüft ist allein, ob der Framework-Default sie schon erfüllt; die Prüfung ist deshalb Teil der Behebung, keine offene Verletzung
+**Fällig:** TD-S106-1, Phase:MVP – die Anforderung selbst gilt bereits, ungeprüft ist allein, ob der Framework-Default sie schon erfüllt; die Prüfung ist deshalb Teil der Behebung, keine offene Verletzung.
 **Problem:** Die Anforderung steht seit S112 in `docs/process/nfr.md` (Sektion Observability), im Code existiert davon nichts: `Server/appsettings.json` hat keine `Logging`-Sektion, und in `Server/` wie `Infrastructure/` gibt es keine einzige `ILogger`-Nutzung. Vorhanden ist allein der Framework-Default (Console-/Debug-Provider aus `WebApplication.CreateBuilder`). Für die Kernzusicherung – unbehandelte Exceptions landen mit Stack-Trace im Log – reicht das vermutlich bereits aus, weil die Hosting-Schicht unbehandelte Exceptions selbst auf Error-Level protokolliert; **verifiziert ist das nicht**.
 **Behebung:** Empirisch prüfen, ob eine unbehandelte Exception tatsächlich mit Stack-Trace auf stdout landet, und die Zusicherung mit einem Test festnageln. Nur falls die Prüfung eine Lücke zeigt, explizite Logging-Konfiguration ergänzen – nicht vorsorglich.
