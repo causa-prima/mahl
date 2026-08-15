@@ -49,6 +49,10 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Eine stabile Quelle (z.B. ADR) darf **keine** volatile Stelle referenzieren (z.B. `open-questions.md`,
   die bei Lösung gelöscht wird) – sonst dangelt die Referenz, sobald die volatile Stelle verschwindet.
   Die volatile Stelle referenziert die stabile; relevante Informationen leben (auch) in der stabilen Quelle.
+  Mechanisch abgesichert in beide Richtungen: `check-ref-direction.py` blockt volatile IDs in stabilen
+  Dokumenten (Einzelfall-Escape: `ref-ok`), `check-dangling-refs.py` blockt das Löschen eines TD-/OQ-Eintrags,
+  auf den noch verwiesen wird (Escape: `dangling-ok`). Der zweite schließt die Lücke, dass `ref-ok` sonst
+  ein stummes Opt-out bliebe – einmal gesetzt, nie wieder geprüft.
 
 - **Zustandsdokumente tragen nur den offenen/aktuellen Zustand – kein Erledigtes.**
   Ein Zustandsdokument (z.B. `AGENT_MEMORY.md` „Nächste Prioritäten", `tech-debt.md`, `open-questions.md`,
@@ -57,7 +61,7 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   **(b) kurativ** – ist ein Eintrag erledigt, wird er **aus dem Dokument entfernt** (er lebt in git-Historie / Session-Log /
   Archiv weiter), nicht als „erledigt"-Notiz stehengelassen. Weil solche Dokumente laufend geräumt werden, sind ihre
   Einträge/IDs volatil → an Verweisstellen die nötige Info **inlinen** oder nur auf **stabile** Artefakte (ADR, Guideline)
-  verweisen (siehe Prinzip „volatil → stabil" oben; der syntaktische Guard dafür ist in Arbeit).
+  verweisen (siehe Prinzip „volatil → stabil" oben; die syntaktischen Guards dafür stehen dort).
 
 ## Kommunikation & Argumentation
 

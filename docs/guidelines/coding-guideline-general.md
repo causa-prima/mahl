@@ -13,6 +13,7 @@ kritische-regeln:
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
+| Code-Beispiele lesen | Beispiele zeigen Regeln, nicht den Bestand und keinen Bauauftrag | Bevor du ein Beispiel aus einer Guideline übernimmst |
 | KISS | Einfachste Lösung wählen, keine vorzeitigen Abstraktionen | Immer – vor jedem Feature |
 | Naming | Glossar-Begriffe, selbsterklärende Namen, Kommentare = Warum | Immer – beim Benennen von Typen/Methoden |
 | Komplexität & Refactoring | Max. ~20 Zeilen/Methode, max. 3 Verschachtelungsebenen, kein toter Code | Bei Umstrukturierung oder wachsenden Methoden |
@@ -21,6 +22,34 @@ kritische-regeln:
 
 Diese Grundprinzipien gelten für **alle** Sprachen im Projekt (C# und TypeScript/React).
 Sprachspezifische Umsetzungen: `docs/guidelines/coding-guideline-csharp.md` · `docs/guidelines/coding-guideline-typescript.md`
+
+---
+
+## Wie Code-Beispiele in Guidelines zu lesen sind
+
+Ein Code-Beispiel in einer Guideline zeigt eine **Regel** – nicht den Bestand und nicht einen
+Bauauftrag. Drei Dinge folgen daraus, alle drei sind im Projekt schon schiefgegangen:
+
+1. **Ein Beispiel beschreibt nicht, was existiert.** Guidelines und ADRs nennen regelmäßig
+   Typen, die es im Code (noch) nicht oder nicht in dieser Form gibt – normal, weil eine Regel
+   früher entsteht als ihre Anwendung und länger lebt als eine einzelne Implementierung. Aus
+   einem Beispiel folgt also kein Anspruch auf Vorhandensein. Ein eigener Prüfschritt ist dafür
+   nicht nötig: Fehlt etwas, zeigen es Compiler und Tests von selbst.
+
+2. **Ein Beispiel ist ein möglicher Zielzustand, keine Umsetzungsanweisung.** Es 1:1 nachzubauen
+   kann gegen andere, vorrangige Regeln verstoßen: KISS („Abstraktionen nur für bewiesenen,
+   gegenwärtigen Bedarf"), und vor allem die Regel, dass jeder Zweig ein ausübendes Szenario
+   braucht – vorgezogener Code erzeugt Stryker-Survivors und damit Suppressions außerhalb des
+   treibenden Szenarios. Gebaut wird, was das aktuelle Szenario fordert; das Beispiel sagt, in
+   welche **Richtung**.
+
+3. **Ein Beispiel kann überholt oder vereinfacht sein.** Es wird nicht kompiliert und nicht
+   getestet, also driftet es. Real vorgekommen (S119): Ein als „kanonisch" bezeichnetes Beispiel
+   verstieß gegen eine Regel derselben Datei, und ein zweites zitierte eine Signatur, die die
+   Guideline an anderer Stelle bereits verbot. Widerspricht ein Beispiel einer ausformulierten
+   Regel, **gilt die Regel** – und das Beispiel gehört korrigiert.
+
+Kurz: Regeltext schlägt Beispiel, Bestand schlägt Annahme, Szenario schlägt Zielbild.
 
 ---
 

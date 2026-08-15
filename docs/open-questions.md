@@ -8,27 +8,58 @@ wann-lesen: Wird vom Drain-Vorschlag am Session-Start vorgelegt, sobald ein `Fä
             Suppression-Entscheidung; getypte IDs vor ID-naher Domain-Arbeit / US-602).
 wann-schreiben: Wenn eine Architektur-/Produkt-Diskussion mit dem User ohne Auflösung
             geparkt wird. Bei Klärung: Eintrag entfernen (Ergebnis ggf. als ADR/Tech-Schuld).
+aufnahmebedingung: Hier steht eine **noch nicht entschiedene** Frage am Produkt (Code +
+            Build-/Test-Kette), deren Antwort mit dem User zu klären ist. Mit der Entscheidung
+            verlässt der Eintrag diese Datei: bleibt nach Erledigung etwas zu erklären übrig →
+            `docs/history/adr.md`, sonst → `docs/tech-debt.md`.
+            NICHT hierher gehört: (a) alles bereits **Entschiedene** – auch wenn die Umsetzung
+            noch aussteht (das ist `docs/tech-debt.md`, nicht „offen"); (b) alles **Prozess**-
+            seitige, also wie gearbeitet wird (`.claude/**`, `docs/process/`, `docs/kaizen/`) –
+            das läuft über `docs/kaizen/observations.md`; (c) eine Aufgabe, der nur die
+            Priorisierung fehlt (das ist `docs/AGENT_MEMORY.md`).
+            Abgrenzung ADR/TD/OQ kanonisch: `CLAUDE.md`, Sektion „Ablage: ADR, TD oder
+            offene Frage?"
 
 Sortierung: nach ID (Session) aufsteigend – neue Einträge unten anfügen.
 
 Eintrag-Format:
   ## OQ-S<NNN>-<n> — <Kurztitel>
   **Frage:** <die offene, mit dem User zu klärende Frage>
-  **Fällig:** S<NNN>          (optional – wann soll die Frage vorgelegt werden?)
+  **Fällig:** <Anker>[, <Anker>…] – <Prosa>   (optional – wann vorlegen?)
   **Hintergrund:** <Auslöser / Kontext / betroffene Artefakte>
 
   ID: OQ-S<NNN>-<n> – 3-stellige Session (geparkt), laufende Nummer innerhalb der Session.
 
-  `Fällig` ist optional und steuert die Vorlage: Ist ein Termin gesetzt, erscheint die Frage
-  genau dann (und vorher nicht – ein Termin unterdrückt die Alters-Regel, sonst wäre er
-  wirkungslos). Ohne Termin gilt eine Frage nach ~10 Sessions als überaltert und wird
-  vorgelegt. Ein Termin lohnt, wenn die Frage an ein Ereignis gebunden ist („vor US-602");
-  ohne Termin genügt das Alter.
+  `Fällig` ist **optional** und steuert die Vorlage. Es nutzt dieselbe Anker-Grammatik wie
+  `docs/tech-debt.md` – kanonisch in `.claude/scripts/td_anchors.py`, von `open_questions.py`
+  wiederverwendet (nicht kopiert). Der Kopf vor dem Gedankenstrich ist maschinenlesbar:
+
+      jetzt              sofort vorlegen
+      Phase:V1           Phasenwechsel (auch MVP/V2)
+      S140               Spätestens-Termin (Session-Nummer)
+      Szenario:„…"       ein Gherkin-Szenario aus features/ (Titel exakt)
+      US-602             eine Story – nur solange sie noch keine Szenarien hat
+      TD-S089-1          ein Tech-Debt-Eintrag – tritt ein, wenn jener behoben ist
+
+  Mehrere Anker mit Komma. Alles Erklärende gehört **hinter** den Gedankenstrich.
+
+  Ist ein Anker gesetzt, erscheint die Frage genau dann (und vorher nicht – ein Anker
+  unterdrückt die Alters-Regel, sonst wäre er wirkungslos). **Ohne** das Feld gilt eine Frage
+  nach ~10 Sessions als überaltert und wird vorgelegt.
+
+  Mechanisch geprüft an beiden Enden: `.claude/hooks/check-oq-capture.py` blockt zur
+  Schreibzeit ein gesetztes Feld, das nicht trägt (Vertipper, kein terminierter Anker);
+  `open_questions.py` meldet zur Lesezeit einen dennoch unauswertbaren Anker, statt ihn zu
+  verschlucken. Vorher fiel beides still auf die Alters-Regel zurück und blieb unbemerkt.
+
+  Anders als bei Tech-Debt erzeugt `jetzt` hier einen Vorlage-Grund: TD-Einträge mit `jetzt`
+  stehen zusätzlich in `AGENT_MEMORY.md` und kämen sonst doppelt, offene Fragen haben diesen
+  zweiten Kanal nicht.
 -->
 
 ## OQ-S094-1 — Client-seitige Validierung (Instant-Feedback) einführen?
 **Frage:** Lohnt eine client-seitige Validierung (Instant-Feedback *vor* dem Speichern) – und wenn ja, drift-frei wie?
-**Fällig:** S140 – reiner Backstop. Der tragende Trigger ist das Ereignis (siehe „Trigger zum Wiederaufgreifen" unten), nicht das Alter; ausdrücken lässt er sich hier noch nicht, weil `Fällig` bei OQ bisher nur eine Session-Nummer kennt. Sobald dieses Feld die Anker-Grammatik aus `.claude/scripts/td_anchors.py` übernimmt, wird daraus `Phase:V1`.
+**Fällig:** Phase:V1, S140 – der tragende Trigger ist das Ereignis (siehe „Trigger zum Wiederaufgreifen" unten), nicht das Alter; `Phase:V1` drückt ihn aus, `S140` bleibt als Backstop stehen, falls die Phase sich verschiebt.
 **Hintergrund:** Diese Abwägung kam schon mehrfach auf. Die maßgebliche, _front-loaded_ Argumentkette steht stabil in **ADR-S090-1** (Abschnitt „Validierung bleibt server-only / Client-Validierung aufgeschoben", Punkte 1–4) – bitte zuerst dort lesen, damit die Argumente nicht erneut von vorn aufgerollt werden. Kurzfassung: nur **Required** lohnt; Drift ist via backend-getriebener Metadaten lösbar (aber YAGNI); Fokus-aufs-Fehlerfeld bleibt ohnehin custom. **Aktueller Stand:** aufgeschoben aus YAGNI. **Trigger zum Wiederaufgreifen:** ein UX-Szenario fordert explizit Instant-Feedback, oder mehrere große Formulare entstehen parallel (Konsistenzdruck).
 
 ---
@@ -36,3 +67,53 @@ Eintrag-Format:
 ## OQ-S094-2 — Mobile-Ansicht: welche Szenarien, ab wann?
 **Frage:** Welche Mobile-spezifischen Szenarien braucht die App, und ab welcher Phase?
 **Hintergrund:** Mobile-First ist NFR (`ux-ui-auditor`, MUI v7), aber `features/` enthält bisher **keine** Mobile-Szenarien. Laut Stories MVP/V1-Scope. Der responsive Reorder-Schutz für Formulare („Felder nicht per CSS umsortieren", weil das die Autofokus-/Fokus-Reihenfolge bricht) ist bereits in UX-Guideline Prinzip 8 verankert. Systematisch beim MVP/V1 angehen – nicht vergessen.
+
+---
+
+## OQ-S119-2 — Validierungs-Fehlermodell: Typ je Prüfung statt je Feld×Prüfung?
+**Frage:** Werden Validierungsfehler als ein Typ **je Prüfung** mit Feld-Payload modelliert (`NonEmptyViolation(Field)`, `MaxLengthViolation(Field, Max)`) statt als ein Fall je Feld×Prüfung (`NameEmpty`, `NameTooLong`, `UnitEmpty`, …)?
+**Fällig:** jetzt, S128 – blockiert TD-S118-2 (s. „Vorrang" unten), das seinerseits `jetzt` ist. Ursprünglich an die **nächste Entität mit validierten Feldern** (US-602) gehängt; dieser Trigger ist überholt, seit der `Unit`-Umbau vorgezogen wurde. `S128` bleibt als Backstop.
+
+**Vorrang:** Diese Frage blockiert **TD-S118-2**. Der dortige Umbau verlangt ein über Entitäten **geteiltes** `Unit` (Rezept und Einkaufsliste nutzen dasselbe Konzept) – ein geteilter Domänentyp kann aber keinen entitätsspezifischen `IngredientValidationError` liefern. Wird hier erst nach dem Umbau entschieden, wird `Unit` zweimal gebaut. Festgehalten auch in `coding-guideline-csharp.md` §2, Absatz „Offener Punkt am Fehlertyp".
+
+**Hintergrund:** Aufgekommen in S119 neben der Frage, wie parametrisierte Einschränkungen modelliert werden (inzwischen entschieden: ADR-S119-1), aber davon unabhängig – die Violation-Taxonomie funktioniert mit beiden dort erwogenen Varianten. Heute: `Server/Domain/IngredientValidationError.cs`, ein Sum-Type mit einem Fall je Feld×Prüfung.
+
+**Skalierung, gezählt an ADR-S051-2 (12 Zeilen, nicht am Code gemessen):** 12 Fälle → 7 Violation-Typen. Heute moderat; der Gewinn liegt in der Steigung – **jedes neue String-Feld kostet 0 neue Typen statt 2.** Bei den noch kommenden Rezept-Feldern dreht sich das Verhältnis deutlich.
+
+**Geprüft und widerlegt: „dann braucht es kein Matching mehr an der Grenze."** Neun der zwölf Texte folgen einem Template, drei nicht:
+- `ingredients` leer → „Rezept muss mindestens **eine Zutat** haben." und `steps` leer → „Rezept muss mindestens **einen Schritt** haben." – dieselbe Prüfung, völlig andere Textform, und untereinander verschieden im **grammatischen Geschlecht**. Aus einem Feldnamen nicht ableitbar.
+- `ingredientId` nicht gefunden → „Eine oder mehrere Zutaten wurden nicht gefunden." – kein Feld-Label, Plural, bespoke.
+
+Diese Texte lassen sich **nicht** ins Template biegen: ADR-S051-2 erklärt sie zu festen Werten („Änderungen sind Breaking Changes"). Tragfähige Form ist deshalb Template-Renderer für den Regelfall + Override-Tabelle für die drei Abweichler + Label-Tabelle je Feld. Das Matching schrumpft, es verschwindet nicht.
+
+**Nicht im Weg:** ADR-S018-1 regelt die *Bauform* von Sum-Types (private Subtypen, `Match<T>`), nicht die Taxonomie – der Umbau bliebe Variante A und ist nicht ADR-revidierend.
+
+**Verwandter Befund, unabhängig entscheidbar:** Innerhalb eines Feldes ist die Validierung heute fail-fast, dokumentiert als sicher (`IngredientsEndpoints.cs:140`: „Leer und zu lang schließen sich strukturell aus"). Das ist eine Aussage über die *heutige Regelmenge*, nicht über die Konstruktion, und wird still falsch, sobald eine dritte, ko-fehlschlagende Regel dazukommt („muss E-Mail sein" + „max 50"). Feldübergreifend wird bereits akkumuliert, und der 422-Vertrag trägt schon jetzt mehrere Meldungen pro Feld (`g.ToArray()`). Akkumulation *innerhalb* eines Feldes jetzt zu bauen erzeugt aber einen Zweig, den kein Szenario ausübt (die Liste bliebe immer einelementig) → Survivor → Suppression außerhalb des treibenden Szenarios, dieselbe Konstellation, die TD-S101-1 offen hält. Also: mit der ersten ko-fehlschlagenden Regel, nicht vorher. Der Kommentar in `:140` gehört dann umformuliert.
+
+**Bei Klärung mit anzupassen:** `docs/guidelines/coding-guideline-csharp.md` §2 trägt am Ende der Sektion „Domänentyp und Constraint-Typ" den Absatz **„Offener Punkt am Fehlertyp"**, der auf diese Frage verweist. Er hält fest, dass das dortige `IngredientName`-Beispiel mit `IngredientValidationError` nur trägt, weil der Typ zu *einer* Entität gehört, und dass ein geteilter Domänentyp wie `Unit` diesen Fehlertyp nicht liefern kann. Mit der Entscheidung hier ist der Absatz entweder aufzulösen (Beispiel auf das neue Fehlermodell umstellen) oder ersatzlos zu streichen – er verweist sonst ins Leere. Der Verweis dort nennt bewusst nur die Datei, nicht diese ID, weil eine stabile Datei keine volatile ID referenziert (`docs/kaizen/principles.md`).
+
+---
+
+## OQ-S119-3 — Native C#-Union-Types statt `SumType.cs`, sobald .NET 11 verfügbar ist?
+**Frage:** Werden die handgerollten Sum-Types (`Server/Types/SumType.cs`, ADR-S040-1) auf native `union`-Typen umgestellt, sobald das Projekt auf .NET 11 / C# 15 steht?
+**Fällig:** S130 – reiner Backstop. Der tragende Trigger ist der **Wechsel auf .NET 11**; ein Anker dafür existiert im Vokabular nicht (weder Phase noch Szenario treffen es).
+
+**Hintergrund:** Recherchiert in S119. C# 15 führt `union` als nominale Deklaration ein (`public union Pet(Cat, Dog, Bird);`) mit compiler-erzwungener Exhaustivität in `switch`, dazu den `closed`-Modifier für geschlossene Hierarchien. Verfügbar ab .NET 11 Preview 2, GA für November 2026 angekündigt.
+
+**Warum relevant:** Der in `session_118.md` E3 beschlossene `IngredientId` als Union `Known`/`Unknown` liefe heute über `SumType.cs`; nativ entfielen die `SumType.Unreachable<T>()`-Arme samt Stryker-Suppression (ADR-S018-2) – genau das Bedenken, das in E3 diskutiert wurde.
+
+**Zwei Haken, die gegen ein Vertagen von TD-S118-1 darauf sprechen:**
+1. Unions sind Structs mit einem `object? Value` – **Value Types boxen bei jeder Zuweisung.** Die Domänentypen des Projekts sind `readonly record struct` ausdrücklich, um Heap-Allokation zu vermeiden (`coding-guideline-csharp.md` §1-Tabelle).
+2. Das Projekt steht auf `net10.0`; `LangVersion=latest` liefert auf dem .NET-10-SDK C# 14, nicht 15. In Preview 5 fehlen laut Doku noch Teile der Spec (`ClosedAttribute` shippt die Runtime noch nicht).
+
+---
+
+## OQ-S119-4 — Gilt „Regeln in den Typ, Meldungen an die Grenze" auch im Frontend?
+**Frage:** Wird der Frontend-Fehlertyp `ValidationError = { readonly message: string }` auf Fehler**fälle** statt Meldungstexte umgestellt – oder gilt die Regel bewusst nur backend-seitig?
+**Fällig:** S132 – reiner Backstop. Der tragende Trigger ist die Entscheidung über das **Backend**-Fehlermodell (OQ-S119-2): dieselbe Frage eine Ebene tiefer, deren Antwort prägt, wie ein fallbasierter Frontend-Fehlertyp überhaupt aussähe. Vorher entschieden wäre die Reihenfolge verkehrt. Ein Verweis-Anker auf einen anderen OQ-Eintrag lässt sich hier nicht ausdrücken – `open_questions.py:23` kennt nur `S<NNN>` (bekannte Lücke aus E4/S118).
+
+**Hintergrund:** Aufgekommen im S119-Review beim Verankern von E2. `docs/reference/architecture.md` §2 erklärt das Domain-Modeling-Kapitel ausdrücklich für „C# und TypeScript gleichermaßen" gültig und verweist für die Ausformulierung auf die sprachspezifischen Guidelines. Die dort in §2 verankerte **Regel 5** lautet: „Ein Domänentyp gibt einen Fehler**fall** zurück, nie einen Meldungstext" (ADR-S051-2: die Zuordnung Fall → deutscher Text lebt an der API-Grenze). `coding-guideline-typescript.md` schreibt aber das Gegenteil vor: `ValidationError` trägt ein `message: string` als einziges Feld.
+
+**Nicht automatisch ein Fehler.** ADR-S112-4 hält fest, dass Domänenregeln das **Backend** durchsetzt und Frontend-Brands rein nominal sind – die Factory validiert nicht. Wo nichts validiert wird, entstehen kaum Fehlerfälle, und ein Meldungstext, der vom Server kommt und nur durchgereicht wird, ist an dieser Stelle womöglich das Richtige. Genau das ist zu entscheiden statt anzunehmen.
+
+**Aktueller Stand:** In `architecture.md` §2 ist vermerkt, dass die Regeln für C# ausformuliert sind und die TypeScript-Seite nicht nachgezogen ist – die Doku behauptet also keine Parität mehr, die es nicht gibt. Mit der Entscheidung hier ist dieser Vermerk aufzulösen.

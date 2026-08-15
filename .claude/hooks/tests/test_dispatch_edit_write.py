@@ -31,6 +31,9 @@ def test_registry_covers_every_registered_check():
         "check-ref-direction",
         "check-obs-capture",
         "check-td-capture",
+        "check-adr-capture",
+        "check-oq-capture",
+        "check-dangling-refs",
     }
 
 

@@ -230,10 +230,12 @@ def check(data: dict) -> str | None:
         "ein, dann greift diese Prüfung.\n"
         "  5. Verletzt der Eintrag eine HEUTE geltende Regel (NFR, Guideline, DoD), ist die "
         "Fälligkeit immer `jetzt` – eine geltende Regel wartet auf keine Bedingung. Soll sie "
-        "doch warten, ist das eine Entscheidung über die Regel: Regel ändern oder Ausnahme "
-        "als ADR dokumentieren (so ADR-S083-2 für TD-S101-1). Ein ungeprüfter Verdacht ist "
-        "keine Verletzung – dann ist die Prüfung die Behebung und bekommt eine eigene "
-        "Fälligkeit."
+        "doch warten, ist das eine Entscheidung über die Regel: Regel ändern, oder die "
+        "Abweichung als **dauerhafte** Ausnahme per ADR festschreiben – dann ist sie "
+        "entschieden und der Eintrag entfällt. Was es nicht gibt: eine ADR, die dem Eintrag "
+        "nur erlaubt zu warten (Hybrid – s. `CLAUDE.md`, „Ablage: ADR, TD oder offene "
+        "Frage?\"). Ein ungeprüfter Verdacht ist keine Verletzung – dann ist die Prüfung die "
+        "Behebung und bekommt eine eigene Fälligkeit."
     )
 
 

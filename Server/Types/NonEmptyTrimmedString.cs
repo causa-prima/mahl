@@ -18,7 +18,7 @@ internal readonly record struct NonEmptyTrimmedString
 
     // ADR-S051-1: trim before validation, store the trimmed value.
     // Payloadless Error (OneOf.Types.Error): field-specific messages belong at the API boundary
-    // that knows the field (ADR-S051-2), not in this field-agnostic primitive.
+    // that knows the field (ADR-S051-2), not in this field-agnostic constraint type.
     public static OneOf<NonEmptyTrimmedString, Error> Create(string input)
     {
         var trimmed = input?.Trim();

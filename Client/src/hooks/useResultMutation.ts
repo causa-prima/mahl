@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import type { Result, ResultAsync } from 'neverthrow'
 
-// ADR-S083-2: bewusst minimal modelliert – kein MutationState-Discriminated-Union, kein
-// matchState, kein throwOnError. `error`/`isPending`/`reset` decken genau das ab, was die
-// bisher umgesetzten US-904-Szenarien beobachten (Erfolg, Feld-Fehler, Pending, Reset beim
-// Schließen); die volle Union bleibt für @US-904-error/resilience aufgeschoben. Details/
-// Begründung: docs/history/adr.md (ADR-S083-2).
+// Bewusst minimal modelliert – kein MutationState-Discriminated-Union, kein matchState,
+// kein throwOnError. `error`/`isPending`/`reset` decken genau das ab, was die bisher
+// umgesetzten US-904-Szenarien beobachten (Erfolg, Feld-Fehler, Pending, Reset beim
+// Schließen); die volle Union bleibt für @US-904-error/resilience aufgeschoben.
+// Kanonische Form: ADR-S056-1 und coding-guideline-typescript.md §4b.
+// Stand der Abweichung samt bekannter Konsequenzen: TD-S101-1.
 // run-11: `onSuccess` reicht den Erfolgswert durch (statt ihn zu verschlucken) – kein neuer
 // Zustand, keine neue Union, nur der bereits vorhandene Ok-Wert wird sichtbar. Getrieben vom
 // Reaktivierungs-Konflikt-Szenario, das den gespeicherten Stand für die Snackbar braucht

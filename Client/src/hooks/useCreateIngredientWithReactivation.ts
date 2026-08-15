@@ -9,9 +9,9 @@ export type ReactivationConflictNotice = {
   readonly savedUnit: string
 }
 
-// ADR-S083-2: direkter kind-Check statt matchKind, konsistent mit dem bereits bestehenden
+// Direkter kind-Check statt matchKind, konsistent mit dem bereits bestehenden
 // FieldErrors-Zugriff unten (matchKind-Adoption ist auf die volle MutationState-Union
-// aufgeschoben). ADR-S111-3: der Konflikt ist fachlich erfolgreich (Ok-Pfad) – nur dieser
+// aufgeschoben – TD-S101-1). ADR-S111-3: der Konflikt ist fachlich erfolgreich (Ok-Pfad) – nur dieser
 // eine Zweig liefert einen Hinweis mit dem tatsächlich gespeicherten Stand; sonst `null` (setzt
 // einen evtl. noch sichtbaren alten Hinweis zurück).
 // run-11-Nachbesserung F2: `requestedName` GETRIMMT – jede andere nutzersichtbare Wiedergabe

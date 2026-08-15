@@ -5,6 +5,15 @@ wann-lesen: Wenn der zu bearbeitende Code einen der Bereiche unten berührt (z.B
             in implementing-scenario) sowie beim Session-Abschluss (closing-session, nfr.md).
 wann-schreiben: Sobald eine bewusst aufgeschobene Schuld entsteht (⚠️-Finding nicht sofort gefixt,
             bewusste Vereinfachung, vertagte Härtung).
+aufnahmebedingung: Hier steht eine **entschiedene** Sache am Produkt (Code + Build-/Test-Kette),
+            die mit ihrer Behebung **ersatzlos verschwindet** – nichts bleibt zu erklären übrig.
+            Operativer Test (Kurzfassung; kanonischer Wortlaut in `CLAUDE.md`): „Ist die Sache
+            erledigt – bleibt dann etwas zu erklären übrig?"
+            Nein → hierher (der Eintrag wird gelöscht). Ja → `docs/history/adr.md` (bleibt als
+            `Superseded` stehen). Noch nicht entschieden → `docs/open-questions.md`. Hierher
+            gehört auch der **Aufschub-Teil** einer Entscheidung, deren terminaler Rest als ADR
+            abgelegt ist – eine ADR trägt keinen Aufschub. Abgrenzung ADR/TD/OQ kanonisch:
+            `CLAUDE.md`, Sektion „Ablage: ADR, TD oder offene Frage?"
 
 Sortierung: nach ID (Session) aufsteigend – neue Einträge unten anfügen (kein Umsortieren).
 
@@ -46,9 +55,14 @@ Grammatik und Auflösung kanonisch in `.claude/scripts/td_anchors.py`):
 
   5. Verletzt der Eintrag eine HEUTE geltende Regel (NFR, Guideline, DoD), ist die Fälligkeit
      immer `jetzt` – eine geltende Regel wartet auf keine Bedingung. Soll sie doch warten, ist
-     das eine Entscheidung über die Regel: Regel ändern oder Ausnahme als ADR dokumentieren
-     (so ADR-S083-2 für TD-S101-1). Ein ungeprüfter Verdacht ist keine Verletzung – dann ist
-     die Prüfung die Behebung und bekommt eine eigene Fälligkeit.
+     das eine Entscheidung über die Regel: Regel ändern, oder die Abweichung als **dauerhafte**
+     Ausnahme per ADR festschreiben. Im zweiten Fall ist die Sache entschieden und dieser
+     Eintrag **entfällt** – es gibt dann keine Schuld mehr, nur eine begründete Ausnahme.
+     Was es nicht gibt: eine ADR, die dem Eintrag lediglich erlaubt zu warten. Das ist der
+     Hybrid, den die Ablage-Taxonomie ausschließt (`CLAUDE.md`, „Ablage: ADR, TD oder offene
+     Frage?"): Der Aufschub gehört hierher, die ADR behält nur den terminalen Rest.
+     Ein ungeprüfter Verdacht ist keine Verletzung – dann ist die Prüfung die Behebung und
+     bekommt eine eigene Fälligkeit.
 
   6. **Story-Anker umhängen, sobald die Story Szenarien hat.** Vor dem `gherkin-workshop` ist
      `US-NNN` die feinste verfügbare Granularität; danach steht fest, zu welchem Szenario die
@@ -99,7 +113,7 @@ Grammatik und Auflösung kanonisch in `.claude/scripts/td_anchors.py`):
 ---
 
 ## TD-S083-3 — Frontend: Cold-Start-Race beim ersten GET
-**Fällig:** TD-S083-1 – Query-Zustand in `useResultQuery` (ADR-S083-2); vorher technisch nicht umsetzbar.
+**Fällig:** TD-S083-1 – Query-Zustand in `useResultQuery` (heutige Minimal-Form: TD-S101-1); vorher technisch nicht umsetzbar.
 **Problem:** Feuert der POST/`invalidateQueries`, während der initiale Listen-GET noch in-flight ist, koalesziert react-query und nutzt das stale leere Ergebnis (kein zweiter GET) → gerade angelegte Zutat erscheint nicht. Nur bei kaltem Server / langsamem erstem GET (warm: unkritisch). **Vorher nicht umsetzbar:** `useResultQuery` liefert ausschließlich `TData | undefined` und exponiert keinerlei Lade-/Fehlerzustand – die Seite *kann* nicht wissen, ob der initiale GET gesettled ist.
 **Behebung:** Speichern sperren, solange die Ingredients-Query nicht gesettled ist. **Achtung:** Das vorhandene `disabled={isPending}` löst das nicht – dessen `isPending` stammt aus `useCreateIngredientWithReactivation` und ist der Zustand der *POST-Mutation*, greift also erst, nachdem der POST bereits feuerte.
 
@@ -109,6 +123,14 @@ Grammatik und Auflösung kanonisch in `.claude/scripts/td_anchors.py`):
 **Fällig:** jetzt – `coding-guideline-typescript.md` §2 gilt heute und wird heute verletzt; terminiert in `docs/AGENT_MEMORY.md` (vor Beginn der nächsten Story)
 **Problem:** `ingredientsApi.ts` definiert `Ingredient` (id, name, defaultUnit, etag) und `NewIngredient` (name, defaultUnit) mit nackten `string`-Feldern; in `Client/src` existiert kein einziger Branded Type. Guideline §2 verlangt die Kapselung. Signaturen mit mehreren gleichartigen Parametern hintereinander – etwa `restoreIngredient(id, name, defaultUnit)` – sind dadurch gegen Vertauscher ungeschützt, obwohl der Compiler sie fangen könnte; genau diese Signatur führt §2 als Motivation an.
 **Behebung:** Nominale Brands nach ADR-S112-4 (Vergabe an der API-Grenze, keine Regelprüfung) für beide Typen.
+
+---
+
+## TD-S083-5 — Backend Read-Pfad: `GET /api/ingredients` mappt DB→DTO direkt, ohne `ToDomain()`
+**Fällig:** Phase:MVP – der tragende Auslöser ist ein dediziertes DB-Inkonsistenz-Szenario, das den Fehlerzweig erstmals ausübt; es existiert in `features/` noch nicht und lässt sich deshalb nicht als Anker setzen. Vorher umzubauen erzeugt einen Zweig, den kein Szenario ausübt → Survivor → Suppression außerhalb des treibenden Szenarios. Spätestens zum MVP muss der Read-Pfad stimmen.
+**Problem:** `GET /api/ingredients` projiziert `IngredientDbType` **direkt** auf `IngredientDto` (`db.Ingredients.Select(i => new IngredientDto(i.Id, i.Name, i.DefaultUnit))`), statt den kanonischen Read-Pfad `DbType → ToDomain() → OneOf<Ingredient, Error<string>> → DTO` zu gehen (`docs/reference/architecture.md` 4b, `coding-guideline-csharp.md` §5). Weder `ToDomain()` noch das Skip-/Log-Verhalten für korrupte DB-Zeilen existieren auf diesem Pfad. Die Domäne sieht die DB-Daten also nicht – ihre Zusicherung „ein Wert dieses Typs ist garantiert gültig" trägt hier nicht. Dieselbe Abweichung an zweiter Stelle: der Restore-Pfad in `IngredientsEndpoints.cs` (dort mit eigener Begründung, ADR-S108-1).
+**Behebung:** Read-Pfad auf `ToDomain()` umstellen (Skip+Log bei Listen, 500 bei Einzel-Ressource). Die Zielsemantik ist für Recipes bereits entschieden – ADR-S039-3: 500 + `application/problem+json` bei korrupter DB-Zeile, kein silent `null`. Das kanonische Beispiel in `coding-guideline-csharp.md` §5 zeigt die Zielform inklusive Fehlersammlung.
+**Herkunft:** War bis S119 als ADR-S083-1 abgelegt. Umgehängt, weil der Eintrag ein Hybrid ohne terminalen Rest ist: Ist der Read-Pfad umgestellt, gibt es keine Abweichung mehr, die zu erklären wäre – der Eintrag verschwindet ersatzlos. Was terminal ist (Zielsemantik bei korrupter DB), steht schon in ADR-S039-3; ADR-S083-1 trug nur den Aufschub, und den trägt eine ADR nicht.
 
 ---
 
@@ -143,8 +165,14 @@ Grammatik und Auflösung kanonisch in `.claude/scripts/td_anchors.py`):
 
 ## TD-S101-1 — Frontend Hook: `useResultMutation` weicht von der kanonischen Wrapper-Form ab
 **Fällig:** Phase:MVP – das `QueryCache.onError`-Setup der `@NFR-resilience`-Szenarien; erst dann ist `throwOnError` möglich und die Zustands-Union hat ausgeübte Zweige. Gemeinsam mit TD-S090-2, aber nicht darauf verankert (s. dort: wechselseitiger Verweis aufgelöst).
-**Problem:** Der Hook liefert `[mutate, error, isPending, reset]`. Kanonisch nach `coding-guideline-typescript.md` §4b wäre `[mutate, MutationState<TData, TError>]` mit voller Zustands-Union. Die Abweichung ist bewusst; Entscheidung, Begründung und die bekannten Konsequenzen stehen in **ADR-S083-2**. Sie wächst mit jedem Addendum weiter (run-2 hängte `isPending` an, run-11 den `onSuccess`-Wert).
-**Behebung:** Auf `[mutate, MutationState<TData, TError>]` umstellen; vorher entstünden Survivor und Suppressions außerhalb des treibenden Szenarios.
+**Problem:** Der Hook liefert `[mutate, error, isPending, reset]`. Kanonisch nach `coding-guideline-typescript.md` §4b und ADR-S056-1 wäre `[mutate, MutationState<TData, TError>]` mit voller Zustands-Union (`idle|pending|success|error`) plus `matchState()`/`matchKind()` und `throwOnError: true`. Betroffen sind beide Wrapper in `Client/src/hooks/`: `useResultQuery` liefert `TData | undefined` (nur success-Zweig), `useResultMutation` das Tupel oben. Die Abweichung ist bewusst und stammt aus dem US-904-Happy-Path „Zutat anlegen" (S083), der nur den success-Pfad ausübt.
+
+**Bekannte Konsequenzen, solange die Schuld steht:** (1) Name-Kollision mit den kanonischen Wrappern – ein Leser der Guideline erwartet das `MutationState`-Tupel. (2) `onSuccess` feuert auch bei einem `Err`-Result, da `Promise.resolve(ResultAsync)` den `Err` nicht wirft – im success-only-Pfad harmlos, aber vor dem Error-Szenario auf `result.match(onSuccess, onError)` umzustellen. (3) Fehlendes `throwOnError` → bei Netzwerkfehler bliebe `query.data` undefined und der Empty-State würde fälschlich gerendert.
+
+**Bereits eingelöste Teile** (die Schuld schrumpft schrittweise, statt am Stück behoben zu werden): `isPending` kam mit run-2 („Speichern-Button deaktiviert während des Speicherns") dazu; `onSuccess` reicht seit run-11 („Reaktivierung") den Erfolgswert durch, statt ihn zu verschlucken (getrieben von ADR-S111-3, das den gespeicherten Stand für die Snackbar braucht). Beides ohne neue Zustände oder Union.
+
+**Behebung:** Auf `[mutate, MutationState<TData, TError>]` umstellen, samt `matchState` und `throwOnError`. Vorher entstünden unausgeübte `idle`/`error`-Zweige → Survivor → Suppressions außerhalb des treibenden Szenarios. `throwOnError` setzt zusätzlich `QueryCache.onError` voraus (existiert noch nicht) – deshalb die Kopplung an die `@NFR-resilience`-Szenarien im Fälligkeitsanker oben.
+**Herkunft:** Entscheidung, Begründung und Konsequenzen standen bis S119 als ADR-S083-2 in `docs/history/adr.md` und sind hier aufgegangen. Umgehängt, weil der Eintrag ein Hybrid ohne terminalen Rest war: Ist der Hook auf die kanonische Form umgestellt, gibt es keine Abweichung mehr zu erklären – der Eintrag verschwindet ersatzlos. Die kanonische Form selbst ist in ADR-S056-1 und `coding-guideline-typescript.md` §4b verankert, nicht hier.
 
 ---
 
@@ -199,7 +227,7 @@ Alle drei Punkte sind im Erfolgsfall bei schnellem Netz unbeobachtbar – deshal
 (c) **Skalar statt Menge.** Bei zwei überlappenden Löschvorgängen überschreibt der zweite `deletingId`; die erste Zeile wird wieder klickbar, obwohl ihr DELETE noch aussteht – ein zweiter DELETE auf dieselbe Zeile ist dann auslösbar. Quelle: ux-ui-auditor (Review run-9).
 (d) **Kein Pending-Guard am „Rückgängig"-Button.** `deletingId` sperrt die Zeile während des DELETE; für den umgekehrten Weg gibt es nichts Vergleichbares – der „Rückgängig"-Button bleibt klickbar, während sein Restore noch läuft. Zwei schnelle Klicks lösen zwei parallele Restores derselben Zeile aus. Serverseitig sauber abgefangen (identische Werte → `200`, der Verlierer eines echten Races → `200`/`409` statt `500`, s. ADR-S111-1-Addendum), es entsteht also kein Datenschaden – die Lücke ist rein UI-seitig: eine laufende Aktion ohne sichtbare Rückmeldung, erneut auslösbar. Eine Button-Sperre ist sichtbares Nutzerverhalten und braucht ein eigenes Gherkin-Szenario. Quelle: functional-correctness-auditor (Review run-11).
 Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende Szenario ist ein Singleton-Happy-Path („nur Mehl existiert"), Fehlerpfade sind ihm bewusst entzogen; für (d) fehlt das Szenario, das die Sperre überhaupt fordert.
-**Behebung:** (a) und (b) gemeinsam mit TD-S108-1: `deletingId` im Fehler-Zweig und im Restore-`onSuccess` mit zurücksetzen. (c) auf `ReadonlySet<string>` umstellen, (d) analog zu `deletingId` als Pending-Flag im selben Hook – beides erst **nach** dem jeweiligen Szenario: vorab umgesetzt entstünde ein Zweig, den kein Szenario ausübt → Stryker-Survivor → Suppression außerhalb des treibenden Szenarios, genau die Konstellation, die ADR-S083-2 vermeiden will.
+**Behebung:** (a) und (b) gemeinsam mit TD-S108-1: `deletingId` im Fehler-Zweig und im Restore-`onSuccess` mit zurücksetzen. (c) auf `ReadonlySet<string>` umstellen, (d) analog zu `deletingId` als Pending-Flag im selben Hook – beides erst **nach** dem jeweiligen Szenario: vorab umgesetzt entstünde ein Zweig, den kein Szenario ausübt → Stryker-Survivor → Suppression außerhalb des treibenden Szenarios, genau die Konstellation, die auch TD-S101-1 offen hält.
 
 ---
 
@@ -229,4 +257,12 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 ## TD-S118-2 — `Ingredient`: Constraint-Typen statt Domänentypen für `Name` und `DefaultUnit`
 **Fällig:** jetzt – verletzt `architecture.md` Kernprinzip 1 („jedes Domänen-Konzept bekommt einen eigenen Typ, der seine Invarianten selbst durchsetzt"). Vor TD-S118-1 zu klären, weil beide dieselben Signaturen anfassen.
 **Problem:** `Name` und `DefaultUnit` sind `NonEmptyTrimmedString` – ein **Constraint-Typ** (Prädikat über einem Primitive, feldagnostisch, `Server/Types/`), kein Domänenkonzept. Zwei Folgen: (a) Die Feldregeln liegen im Endpoint (`IngredientsEndpoints.cs:117/119`, `MaxNameLength = 30`, `MaxUnitLength = 20`), nicht im Typ – `Ingredient.Create` akzeptiert einen 500-Zeichen-Namen, und dass das nicht passiert, hält allein der eine Aufrufer `ToDomain()`. Die Zusicherung aus `architecture.md` Kernprinzip 1 („ein Wert, der diesen Typ hat, ist garantiert gültig") trägt hier nicht der Typ, sondern Aufrufer-Disziplin. (b) Beide Parameter sind typgleich und damit vertauschbar. `Quantity` (ADR-S020-1) zeigt, dass die Ebene im Projekt bekannt ist; bei `Ingredient` wurde sie nicht gezogen. Undokumentierte Abweichung – `architecture.md` 0b verlangt für Abweichungen einen ADR-Eintrag, es gibt keinen.
-**Behebung:** Zuerst das Prinzip festschreiben (`coding-guideline-csharp.md` §2 + Verweis aus `architecture.md`), dann `Ingredient` daran anpassen. Prinzip und Begründung: `docs/history/sessions/session_118.md`, Abschnitt E2 – der Domänentyp ist die stabile Schnittstelle, der Constraint-Typ die austauschbare Implementierung; Rolle ≠ Typ; Verwechslungsschutz ist Nebenprodukt, kein Entwurfsziel; Abwesenheit ist keine Einschränkung; Regeln in den Typ, Meldungen an die Grenze (ADR-S051-2 bleibt unberührt). Konkret: `IngredientName` und **`Unit`** – geteilt, nicht `IngredientUnit`, weil Rezept und Einkaufsliste dasselbe Konzept verwenden werden. `MaxNameLength`/`MaxUnitLength` wandern in die Typen. Zusätzlich das Guideline-Beispiel `coding-guideline-csharp.md:216` korrigieren, das mit `Create(Guid id, …)` §2 und §68 derselben Datei widerspricht (gleiches Muster wie ADR-S112-4).
+**Behebung:** Das Prinzip **ist festgeschrieben** (S119): `coding-guideline-csharp.md` §2, Sektion „Domänentyp und Constraint-Typ – fünf Regeln", plus Verweis aus `architecture.md`; das kanonische Beispiel dort zeigt die Sollform. Offen ist die Anpassung des Codes. Konkret:
+
+1. **Domänentypen anlegen:** `IngredientName` und **`Unit`** – geteilt, nicht `IngredientUnit`, weil Rezept und Einkaufsliste dasselbe Konzept verwenden werden. `MaxNameLength`/`MaxUnitLength` verschwinden aus dem Endpoint.
+2. **Constraint-Träger anlegen** (`Server/Types/`, ADR-S119-1): `IStringConstraint<TSelf>`, `IMaxLength`, `TrimmedString`, `NonEmpty<TInner>`, `Bounded<TInner, TMax>`, Marker `Max30`/`Max20`, `StringViolation`. Die Grenze steht im Feldtyp, nicht als `const` in `Create()`. Ausformulierter Code: `docs/history/sessions/session_119.md`, Abschnitt „Volltext zur Constraint-Parametrisierung", Variante A.
+3. **`Collect` bauen** (`Server/OneOfExtensions.cs`, ADR-S119-2): Applicative-Kombinator für Collect-All, ein Overload je Arity (2 und 3 genügen für `Ingredient`). Ersetzt die heutige Ersatzkonstruktion in `IngredientsEndpoints.cs` – `ErrorOrEmpty()` packt den Fehler aus dem `OneOf` aus (verkapptes `.AsT1`) und `MapError(_ => errors)` verwirft den Fehlerkanal und schleust parallel berechneten Zustand ein. Beides widerspricht `csharp-rop.md`. Kein eigener TD-Eintrag, weil `Collect` ohne diesen Umbau keinen Aufrufer hat und allein nur Stryker-Survivors erzeugen würde.
+4. **Nach der Umstellung in `coding-guideline-csharp.md` §2 den Absatz „Sollform, nicht Bestand" bereinigen** – seine Aussage „der Code ist noch nicht darauf umgestellt" wird mit diesem Eintrag falsch. Der Verweis auf die Lesekonvention in `coding-guideline-general.md` bleibt sinnvoll und kann stehen; nur die Bestandsaussage muss weg, sonst belügt die Guideline dauerhaft ihre Leser.
+5. **`IngredientsEndpoints.cs:140` umformulieren:** Der Kommentar „Leer und zu lang schließen sich strukturell aus" ist eine Aussage über die heutige Regelmenge, nicht über die Konstruktion – er wird still falsch, sobald eine dritte, ko-fehlschlagende Regel dazukommt.
+
+Prinzip und Herleitung: `docs/history/sessions/session_118.md`, Abschnitt E2. Erledigt und nicht mehr Teil dieses Eintrags: das Guideline-Beispiel, das mit `Create(Guid id, …)` §2 und §68 derselben Datei widersprach (in S119 auf Domänentypen umgestellt).

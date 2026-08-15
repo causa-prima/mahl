@@ -28,8 +28,10 @@ from importlib import import_module
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Reihenfolge = Ausgabe-Reihenfolge der Gründe. Hinzufügen/Entfernen wirkt sofort,
-# ohne settings.json-Änderung und ohne Reload.
+# Die Reihenfolge bestimmt, in welcher Folge mehrere Blockier-Gründe ausgegeben werden – rein
+# kosmetisch, kein Vertrag: die Checks sind untereinander unabhängig, und `collect_reasons`
+# führt sie alle aus. Deshalb prüft der Registry-Test auf Mengen-, nicht auf Listengleichheit.
+# Hinzufügen/Entfernen wirkt sofort, ohne settings.json-Änderung und ohne Reload.
 CHECKS = [
     "check-dependency-allowlist",
     "check-code-quality-blocking",
@@ -38,6 +40,9 @@ CHECKS = [
     "check-ref-direction",
     "check-obs-capture",
     "check-td-capture",
+    "check-adr-capture",
+    "check-oq-capture",
+    "check-dangling-refs",
 ]
 
 

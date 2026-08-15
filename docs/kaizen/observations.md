@@ -101,8 +101,8 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: QUALITÄT    Kontext: TS-Code
 - Beobachtung: `useResultMutation` gibt jetzt ein 4-Tupel `[mutate, error, isPending, reset]` zurück – zwei davon Funktionen. Positions-Tupel werden mit wachsender Länge fehleranfällig (Call-Sites müssen exakt in Reihenfolge destrukturieren, `error`/`isPending` leicht verwechselbar). Ein Objekt `{ save, error, isPending, reset }` wäre selbstdokumentierend und reihenfolgeunabhängig.
-- Entscheidung/Maßnahme: aufgeschoben – bündeln mit dem nächsten großen Hook-Schritt (volle MutationState-Union, ADR-S083-2), damit die Call-Sites nicht zweimal angefasst werden. Re-Trigger: wenn die volle Union / `matchState` eingeführt wird.
-- Bezug: ADR-S083-2
+- Entscheidung/Maßnahme: aufgeschoben – bündeln mit dem nächsten großen Hook-Schritt (volle MutationState-Union, TD-S101-1), damit die Call-Sites nicht zweimal angefasst werden. Re-Trigger: wenn die volle Union / `matchState` eingeführt wird.
+- Bezug: TD-S101-1
 
 ## OBS-S099-2 – Test-Freigabe-Anker verlangt manuelle Zustandshaltung im Orchestrator
 - Quelle: Orchestrator
@@ -323,3 +323,21 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Vorprägung: User: 'das doppelt doch nur das TD und koennte mechanisch gemacht werden (wie es fuer die anderen Eintraege auch gemacht wird)'. Orchestrator-Vermutung: Das Anti-Doppelungs-Argument in td_anchors.py ist auf der falschen Ebene angesetzt - es vermeidet doppelte Vorlage, nicht doppelte Pflege. Denkbare Richtungen, ungeprueft: jetzt-TDs vom Script injizieren und AGENT_MEMORY nur noch Rangfolge-Ueberschreibungen tragen lassen; oder das Done-Kriterium als Feld ins TD-Format aufnehmen, damit die Zeile vollstaendig generierbar wird.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S116-2
+
+## OBS-S119-1 – Deny-Text des Bash-Hooks lenkt in Einmalscripte, statt die Werkzeugfrage zu stellen
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Der Deny-Text von check-bash-permission.py (Zeile 605 und analog 568) bietet als Ausweg an: 'Für Ad-hoc-Logik: Script nach .claude/tmp/foo.py schreiben, dann python3 .claude/tmp/foo.py.' Der Text setzt damit stillschweigend voraus, dass der geblockte Befehl überhaupt Ad-hoc-Logik war, und bietet den Ausweg an, bevor die Vorfrage gestellt ist: Braucht es hier ein Script? Aufgetreten in S119: Ein zusammenhaengender, vollstaendig gelesener Textblock sollte aus einer Markdown-Datei geloescht werden. Das ist ein Edit-Fall. Ich habe reflexhaft einen Python-Heredoc in Bash versucht, der Hook hat geblockt, und ich bin dem angebotenen Ausweg direkt gefolgt und habe .claude/tmp/drop_oq.py geschrieben – ohne einen Schritt zurueckzugehen. Der Hook hat den Befehl korrekt geblockt und dann in eine zweite, ebenfalls unpassende Loesung gelenkt. Verschaerfend: Das Einmalscript war hier das riskantere Werkzeug. Ein Edit-Mismatch schlaegt fehl, waehrend index() + Slicing blind schneidet, ohne dass sichtbar wird, was rausfliegt. Der Deny-Text nennt kein Kriterium, wann ein Script gegenueber vorhandenen Tools und Scripten ueberhaupt gerechtfertigt ist.
+- Vorprägung: Der User hat als Kriterium genannt: ein Script lohnt nur, wenn es effizienter und/oder weniger fehleranfaellig ist als die vorhandenen Tools – nicht deshalb, weil Bash geblockt wurde. Einmalscripte haetten vor allem im Standardprozess nur begrenzt Sinn; primaer sollen vorhandene Tools und Scripte genutzt werden. Naheliegende Richtung waere daher, den Deny-Text um diese Vorfrage zu ergaenzen, statt direkt den tmp-Ausweg anzubieten.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S119-2 – Fuenf PreToolUse-Hooks tragen identischen Boilerplate; Beispiel-IDs im Tooling kollidieren mit dem Dangling-Check
+- Quelle: Subagent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Zwei zusammenhaengende Befunde aus dem S119-Review. (a) Duplikation: read_file_text() ist in check-obs-capture.py, check-td-capture.py, check-ref-direction.py, check-adr-capture.py und check-dangling-refs.py byte-identisch; compute_post_content() in drei Modulen identisch und in zwei weiteren fast identisch; main() in allen fuenf bis auf den geloggten Modulnamen wortgleich. In Summe ueber 100 Zeilen Copy-Paste. Die drei in S119 neu gebauten Hooks (check-adr-capture.py, check-dangling-refs.py, check-oq-capture.py) loesen das nicht auf, sondern schreiben es fort – der Bestand waechst damit von fuenf auf sechs Kopien. Eine kuenftige Aenderung am Fail-open-Verhalten (Exit-Code, stderr-Format) muss fuenfmal nachgezogen werden. (b) Beispiel-IDs: check-td-capture.py, .claude/scripts/td_anchors.py und mehrere Testfixtures verwenden TD-S089-1 als illustratives Beispiel im Anker-Vokabular. TD-S089-1 ist ein echter, aktiver Eintrag in docs/tech-debt.md mit Faelligkeit jetzt. Sobald er regulaer erledigt und geloescht wird, blockiert der neue check-dangling-refs.py diese Loeschung und listet neben den zwei echten Referenzen in .claude/scripts/dotnet-test.py rund acht irrelevante Beispieltext-Stellen auf, die einzeln mit dangling-ok quittiert werden muessen. Der Autor von check-dangling-refs.py war sich der Gefahr fuer die eigene Datei bewusst und nutzt dort bewusst IDs aus dem nicht vergebenen S001-Raum; auf die uebrigen Tooling-Dateien wurde diese Disziplin nicht angewendet.
+- Vorprägung: Der Reviewer schlug fuer (a) ein gemeinsames Modul mit read_file_text, compute_post_content und einem run(check_fn, prefix)-Wrapper vor, wobei die Standalone-Lauffaehigkeit der Module erhalten bliebe. Fuer (b) schlug er vor, entweder die Beispiel-IDs im Tooling auf einen nicht vergebenen Nummernraum umzustellen oder den Einmalaufwand vor dem Schliessen von TD-S089-1 einzuplanen.
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

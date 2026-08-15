@@ -36,6 +36,7 @@
 | Retro durchführen | Skill `kaizen` verwenden |
 | Technische Schuld tracken | `docs/tech-debt.md` |
 | Offene Fragen / geparkte Diskussionen | `docs/open-questions.md` |
+| Wohin gehört dieser Eintrag – ADR, TD oder OQ? | Sektion "Ablage: ADR, TD oder offene Frage?" (unten in dieser Datei) |
 | Langsame Befehle dokumentieren | `docs/process/slow-commands.md` |
 | Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "Befehlsauswahl & Timeouts") |
 | Warum wurde X so entschieden? | `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`) |
@@ -43,6 +44,55 @@
 | Neuen Agenten beauftragen | `.claude/agents/` (bestehende Definitionen als Vorlage) + Skill `review-code` |
 | Interface/API designen (Design It Twice) | Skill `design-an-interface` verwenden |
 | Session abschließen | Skill `closing-session` verwenden |
+
+---
+
+## Ablage: ADR, TD oder offene Frage?
+
+Kanonische Taxonomie für die drei **produkt**-seitigen Tracker. Die Datei-Header von
+`docs/history/adr.md`, `docs/tech-debt.md` und `docs/open-questions.md` tragen je die
+Aufnahmebedingung ihrer Datei und verweisen hierher für die Abgrenzung untereinander.
+
+Drei Trennschnitte, jeder für sich eindeutig:
+
+| Schnitt | Trennt |
+|---|---|
+| **Produkt vs. Prozess** | ADR/TD/OQ ↔ OBS/CM/LL |
+| **entschieden vs. offen** | ADR/TD ↔ OQ |
+| **terminal vs. terminierend** | ADR ↔ TD |
+
+**Schnitt 1 – Produkt vs. Prozess.** Produkt ist der Code samt Build-/Test-Kette
+(`stryker-config.json`, `playwright.config.ts`, `Directory.Build.props`) → ADR/TD/OQ.
+Prozess ist, wie gearbeitet wird (`.claude/**`, `docs/process/`, `docs/kaizen/`) →
+OBS/CM/LL; deren Taxonomie steht vollständig in `docs/kaizen/process.md`
+(Sektion "Wann gehört etwas wohin?") und wird hier nicht wiederholt.
+
+**Schnitt 2 – entschieden vs. offen.** Steht die Antwort noch aus und ist sie mit dem User
+zu klären → `docs/open-questions.md`. Alles Entschiedene fällt unter Schnitt 3.
+
+**Schnitt 3 – terminal vs. terminierend.** Operativer Test:
+
+> *"Ist die Sache erledigt – bleibt dann etwas zu erklären übrig, das ohne diesen Eintrag
+> unverständlich wäre?"*
+
+- **Ja → ADR** (`docs/history/adr.md`). Der Eintrag wird `Superseded` und bleibt stehen.
+- **Nein → TD** (`docs/tech-debt.md`). Der Eintrag verschwindet mit der Behebung ersatzlos.
+
+**Keine Hybride.** Eine ADR trägt keinen Aufschub. Ist eine Entscheidung teils terminal, teils
+aufgeschoben, wird der Aufschub-Teil ein eigener TD-Eintrag; die ADR behält nur den terminalen
+Rest. Bleibt kein terminaler Rest, war es nie eine ADR. Formulierungen wie "aufgeschoben",
+"vorerst", "bis zur Erweiterung", "technische Schuld" in einer ADR sind das Warnzeichen –
+bei **neu** erfassten Einträgen blockt `.claude/hooks/check-adr-capture.py` sie mechanisch
+(Escape für bewusste Einzelfälle: `adr-ok`-Marker im Eintrag). Bestehende Einträge bleiben
+frei änderbar, sonst wäre Aufräumen unmöglich.
+
+**Lifecycle – bewusste Abweichung von der Lehrmeinung.** Der Mainstream kennt kein Löschen von
+ADRs (immutable, nur `Superseded`). Hier gilt: Eine ADR, die je **gegolten** hat, bleibt als
+`Superseded` stehen, weil sie Projekthistorie erklärt – auch wenn keine Anwendungsstelle mehr
+existiert. Eine ADR, die **nie** angewendet wurde, erklärt nichts und wird gelöscht (Präzedenz
+S108: ADR-S000-3). Im Zweifel behalten. Kein `Rejected`-Archiv.
+
+Herleitung und verworfene Alternativen: `docs/history/sessions/session_118.md`, Abschnitt E1.
 
 ---
 

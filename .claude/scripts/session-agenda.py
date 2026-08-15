@@ -48,6 +48,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import open_questions  # noqa: E402
+import td_anchors  # noqa: E402
 import td_due  # noqa: E402
 from obs_parse import current_session, parse_entries  # noqa: E402
 
@@ -226,20 +227,35 @@ def modul_next_run() -> Block:
 # --- Reine Stub-Module -------------------------------------------------------
 
 def modul_open_questions() -> Block:
+    """Fällige offene Fragen – mit Fragetext, nicht nur mit ID.
+
+    Als reiner Einzeiler („3 Fragen fällig, Volltext: <Datei>") war das Modul wirkungslos:
+    Es setzte voraus, dass jemand die Datei aufschlägt, und genau das geschah 32 Sessions
+    lang nicht (S115/S118). Deshalb steht die **Frage selbst** im Startkontext – so viel,
+    dass sie ohne weiteren Lesevorgang vorgelegt werden kann.
+
+    Bewusst nicht der ganze Eintragskörper: Der trägt Herleitung, verworfene Varianten und
+    Recherche-Ergebnisse (bei OQ-S119-2 rund zwanzig Zeilen) und würde den Startkontext
+    dominieren, ohne die Vorlage-Entscheidung zu verbessern. Der Hintergrund steht in der
+    Datei, auf die die letzte Zeile zeigt.
+    """
     fragen = open_questions.parse(_lies(ROOT / open_questions.OQ_FILE))
     cur = current_session(ROOT)
-    faellig = open_questions.due(fragen, cur)
+    faellig = open_questions.due(fragen, td_anchors.lade_kontext(ROOT), cur)
     if not faellig:
         return Block(stub="")
-    zeilen = [
-        f"  - {f['id']}  ({'Termin S%d' % f['faellig'] if f['faellig'] else '~%s Sessions' % (cur - f['session'])})"
-        f"  {f['title']}"
+
+    abschnitte = [
+        f"  {f['id']} — {f['title']}\n"
+        f"    Frage:  {f['frage']}\n"
+        f"    Fällig: {'; '.join(f['gruende'])}"
         for f in faellig
     ]
     return Block(
         stub=f"Offene Fragen: {len(faellig)} fällig (mit dem User klären, nicht selbst entscheiden)",
-        inhalt="Offene Fragen – Termin erreicht oder überaltert:\n" + "\n".join(zeilen)
-               + f"\n  Volltext: {open_questions.OQ_FILE}",
+        inhalt="Offene Fragen – vorzulegen, nicht selbst zu entscheiden:\n"
+               + "\n\n".join(abschnitte)
+               + f"\n\n  Hintergrund je Frage: {open_questions.OQ_FILE}",
     )
 
 
@@ -320,7 +336,11 @@ MODULE: list[tuple[str, str, callable]] = [
     ("obs-drain", AUFGABE, modul_obs_drain),
     ("priorities", AUFGABE, modul_priorities),
     ("next-run", AUFGABE, modul_next_run),
-    ("open-questions", STUB, modul_open_questions),
+    # ZUSTAND statt STUB (S119, Beschluss E4): Ein STUB erscheint nur als Einzeiler im
+    # Nachrang-Bereich – die Frage selbst käme nie in den Startkontext, und genau daran ist
+    # der Mechanismus 32 Sessions lang gescheitert. Keine AUFGABE: Offene Fragen sind kein
+    # Arbeitsauftrag für die Session, sie sollen vorgelegt werden.
+    ("open-questions", ZUSTAND, modul_open_questions),
     ("td-due", STUB, modul_td_due),
     ("ungeplante-szenarien", STUB, modul_ungeplante_szenarien),
 ]

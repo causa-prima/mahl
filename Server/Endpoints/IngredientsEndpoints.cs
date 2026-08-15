@@ -186,8 +186,9 @@ file static class IngredientMappings
 
     // ADR-S108-1: derselbe Zeilen-DTO, hier direkt aus der DB-Zeile gebaut (Restore-Pfade lesen den
     // Stand einer schon existierenden Zeile, nicht eines frisch validierten Domain-Objekts). Bewusste
-    // Abweichung vom kanonischen Read-Pfad DbType -> ToDomain() -> DTO (ADR-S083-1): der ToDomain()-
-    // Roundtrip würde hier einen ungeübten DB-Inkonsistenz-Fehlerzweig einführen, den kein Szenario fordert.
+    // Abweichung vom kanonischen Read-Pfad DbType -> ToDomain() -> DTO: der ToDomain()-Roundtrip würde
+    // hier einen ungeübten DB-Inkonsistenz-Fehlerzweig einführen, den kein Szenario fordert.
+    // Gleiche Abweichung auf dem GET-Pfad, dort als Schuld erfasst (TD-S083-5).
     private static IngredientDto ToDto(this IngredientDbType row, uint xmin) =>
         new(row.Id, row.Name, row.DefaultUnit, XminETag.Format(xmin));
 

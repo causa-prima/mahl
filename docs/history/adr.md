@@ -5,6 +5,17 @@ wann-lesen: Bevor eine Entscheidung getroffen wird die bereits getroffene Entsch
             berühren könnte. Vor dem Schreiben von Tags:
             `python3 .claude/scripts/decisions.py tags` ausführen – listet alle
             verwendeten Kategorien und Tags.
+aufnahmebedingung: Hier steht eine **entschiedene** Sache am Produkt (Code + Build-/Test-Kette),
+            von der nach Behebung oder Ablösung ein **terminaler Rest** bleibt – etwas, das ohne
+            diesen Eintrag unverständlich wäre. Operativer Test (Kurzfassung; kanonischer Wortlaut
+            in `CLAUDE.md`): „Ist die Sache erledigt – bleibt dann etwas zu erklären übrig?"
+            Ja → hierher (der Eintrag wird `Superseded` und bleibt stehen).
+            Nein → `docs/tech-debt.md`. Noch nicht entschieden → `docs/open-questions.md`.
+            Trägt eine Entscheidung einen Aufschub, gehört der Aufschub-Teil als eigener Eintrag
+            nach `docs/tech-debt.md` – eine ADR trägt keinen Aufschub. Bei **neu** erfassten
+            Einträgen mechanisch geprüft: `.claude/hooks/check-adr-capture.py` blockt
+            Aufschub-Vokabular (Escape für bewusste Einzelfälle: `adr-ok`-Marker im Eintrag).
+            Abgrenzung ADR/TD/OQ kanonisch: `CLAUDE.md`, Sektion „Ablage: ADR, TD oder offene Frage?"
 kritische-regeln:
   - Jede selbst getroffene technische Entscheidung hier dokumentieren
   - Format: Status + Tags + Entscheidung + Begründung + Verworfen
@@ -368,19 +379,6 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 ---
 
-### ADR-S083-1: GET /api/ingredients – Read-Pfad mappt DB→DTO direkt (ToDomain aufgeschoben)
-
-**Status:** Accepted
-**Tags:** scope:feature, resource:ingredients, http:get, arch:domain-type, arch:error-handling
-
-**Entscheidung:** Der Happy-Path-`GET /api/ingredients` projiziert `IngredientDbType` **direkt** auf `IngredientDto` (`db.Ingredients.Select(i => new IngredientDto(i.Id, i.Name, i.DefaultUnit))`), ohne den Read-Pfad `DbType → ToDomain() → OneOf<Ingredient, Error> → DTO`. Eine `ToDomain()`-Funktion und das Skip-/Log-Verhalten für korrupte DB-Rows werden **nicht** in diesem Zyklus implementiert.
-
-**Begründung:** Der `ToDomain()`-Roundtrip führt einen DB-Inkonsistenz-Fehlerzweig ein (z.B. leerer `Name` in der DB → `NonEmptyTrimmedString.Create` schlägt fehl), den der Happy-Path nicht ausübt und für den keine genehmigte Suppression vorliegt – er würde einen Stryker-Survivor erzeugen oder eine Vorab-Suppression außerhalb des vorgesehenen Szenarios erzwingen. Der DB-Inkonsistenz-Pfad (Skip+Log bei Listen, 500 bei Einzel-Ressource) gehört in ein dediziertes DB-Inkonsistenz-Szenario – analog zur bereits getroffenen Entscheidung für Recipes (ADR-S039-3). Bewusste Abweichung von der kanonischen Read-Pfad-Architektur (architecture.md 4b) für den SKELETON-Happy-Path, hier dokumentiert (Doku-Pflicht für Abweichungen).
-
-**Verworfen:** `ToDomain()`-Read-Pfad jetzt + Suppression auf dem ungeübten Inkonsistenz-Zweig – Vorabtestung/Suppression außerhalb des treibenden Szenarios.
-
----
-
 ### ADR-S000-5: DELETE-Semantik: 404 vs. idempotent 204
 
 **Status:** Accepted
@@ -711,6 +709,58 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 
 ---
 
+### ADR-S119-1: Parametrisierte Einschränkungen stehen im Constraint-Typ – Marker-Typ je Grenzwert
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:domain-type, arch:validation
+
+**Entscheidung:** Eine parametrisierte Einschränkung (`max. N Zeichen` und Analoges) wird **Teil des Typs**, nicht eine Prüfung in der `Create()` des Domänentyps. Der Domänentyp trägt sie als Typ seines privaten Feldes:
+
+```csharp
+private readonly Bounded<NonEmpty<TrimmedString>, Max30> _value;
+```
+
+Bausteine in `Server/Types/`: `IStringConstraint<TSelf>` (CRTP mit `static abstract Create`), `IMaxLength` als Marker-Interface, die Träger `TrimmedString`, `NonEmpty<TInner>`, `Bounded<TInner, TMax>` und ein Marker-Typ **je Grenzwert** (`Max30`, `Max20`). Die Träger melden `StringViolation` (`Empty`, `TooLong`); der Domänentyp faltet das in seine feldspezifischen Fehlerfälle auf (`NameEmpty`, `NameTooLong` – ADR-S051-2 bleibt unberührt). Ausformulierter Code: `docs/history/sessions/session_119.md`, Abschnitt „Volltext zur Constraint-Parametrisierung", Variante A.
+
+**Begründung:** Der Grenzwert ist damit nicht vergessbar – der Feldtyp deklariert ihn, und ein neuer Domänentyp kann ihn nicht stillschweigend auslassen. Das ist ein Mechanismus statt Lese-Disziplin (`docs/kaizen/principles.md`). Die Alternative sichert die Grenze nur über das je begrenztem Feld ohnehin geforderte „zu lang"-Szenario ab – bei einem **neuen** Domänentyp existiert dieses Szenario aber noch nicht, wenn die Zeile vergessen wird.
+
+**Warum ein Marker-Typ je Grenzwert:** C# kennt keine const generics (`dotnet/csharplang#7508` ist seit 2023 Draft, in C# 15 nicht enthalten), also lässt sich `Bounded<…, 30>` nicht schreiben. Bemerkenswert für spätere Leser: Rust *hat* const generics, und `nutype` nutzt trotzdem Proc-Macro-Codegen statt typseitiger Komposition – das Ergonomieproblem ist keine C#-Schwäche und verschwindet nicht, wenn die Sprache nachzieht.
+
+**Bekannte Kosten, bewusst getragen:** Eine Grenzwertänderung (30→40) heißt Marker umbenennen – der Grenzwert ist Typidentität – oder einen Marker je Feld führen (O(F)-Boilerplate). Die Violation muss durch alle Generic-Ebenen gereicht und am Domänentyp aufgefaltet werden. Gegenüber der Alternative entstehen fünf Typen und ein Enum zusätzlich.
+
+**Verworfen:** `private const int MaxLength` im Domänentyp + Längenprüfung in dessen `Create()` – null neue Typen, Fehlerunterscheidung direkt am Ort der Prüfung, ein Token je Grenzwertänderung. Verworfen, weil die Prüfzeile opt-in und damit vergessbar bleibt.
+**Verworfen:** `StringRule` als fluent Prädikat-Pipeline (`For(x).NonEmpty().MaxLength(30).Build()`) – jeder Schritt ist opt-in, ein vergessenes `.NonEmpty()` erlaubt still leere Werte; dieselbe Vergessbarkeit wie oben, ohne den Ertrag des Typs.
+**Verworfen:** `CheckedString` als neutraler Träger allein für den `default(T)`-Guard – spart über vier Felder nur 8→6 Suppressions, zu dünn für einen eigenen Typ und ein eigenes Konzept.
+**Verworfen:** NRT statt des `default(T)`-Guards – trägt nicht: `default(T)` null-initialisiert bei structs auch ein als non-nullable deklariertes Feld, ohne Compiler-Warnung.
+
+---
+
+### ADR-S119-2: Fehler-sammelnde Validierung als `Collect` – ein Overload je Arity
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:error-handling, arch:validation
+
+**Entscheidung:** Collect-All-Validierung (ADR-S090-1: der 422-Body nennt alle Feldfehler gleichzeitig) läuft über einen Applicative-Kombinator `Collect` in `Server/OneOfExtensions.cs`, mit **einem Overload je Stelligkeit**:
+
+```csharp
+internal static OneOf<TOut, IReadOnlyList<TError>> Collect<T1, T2, TOut, TError>(
+    OneOf<T1, TError> first, OneOf<T2, TError> second, Func<T1, T2, TOut> combine);
+// … analog für 3, 4, 5 Eingänge
+```
+
+`Collect` wertet seine Eingänge unabhängig aus und konkateniert deren Fehler. Anwendungsbeispiel: `coding-guideline-csharp.md`, Sektion „Kanonisches Beispiel".
+
+**Begründung:** `Bind` kann strukturell nicht sammeln – es schließt beim ersten Fehler kurz. Sammeln ist ein Applicative, kein Monad. Ohne einen solchen Kombinator entsteht die Ersatzkonstruktion, die der Bestand zeigt (`IngredientsEndpoints.cs`): Fehler werden per `ErrorOrEmpty()` aus dem `OneOf` ausgepackt, parallel zur Kette in einer Liste gesammelt und am Ende per `MapError(_ => errors)` wieder eingeschleust. Das `_` verwirft den tatsächlichen Fehler des Fehlerkanals – der Kanal trägt die Information nicht mehr, und das Auspacken ist verkapptes `.AsT1`. Beides widerspricht der ROP-Pflicht (`csharp-rop.md`).
+
+**Warum ein Overload je Arity:** Der Preis ist einmalige Boilerplate in **einer** Bibliotheksdatei; realistisch werden Arity 2 bis ~5 gebraucht (`Recipe` hat die meisten Felder). Die Aufrufer sind viele und bleiben lesbar.
+
+**Verworfen:** Currying + ein einzelnes `Apply` (das kanonische `<*>`) – kommt mit **einer** Signatur für jede Arity aus und ist damit die einzige echte Alternative. Verlagert die Boilerplate aber vom einmaligen Bibliotheks-Code an jeden Aufrufort: handgecurriete Lambdas und ausgeschriebene `Func<,>`-Typen, weil C# verschachtelte Funktionstypen schlecht inferiert. Einmalige Kosten gegen dauerhafte eingetauscht.
+**Verworfen:** LINQ-Query-Syntax (`from n in name from u in unit select …`) – eine Signatur, beliebige Arity, sehr lesbar, aber `SelectMany` ist monadisch und schließt beim ersten Fehler kurz. Query-Syntax kann grundsätzlich kein Applicative sein.
+**Verworfen:** Tupel-Akkumulation (`r1.Zip(r2).Zip(r3)`) – die Tupel verschachteln sich zu `((a,b),c)`, und C# erlaubt keine Dekonstruktion in Lambda-Parameterlisten. Am Aufrufort unbrauchbar.
+**Verworfen:** `params`-Array – verliert die Typen zur Compile-Zeit und damit den Zweck.
+
+---
+
 ## Querschnittliche Fehlerbehandlung (Frontend)
 
 ### ADR-S056-1: Service-Layer + Custom Hooks + match()-Pflicht
@@ -893,24 +943,6 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 ---
 
-### ADR-S083-2: useResultQuery/useResultMutation – minimale Modellierung (YAGNI), volle Union aufgeschoben
-
-**Status:** Accepted
-**Tags:** scope:cross-cutting, frontend:typescript, frontend:hooks, frontend:react
-
-**Entscheidung:** Die Hooks `useResultQuery`/`useResultMutation` (`Client/src/hooks/`) werden zunächst **minimal** modelliert: `useResultQuery` liefert `TData | undefined` (nur success-Zweig); `useResultMutation` liefert `(vars) => void` + `onSuccess`-Callback (nur Erfolgs-Seiteneffekt). Es gibt **kein** vollständiges `MutationState`-Discriminated-Union (`idle|pending|success|error`), **kein** `matchState()`/`matchKind()` und **kein** `throwOnError: true` – abweichend von der kanonischen Spezifikation in `coding-guideline-typescript.md` Abschnitt 4b und ADR-S056-1.
-
-**Begründung:** Eingeführt im US-904-Happy-Path „Zutat anlegen" (Session 083). Dieses Szenario übt nur den success-Pfad aus (befüllte Liste rendern, nach POST invalidieren). Eine volle Union würde unausgeübte `pending`/`error`/`idle`-Zweige erzeugen → Stryker-Survivors → Suppressions außerhalb des treibenden Szenarios. Bewusste YAGNI-Entscheidung des Nutzers, um genau diese Suppressions zu vermeiden. Die Erweiterung auf die volle Union + `matchState` + `throwOnError` erfolgt mit den Szenarien, die sie ausüben: „Speichern-Button deaktiviert während des Speicherns" (pending) und die @US-904-error-Szenarien (error).
-
-**Bekannte Konsequenzen (technische Schuld bis zur Erweiterung):** (1) Name-Kollision mit den kanonischen Wrappern – ein Leser der Guideline erwartet das `MutationState`-Tupel. (2) `onSuccess` feuert auch bei einem `Err`-Result, da `Promise.resolve(ResultAsync)` den `Err` nicht wirft – im success-only-Happy-Path harmlos, aber vor dem Error-Szenario auf `result.match(onSuccess, onError)` umzustellen. (3) Fehlendes `throwOnError` → bei Netzwerkfehler bliebe `query.data` undefined und der Empty-State würde fälschlich gerendert.
-
-**Verworfen:** Volle 4er-Union jetzt – erzeugt unausgeübte Zweige + Suppressions vor dem treibenden Szenario (widerspricht der Suppression-Minimierung).
-
-**Addendum (run-11, „Reaktivierung"):** `onSuccess` reicht den Erfolgswert durch – die Signatur wechselt von `() => void` auf `(data: TData) => void`. Getrieben vom Reaktivierungs-Konflikt: die Snackbar braucht den vom Server gespeicherten Stand, den nur der Ok-Wert der Mutation trägt (ADR-S111-3). Das ist **keine** Aufweichung der Aufschub-Entscheidung oben: es entsteht weder ein neuer Zustand noch eine neue Union noch `throwOnError` – der bereits vorhandene Ok-Wert wird lediglich nicht mehr verschluckt. Bestehende Aufrufer mit parameterlosem Callback bleiben typkorrekt zuweisbar. Die volle `MutationState`-Union, `matchState` und `throwOnError` bleiben unverändert aufgeschoben.
-
-**Addendum (run-2, "Speichern-Button deaktiviert während des Speicherns"):** Der `pending`-Teil der oben aufgeschobenen Erweiterung wird **minimal** eingelöst: `useResultMutation` liefert neu ein 3-Tupel `[mutate, error, isPending]`, wobei `isPending = mutation.isPending` (React Query). **Keine** volle `MutationState`-Union, **kein** `matchState`, **kein** `throwOnError` – die Begründung von oben gilt unverändert für diese Teile, weil `throwOnError` weiterhin `QueryCache.onError` voraussetzt (existiert noch nicht) und die volle Union weiterhin unausgeübte `idle`/`error`-Zweige erzeugen würde. Die volle Union + `matchState` + `throwOnError` bleiben mit den @US-904-error/resilience-Szenarien aufgeschoben.
-
----
 
 ### ADR-S112-4: Domänenregeln setzt das Backend durch; Frontend-Brands sind nominal
 

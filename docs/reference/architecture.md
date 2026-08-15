@@ -131,10 +131,11 @@ Für jedes Domänen-Konzept existiert ein eigener Typ, der seine Invarianten sel
 - **Dependency Rule:** Factory Functions nehmen Domain-Typen oder Primitives – niemals DTOs, API-Response-Typen oder DB-Entities. Mapping findet im Endpoint-Layer statt.
 - **Cross-Entity-Constraints** (Uniqueness etc.) können nicht im Typ ausgedrückt werden → expliziter Check im Endpoint-Layer.
 - **Result-Typen als Bausteine:** `OneOf<A, B>` (C#) / `Result<T, E>` (TypeScript) sind Bausteine, kein Ersatz für eigene Domain-Typen. Je mehr Semantik ein Konzept trägt, desto eher verdient es einen eigenen Typ.
+- **Domänentyp ≠ Constraint-Typ:** Ein **Constraint-Typ** ist ein Prädikat über einer Repräsentation (feldagnostisch, wiederverwendbar); ein **Domänentyp** ist eine Rolle in der Fachsprache und *benutzt* Constraint-Typen als Baumaterial. Nur der Domänentyp erfüllt „ein eigener Typ je Domänen-Konzept" oben – ein Constraint-Typ in einer Signatur leckt ein Implementierungsdetail. Fünf Regeln dazu (Domänentyp = Schnittstelle, Constraint-Typ = Implementierung; Rolle ≠ Typ; Verwechslungsschutz ist Nebenprodukt; Abwesenheit ist keine Einschränkung; Regeln in den Typ, Meldungen an die Grenze) kanonisch in `docs/guidelines/coding-guideline-csharp.md` §2. Dort sind sie für C# ausformuliert; die TypeScript-Seite ist noch nicht darauf nachgezogen (siehe `docs/open-questions.md`).
 - **Immutability:** Objekte sind nach Konstruktion unveränderlich (C#: `init`-Properties; TypeScript: `readonly`, Spreading statt Mutation).
 
 Implementierungsdetails & Code-Beispiele:
-- C#: `docs/guidelines/coding-guideline-csharp.md` (Sektion Domain Modeling)
+- C#: `docs/guidelines/coding-guideline-csharp.md` §2 (Primitive Obsession, Domänentyp/Constraint-Typ) und §5 (Domain-Typen, kanonisches Beispiel)
 - TypeScript: `docs/guidelines/coding-guideline-typescript.md` (Sektionen 2–4)
 
 ---
