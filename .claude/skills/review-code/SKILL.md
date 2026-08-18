@@ -79,6 +79,19 @@ Agent-Prompts enthalten (je Agent):
   (konkrete Datei + Sektion) und Begründung (nicht nur Guideline zitieren)
 - Hinweis: Projekt-Guidelines (`docs/guidelines/coding-guideline-*.md`) haben Vorrang vor
   agenten-eigenen Checklisten
+- **ADR-Volltexte im Prompt, plus Auftrag zur eigenen Gegenprobe.** Die Auditoren haben **kein Bash**
+  (Tools: Read, Grep, Glob, LSP – s. `.claude/agents/*.md`), und das bleibt so: Die Tool-Liste ist
+  der Mechanismus, der „erzeugt ausschließlich Findings" garantiert – eine Allow-Liste wäre dafür
+  nur Disziplin. Ein Prompt, der ihnen `python3 .claude/scripts/decisions.py get …` aufträgt, läuft
+  deshalb ins Leere. Stattdessen zweigleisig:
+  1. Die vom Orchestrator als relevant eingestuften ADRs **im Prompt ausschreiben**.
+  2. Den Auditor ausdrücklich beauftragen, in `docs/history/adr.md` **per Grep selbst nachzusehen** –
+     eine zweite Meinung, die nur die Auswahl des Orchestrators kennt, ist keine.
+
+  Punkt 2 ist nicht optional: Fehlt eine ADR, die ein Finding entkräftet, meldet der Auditor ein
+  False Positive, das erst beim Zusammenführen auffliegt. Real passiert: ADR-S106-3 (Querschnitts-/
+  Infra-Tests tragen bewusst keinen US-Tag) stand nicht im Prompt, und ein Auditor meldete daraufhin
+  zwölf legitime Tests als Namensformat-Verstoß.
 - **Ausgabekanal (Pflicht):** Den vollständigen Findings-Endbericht **per `SendMessage` an den
   Orchestrator** zurückgeben – NICHT nur als plain-text-Antwort ausgeben. Grund: Wird der Auditor
   als Team-Subagent gespawnt (Regelfall via `implementing-scenario`), ist sein plain-text-Output

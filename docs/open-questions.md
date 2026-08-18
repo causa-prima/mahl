@@ -70,39 +70,15 @@ Eintrag-Format:
 
 ---
 
-## OQ-S119-2 — Validierungs-Fehlermodell: Typ je Prüfung statt je Feld×Prüfung?
-**Frage:** Werden Validierungsfehler als ein Typ **je Prüfung** mit Feld-Payload modelliert (`NonEmptyViolation(Field)`, `MaxLengthViolation(Field, Max)`) statt als ein Fall je Feld×Prüfung (`NameEmpty`, `NameTooLong`, `UnitEmpty`, …)?
-**Fällig:** jetzt, S128 – blockiert TD-S118-2 (s. „Vorrang" unten), das seinerseits `jetzt` ist. Ursprünglich an die **nächste Entität mit validierten Feldern** (US-602) gehängt; dieser Trigger ist überholt, seit der `Unit`-Umbau vorgezogen wurde. `S128` bleibt als Backstop.
-
-**Vorrang:** Diese Frage blockiert **TD-S118-2**. Der dortige Umbau verlangt ein über Entitäten **geteiltes** `Unit` (Rezept und Einkaufsliste nutzen dasselbe Konzept) – ein geteilter Domänentyp kann aber keinen entitätsspezifischen `IngredientValidationError` liefern. Wird hier erst nach dem Umbau entschieden, wird `Unit` zweimal gebaut. Festgehalten auch in `coding-guideline-csharp.md` §2, Absatz „Offener Punkt am Fehlertyp".
-
-**Hintergrund:** Aufgekommen in S119 neben der Frage, wie parametrisierte Einschränkungen modelliert werden (inzwischen entschieden: ADR-S119-1), aber davon unabhängig – die Violation-Taxonomie funktioniert mit beiden dort erwogenen Varianten. Heute: `Server/Domain/IngredientValidationError.cs`, ein Sum-Type mit einem Fall je Feld×Prüfung.
-
-**Skalierung, gezählt an ADR-S051-2 (12 Zeilen, nicht am Code gemessen):** 12 Fälle → 7 Violation-Typen. Heute moderat; der Gewinn liegt in der Steigung – **jedes neue String-Feld kostet 0 neue Typen statt 2.** Bei den noch kommenden Rezept-Feldern dreht sich das Verhältnis deutlich.
-
-**Geprüft und widerlegt: „dann braucht es kein Matching mehr an der Grenze."** Neun der zwölf Texte folgen einem Template, drei nicht:
-- `ingredients` leer → „Rezept muss mindestens **eine Zutat** haben." und `steps` leer → „Rezept muss mindestens **einen Schritt** haben." – dieselbe Prüfung, völlig andere Textform, und untereinander verschieden im **grammatischen Geschlecht**. Aus einem Feldnamen nicht ableitbar.
-- `ingredientId` nicht gefunden → „Eine oder mehrere Zutaten wurden nicht gefunden." – kein Feld-Label, Plural, bespoke.
-
-Diese Texte lassen sich **nicht** ins Template biegen: ADR-S051-2 erklärt sie zu festen Werten („Änderungen sind Breaking Changes"). Tragfähige Form ist deshalb Template-Renderer für den Regelfall + Override-Tabelle für die drei Abweichler + Label-Tabelle je Feld. Das Matching schrumpft, es verschwindet nicht.
-
-**Nicht im Weg:** ADR-S018-1 regelt die *Bauform* von Sum-Types (private Subtypen, `Match<T>`), nicht die Taxonomie – der Umbau bliebe Variante A und ist nicht ADR-revidierend.
-
-**Verwandter Befund, unabhängig entscheidbar:** Innerhalb eines Feldes ist die Validierung heute fail-fast, dokumentiert als sicher (`IngredientsEndpoints.cs:140`: „Leer und zu lang schließen sich strukturell aus"). Das ist eine Aussage über die *heutige Regelmenge*, nicht über die Konstruktion, und wird still falsch, sobald eine dritte, ko-fehlschlagende Regel dazukommt („muss E-Mail sein" + „max 50"). Feldübergreifend wird bereits akkumuliert, und der 422-Vertrag trägt schon jetzt mehrere Meldungen pro Feld (`g.ToArray()`). Akkumulation *innerhalb* eines Feldes jetzt zu bauen erzeugt aber einen Zweig, den kein Szenario ausübt (die Liste bliebe immer einelementig) → Survivor → Suppression außerhalb des treibenden Szenarios, dieselbe Konstellation, die TD-S101-1 offen hält. Also: mit der ersten ko-fehlschlagenden Regel, nicht vorher. Der Kommentar in `:140` gehört dann umformuliert.
-
-**Bei Klärung mit anzupassen:** `docs/guidelines/coding-guideline-csharp.md` §2 trägt am Ende der Sektion „Domänentyp und Constraint-Typ" den Absatz **„Offener Punkt am Fehlertyp"**, der auf diese Frage verweist. Er hält fest, dass das dortige `IngredientName`-Beispiel mit `IngredientValidationError` nur trägt, weil der Typ zu *einer* Entität gehört, und dass ein geteilter Domänentyp wie `Unit` diesen Fehlertyp nicht liefern kann. Mit der Entscheidung hier ist der Absatz entweder aufzulösen (Beispiel auf das neue Fehlermodell umstellen) oder ersatzlos zu streichen – er verweist sonst ins Leere. Der Verweis dort nennt bewusst nur die Datei, nicht diese ID, weil eine stabile Datei keine volatile ID referenziert (`docs/kaizen/principles.md`).
-
----
-
 ## OQ-S119-3 — Native C#-Union-Types statt `SumType.cs`, sobald .NET 11 verfügbar ist?
 **Frage:** Werden die handgerollten Sum-Types (`Server/Types/SumType.cs`, ADR-S040-1) auf native `union`-Typen umgestellt, sobald das Projekt auf .NET 11 / C# 15 steht?
 **Fällig:** S130 – reiner Backstop. Der tragende Trigger ist der **Wechsel auf .NET 11**; ein Anker dafür existiert im Vokabular nicht (weder Phase noch Szenario treffen es).
 
 **Hintergrund:** Recherchiert in S119. C# 15 führt `union` als nominale Deklaration ein (`public union Pet(Cat, Dog, Bird);`) mit compiler-erzwungener Exhaustivität in `switch`, dazu den `closed`-Modifier für geschlossene Hierarchien. Verfügbar ab .NET 11 Preview 2, GA für November 2026 angekündigt.
 
-**Warum relevant:** Der in `session_118.md` E3 beschlossene `IngredientId` als Union `Known`/`Unknown` liefe heute über `SumType.cs`; nativ entfielen die `SumType.Unreachable<T>()`-Arme samt Stryker-Suppression (ADR-S018-2) – genau das Bedenken, das in E3 diskutiert wurde.
+**Warum relevant:** `IngredientId` ist als Union `Known`/`Unknown` über `SumType.cs` gebaut (S120, Herleitung in `session_118.md` E3); nativ entfielen die `SumType.Unreachable<T>()`-Arme samt Stryker-Suppression (ADR-S018-2) – genau das Bedenken, das in E3 diskutiert wurde.
 
-**Zwei Haken, die gegen ein Vertagen von TD-S118-1 darauf sprechen:**
+**Zwei Haken, die 2026 gegen ein Warten auf .NET 11 sprachen** – sie sind weiterhin die Prüfpunkte, an denen die Umstellung zu messen ist:
 1. Unions sind Structs mit einem `object? Value` – **Value Types boxen bei jeder Zuweisung.** Die Domänentypen des Projekts sind `readonly record struct` ausdrücklich, um Heap-Allokation zu vermeiden (`coding-guideline-csharp.md` §1-Tabelle).
 2. Das Projekt steht auf `net10.0`; `LangVersion=latest` liefert auf dem .NET-10-SDK C# 14, nicht 15. In Preview 5 fehlen laut Doku noch Teile der Spec (`ClosedAttribute` shippt die Runtime noch nicht).
 
@@ -110,7 +86,7 @@ Diese Texte lassen sich **nicht** ins Template biegen: ADR-S051-2 erklärt sie z
 
 ## OQ-S119-4 — Gilt „Regeln in den Typ, Meldungen an die Grenze" auch im Frontend?
 **Frage:** Wird der Frontend-Fehlertyp `ValidationError = { readonly message: string }` auf Fehler**fälle** statt Meldungstexte umgestellt – oder gilt die Regel bewusst nur backend-seitig?
-**Fällig:** S132 – reiner Backstop. Der tragende Trigger ist die Entscheidung über das **Backend**-Fehlermodell (OQ-S119-2): dieselbe Frage eine Ebene tiefer, deren Antwort prägt, wie ein fallbasierter Frontend-Fehlertyp überhaupt aussähe. Vorher entschieden wäre die Reihenfolge verkehrt. Ein Verweis-Anker auf einen anderen OQ-Eintrag lässt sich hier nicht ausdrücken – `open_questions.py:23` kennt nur `S<NNN>` (bekannte Lücke aus E4/S118).
+**Fällig:** jetzt – der tragende Trigger, die Entscheidung über das **Backend**-Fehlermodell, ist mit **ADR-S120-1** gefallen (ein Fehlertyp je Domänentyp, feldagnostisch, Feldbezug an der Grenze). Damit steht das Vorbild fest, an dem sich diese Frage messen lässt. Der frühere Backstop `S132` begründete sich damit, der tragende Anker sei nicht ausdrückbar – das traf schon damals nicht mehr zu (`open_questions.py` verwendet seit S119 `td_anchors.py`).
 
 **Hintergrund:** Aufgekommen im S119-Review beim Verankern von E2. `docs/reference/architecture.md` §2 erklärt das Domain-Modeling-Kapitel ausdrücklich für „C# und TypeScript gleichermaßen" gültig und verweist für die Ausformulierung auf die sprachspezifischen Guidelines. Die dort in §2 verankerte **Regel 5** lautet: „Ein Domänentyp gibt einen Fehler**fall** zurück, nie einen Meldungstext" (ADR-S051-2: die Zuordnung Fall → deutscher Text lebt an der API-Grenze). `coding-guideline-typescript.md` schreibt aber das Gegenteil vor: `ValidationError` trägt ein `message: string` als einziges Feld.
 

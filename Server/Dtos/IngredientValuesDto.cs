@@ -5,5 +5,5 @@ namespace mahl.Server.Dtos;
 // beide validieren über denselben ToDomain()-Pfad (ADR-S090-1/S051-2/S051-3). Der Name beschreibt
 // den INHALT, nicht eine der beiden Operationen (vormals CreateIngredientDto, umbenannt run-11).
 #pragma warning disable CA1812 // instantiated by ASP.NET Core model binding via reflection
-internal sealed record IngredientValuesDto(string Name, string DefaultUnit);
+internal sealed record IngredientValuesDto(string Name, string BaseUnit);
 #pragma warning restore CA1812

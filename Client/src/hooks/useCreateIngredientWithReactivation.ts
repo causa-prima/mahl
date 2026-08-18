@@ -22,7 +22,7 @@ function toConflictNotice(result: Readonly<CreateIngredientResult>): Reactivatio
     ? {
         requestedName: result.requestedName.trim(),
         savedName: result.savedIngredient.name,
-        savedUnit: result.savedIngredient.defaultUnit,
+        savedUnit: result.savedIngredient.baseUnit,
       }
     : null
 }
@@ -60,13 +60,13 @@ export function useCreateIngredientWithReactivation(onSuccess: () => void): Crea
   // die Komponenten-Fehler-Union auf Domain-Fehler-only kollabiert. Tracking: docs/tech-debt.md.
   // ADR-S090-1: feld-keyed 422-Fehler -> Meldung am betroffenen Feld (UX-Guideline §4: nah
   // am betroffenen Element). Nur der FieldErrors-kind trägt feldbezogene Meldungen. Der Key
-  // (name / defaultUnit) ist die Request-JSON-Property; ein FieldErrors kann einen Key
-  // weglassen (z.B. nur defaultUnit beim 'leere Einheit'-Szenario), daher liefert der Lookup
+  // (name / baseUnit) ist die Request-JSON-Property; ein FieldErrors kann einen Key
+  // weglassen (z.B. nur baseUnit beim 'leere Einheit'-Szenario), daher liefert der Lookup
   // dank noUncheckedIndexedAccess (tsconfig.app.json) ehrlich `... | undefined` -> der
   // `?.`-Guard schützt vor einem Render-Crash bei fehlendem Key.
   const fieldErrors = saveError?.kind === 'FieldErrors' ? saveError.fields : undefined
   const nameError = fieldErrors?.name?.[0]
-  const unitError = fieldErrors?.defaultUnit?.[0]
+  const unitError = fieldErrors?.baseUnit?.[0]
 
   return {
     save,

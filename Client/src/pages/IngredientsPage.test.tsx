@@ -28,19 +28,19 @@ async function awaitDialogAutofocus() {
   await waitFor(() => { expect(screen.getByLabelText(/^Name/)).toHaveFocus() })
 }
 
-const tomaten = { id: '1', name: 'Tomaten', defaultUnit: 'Stück' } as const
+const tomaten = { id: '1', name: 'Tomaten', baseUnit: 'Stück' } as const
 
-const salz = { id: '7', name: 'Salz', defaultUnit: 'g' } as const
+const salz = { id: '7', name: 'Salz', baseUnit: 'g' } as const
 
 // run-8: nur "Mehl" (g) existiert. Der per-Zeile-xmin-ETag (ADR-S108-1) reist im GET-Body mit
 // und wird von der Komponente als If-Match beim DELETE verwendet. Realistisches Format: lowercase
 // hex in Quotes ("{xmin:x8}", ADR-S106-1). Das If-Match-VERHALTEN selbst prüft der Service-Client-
 // Test (ingredientsApi.test.ts); hier ist der ETag nur Durchreiche-Wert.
-const mehl = { id: '8', name: 'Mehl', defaultUnit: 'g', etag: '"0000a1b2"' } as const
+const mehl = { id: '8', name: 'Mehl', baseUnit: 'g', etag: '"0000a1b2"' } as const
 
 // run-8-Nachtrag: zweite Zutat für die Undo-Toast-Verlässlichkeits-Szenarien (zwei
 // Löschvorgänge nacheinander). Gleiche ETag-Semantik wie "mehl" – nur als Durchreiche-Wert.
-const zucker = { id: '9', name: 'Zucker', defaultUnit: 'g', etag: '"0000c3d4"' } as const
+const zucker = { id: '9', name: 'Zucker', baseUnit: 'g', etag: '"0000c3d4"' } as const
 
 // > MUI theme.transitions.duration.leavingScreen (225ms, MUI-Default) + Marge. Settle-
 // Fenster VOR Assertions, die sich auf "Dialog noch im DOM" verlassen: die Exit-Transition
@@ -293,8 +293,8 @@ describe('IngredientsPage – Zutat anlegen', () => {
       expect(screen.queryByRole('dialog', { name: 'Zutat anlegen' })).not.toBeInTheDocument()
     })
 
-    // Then: der POST trug Name + Einheit als { name, defaultUnit } (ADR-S068-1)
-    expect(captured.current?.body).toEqual({ name: 'Tomaten', defaultUnit: 'Stück' })
+    // Then: der POST trug Name + Einheit als { name, baseUnit } (ADR-S068-1)
+    expect(captured.current?.body).toEqual({ name: 'Tomaten', baseUnit: 'Stück' })
     // Then: der POST sendete JSON (Content-Type), damit das Backend den Body bindet
     expect(captured.current?.contentType).toBe('application/json')
   })
@@ -471,15 +471,15 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leerer Name)', () => 
 
 // @US-904-error: Ausgangszustand = eine bestehende Zutat (Salz); der POST mit leerer
 // Einheit (gültiger Name "Salz") beantwortet das Backend mit 422 + feld-keyed Body
-// (ADR-S090-1): { errors: { defaultUnit: ["Einheit darf nicht leer sein."] } }. Der Key
-// `defaultUnit` ist die Request-JSON-Property exakt wie das FE im POST sendet. GET liefert
+// (ADR-S090-1): { errors: { baseUnit: ["Einheit darf nicht leer sein."] } }. Der Key
+// `baseUnit` ist die Request-JSON-Property exakt wie das FE im POST sendet. GET liefert
 // unverändert [salz] (kein optimistic add), sodass "Liste bleibt unverändert" echt gilt.
 function useEmptyUnitRejectingHandlers(): void {
   server.use(
     http.get('/api/ingredients', () => HttpResponse.json([salz])),
     http.post('/api/ingredients', () =>
       HttpResponse.json(
-        { status: 422, errors: { defaultUnit: ['Einheit darf nicht leer sein.'] } },
+        { status: 422, errors: { baseUnit: ['Einheit darf nicht leer sein.'] } },
         { status: 422 },
       ),
     ),
@@ -521,7 +521,7 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
     // When: Name "Salz" + leere Einheit speichern
     await submitEmptyUnitWithNameSalz()
 
-    // Then: das Einheit-Feld ist als ungültig markiert (der defaultUnit-Fehler landet dort)
+    // Then: das Einheit-Feld ist als ungültig markiert (der baseUnit-Fehler landet dort)
     expect(await screen.findByLabelText(/^Einheit/)).toHaveAttribute('aria-invalid', 'true')
     // Then: das Name-Feld ist NICHT als ungültig markiert (der Fehler betrifft nur die
     //   Einheit) — killt den Mutanten "es wird immer dasselbe Feld markiert" und treibt
@@ -867,7 +867,7 @@ function useReactivateSoftDeletedHandlers(
     http.get('/api/ingredients', () =>
       HttpResponse.json(
         restoreRequestBody.current
-          ? [{ id, ...(restoreRequestBody.current as { name: string; defaultUnit: string }), etag: '"00000001"' }]
+          ? [{ id, ...(restoreRequestBody.current as { name: string; baseUnit: string }), etag: '"00000001"' }]
           : [],
       )),
     http.post('/api/ingredients', () =>
@@ -878,7 +878,7 @@ function useReactivateSoftDeletedHandlers(
       // eslint-disable-next-line functional/immutable-data -- Capture: s.o.
       restoreContentType.current = request.headers.get('Content-Type')
       return HttpResponse.json(
-        { id, ...(restoreRequestBody.current as { name: string; defaultUnit: string }), etag: '"00000001"' },
+        { id, ...(restoreRequestBody.current as { name: string; baseUnit: string }), etag: '"00000001"' },
         { status: 200 },
       )
     }),
@@ -914,7 +914,7 @@ describe('IngredientsPage – Zutat reaktivieren', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
     // Then: der Client rief den Restore transparent mit den EIGENEN Eingaben auf
-    expect(restoreRequestBody.current).toEqual({ name: 'Butter', defaultUnit: 'g' })
+    expect(restoreRequestBody.current).toEqual({ name: 'Butter', baseUnit: 'g' })
     // Then: der Restore-Request sendete JSON (Content-Type), damit das Backend den Pflicht-Body
     //   bindet (ADR-S111-1)
     expect(restoreContentType.current).toBe('application/json')
@@ -996,7 +996,7 @@ describe('IngredientsPage – Zutat reaktivieren', () => {
 
     // Then: der Restore-Request trug Name und Einheit der gelöschten Zutat unverändert mit
     await waitFor(() => {
-      expect(restoreRequestBody.current).toEqual({ name: 'Mehl', defaultUnit: 'g' })
+      expect(restoreRequestBody.current).toEqual({ name: 'Mehl', baseUnit: 'g' })
     })
   })
 
@@ -1062,7 +1062,7 @@ describe('IngredientsPage – Zutat reaktivieren', () => {
 function useReactivationConflictHandlers(id: string): void {
   // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET vor/nach dem Restore-Konflikt
   let isResolved = false
-  const activeIngredient = { id, name: 'Koriander', defaultUnit: 'Töpfchen', etag: '"00000002"' } as const
+  const activeIngredient = { id, name: 'Koriander', baseUnit: 'Töpfchen', etag: '"00000002"' } as const
   server.use(
     http.get('/api/ingredients', () => HttpResponse.json(isResolved ? [activeIngredient] : [])),
     http.post('/api/ingredients', () =>
@@ -1174,8 +1174,8 @@ describe('IngredientsPage – Reaktivierungs-Konflikt', () => {
     let isResolved = false
     // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: s.o.
     let created = false
-    const activeIngredient = { id, name: 'Koriander', defaultUnit: 'Töpfchen', etag: '"00000002"' } as const
-    const zwiebel = { id: 'zwiebel-id', name: 'Zwiebel', defaultUnit: 'Stück', etag: '"00000003"' } as const
+    const activeIngredient = { id, name: 'Koriander', baseUnit: 'Töpfchen', etag: '"00000002"' } as const
+    const zwiebel = { id: 'zwiebel-id', name: 'Zwiebel', baseUnit: 'Stück', etag: '"00000003"' } as const
     server.use(
       http.get('/api/ingredients', () =>
         HttpResponse.json([...(isResolved ? [activeIngredient] : []), ...(created ? [zwiebel] : [])])),

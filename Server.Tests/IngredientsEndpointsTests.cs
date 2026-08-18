@@ -12,12 +12,12 @@ namespace mahl.Server.Tests;
 public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : EndpointsTestsBase(postgres)
 {
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
-    private sealed record IngredientResponse(Guid Id, string Name, string DefaultUnit);
+    private sealed record IngredientResponse(Guid Id, string Name, string BaseUnit);
     // ADR-S108-1: eigener, NICHT-blinder Response-Record fürs neue etag-Feld. IngredientResponse bleibt
     // unverändert – eine Erweiterung würde bestehende BeEquivalentTo-Assertions zwingen, einen xmin-Wert
     // vorherzusagen, den sie nicht kennen können.
-    private sealed record IngredientWithEtagResponse(Guid Id, string Name, string DefaultUnit, string Etag);
-    private sealed record CreateIngredientRequest(string Name, string DefaultUnit);
+    private sealed record IngredientWithEtagResponse(Guid Id, string Name, string BaseUnit, string Etag);
+    private sealed record CreateIngredientRequest(string Name, string BaseUnit);
     private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
     // ADR-S004-1/ADR-S111-2: 409-Body von POST bei soft-deleted-Namenskonflikt.
@@ -41,7 +41,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     // zurück – das POST+Deserialize+ETag-Auslesen-Setup wiederholt sich über mehrere DELETE-Tests.
     private async Task<(IngredientResponse Ingredient, string ETag)> CreateIngredientAsync(string name, string unit)
     {
-        var createRequest = new CreateIngredientRequest(Name: name, DefaultUnit: unit);
+        var createRequest = new CreateIngredientRequest(Name: name, BaseUnit: unit);
         var createResponse = await Client.PostAsJsonAsync("/api/ingredients", createRequest, TestContext.Current.CancellationToken);
         var created = await createResponse.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         return (created!, createResponse.Headers.ETag!.Tag);
@@ -58,11 +58,11 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     }
 
     // ADR-S111-1 (überholt ADR-S108-2): Restore verlangt ab run-11 einen Pflicht-Body { name,
-    // defaultUnit } – ohne If-Match (Single-User-App-Ausnahme von ADR-S058-1 bleibt unverändert gültig).
-    private async Task<HttpResponseMessage> RestoreIngredientAsync(Guid id, string name, string defaultUnit) =>
+    // baseUnit } – ohne If-Match (Single-User-App-Ausnahme von ADR-S058-1 bleibt unverändert gültig).
+    private async Task<HttpResponseMessage> RestoreIngredientAsync(Guid id, string name, string baseUnit) =>
         await Client.PostAsJsonAsync(
             $"/api/ingredients/{id}/restore",
-            new CreateIngredientRequest(Name: name, DefaultUnit: defaultUnit),
+            new CreateIngredientRequest(Name: name, BaseUnit: baseUnit),
             TestContext.Current.CancellationToken);
 
     [Fact]
@@ -79,7 +79,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     public async Task US904_HappyPath_CreateIngredient_ValidData_Returns201WithBodyAndLocation()
     {
         // Given: name and unit for a new ingredient
-        var request = new CreateIngredientRequest(Name: "Tomaten", DefaultUnit: "Stück");
+        var request = new CreateIngredientRequest(Name: "Tomaten", BaseUnit: "Stück");
 
         // When: ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -89,7 +89,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Name.Should().Be("Tomaten");
-        body.DefaultUnit.Should().Be("Stück");
+        body.BaseUnit.Should().Be("Stück");
 
         // Then: Location header points to the new resource (ADR-S068-1)
         response.Headers.Location.Should().Be($"/api/ingredients/{body.Id}");
@@ -97,14 +97,14 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the ingredient is persisted (full-state DB assertion) with the server-generated id
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = "Tomaten", DefaultUnit = "Stück" }]);
+            [new IngredientDbType { Id = body.Id, Name = "Tomaten", BaseUnit = "Stück" }]);
     }
 
     [Fact]
     public async Task US904_HappyPath_GetIngredients_AfterCreate_ReturnsCreatedIngredient()
     {
         // Given: an ingredient was created
-        var request = new CreateIngredientRequest(Name: "Tomaten", DefaultUnit: "Stück");
+        var request = new CreateIngredientRequest(Name: "Tomaten", BaseUnit: "Stück");
         var createResponse = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
         var created = await createResponse.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         created.Should().NotBeNull();
@@ -117,7 +117,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse[]>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Should().BeEquivalentTo(
-            [new IngredientResponse(Id: created.Id, Name: "Tomaten", DefaultUnit: "Stück")]);
+            [new IngredientResponse(Id: created.Id, Name: "Tomaten", BaseUnit: "Stück")]);
     }
 
     // @US-904-happy-path (run-7 „Liste"): mehrere Zutaten erscheinen alphabetisch sortiert. Insertion-
@@ -153,7 +153,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var (active, _) = await CreateIngredientAsync("Petersilie", "Bund");
         Db.Ingredients.Add(new IngredientDbType
         {
-            Id = Guid.CreateVersion7(), Name = "Basilikum", DefaultUnit = "Stück", DeletedAt = DateTimeOffset.UtcNow,
+            Id = Guid.CreateVersion7(), Name = "Basilikum", BaseUnit = "Stück", DeletedAt = DateTimeOffset.UtcNow,
         });
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -163,7 +163,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: 200 OK with only the active ingredient – the soft-deleted row is filtered out
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse[]>(TestContext.Current.CancellationToken);
-        body.Should().BeEquivalentTo([new IngredientResponse(Id: active.Id, Name: "Petersilie", DefaultUnit: "Bund")]);
+        body.Should().BeEquivalentTo([new IngredientResponse(Id: active.Id, Name: "Petersilie", BaseUnit: "Bund")]);
     }
 
     // @US-904-edge-case: Führende und nachfolgende Leerzeichen werden beim Speichern entfernt.
@@ -175,7 +175,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     public async Task US904_EdgeCase_CreateIngredient_WhitespacePaddedInput_TrimsAndPersistsTrimmedValue()
     {
         // Given: name and unit padded with leading and trailing whitespace
-        var request = new CreateIngredientRequest(Name: "  Oregano  ", DefaultUnit: "  g  ");
+        var request = new CreateIngredientRequest(Name: "  Oregano  ", BaseUnit: "  g  ");
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -185,12 +185,12 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Name.Should().Be("Oregano");
-        body.DefaultUnit.Should().Be("g");
+        body.BaseUnit.Should().Be("g");
 
         // Then: the persisted row stores the trimmed values (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = "Oregano", DefaultUnit = "g" }]);
+            [new IngredientDbType { Id = body.Id, Name = "Oregano", BaseUnit = "g" }]);
     }
 
     // Same invariant ("Pflichtfeld leer oder nur Whitespace -> 422 feld-keyed"), nur Input variiert
@@ -199,13 +199,13 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     [Theory]
     [InlineData("", "g", "name", "Name darf nicht leer sein.")]
     [InlineData("   ", "g", "name", "Name darf nicht leer sein.")]
-    [InlineData("Salz", "", "defaultUnit", "Einheit darf nicht leer sein.")]
-    [InlineData("Salz", "   ", "defaultUnit", "Einheit darf nicht leer sein.")]
+    [InlineData("Salz", "", "baseUnit", "Einheit darf nicht leer sein.")]
+    [InlineData("Salz", "   ", "baseUnit", "Einheit darf nicht leer sein.")]
     public async Task US904_Error_CreateIngredient_InvalidInput_Returns422WithFieldKeyedError(
         string name, string unit, string expectedKey, string expectedMessage)
     {
         // Given: a request whose required field is empty or whitespace-only
-        var request = new CreateIngredientRequest(Name: name, DefaultUnit: unit);
+        var request = new CreateIngredientRequest(Name: name, BaseUnit: unit);
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -233,7 +233,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     public async Task US904_Error_CreateIngredient_NameExceeds30Chars_Returns422WithNameTooLongError()
     {
         // Given: a name of 31 characters (exceeds the 30-character limit, ADR-S051-3)
-        var request = new CreateIngredientRequest(Name: new string('A', 31), DefaultUnit: "g");
+        var request = new CreateIngredientRequest(Name: new string('A', 31), BaseUnit: "g");
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -260,7 +260,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     {
         // Given: a name of exactly 30 characters (at the limit, still valid per ADR-S051-3)
         var name = new string('A', 30);
-        var request = new CreateIngredientRequest(Name: name, DefaultUnit: "g");
+        var request = new CreateIngredientRequest(Name: name, BaseUnit: "g");
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -270,22 +270,50 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Name.Should().Be(name);
-        body.DefaultUnit.Should().Be("g");
+        body.BaseUnit.Should().Be("g");
 
         // Then: the ingredient is persisted (full-state DB assertion) with the server-generated id
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = name, DefaultUnit = "g" }]);
+            [new IngredientDbType { Id = body.Id, Name = name, BaseUnit = "g" }]);
     }
 
-    // @US-904-error: Server-seitige Max-Length-Validierung (ADR-S051-3: defaultUnit max. 20 Zeichen, nach
+    // @US-904-edge-case: die Längengrenze misst den GETRIMMTEN Wert (ADR-S051-3 "nach Trimming gemessen"),
+    // nicht den rohen Input. Erst die Kombination beider Achsen unterscheidet die zwei Implementierungen:
+    // 30 Zeichen mit Padding sind roh 34, eine Messung VOR dem Trimmen antwortete hier mit 422 statt 201.
+    // Die benachbarten Tests decken je nur eine Achse ab – WhitespacePaddedInput trimmt kurze Werte,
+    // NameExactly30Chars prüft den Grenzwert ohne Padding.
+    [Fact]
+    public async Task US904_EdgeCase_CreateIngredient_PaddedNameAt30CharLimit_Returns201AndPersistsTrimmedValue()
+    {
+        // Given: a name of exactly 30 characters, padded to 34 raw characters
+        var name = new string('A', 30);
+        var request = new CreateIngredientRequest(Name: $"  {name}  ", BaseUnit: "g");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 201 Created – the limit applies to the trimmed value, which is still at the boundary
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Name.Should().Be(name);
+        body.BaseUnit.Should().Be("g");
+
+        // Then: the persisted row stores the trimmed 30-character value (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = body.Id, Name = name, BaseUnit = "g" }]);
+    }
+
+    // @US-904-error: Server-seitige Max-Length-Validierung (ADR-S051-3: baseUnit max. 20 Zeichen, nach
     // Trimming gemessen). Eigener Test statt weiterer [InlineData] der Empty-Theory oben – andere
     // fachliche Invariante (zu lang statt leer), eigener erwarteter Text (ADR-S051-2).
     [Fact]
     public async Task US904_Error_CreateIngredient_UnitExceeds20Chars_Returns422WithUnitTooLongError()
     {
         // Given: a unit of 21 characters (exceeds the 20-character limit, ADR-S051-3)
-        var request = new CreateIngredientRequest(Name: "Salz", DefaultUnit: new string('A', 21));
+        var request = new CreateIngredientRequest(Name: "Salz", BaseUnit: new string('A', 21));
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -298,7 +326,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.Should().NotBeNull();
         body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["defaultUnit"] = ["Einheit darf maximal 20 Zeichen lang sein."],
+            ["baseUnit"] = ["Einheit darf maximal 20 Zeichen lang sein."],
         });
 
         // Then: nothing is persisted – the ingredient list stays unchanged (empty)
@@ -312,7 +340,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     {
         // Given: a unit of exactly 20 characters (at the limit, still valid per ADR-S051-3)
         var unit = new string('A', 20);
-        var request = new CreateIngredientRequest(Name: "Salz", DefaultUnit: unit);
+        var request = new CreateIngredientRequest(Name: "Salz", BaseUnit: unit);
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -322,12 +350,38 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Name.Should().Be("Salz");
-        body.DefaultUnit.Should().Be(unit);
+        body.BaseUnit.Should().Be(unit);
 
         // Then: the ingredient is persisted (full-state DB assertion) with the server-generated id
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = "Salz", DefaultUnit = unit }]);
+            [new IngredientDbType { Id = body.Id, Name = "Salz", BaseUnit = unit }]);
+    }
+
+    // @US-904-edge-case: Einheiten-Gegenstück zum Namens-Fall oben – dieselbe Invariante (Grenze misst den
+    // getrimmten Wert, ADR-S051-3) auf der zweiten Feld-Achse, weil jedes Feld seinen eigenen Marker-Typ
+    // für den Grenzwert trägt. 20 Zeichen mit Padding sind roh 24.
+    [Fact]
+    public async Task US904_EdgeCase_CreateIngredient_PaddedUnitAt20CharLimit_Returns201AndPersistsTrimmedValue()
+    {
+        // Given: a unit of exactly 20 characters, padded to 24 raw characters
+        var unit = new string('A', 20);
+        var request = new CreateIngredientRequest(Name: "Salz", BaseUnit: $"  {unit}  ");
+
+        // When: the ingredient is created
+        var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
+
+        // Then: 201 Created – the limit applies to the trimmed value, which is still at the boundary
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Name.Should().Be("Salz");
+        body.BaseUnit.Should().Be(unit);
+
+        // Then: the persisted row stores the trimmed 20-character value (full-state DB assertion)
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(
+            [new IngredientDbType { Id = body.Id, Name = "Salz", BaseUnit = unit }]);
     }
 
     // @US-904-error: Drei Gherkin-Szenarien testen dieselbe fachliche Invariante (Eindeutigkeit case-insensitiv,
@@ -344,12 +398,12 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         string existingName, string existingUnit, string requestName, string requestUnit, string expectedNameInMessage)
     {
         // Given: an ingredient with the existing name already exists
-        var existing = new IngredientDbType { Id = Guid.CreateVersion7(), Name = existingName, DefaultUnit = existingUnit };
+        var existing = new IngredientDbType { Id = Guid.CreateVersion7(), Name = existingName, BaseUnit = existingUnit };
         Db.Ingredients.Add(existing);
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // When: another ingredient with a duplicate (possibly differently cased/padded) name is created
-        var request = new CreateIngredientRequest(Name: requestName, DefaultUnit: requestUnit);
+        var request = new CreateIngredientRequest(Name: requestName, BaseUnit: requestUnit);
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
 
         // Then: 422 Unprocessable Entity (ADR-S090-1, ADR-S004-1 Addendum S105 – aktives Duplikat ist field-keyed)
@@ -375,7 +429,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     public async Task US904_Error_CreateIngredient_BothFieldsEmpty_Returns422WithBothFieldKeyedErrors()
     {
         // Given: a request whose name AND unit are both empty
-        var request = new CreateIngredientRequest(Name: "", DefaultUnit: "");
+        var request = new CreateIngredientRequest(Name: "", BaseUnit: "");
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -389,7 +443,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["name"] = ["Name darf nicht leer sein."],
-            ["defaultUnit"] = ["Einheit darf nicht leer sein."],
+            ["baseUnit"] = ["Einheit darf nicht leer sein."],
         });
 
         // Then: nothing is persisted – the ingredient list stays unchanged (empty)
@@ -405,7 +459,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     public async Task CreateIngredient_ValidData_Returns201WithXminETagHeader()
     {
         // Given: name and unit for a new ingredient
-        var request = new CreateIngredientRequest(Name: "Zimt", DefaultUnit: "g");
+        var request = new CreateIngredientRequest(Name: "Zimt", BaseUnit: "g");
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -435,7 +489,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Then: the row is soft-deleted – physically retained, DeletedAt set (ADR-S000-6)
-        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Pfeffer", DefaultUnit = "g" });
+        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Pfeffer", BaseUnit = "g" });
     }
 
     // @US-904-edge-case: "Bereits gelöschte Zutat erneut löschen schlägt fehl". Sendet bewusst dasselbe
@@ -460,7 +514,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.ErrorCode.Should().Be("INGREDIENT_NOT_FOUND");
 
         // Then: die Zeile bleibt unverändert soft-deleted – keine weitere Mutation (full-state DB assertion)
-        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Pfeffer", DefaultUnit = "g" });
+        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Pfeffer", BaseUnit = "g" });
     }
 
     // ADR-S058-1: mutierende Single-Resource-Endpoints verlangen If-Match. Nicht durch das Gherkin-Szenario
@@ -480,7 +534,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
         // Then: nichts wird soft-deleted (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
-        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Salz", DefaultUnit = "g" }]);
+        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Salz", BaseUnit = "g" }]);
     }
 
     // ADR-S058-1/ADR-S058-3: stale If-Match auf eine aktive Zeile -> 412 (EF Core prüft xmin beim
@@ -499,7 +553,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
         // Then: nichts wird soft-deleted (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
-        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Muskat", DefaultUnit = "g" }]);
+        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Muskat", BaseUnit = "g" }]);
     }
 
     // Ein If-Match-Wert, der wie ein ETag AUSSIEHT, aber nicht zu einem xmin geparst werden kann
@@ -529,7 +583,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
         // Then: nichts wird soft-deleted (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
-        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Kardamom", DefaultUnit = "g" }]);
+        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Kardamom", BaseUnit = "g" }]);
     }
 
     // Pinnt die 404-Dominanz aus dem ADR-S000-5-Addendum GEGEN den If-Match-Check, auch wenn dieser
@@ -561,7 +615,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.ErrorCode.Should().Be("INGREDIENT_NOT_FOUND");
 
         // Then: die Zeile bleibt unverändert soft-deleted – keine weitere Mutation (full-state DB assertion)
-        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Wacholder", DefaultUnit = "g" });
+        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Wacholder", BaseUnit = "g" });
     }
 
     // ADR-S108-1: GET /api/ingredients liefert je Zeile den xmin-ETag im Body (etag-Feld) – die
@@ -582,7 +636,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<IngredientWithEtagResponse[]>(TestContext.Current.CancellationToken);
         body.Should().BeEquivalentTo(
-            [new IngredientWithEtagResponse(Id: created.Id, Name: "Kreuzkümmel", DefaultUnit: "g", Etag: etag)]);
+            [new IngredientWithEtagResponse(Id: created.Id, Name: "Kreuzkümmel", BaseUnit: "g", Etag: etag)]);
     }
 
     // ADR-S108-1: POST /api/ingredients (201) teilt sich das IngredientDto mit GET – das etag-Feld des
@@ -592,7 +646,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     public async Task CreateIngredient_ValidData_Returns201BodyWithEtagFieldMatchingETagHeader()
     {
         // Given: name and unit for a new ingredient
-        var request = new CreateIngredientRequest(Name: "Ingwer", DefaultUnit: "g");
+        var request = new CreateIngredientRequest(Name: "Ingwer", BaseUnit: "g");
 
         // When: the ingredient is created
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
@@ -626,12 +680,12 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Name.Should().Be("Rosmarin");
-        body.DefaultUnit.Should().Be("g");
+        body.BaseUnit.Should().Be("g");
 
         // Then: the row is active again – DeletedAt cleared, name/unit unchanged (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = created.Id, Name = "Rosmarin", DefaultUnit = "g" }]);
+            [new IngredientDbType { Id = created.Id, Name = "Rosmarin", BaseUnit = "g" }]);
     }
 
     // ADR-S108-2/ADR-S111-1: eine nie existente id liefert 404 mit demselben Body wie DELETE
@@ -645,7 +699,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var nonExistentId = Guid.CreateVersion7();
 
         // When: restoring that id with a valid body
-        var response = await RestoreIngredientAsync(nonExistentId, name: "Irrelevant", defaultUnit: "g");
+        var response = await RestoreIngredientAsync(nonExistentId, name: "Irrelevant", baseUnit: "g");
 
         // Then: 404 with the fixed German detail and machine-readable errorCode
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -669,7 +723,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var (created, _) = await CreateIngredientAsync("Kurkuma", "g");
 
         // When: restoring with an empty name
-        var response = await RestoreIngredientAsync(created.Id, name: "", defaultUnit: "g");
+        var response = await RestoreIngredientAsync(created.Id, name: "", baseUnit: "g");
 
         // Then: 422 Unprocessable Entity, field-keyed (ADR-S090-1, same ToDomain() path as POST)
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -683,7 +737,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the row is unchanged (full-state DB assertion) – validation runs before the DB write
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = created.Id, Name = "Kurkuma", DefaultUnit = "g" }]);
+            [new IngredientDbType { Id = created.Id, Name = "Kurkuma", BaseUnit = "g" }]);
     }
 
     // Kategorie-1-Protokolltest (ADR-S106-3): kein treibendes Gherkin-Szenario – Restore ist seit
@@ -702,7 +756,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // When: restoring "Zucker" with a name colliding with the active "Mehl"
-        var response = await RestoreIngredientAsync(zucker.Id, name: "Mehl", defaultUnit: "g");
+        var response = await RestoreIngredientAsync(zucker.Id, name: "Mehl", baseUnit: "g");
 
         // Then: 422 Unprocessable Entity, field-keyed with the same duplicate-name message as POST
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -717,8 +771,8 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
             [
-                new IngredientDbType { Id = mehl.Id, Name = "Mehl", DefaultUnit = "g" },
-                new IngredientDbType { Id = zucker.Id, Name = "Zucker", DefaultUnit = "g" },
+                new IngredientDbType { Id = mehl.Id, Name = "Mehl", BaseUnit = "g" },
+                new IngredientDbType { Id = zucker.Id, Name = "Zucker", BaseUnit = "g" },
             ],
             o => o.Excluding(x => x.DeletedAt)); // Zucker bleibt soft-deleted – exakter Zeitstempel nicht Teil des Szenarios
         persisted.Single(i => i.Id == zucker.Id).DeletedAt.Should().NotBeNull();
@@ -739,13 +793,13 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Given: a soft-deleted ingredient with the existing (possibly differently cased) name
         var deleted = new IngredientDbType
         {
-            Id = Guid.CreateVersion7(), Name = existingName, DefaultUnit = "g", DeletedAt = DateTimeOffset.UtcNow,
+            Id = Guid.CreateVersion7(), Name = existingName, BaseUnit = "g", DeletedAt = DateTimeOffset.UtcNow,
         };
         Db.Ingredients.Add(deleted);
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // When: an ingredient with the (possibly differently cased) duplicate name is created
-        var request = new CreateIngredientRequest(Name: requestName, DefaultUnit: "kg");
+        var request = new CreateIngredientRequest(Name: requestName, BaseUnit: "kg");
         var response = await Client.PostAsJsonAsync("/api/ingredients", request, TestContext.Current.CancellationToken);
 
         // Then: 409 Conflict with the soft-deleted row's id (ADR-S004-1)
@@ -774,7 +828,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Given: a soft-deleted ingredient with the stored name/unit
         var deleted = new IngredientDbType
         {
-            Id = Guid.CreateVersion7(), Name = storedName, DefaultUnit = storedUnit, DeletedAt = DateTimeOffset.UtcNow,
+            Id = Guid.CreateVersion7(), Name = storedName, BaseUnit = storedUnit, DeletedAt = DateTimeOffset.UtcNow,
         };
         Db.Ingredients.Add(deleted);
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -791,12 +845,12 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Name.Should().Be(requestName);
-        body.DefaultUnit.Should().Be(requestUnit);
+        body.BaseUnit.Should().Be(requestUnit);
 
         // Then: the row is active again with the request values (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = deleted.Id, Name = requestName, DefaultUnit = requestUnit }]);
+            [new IngredientDbType { Id = deleted.Id, Name = requestName, BaseUnit = requestUnit }]);
     }
 
     // @US-904-edge-case: "Reaktivierung gelingt auch wenn Zutat parallel mit denselben Daten
@@ -819,12 +873,12 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Name.Should().Be("Koriander");
-        body.DefaultUnit.Should().Be("Bund");
+        body.BaseUnit.Should().Be("Bund");
 
         // Then: the row remains unchanged and active (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = created.Id, Name = "Koriander", DefaultUnit = "Bund" }]);
+            [new IngredientDbType { Id = created.Id, Name = "Koriander", BaseUnit = "Bund" }]);
     }
 
     // @US-904-error: "Reaktivierung meldet Konflikt wenn die Zutat parallel mit anderen Daten
@@ -847,7 +901,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.Code.Should().Be("ingredient_already_active");
         body.Ingredient.Id.Should().Be(created.Id);
         body.Ingredient.Name.Should().Be("Koriander");
-        body.Ingredient.DefaultUnit.Should().Be("Töpfchen");
+        body.Ingredient.BaseUnit.Should().Be("Töpfchen");
         // The 409 path writes nothing -> xmin is unchanged, so the etag must equal the creation-time one
         // exactly (not just "look like" an etag – a hardcoded well-formed string must not survive).
         body.Ingredient.Etag.Should().Be(etag);
@@ -855,7 +909,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: nothing was overwritten – the saved values stay unchanged (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = created.Id, Name = "Koriander", DefaultUnit = "Töpfchen" }]);
+            [new IngredientDbType { Id = created.Id, Name = "Koriander", BaseUnit = "Töpfchen" }]);
     }
 
     // ADR-S108-1: IngredientDto.etag ist ausdrücklich die If-Match-Quelle für ein nachfolgendes DELETE.
@@ -885,6 +939,6 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Then: the row is soft-deleted again (full-state DB assertion)
-        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Liebstöckel", DefaultUnit = "Bund" });
+        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Liebstöckel", BaseUnit = "Bund" });
     }
 }

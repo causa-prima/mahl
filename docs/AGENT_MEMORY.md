@@ -30,9 +30,6 @@ Auswahl. TD-Einträge mit
 
 ## Nächste Prioritäten
 
-- **Domänentypen für Ingredient-Name und -Einheit (TD-S118-2)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S118-2 · Done: Die Längengrenzen stehen im Feldtyp statt im Endpoint (ADR-S119-1), `Ingredient.Create` ist nicht mehr mit ungültigen Werten aufrufbar, `Collect` ersetzt die ausgepackte Fehlersammlung, der „Sollform"-Absatz in §2 ist bereinigt.
-  **Zuerst OQ-S119-2 mit dem User klären** – ein geteiltes `Unit` kann keinen `IngredientValidationError` liefern; ohne die Antwort wird `Unit` zweimal gebaut. Prinzip ist in S119 verankert (`coding-guideline-csharp.md` §2), offen ist nur der Code. Danach TD-S118-1 (dieselben Signaturen).
-
 - **Abschnitts-Anker einführen und Verweise prüfbar machen** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/obs.py get OBS-S112-7` (gekoppelt: OBS-S114-2) · Done: Verweise in lebenden Dokumenten zeigen auf Anker, der Prüfer läuft grün und meldet Brüche beim Editieren.
   Eigene Session (User-Entscheid S115: vollständig migrieren, zu groß für einen Drain-Block).
 
@@ -44,8 +41,6 @@ Auswahl. TD-Einträge mit
 - **Theme-Foundation ziehen (TD-S083-2)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S083-2 · Done: Alle interaktiven Controls messen ≥ 44×44px, der Infra-Test hält das fest.
 
 - **Nominale Brands für die Frontend-Domänentypen (TD-S083-4)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S083-4 · Done: `Client/src` führt in Domänentypen keine nackten `string`-Felder mehr, alle Tests grün.
-
-- **Getypte Ingredient-Id + Wegwerf-ID beseitigen (TD-S118-1)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S118-1 · Done: `Ingredient` trägt keinen rohen `Guid` mehr, `ToDomain()` erzeugt keine ungelesene Id, alle Tests grün.
 
 - **Zwei fehlende Szenarien mitschreiben: „DB nicht erreichbar" und Fehlerpfad Löschen/Undo** — `Fällig: Phase:MVP` · Quelle: `docs/tech-debt.md` → TD-S108-1 · Done: `features/resilience.feature` übt auch DELETE aus.
   Kein Workshop nötig – beide entstehen bei der Resilience-Arbeit ohnehin.

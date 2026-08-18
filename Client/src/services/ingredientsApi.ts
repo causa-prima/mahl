@@ -16,7 +16,7 @@ type AlreadyActiveConflictBody = { readonly ingredient: Ingredient }
 export type Ingredient = {
   readonly id: string
   readonly name: string
-  readonly defaultUnit: string
+  readonly baseUnit: string
   // ADR-S108-1: per-Zeile xmin-ETag (hex, "{xmin:x8}") aus dem GET-Body – die If-Match-Quelle
   // fürs Löschen einer aus der Liste geladenen Zutat.
   readonly etag: string
@@ -24,7 +24,7 @@ export type Ingredient = {
 
 export type NewIngredient = {
   readonly name: string
-  readonly defaultUnit: string
+  readonly baseUnit: string
 }
 
 // ADR-S111-1/-3: `createIngredient` liefert im Ok-Pfad zwei unterscheidbare Erfolgsfälle – ein
@@ -77,14 +77,14 @@ export function deleteIngredient(id: string, etag: string): ResultAsync<Response
 }
 
 // ADR-S111-1 (überholt ADR-S108-2): Restore verlangt ab run-11 einen Pflicht-Body { name,
-// defaultUnit } – auch der Undo-Aufruf (run-8/9, useDeleteIngredientWithUndo) schickt ihn jetzt
+// baseUnit } – auch der Undo-Aufruf (run-8/9, useDeleteIngredientWithUndo) schickt ihn jetzt
 // mit, fachlich ein No-op, aber ein einziger Codepfad im Endpoint. Erfolgs-Status 200 (statt 204).
-export function restoreIngredient(id: string, name: string, defaultUnit: string): ResultAsync<RestoreOutcome, ApiError> {
+export function restoreIngredient(id: string, name: string, baseUnit: string): ResultAsync<RestoreOutcome, ApiError> {
   return ResultAsync.fromPromise(
     fetch(`/api/ingredients/${id}/restore`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, defaultUnit }),
+      body: JSON.stringify({ name, baseUnit }),
     }),
     (e): ApiError => ({ kind: 'Unexpected', message: String(e) }),
   ).andThen(toRestoreOutcome)
@@ -110,7 +110,7 @@ function toCreateIngredientResult(response: Response, requested: NewIngredient):
 }
 
 function reactivateSoftDeletedIngredient(id: string, requested: NewIngredient): ResultAsync<CreateIngredientResult, ApiError> {
-  return restoreIngredient(id, requested.name, requested.defaultUnit).map((outcome): CreateIngredientResult =>
+  return restoreIngredient(id, requested.name, requested.baseUnit).map((outcome): CreateIngredientResult =>
     outcome.kind === 'Restored'
       ? { kind: 'Saved', ingredient: outcome.ingredient }
       : {

@@ -259,11 +259,10 @@ dotnet_diagnostic.CA1062.severity = none
 
 # --- Domain types: Value Object helpers (Server/Types/) ---
 [Server/Types/*.cs]
-# CA2225: Provide named alternates for conversion operators – our implicit/explicit operators are
-#         intentional internal API surface; named duplicates would add noise without benefit.
-dotnet_diagnostic.CA2225.severity = none
-# CA1000: Static factory on generic type – NonEmptyList<T>.Create; T is always inferred from the
-#         argument so callers never need to specify it explicitly.
+# CA1000: Static factory on generic type – Bounded<TInner, TMax>.Create. Die statische Factory IST
+#         die vorgeschriebene Bauform (§3: privater Ktor + Create), und der CRTP-Baukasten aus
+#         ADR-S119-1 ruft sie generisch über TInner.Create(...) auf; ohne statische Member auf dem
+#         generischen Typ gäbe es die Kette nicht.
 dotnet_diagnostic.CA1000.severity = none
 
 # --- Domain types: Sum-Types and domain records (Server/Domain/) ---
@@ -309,11 +308,12 @@ dotnet_diagnostic.MA0051.severity = none
 # MA0048: File name must match type name – Razor Pages convention: PageName.cshtml.cs / PageNameModel.
 dotnet_diagnostic.MA0048.severity = none
 
-# --- Sum-types: central Match<T> dispatch (ADR-S040-1) ---
-[Server/Domain/IngredientValidationError.cs]
-# S3060 kollidiert mit dem verpflichtenden zentralen Sum-Type-Match-Dispatch (ADR-S040-1);
-# polymorpher Dispatch ist dort explizit verworfen. Pro Sum-Type-Datei zu wiederholen.
-dotnet_diagnostic.S3060.severity = none
+# --- Constraint-Träger: eine Datei je Baukasten (ADR-S119-1) ---
+[Server/Types/StringConstraints.cs]
+# MA0048: File name must match type name – ADR-S119-1 legt den Baukasten (IStringConstraint,
+#         IMaxLength, Bounded, StringViolation, Marker je Grenzwert) bewusst in EINE Datei: die Typen
+#         sind nur gemeinsam les- und änderbar, und je Typ eine Datei streute sie über sechs Dateien.
+dotnet_diagnostic.MA0048.severity = none
 
 # --- Program.cs: integration-testing entry point ---
 [Server/Program.cs]

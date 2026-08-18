@@ -3,9 +3,9 @@ import { useResultMutation } from './useResultMutation'
 import { deleteIngredient, restoreIngredient } from '../services/ingredientsApi'
 import type { Ingredient } from '../services/ingredientsApi'
 
-// run-11: `defaultUnit` ergänzt, weil der Restore-Body ab jetzt Pflicht ist (ADR-S111-1-Addendum
+// run-11: `baseUnit` ergänzt, weil der Restore-Body ab jetzt Pflicht ist (ADR-S111-1-Addendum
 // zu ADR-S108-2) – der Undo-Aufruf muss Name UND Einheit der gelöschten Zeile mitschicken.
-export type DeletedIngredient = { readonly id: string; readonly name: string; readonly defaultUnit: string }
+export type DeletedIngredient = { readonly id: string; readonly name: string; readonly baseUnit: string }
 
 type DeleteIngredientWithUndo = {
   readonly deleted: DeletedIngredient | null
@@ -42,8 +42,8 @@ export function useDeleteIngredientWithUndo(onChanged: () => void): DeleteIngred
   // Codepfad im Endpoint. Der Wrapper bündelt die drei Werte zum vars-Objekt, das
   // restoreIngredient als Positionsparameter erwartet.
   const [restoreMutate] = useResultMutation(
-    (vars: { readonly id: string; readonly name: string; readonly defaultUnit: string }) =>
-      restoreIngredient(vars.id, vars.name, vars.defaultUnit),
+    (vars: { readonly id: string; readonly name: string; readonly baseUnit: string }) =>
+      restoreIngredient(vars.id, vars.name, vars.baseUnit),
     () => {
       setDeleted(null)
       onChanged()
@@ -51,7 +51,7 @@ export function useDeleteIngredientWithUndo(onChanged: () => void): DeleteIngred
   )
 
   const requestDelete = (ingredient: Readonly<Ingredient>) => {
-    setDeleted({ id: ingredient.id, name: ingredient.name, defaultUnit: ingredient.defaultUnit })
+    setDeleted({ id: ingredient.id, name: ingredient.name, baseUnit: ingredient.baseUnit })
     setDeletingId(ingredient.id)
     deleteMutate({ id: ingredient.id, etag: ingredient.etag })
   }
@@ -60,7 +60,7 @@ export function useDeleteIngredientWithUndo(onChanged: () => void): DeleteIngred
     deleted,
     deletingId,
     requestDelete,
-    undoDelete: (target) => { restoreMutate({ id: target.id, name: target.name, defaultUnit: target.defaultUnit }) },
+    undoDelete: (target) => { restoreMutate({ id: target.id, name: target.name, baseUnit: target.baseUnit }) },
     dismissUndo: () => { setDeleted(null) },
   }
 }

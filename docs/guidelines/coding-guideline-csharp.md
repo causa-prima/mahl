@@ -76,7 +76,7 @@ Verwende den richtigen Typ je nach Rolle:
 Der Domänentyp *benutzt* Constraint-Typen als Baumaterial; **Constraint-Typen stehen nie in Signaturen** – weder in `Create()`-Parametern noch in Properties einer Entity. Wird die zulässige Menge eines Domänentyps später aufzählbar (Enum) oder strukturiert (Sum-Type), verschwindet der Constraint-Typ ersatzlos. Genau das ist der Ertrag: Steht der Constraint-Typ in Signaturen, ist ein Implementierungsdetail geleckt, und der absehbare Wechsel `Unit`: string → Enum wird zur Breaking Change an jeder Signatur statt zur Änderung in einer Datei.
 
 **Regel 2 – Rolle ≠ Typ.**
-`DefaultUnit`, Alternativeinheiten, Rezept- und Einkaufslisten-Einheit sind alle `Unit` – ein geteilter Domänentyp, kein Typ je Verwendungsstelle. Der Grund ist nicht Sparsamkeit: Mehrere Typen für dasselbe Konzept verteilen seine Regeln auf mehrere **Änderungsorte**; eine spätere Verschärfung muss an jedem nachgezogen werden, und ein vergessener ist unsichtbar. Die Regel „keine rohen Primitive" (oben) verbietet nur das Primitive – **nicht** einen eigenen Typ je Property fürs selbe Konzept. Das leistet erst diese Regel.
+`BaseUnit`, Alternativeinheiten, Rezept- und Einkaufslisten-Einheit sind alle `Unit` – ein geteilter Domänentyp, kein Typ je Verwendungsstelle. Der Grund ist nicht Sparsamkeit: Mehrere Typen für dasselbe Konzept verteilen seine Regeln auf mehrere **Änderungsorte**; eine spätere Verschärfung muss an jedem nachgezogen werden, und ein vergessener ist unsichtbar. Die Regel „keine rohen Primitive" (oben) verbietet nur das Primitive – **nicht** einen eigenen Typ je Property fürs selbe Konzept. Das leistet erst diese Regel.
 
 *Ausnahme, eng zu halten:* eine Rolle mit **eigener Invariante** bekommt einen eigenen Typ. Beispiel: `Amount` und `ConversionFactor` – dieselbe Repräsentation (beide über einem `float > 0`-Constraint-Typ), verschiedene Bedeutung. Der Test ist das **Verhalten unter Operationen**, nicht der Name: `Amount × ConversionFactor = Amount` ist sinnvoll, `Amount + ConversionFactor` ist Unsinn. Ein bloßes Synonym (`CustomerName`/`ClientName`) ist ein *Begriff*, kein Konzept, und bekommt keinen Typ.
 
@@ -89,39 +89,41 @@ Bevor ein Wert einen Sonderfall bekommt (`Guid.Empty`, `-1`, `""`), prüfen, ob 
 **Regel 5 – Regeln in den Domänentyp, Meldungen an die Grenze.**
 Die Feldregeln (Länge, Wertebereich) leben im Typ. Die Zuordnung *Fehlerfall → deutscher Text* bleibt an der API-Grenze, die das Request-Format kennt (ADR-S051-2). Ein Domänentyp gibt einen Fehler**fall** zurück, nie einen Meldungstext.
 
+Der Fehlertyp gehört dabei zum **Konzept**, nicht zum Feld und nicht zur Entität (ADR-S120-1): `IngredientName.Create` liefert `IngredientNameError`, `Unit.Create` liefert `UnitError`. Er trägt keinen Feldnamen – den kennt die Grenze statisch, und ein geteilter Domänentyp (Regel 2) kennt seine Verwendungsstelle ohnehin nicht. Ein geteilter Typ bekommt deshalb **je Verwendungsstelle** eine eigene Zuordnung zum Meldungstext, bleibt aber ein Typ.
+
 **Parametrisierte Einschränkungen stehen im Typ (ADR-S119-1).** Eine Grenze wie „max. 30 Zeichen" ist kein handgeschriebener Check in `Create()`, sondern der Typ des privaten Feldes – so ist sie nicht vergessbar. Da C# keine const generics kennt, trägt ein Marker-Typ je Grenzwert den Wert:
 
 ```csharp
 // Server/Domain/IngredientName.cs
 internal readonly record struct IngredientName
 {
-    private readonly Bounded<NonEmpty<TrimmedString>, Max30> _value;   // ADR-S051-3: Grenze steht im Typ
-    public string Value => _value.Value;                               // wirft transitiv
+    private readonly Bounded<NonEmptyTrimmedString, Max30> _value;   // ADR-S051-3: Grenze steht im Typ
+    public string Value => _value.Value;                             // wirft transitiv
 
     // Stryker disable once Statement,String : parameterless ctor (ADR-S041-9)
     public IngredientName() => throw new InvalidOperationException("Uninitialized");
-    private IngredientName(Bounded<NonEmpty<TrimmedString>, Max30> value) => _value = value;
+    private IngredientName(Bounded<NonEmptyTrimmedString, Max30> value) => _value = value;
 
-    // Regel 5: der Typ liefert Fehlerfälle, keine Texte.
-    public static OneOf<IngredientName, IngredientValidationError> Create(string input) =>
-        Bounded<NonEmpty<TrimmedString>, Max30>.Create(input)
-            .MapError<Bounded<NonEmpty<TrimmedString>, Max30>, StringViolation, IngredientValidationError>(v => v switch
+    // Regel 5: der Typ liefert die Fehlerfälle SEINES Konzepts, keine Texte und keinen Feldbezug.
+    public static OneOf<IngredientName, IngredientNameError> Create(string input) =>
+        Bounded<NonEmptyTrimmedString, Max30>.Create(input)
+            .MapError<Bounded<NonEmptyTrimmedString, Max30>, StringViolation, IngredientNameError>(v => v switch
             {
-                StringViolation.Empty   => IngredientValidationError.NameEmpty,
-                StringViolation.TooLong => IngredientValidationError.NameTooLong,
-                _ => SumType.Unreachable<IngredientValidationError>(),
+                StringViolation.Empty   => IngredientNameError.Empty,
+                StringViolation.TooLong => IngredientNameError.TooLong,
+                _ => SumType.Unreachable<IngredientNameError>(),
             })
             .Map(v => new IngredientName(v));
 }
 ```
 
-Die Träger (`IStringConstraint<TSelf>`, `IMaxLength`, `TrimmedString`, `NonEmpty<TInner>`, `Bounded<TInner, TMax>`, Marker) liegen in `Server/Types/`. Volltext: `docs/history/sessions/session_119.md`, Abschnitt „Volltext zur Constraint-Parametrisierung", Variante A.
+Die Träger (`IStringConstraint<TSelf>`, `IMaxLength`, `NonEmptyTrimmedString`, `Bounded<TInner, TMax>`, Marker je Grenzwert) liegen in `Server/Types/StringConstraints.cs` – bewusst eine Datei, weil sie nur gemeinsam les- und änderbar sind (dafür ein `MA0048`-Block in `.editorconfig`). Warum Trimmen und Nicht-Leer in **einem** Träger stecken statt in zwei komponierbaren, und wann die Aufspaltung fällig wird: ADR-S119-1, Abschnitt „Warum `NonEmptyTrimmedString`".
 
-> **Offener Punkt am Fehlertyp:** Das Beispiel zeigt `IngredientName` – ein Domänentyp, der zu *einer* Entität gehört, weshalb `IngredientValidationError` passt. Für einen über mehrere Entitäten geteilten Domänentyp wie `Unit` (Regel 2: Rezept und Einkaufsliste nutzen dasselbe Konzept) trägt dieser Fehlertyp **nicht** – ein geteilter Typ kann keinen entitätsspezifischen Fehler liefern. Die Frage, ob Validierungsfehler je Prüfung statt je Feld×Prüfung modelliert werden, steht in `docs/open-questions.md`. Bis dahin: geteilte Domänentypen erst anlegen, wenn die zweite Entität existiert.
+Ein geteilter Domänentyp wie `Unit` (Regel 2) baut sich genauso, nur mit `Max20` und `UnitError` – der Fehlertyp gehört zum Konzept, nicht zur Entität, und trägt deshalb über alle Entitäten (ADR-S120-1).
 
-> **Sollform, nicht Bestand.** Diese Sektion und das kanonische Beispiel unten zeigen die Zielform; der Code ist noch nicht darauf umgestellt (erfasst in `docs/tech-debt.md`). Wie Beispiele zu lesen sind – insbesondere, dass eine 1:1-Umsetzung ohne treibendes Szenario gegen vorrangige Regeln verstößt – steht in `coding-guideline-general.md`, Sektion „Wie Code-Beispiele in Guidelines zu lesen sind". Neuer Code folgt der Sollform; bestehender wird bei Berührung nachgezogen.
+> **Sollform, nicht Bauauftrag.** Wie die Beispiele hier zu lesen sind – insbesondere, dass eine 1:1-Umsetzung ohne treibendes Szenario gegen vorrangige Regeln verstößt – steht in `coding-guideline-general.md`, Sektion „Wie Code-Beispiele in Guidelines zu lesen sind". Neuer Code folgt der Sollform; bestehender wird bei Berührung nachgezogen.
 
-**Geltungsbereich:** Die Regeln enden an der DTO-/DbType-Grenze. `mahl.Infrastructure` ist `public`, `mahl.Server` `internal` – ein Domänentyp kann dort gar nicht auftauchen (`docs/reference/architecture.md`). `Name` und `DefaultUnit` bleiben im DTO und im DbType deshalb `string`.
+**Geltungsbereich:** Die Regeln enden an der DTO-/DbType-Grenze. `mahl.Infrastructure` ist `public`, `mahl.Server` `internal` – ein Domänentyp kann dort gar nicht auftauchen (`docs/reference/architecture.md`). `Name` und `BaseUnit` bleiben im DTO und im DbType deshalb `string`.
 
 3. "Make Illegal States Unrepresentable" (Sichere Instanziierung):
 
@@ -255,24 +257,24 @@ internal readonly record struct Ingredient
     // Ausschließlich Domänentypen – kein rohes Guid/string (§2, Drei-Ebenen-Regel).
     private readonly IngredientId _id;
     private readonly IngredientName _name;
-    private readonly Unit _defaultUnit;
+    private readonly Unit _baseUnit;
 
     // Alle drei werfen selbst transitiv beim Zugriff – kein Guard in der Entity nötig.
     // Der default(T)-Guard sitzt im jeweiligen Domänentyp, nicht hier (§3).
     public IngredientId Id => _id;
     public IngredientName Name => _name;
-    public Unit DefaultUnit => _defaultUnit;
+    public Unit BaseUnit => _baseUnit;
 
     // Parameterless ctor must be public (record struct limitation) – fängt new Ingredient() ab:
     public Ingredient() => throw new InvalidOperationException("Uninitialized");
-    private Ingredient(IngredientId id, IngredientName name, Unit defaultUnit)
+    private Ingredient(IngredientId id, IngredientName name, Unit baseUnit)
     {
-        _id = id; _name = name; _defaultUnit = defaultUnit;
+        _id = id; _name = name; _baseUnit = baseUnit;
     }
 
     // Create() akzeptiert nur validierte Domänentypen – kein OneOf nötig wenn keine Cross-Field-Invarianten
-    public static Ingredient Create(IngredientId id, IngredientName name, Unit defaultUnit) =>
-        new Ingredient(id, name, defaultUnit);
+    public static Ingredient Create(IngredientId id, IngredientName name, Unit baseUnit) =>
+        new Ingredient(id, name, baseUnit);
 }
 
 // Server/OneOfExtensions.cs – Applicative-Kombinator neben Map/Bind/MapError (ADR-S119-2).
@@ -299,27 +301,42 @@ file static class IngredientMappings
     // 500 + problem+json bei korrupter DB-Zeile, kein silent null) – wer eine korrupte Zeile
     // repariert, braucht alle kaputten Felder auf einmal, nicht eines pro Durchlauf.
     public static OneOf<Ingredient, Error<string>> ToDomain(this IngredientDbType db) =>
-        Combine(
+        Collect(
                 IngredientId.Create(db.Id).OrFieldName(nameof(db.Id)),
                 IngredientName.Create(db.Name).OrFieldName(nameof(db.Name)),
-                Unit.Create(db.DefaultUnit).OrFieldName(nameof(db.DefaultUnit)),
+                Unit.Create(db.BaseUnit).OrFieldName(nameof(db.BaseUnit)),
                 Ingredient.Create)
             .MapError<Ingredient, IReadOnlyList<string>, Error<string>>(fields =>
                 new Error<string>($"DB inconsistency in Ingredient #{db.Id}: invalid {string.Join(", ", fields)}"));
 
     // WRITE-Pfad: collect-all (ADR-S090-1) – der 422-Body nennt alle Feldfehler gleichzeitig.
     // Gleiche Bauform wie oben; die Pfade unterscheiden sich nur darin, wie die Fehlermenge
-    // verbraucht wird. ADR-S030-1: server-seitig vergebene Id.
-    internal static OneOf<Ingredient, IReadOnlyList<IngredientValidationError>> ToDomain(this IngredientValuesDto dto) =>
-        Combine(
-            IngredientName.Create(dto.Name),
-            Unit.Create(dto.DefaultUnit),
-            (name, unit) => Ingredient.Create(IngredientId.New(), name, unit));
+    // verbraucht wird.
+    //
+    // Das Ergebnis trägt KEINE Identität – es ist die validierte Nutzlast, nicht die Entity.
+    // Die Id vergibt allein der anlegende Endpoint (ADR-S030-1); ein Pfad, der denselben Body nur
+    // validiert (Restore – die Zeile steht über den Routenparameter fest), braucht gar keine.
+    // Damit gibt es keinen Ingredient ohne brauchbare Id, und der Compiler verhindert, dass ein
+    // solcher an eine Grenze gerät, die eine Identität voraussetzt (Regel 4).
+    internal static OneOf<IngredientValues, IReadOnlyList<FieldError>> ToValues(this IngredientValuesDto dto) =>
+        Collect(
+            IngredientName.Create(dto.Name).MapError(DescribeName),
+            Unit.Create(dto.BaseUnit).MapError(DescribeBaseUnit),
+            (name, unit) => (Name: name, BaseUnit: unit));
+
+    // Fehlerfall → (Request-Property, fester deutscher Text). Je Verwendungsstelle eine eigene
+    // Zuordnung – `Unit` ist geteilt, die Rezept-Einheit bekommt später ihre eigene (ADR-S120-1).
+    private static FieldError DescribeName(IngredientNameError e) => e switch
+    {
+        IngredientNameError.Empty   => new FieldError("name", "Name darf nicht leer sein."),
+        IngredientNameError.TooLong => new FieldError("name", "Name darf maximal 30 Zeichen lang sein."),
+        _ => SumType.Unreachable<FieldError>(),
+    };
 
     // Zur Grenze hin wieder Primitives – Domänentypen enden hier (Geltungsbereich, §2).
     // Die Zuordnung Fehlerfall → deutscher Text liegt ebenfalls hier, nicht im Typ (Regel 5).
     public static IngredientDto ToDto(this Ingredient domain, bool alwaysInStock) =>
-        new(domain.Id.Value, domain.Name.Value, domain.DefaultUnit.Value, alwaysInStock);
+        new(domain.Id.Value, domain.Name.Value, domain.BaseUnit.Value, alwaysInStock);
 }
 ```
 
@@ -366,7 +383,7 @@ Jeder neue Test muss durch `// Given`, `// When`, `// Then`-Kommentare geglieder
 public async Task GetIngredients_ReturnsList()
 {
     // Given
-    var ingredient = new IngredientDbType { Id = Guid.NewGuid(), Name = "Tomaten", DefaultUnit = "kg" };
+    var ingredient = new IngredientDbType { Id = Guid.NewGuid(), Name = "Tomaten", BaseUnit = "kg" };
     DbContext.Ingredients.Add(ingredient);
     await DbContext.SaveChangesAsync();
 
@@ -389,7 +406,7 @@ Bei `BeEquivalentTo`-Aufrufen müssen alle verglichenen Properties durch ein Akz
 
 ```csharp
 // ✓ Korrekt – alle Properties durch AKs gedeckt
-result.Should().BeEquivalentTo(new { Name = "Tomaten", DefaultUnit = "kg" });
+result.Should().BeEquivalentTo(new { Name = "Tomaten", BaseUnit = "kg" });
 
 // ✓ Erlaubt mit Begründung
 result.Should().BeEquivalentTo(expected, options => options

@@ -321,6 +321,15 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then sehe ich die neue Zutat in der Zutaten-Liste
 
+  # @run-3 · Anlegen·Name-Validierung · Full-Stack
+  @US-904-edge-case
+  Scenario: Name mit 30 Zeichen und versehentlichen Leerzeichen wird akzeptiert
+    When ich auf "Zutat anlegen" klicke
+    And ich einen Namen mit genau 30 Zeichen und umgebenden Leerzeichen eingebe
+    And ich "g" als Einheit eingebe
+    And ich auf "Speichern" klicke
+    Then sehe ich die neue Zutat ohne die Leerzeichen in der Zutaten-Liste
+
   # @run-4 · Anlegen·Einheit-Validierung · Full-Stack
   @US-904-edge-case
   Scenario: Einheit mit exakt 20 Zeichen wird akzeptiert
@@ -329,6 +338,15 @@ Feature: Zutaten verwalten
     And ich eine Einheit mit genau 20 Zeichen eingebe
     And ich auf "Speichern" klicke
     Then sehe ich "Salz" in der Zutaten-Liste
+
+  # @run-4 · Anlegen·Einheit-Validierung · Full-Stack
+  @US-904-edge-case
+  Scenario: Einheit mit 20 Zeichen und versehentlichen Leerzeichen wird akzeptiert
+    When ich auf "Zutat anlegen" klicke
+    And ich "Salz" als Name eingebe
+    And ich eine Einheit mit genau 20 Zeichen und umgebenden Leerzeichen eingebe
+    And ich auf "Speichern" klicke
+    Then sehe ich "Salz" in der Zutaten-Liste mit der Einheit ohne die Leerzeichen
 
   # @run-11 · Reaktivierung · Full-Stack
   @US-904-edge-case

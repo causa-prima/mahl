@@ -154,7 +154,7 @@ function IngredientList({ ingredients, deletingId, onDelete }: Readonly<Ingredie
             </IconButton>
           }
         >
-          <ListItemText primary={ingredient.name} secondary={ingredient.defaultUnit} />
+          <ListItemText primary={ingredient.name} secondary={ingredient.baseUnit} />
         </ListItem>
       ))}
     </List>
@@ -304,7 +304,7 @@ export default function IngredientsPage() {
         onNameChange={setName}
         onUnitChange={setUnit}
         onClose={handleCancel}
-        onSubmit={() => { save({ name, defaultUnit: unit }) }}
+        onSubmit={() => { save({ name, baseUnit: unit }) }}
       />
       {deleted && (
         <UndoToast

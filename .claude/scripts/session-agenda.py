@@ -235,8 +235,8 @@ def modul_open_questions() -> Block:
     dass sie ohne weiteren Lesevorgang vorgelegt werden kann.
 
     Bewusst nicht der ganze Eintragskörper: Der trägt Herleitung, verworfene Varianten und
-    Recherche-Ergebnisse (bei OQ-S119-2 rund zwanzig Zeilen) und würde den Startkontext
-    dominieren, ohne die Vorlage-Entscheidung zu verbessern. Der Hintergrund steht in der
+    Recherche-Ergebnisse (ausgearbeitete Einträge kommen auf zwanzig Zeilen und mehr) und
+    würde den Startkontext dominieren, ohne die Vorlage-Entscheidung zu verbessern. Der Hintergrund steht in der
     Datei, auf die die letzte Zeile zeigt.
     """
     fragen = open_questions.parse(_lies(ROOT / open_questions.OQ_FILE))

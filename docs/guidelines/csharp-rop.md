@@ -70,7 +70,7 @@ In realen Endpoints folgt auf `MapError` meist ein `BindAsync` mit mehreren `ret
 
 ```csharp
 // Referenz-Pattern (aus IngredientsEndpoints.cs):
-return await Ingredient.Create(id, dto.Name, dto.DefaultUnit)
+return await Ingredient.Create(id, dto.Name, dto.BaseUnit)
     .MapError<Ingredient, Error<string>, IResult>(e => Results.UnprocessableEntity(e.Value))
     .BindAsync<Ingredient, (IngredientDbType entity, Ingredient domain), IResult>(async ingredient =>
     {

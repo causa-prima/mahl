@@ -160,7 +160,7 @@ Zusätzlich strukturelle Vorgabe (Interaction Design, kein Szenario nötig dafü
 **Status:** Accepted
 **Tags:** scope:cross-cutting, arch:validation, http:422
 
-**Entscheidung:** Der 422-Validierungsfehler-Body ist **feld-keyed** im Stil von RFC 9457 / ASP.NET `ValidationProblemDetails`: ein `errors`-Objekt, das jeden Feldnamen (= JSON-Property-Name des Requests, z.B. `name`, `defaultUnit`) auf seine Fehlermeldungen (`string[]`) abbildet.
+**Entscheidung:** Der 422-Validierungsfehler-Body ist **feld-keyed** im Stil von RFC 9457 / ASP.NET `ValidationProblemDetails`: ein `errors`-Objekt, das jeden Feldnamen (= JSON-Property-Name des Requests, z.B. `name`, `baseUnit`) auf seine Fehlermeldungen (`string[]`) abbildet.
 
 ```json
 { "status": 422, "errors": { "name": ["Name darf nicht leer sein."] } }
@@ -214,8 +214,8 @@ Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und pe
 | `name` leer (Ingredient) | `"Name darf nicht leer sein."` |
 | `name` zu lang (Ingredient, > 30 Zeichen) | `"Name darf maximal 30 Zeichen lang sein."` |
 | `name` bereits vergeben (aktives Duplikat, ADR-S004-1) | `"Eine Zutat mit dem Namen '{name}' existiert bereits."` (`{name}` = getrimmter Request-Wert, nicht der gespeicherte) |
-| `defaultUnit` leer | `"Einheit darf nicht leer sein."` |
-| `defaultUnit` zu lang (> 20 Zeichen) | `"Einheit darf maximal 20 Zeichen lang sein."` |
+| `baseUnit` leer | `"Einheit darf nicht leer sein."` |
+| `baseUnit` zu lang (> 20 Zeichen) | `"Einheit darf maximal 20 Zeichen lang sein."` |
 | `title` leer (Recipe) | `"Titel darf nicht leer sein."` |
 | `ingredients` leer | `"Rezept muss mindestens eine Zutat haben."` |
 | `steps` leer | `"Rezept muss mindestens einen Schritt haben."` |
@@ -326,7 +326,7 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 **Entscheidung:**
 - `name`: max. 30 Zeichen (nach Trimming gemessen). Case-insensitiver Duplikat-Check: `"Tomaten"` und `"tomaten"` gelten als dieselbe Zutat. Kein Auto-Capitalize – gespeichert wird exakt der getippte Wert nach Trimming (z.B. `"tomaten"` bleibt `"tomaten"`).
-- `defaultUnit`: max. 20 Zeichen (nach Trimming gemessen).
+- `baseUnit`: max. 20 Zeichen (nach Trimming gemessen).
 
 **Begründung max. Länge:** Keine realen deutschen Zutaten- oder Einheitenbezeichnungen überschreiten diese Grenzen. Verhindert UI-Überlauf.
 
@@ -339,7 +339,7 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Status:** Accepted
 **Tags:** scope:feature, resource:ingredients, http:post, db:soft-delete
 
-**Entscheidung:** Wenn `POST /api/ingredients` eine soft-deleted Zutat trifft und der Client daraufhin `POST /api/ingredients/{id}/restore` aufruft, übernimmt der Restore-Endpoint den `name` und die `defaultUnit` aus dem ursprünglichen POST-Request. Die Zutat erscheint anschließend mit dem neuen Namen und der neuen Einheit.
+**Entscheidung:** Wenn `POST /api/ingredients` eine soft-deleted Zutat trifft und der Client daraufhin `POST /api/ingredients/{id}/restore` aufruft, übernimmt der Restore-Endpoint den `name` und die `baseUnit` aus dem ursprünglichen POST-Request. Die Zutat erscheint anschließend mit dem neuen Namen und der neuen Einheit.
 
 **Parallelfall (Restore antwortet 409 "bereits aktiv"):** Der Client zeigt die Zutat ohne Fehlerhinweis als aktiv an. Name und Einheit der bereits aktiven Zutat sind nicht kontrollierbar (hängen vom parallelen Restore ab) – daher kein Guarantee über die angezeigte Einheit.
 
@@ -370,9 +370,9 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Status:** Accepted
 **Tags:** scope:feature, resource:ingredients, http:post, http:201, http:location-header
 
-**Entscheidung:** `POST /api/ingredients` antwortet bei Erfolg mit `201 Created`, Body `{ "id": Guid, "name": string, "defaultUnit": string }` und `Location: /api/ingredients/{id}`.
+**Entscheidung:** `POST /api/ingredients` antwortet bei Erfolg mit `201 Created`, Body `{ "id": Guid, "name": string, "baseUnit": string }` und `Location: /api/ingredients/{id}`.
 
-**Begründung:** Body vermeidet einen zweiten GET-Request im Client. Location ist REST-konform. `defaultUnit` statt `unit` für Konsistenz mit dem Domänenmodell.
+**Begründung:** Body vermeidet einen zweiten GET-Request im Client. Location ist REST-konform. `baseUnit` statt `unit` für Konsistenz mit dem Domänenmodell.
 
 **Verworfen:** 201 ohne Body – Client müsste sofort GET /api/ingredients aufrufen, um die neue Zutat zu kennen.
 **Verworfen:** 200 OK – verletzt REST-Semantik für Ressourcen-Erstellung.
@@ -458,13 +458,13 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Status:** Accepted
 **Tags:** scope:feature, resource:ingredients, http:post, http:409, db:soft-delete, arch:validation
 
-**Entscheidung:** `POST /api/ingredients/{id}/restore` verlangt ab run-11 einen **Pflicht-Body** `{ name, defaultUnit }` und antwortet:
+**Entscheidung:** `POST /api/ingredients/{id}/restore` verlangt ab run-11 einen **Pflicht-Body** `{ name, baseUnit }` und antwortet:
 
 | Zustand der Zeile | Antwort |
 |---|---|
 | soft-deleted | `200` + `IngredientDto` – `DeletedAt = null`, Name und Einheit aus dem Request übernommen (ADR-S051-4) |
 | aktiv, Werte **exakt identisch** zum Request | `200` + `IngredientDto` – kein Schreibvorgang nötig, der Zielzustand ist bereits erreicht |
-| aktiv, Werte **abweichend** | `409` + `{ "code": "ingredient_already_active", "ingredient": { id, name, defaultUnit, etag } }` – der aktuelle Stand geht mit, damit der Client ihn benennen kann (ADR-S111-3) |
+| aktiv, Werte **abweichend** | `409` + `{ "code": "ingredient_already_active", "ingredient": { id, name, baseUnit, etag } }` – der aktuelle Stand geht mit, damit der Client ihn benennen kann (ADR-S111-3) |
 | id existiert nicht | `404` (unverändert, ADR-S108-2) |
 
 Der Body durchläuft **dieselbe Validierung wie der POST** (`ToDomain()`, field-keyed 422 nach ADR-S090-1/S051-2/S051-3). Ohne sie ließe sich über den Restore ein leerer oder zu langer Name persistieren, den der POST verbietet – die Invariante aus ADR-S051-3 gälte dann nur für einen der beiden Schreibpfade. Der Validierungs-Zweig ist damit **strukturell erzwungen** und trägt einen Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag), analog zur 404-Autorisierung in ADR-S108-2.
@@ -477,7 +477,7 @@ Der Body durchläuft **dieselbe Validierung wie der POST** (`ToDomain()`, field-
 
 **Addendum zu ADR-S051-4 (Parallelfall präzisiert):** Dort hieß es, im Parallelfall antworte der Restore mit 409 und Name/Einheit der aktiven Zutat seien „nicht kontrollierbar". Das gilt ab hier nur noch für den Fall **abweichender** Werte. Bei identischen Werten ist die Einheit sehr wohl vorhersagbar – das treibende Szenario („Reaktivierung gelingt auch wenn Zutat parallel mit denselben Daten wiederhergestellt wurde") assertiert sie deshalb.
 
-**Addendum zu ADR-S108-2 (Body und Erfolgs-Status revidiert):** Der bodylose Restore mit `204` entfällt. Der Undo-Pfad (run-8/9) schickt die unveränderten Werte der gelöschten Zutat mit – für ihn ein No-op, der aber einen einzigen Codepfad im Endpoint erhält. `DeletedIngredient` trägt dafür zusätzlich `defaultUnit`. Unverändert gültig bleiben aus ADR-S108-2: die If-Match-Ausnahme und der 404-Pfad samt Test-Autorisierung.
+**Addendum zu ADR-S108-2 (Body und Erfolgs-Status revidiert):** Der bodylose Restore mit `204` entfällt. Der Undo-Pfad (run-8/9) schickt die unveränderten Werte der gelöschten Zutat mit – für ihn ein No-op, der aber einen einzigen Codepfad im Endpoint erhält. `DeletedIngredient` trägt dafür zusätzlich `baseUnit`. Unverändert gültig bleiben aus ADR-S108-2: die If-Match-Ausnahme und der 404-Pfad samt Test-Autorisierung.
 
 **Addendum (run-11-Nachbesserung) – zwei Fehlerzweige des Schreibpfads ergänzt.** Mit diesem ADR wurde der Restore vom bloßen `DeletedAt`-Clear zu einem allgemeinen Schreib-Endpoint und braucht damit dieselbe Exception-Behandlung wie jeder andere Schreibpfad – das Projekt hat keinen globalen Exception-Handler, jeder Schreibpfad behandelt seine DB-Fehler selbst. Zwei Fälle schlugen sonst als roher `500` durch:
 
@@ -717,16 +717,24 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 **Entscheidung:** Eine parametrisierte Einschränkung (`max. N Zeichen` und Analoges) wird **Teil des Typs**, nicht eine Prüfung in der `Create()` des Domänentyps. Der Domänentyp trägt sie als Typ seines privaten Feldes:
 
 ```csharp
-private readonly Bounded<NonEmpty<TrimmedString>, Max30> _value;
+private readonly Bounded<NonEmptyTrimmedString, Max30> _value;
 ```
 
-Bausteine in `Server/Types/`: `IStringConstraint<TSelf>` (CRTP mit `static abstract Create`), `IMaxLength` als Marker-Interface, die Träger `TrimmedString`, `NonEmpty<TInner>`, `Bounded<TInner, TMax>` und ein Marker-Typ **je Grenzwert** (`Max30`, `Max20`). Die Träger melden `StringViolation` (`Empty`, `TooLong`); der Domänentyp faltet das in seine feldspezifischen Fehlerfälle auf (`NameEmpty`, `NameTooLong` – ADR-S051-2 bleibt unberührt). Ausformulierter Code: `docs/history/sessions/session_119.md`, Abschnitt „Volltext zur Constraint-Parametrisierung", Variante A.
+Bausteine in `Server/Types/`: `IStringConstraint<TSelf>` (CRTP mit `static abstract Create`), `IMaxLength` als Marker-Interface, die Träger `NonEmptyTrimmedString` und `Bounded<TInner, TMax>` und ein Marker-Typ **je Grenzwert** (`Max30`, `Max20`). Die Träger melden `StringViolation` (`Empty`, `TooLong`); der Domänentyp faltet das in seine Fehlerfälle auf (ADR-S051-2 bleibt unberührt; die Fälle gehören zum Konzept, nicht zum Feld – ADR-S120-1). Ausformulierter Code: `docs/history/sessions/session_119.md`, Abschnitt „Volltext zur Constraint-Parametrisierung", Variante A – dort noch mit der ursprünglich vorgesehenen Träger-Trennung, siehe nächster Absatz.
+
+**Warum `NonEmptyTrimmedString` statt `NonEmpty<TrimmedString>` (S120):** Ursprünglich waren zwei orthogonale Träger vorgesehen – `TrimmedString` normalisiert, `NonEmpty<TInner>` prädiziert. Beim Umbau zeigte sich, dass diese Trennung einen **nicht killbaren Mutanten** erzeugt: Ein rein normalisierender Träger muss im JSON-`null`-Fall einen *Wert* liefern (`""`), und `""` aus `null` ist von `""` aus `""` nicht unterscheidbar – jeder Mutant, der die Null-Behandlung entfernt, wirkt sich nur bei `{"feld": null}` aus, wofür kein Szenario existiert. Im ungetrennten Träger fällt die Leer-Entscheidung dagegen im selben Schritt und kann einen **Fehler** zurückgeben, dessen Entfernung über HTTP sofort beobachtbar ist. Eine Suppression schied aus: Der Zweig ist erreichbar, das ist eine Testlücke und keine Unerreichbarkeit (ADR-S041-9 greift nicht).
+
+Der Ertrag dieser Entscheidung bleibt davon unberührt – die Grenze steht weiterhin als Typ des privaten Feldes und ist nicht vergessbar. Betroffen ist nur die Träger-**Liste**.
+
+**Erweiterungspfad:** Die Trennung wird nötig, sobald ein Feld **getrimmt werden muss, aber leer sein darf** (z.B. eine optionale Beschreibung). `NonEmptyTrimmedString` kann das nicht ausdrücken. Dann kommt `TrimmedString` hinzu und das betroffene Feld wird `Bounded<TrimmedString, MaxN>`; bestehende Felder können auf `Bounded<NonEmpty<TrimmedString>, MaxN>` nachziehen, sobald ein `null`-Szenario den Mutanten oben killbar macht. Der Schritt ist additiv, kein Umbau – die heutige Form ist deshalb vollständig für die heutigen Felder und nicht ein Zwischenstand (KISS: ein getrimmt-aber-leer-erlaubtes Feld existiert nicht).
+
+Erneut geprüft und verworfen: das Prädikat im **Rohwert** von `NonEmpty<TInner>` messen (`IsNullOrWhiteSpace(input)` statt `inner.Value.Length == 0`) – killbar, koppelt den Träger aber verdeckt an „mein innerer Träger trimmt" und wäre mit einem anderen inneren Träger schlicht falsch, ohne dass der Compiler es merkt.
 
 **Begründung:** Der Grenzwert ist damit nicht vergessbar – der Feldtyp deklariert ihn, und ein neuer Domänentyp kann ihn nicht stillschweigend auslassen. Das ist ein Mechanismus statt Lese-Disziplin (`docs/kaizen/principles.md`). Die Alternative sichert die Grenze nur über das je begrenztem Feld ohnehin geforderte „zu lang"-Szenario ab – bei einem **neuen** Domänentyp existiert dieses Szenario aber noch nicht, wenn die Zeile vergessen wird.
 
 **Warum ein Marker-Typ je Grenzwert:** C# kennt keine const generics (`dotnet/csharplang#7508` ist seit 2023 Draft, in C# 15 nicht enthalten), also lässt sich `Bounded<…, 30>` nicht schreiben. Bemerkenswert für spätere Leser: Rust *hat* const generics, und `nutype` nutzt trotzdem Proc-Macro-Codegen statt typseitiger Komposition – das Ergonomieproblem ist keine C#-Schwäche und verschwindet nicht, wenn die Sprache nachzieht.
 
-**Bekannte Kosten, bewusst getragen:** Eine Grenzwertänderung (30→40) heißt Marker umbenennen – der Grenzwert ist Typidentität – oder einen Marker je Feld führen (O(F)-Boilerplate). Die Violation muss durch alle Generic-Ebenen gereicht und am Domänentyp aufgefaltet werden. Gegenüber der Alternative entstehen fünf Typen und ein Enum zusätzlich.
+**Bekannte Kosten, bewusst getragen:** Eine Grenzwertänderung (30→40) heißt Marker umbenennen – der Grenzwert ist Typidentität – oder einen Marker je Feld führen (O(F)-Boilerplate). Die Violation muss durch alle Generic-Ebenen gereicht und am Domänentyp aufgefaltet werden. Gegenüber der Alternative entstehen in der umgesetzten Form drei Typen und ein Enum zusätzlich (`IStringConstraint`, `IMaxLength`, `Bounded`, `StringViolation`) plus ein Marker je Grenzwert.
 
 **Verworfen:** `private const int MaxLength` im Domänentyp + Längenprüfung in dessen `Create()` – null neue Typen, Fehlerunterscheidung direkt am Ort der Prüfung, ein Token je Grenzwertänderung. Verworfen, weil die Prüfzeile opt-in und damit vergessbar bleibt.
 **Verworfen:** `StringRule` als fluent Prädikat-Pipeline (`For(x).NonEmpty().MaxLength(30).Build()`) – jeder Schritt ist opt-in, ein vergessenes `.NonEmpty()` erlaubt still leere Werte; dieselbe Vergessbarkeit wie oben, ohne den Ertrag des Typs.
@@ -758,6 +766,37 @@ internal static OneOf<TOut, IReadOnlyList<TError>> Collect<T1, T2, TOut, TError>
 **Verworfen:** LINQ-Query-Syntax (`from n in name from u in unit select …`) – eine Signatur, beliebige Arity, sehr lesbar, aber `SelectMany` ist monadisch und schließt beim ersten Fehler kurz. Query-Syntax kann grundsätzlich kein Applicative sein.
 **Verworfen:** Tupel-Akkumulation (`r1.Zip(r2).Zip(r3)`) – die Tupel verschachteln sich zu `((a,b),c)`, und C# erlaubt keine Dekonstruktion in Lambda-Parameterlisten. Am Aufrufort unbrauchbar.
 **Verworfen:** `params`-Array – verliert die Typen zur Compile-Zeit und damit den Zweck.
+
+### ADR-S120-1: Ein Validierungs-Fehlertyp je Domänentyp – feldagnostisch, Feldbezug an der Grenze
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:domain-type, arch:error-handling, arch:validation
+
+**Entscheidung:** Jeder Domänentyp bekommt einen **eigenen** Fehlertyp, dessen Fälle die Fehlerfälle *seines Fachkonzepts* sind – nicht die des darunterliegenden Constraint-Typs und nicht die eines Feldes. `IngredientName.Create` liefert `OneOf<IngredientName, IngredientNameError>`, `Unit.Create` liefert `OneOf<Unit, UnitError>`. Der Fehlertyp trägt **keinen** Feldnamen; der Feldbezug entsteht an der API-Grenze, die statisch weiß, welches Feld sie gerade validiert:
+
+```csharp
+// Grenze – der akkumulierte Fehlertyp IST das Antwortformat (ADR-S090-1), keine Zwischenstufe.
+internal readonly record struct FieldError(string Key, string Message);
+
+OneOfExtensions.Collect(
+    IngredientName.Create(dto.Name).MapError(DescribeName),
+    Unit.Create(dto.BaseUnit).MapError(DescribeBaseUnit),
+    (name, unit) => (Name: name, BaseUnit: unit));
+```
+
+Ein geteilter Domänentyp (`Unit`, §2 Regel 2) bekommt **je Verwendungsstelle** eine eigene `Describe`-Zuordnung – die Rezept-Einheit später mit anderem Key und anderem Label. Der Typ bleibt einer.
+
+**Präzisiert ADR-S119-1:** Dort heißt es, der Domänentyp falte `StringViolation` „in seine feldspezifischen Fehlerfälle (`NameEmpty`, `NameTooLong`)" auf. Die Faltung bleibt, ihr Ziel ist aber **konzept**-, nicht feldspezifisch (`IngredientNameError.Empty`). ADR-S051-2 (Fall → fester deutscher Text an der Grenze) bleibt unberührt.
+
+**Folge für `IngredientValidationError`:** Der Typ verliert seine vier Feld×Prüfung-Fälle. Übrig bliebe `NameDuplicate` – ein Fehler, den kein Domänentyp erzeugen kann, weil er die Datenbank braucht und ohnehin erst nach der abgelehnten Insert-Operation entsteht (ADR-S111-2), also bereits an der Grenze. Ein Sum-Type mit genau einem Fall trägt nichts; der Duplikat-Fehler wird dort direkt zum `FieldError`, und der Typ entfällt.
+
+**Begründung:** Regel 1 aus `coding-guideline-csharp.md` §2 verlangt, dass Constraint-Typen nicht in Signaturen stehen. Gäbe der Domänentyp `StringViolation` direkt zurück, müsste jeder Aufrufer wissen, was `Empty` *für dieses Konzept* bedeutet, und der absehbare Wechsel `Unit`: string → Enum (Fehlerfälle dann `Unknown` statt `Empty`/`TooLong`) bräche jede Aufrufstelle statt einer Datei. Ein eigener Fehlertyp je Konzept hält diesen Wechsel lokal.
+
+**Bekannte Kosten, bewusst getragen:** ein zusätzlicher kleiner Typ je Domänentyp, und die Meldungstexte werden je Verwendungsstelle eines geteilten Typs erneut zugeordnet (Duplikation genau dann, wenn zwei Felder Label und Text teilen).
+
+**Verworfen:** Domänentyp reicht `StringViolation` durch – null neue Typen, der Domänentyp schrumpft auf drei Zeilen. Verworfen wegen des Regel-1-Lecks oben: er hat dann keine eigene Aussage mehr, sondern ist ein Alias auf seinen Constraint-Stack.
+**Verworfen:** ein Violation-Typ **je Prüfung** mit Feld-Payload (`NonEmpty(field)`, `MaxLength(field, max)`) – ergäbe die kompakteste Grenze, einen Template-Renderer plus Override-Tabelle statt eines Match je Fall. Verworfen aus zwei unabhängigen Gründen. (1) Ein geteilter Domänentyp kennt seine Verwendungsstelle nicht; der Feldname müsste als Parameter in `Create(field, input)` – damit kennt die Domäne das Request-Format, und ein Tippfehler im Feldnamen kompiliert klaglos. (2) Nicht jeder `Create`-Aufrufer kommt von einem Request: der Read-Pfad DB-Zeile → Domain (heute umgangen, siehe ADR-S108-1), Seeding, Import. Für die gibt es keinen sinnvollen Feldnamen, und ein zweiter Overload ohne `field` hebt die Garantie des Parameters wieder auf.
+**Verworfen:** `IngredientValidationError` als Zwischenstufe beibehalten, mit dem neuen Fehlertyp davor – übersetzt dieselbe Information dreimal (`StringViolation` → `UnitError` → `IngredientValidationError` → Text), ohne Gegenwert gegenüber der ersten verworfenen Variante.
 
 ---
 
@@ -953,7 +992,7 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Entscheidung:** Die Guideline wird **angepasst statt kommentiert**. §2 beschreibt Brands ab jetzt als rein **nominal** (Vergabe an der API-Grenze, keine Regelprüfung); der neue **§4c** trägt die Validierungs-Regel samt Ausnahme für Bereiche, in denen Zustandsänderungen ohne erreichbares Backend entgegengenommen werden. Die operative Regel steht dort, nicht hier.
 
-**Begründung:** Eine Guideline, deren Beispiel dem gelebten Code widerspricht, ist die Fehlerquelle – eine ADR, die bloß die Abweichung erklärt, würde sie dauerhaft konservieren. Nominale Brands kosten fast nichts und tragen trotzdem: `restoreIngredient(id, name, defaultUnit)` reiht drei gleichartige Strings aneinander, der Compiler fängt Vertauscher ohne einen einzigen Test. Die Offline-Ausnahme folgt nicht aus Bequemlichkeit, sondern aus der Abwesenheit des Servers.
+**Begründung:** Eine Guideline, deren Beispiel dem gelebten Code widerspricht, ist die Fehlerquelle – eine ADR, die bloß die Abweichung erklärt, würde sie dauerhaft konservieren. Nominale Brands kosten fast nichts und tragen trotzdem: `restoreIngredient(id, name, baseUnit)` reiht drei gleichartige Strings aneinander, der Compiler fängt Vertauscher ohne einen einzigen Test. Die Offline-Ausnahme folgt nicht aus Bequemlichkeit, sondern aus der Abwesenheit des Servers.
 
 **Verworfen:** Validierende Factories im Frontend als Normalfall – sie duplizieren ADR-S051-3, und E2E deckt Drift in Richtung Lockerung nicht auf: Ein Szenario müsste genau das freigewordene Wertband ausüben, sonst bleibt die zu strenge Frontend-Regel unbemerkt.
 

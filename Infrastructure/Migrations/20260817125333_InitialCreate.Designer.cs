@@ -12,7 +12,7 @@ using mahl.Infrastructure;
 namespace mahl.Infrastructure.Migrations
 {
     [DbContext(typeof(MahlDbContext))]
-    [Migration("20260721191200_InitialCreate")]
+    [Migration("20260817125333_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -31,7 +31,7 @@ namespace mahl.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("DefaultUnit")
+                    b.Property<string>("BaseUnit")
                         .IsRequired()
                         .HasColumnType("text");
 

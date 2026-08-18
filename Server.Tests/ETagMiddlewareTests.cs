@@ -10,8 +10,8 @@ namespace mahl.Server.Tests;
 public class ETagMiddlewareTests(PostgresContainerFixture postgres) : EndpointsTestsBase(postgres)
 {
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
-    private sealed record CreateIngredientRequest(string Name, string DefaultUnit);
-    private sealed record IngredientResponse(Guid Id, string Name, string DefaultUnit);
+    private sealed record CreateIngredientRequest(string Name, string BaseUnit);
+    private sealed record IngredientResponse(Guid Id, string Name, string BaseUnit);
 #pragma warning restore CA1812
 
     [Fact]
@@ -76,7 +76,7 @@ public class ETagMiddlewareTests(PostgresContainerFixture postgres) : EndpointsT
         var emptyEtag = emptyResponse.Headers.ETag!.Tag;
 
         // Given: the collection content changes via POST
-        var createRequest = new CreateIngredientRequest(Name: "Tomaten", DefaultUnit: "Stück");
+        var createRequest = new CreateIngredientRequest(Name: "Tomaten", BaseUnit: "Stück");
         await Client.PostAsJsonAsync("/api/ingredients", createRequest, TestContext.Current.CancellationToken);
 
         // When: the now-stale empty-collection ETag is sent via If-None-Match
@@ -98,7 +98,7 @@ public class ETagMiddlewareTests(PostgresContainerFixture postgres) : EndpointsT
     public async Task ETagMiddleware_PostRequest_PassesThroughWithEndpointSetETagUnmodified()
     {
         // Given: a valid create request
-        var createRequest = new CreateIngredientRequest(Name: "Tomaten", DefaultUnit: "Stück");
+        var createRequest = new CreateIngredientRequest(Name: "Tomaten", BaseUnit: "Stück");
 
         // When: a non-GET (POST) request is made
         var response = await Client.PostAsJsonAsync("/api/ingredients", createRequest, TestContext.Current.CancellationToken);
@@ -114,7 +114,7 @@ public class ETagMiddlewareTests(PostgresContainerFixture postgres) : EndpointsT
         response.Headers.ETag!.Tag.Trim('"').Should().MatchRegex("^[0-9a-f]{1,8}$");
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().BeEquivalentTo(
-            new IngredientResponse(Id: body!.Id, Name: "Tomaten", DefaultUnit: "Stück"));
+            new IngredientResponse(Id: body!.Id, Name: "Tomaten", BaseUnit: "Stück"));
         // Id is server-generated; round-tripped value compared against itself, name/unit pinned exactly.
     }
 

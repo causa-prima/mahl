@@ -77,7 +77,7 @@ type IngredientName = string & { readonly __brand: 'IngredientName' };
 const asRecipeId = (value: string): RecipeId => value as RecipeId;
 ```
 
-**Der Brand ist nominal, die Factory validiert nicht (ADR-S112-4).** Sie vergibt den Brand und prüft keine Regeln – wo Regeln durchgesetzt werden, regelt der Validierungs-Abschnitt, nicht dieser hier. Zweck des Brands ist allein Typ-Unterscheidbarkeit: Er verhindert, dass gleichartige Strings in einer Signatur vertauscht werden (`restoreIngredient(id, name, defaultUnit)`).
+**Der Brand ist nominal, die Factory validiert nicht (ADR-S112-4).** Sie vergibt den Brand und prüft keine Regeln – wo Regeln durchgesetzt werden, regelt der Validierungs-Abschnitt, nicht dieser hier. Zweck des Brands ist allein Typ-Unterscheidbarkeit: Er verhindert, dass gleichartige Strings in einer Signatur vertauscht werden (`restoreIngredient(id, name, baseUnit)`).
 
 **Fehlertyp:** Prüft eine Factory ausnahmsweise doch Regeln (siehe Validierungs-Abschnitt), gibt sie immer `Result<T, ValidationError>` zurück – **kein `Result<T, string>`**.
 `ValidationError` ist in `src/types/validationError.ts` definiert:
@@ -431,7 +431,7 @@ Jeder neue Test muss durch `// Given`, `// When`, `// Then`-Kommentare geglieder
 it('zeigt Zutaten-Liste an', async () => {
   // Given
   server.use(http.get('/api/ingredients', () => HttpResponse.json([
-    { id: '1', name: 'Tomaten', defaultUnit: 'kg' },
+    { id: '1', name: 'Tomaten', baseUnit: 'kg' },
   ])));
 
   // When
@@ -451,11 +451,11 @@ Bei `toEqual`- und `toMatchObject`-Aufrufen müssen alle verglichenen Properties
 
 ```typescript
 // ✓ Korrekt – alle Properties durch AKs gedeckt
-expect(result).toEqual({ id: '1', name: 'Tomaten', defaultUnit: 'kg' });
+expect(result).toEqual({ id: '1', name: 'Tomaten', baseUnit: 'kg' });
 
 // ✓ Erlaubt mit Begründung
 expect(result).toMatchObject({ name: 'Tomaten' });
-// id und defaultUnit werden in separaten Assertions geprüft
+// id und baseUnit werden in separaten Assertions geprüft
 
 // ✗ Ohne Begründung – Gold-Plating-Signal
 expect(result).toMatchObject({ name: 'Tomaten' });

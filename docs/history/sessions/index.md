@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 120 | 2026-08-17/18 | SKELETON (US-904 Domänentypen) | TD-S118-1/-2 umgesetzt: `IngredientName`/`Unit`/`IngredientId`, Baukasten `StringConstraints.cs` + `Uuid7`, `Collect`; `IngredientValidationError` gelöscht (ADR-S120-1 aus OQ-S119-2). `DefaultUnit`→`BaseUnit`. TD-S120-1..-5, LL-S120-1..-4, OBS-S120-1..-4. |
 | 119 | 2026-08-13/15 | SKELETON (S118-Verankerung) | E1/E2/E4 verankert: ADR-S119-1/-2, ADR-S083-1/-2 → TD-S083-5/TD-S101-1, §2 Drei-Ebenen-Regel + Beispiel-Lesekonvention. Neu: `check-adr-capture`, `check-oq-capture`, `check-dangling-refs`; `primitives.py` und OQ-`Fällig` umgebaut. OQ-S119-4, OBS-S119-1/-2. |
 | 118 | 2026-08-12 | SKELETON (offene Fragen) | Alle 3 fälligen OQ geklärt: Ablage-Taxonomie ADR/TD/OQ (E1), Domänentyp vs. Constraint-Typ (E2), ID als Union über `Uuid7` (E3), OQ-`Fällig` auf Anker-Grammatik (E4). OQ-S083-1/-2 entfernt → TD-S118-1/-2 (beide `jetzt`); LL-S118-1, OBS-S118-1. Kein Code. |
 | 117 | 2026-08-11 | SKELETON (OBS-Drain) | 2 OBS aufgelöst: Infra-TDD ohne Szenario in `tdd-process.md`; Anker-Grammatik `td_anchors.py` + 17 `Fällig:`-Zeilen migriert, `td_due.py`. `session-agenda.py` ersetzt `session-start.sh` (10 Module, `open_questions.py` herausgelöst); Injektion 18.812→12.380 Bytes; LL-S117-1, OBS-S117-1..4. |

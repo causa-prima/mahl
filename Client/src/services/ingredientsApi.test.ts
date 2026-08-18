@@ -46,7 +46,7 @@ describe('restoreIngredient', () => {
   it('erkennt eine 200-Antwort als Reaktivierung, nicht als Konflikt', async () => {
     // Given: der Server antwortet 200 mit dem reaktivierten Datensatz (flache Form, kein
     //   verschachteltes "ingredient"-Feld – das trägt nur die 409-Antwort, ADR-S111-1)
-    const restored = { id: '1', name: 'Mehl', defaultUnit: 'g', etag: '"00000001"' }
+    const restored = { id: '1', name: 'Mehl', baseUnit: 'g', etag: '"00000001"' }
     server.use(http.post('/api/ingredients/:id/restore', () => HttpResponse.json(restored, { status: 200 })))
 
     // When: die Zutat "1" reaktiviert wird

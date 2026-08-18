@@ -243,6 +243,21 @@ python3 .claude/scripts/playwright-test.py --verbose
 
 **KEINE Migrations-Hölle** – bei Schema-Änderungen einfach neu aufbauen:
 
+> ⚠️ **Vor `migrations remove`: handgepflegtes SQL sichern.** Die Migrationsdatei ist der
+> Aufbaumechanismus für **alle** Umgebungen – Integrationstests (`PostgresContainerFixture`) und
+> E2E (`E2ETestSupport`) provisionieren das Schema beide via `MigrateAsync()`, nicht via
+> `EnsureCreated()`. `migrations add` erzeugt die Datei aber **ausschließlich aus dem EF-Modell**:
+> Von Hand ergänzte `migrationBuilder.Sql(...)`-Blöcke kennt EF nicht und schreibt sie nicht zurück.
+> Betroffen ist heute der funktionale Unique-Index `IX_Ingredients_Name_Lower`
+> (`LOWER("Name")`, ADR-S105-2).
+>
+> Also: `grep -n "migrationBuilder.Sql" Infrastructure/Migrations/*.cs` **vor** dem Remove, und die
+> Blöcke danach in `Up` **und** `Down` der neuen Datei zurückschreiben.
+>
+> **Der Verlust ist still.** Der Build bleibt grün, `dotnet ef` meldet nichts – erst die
+> Integrationstests zeigen ihn (S120: sechs fehlschlagende Duplikat-Tests). Ohne vollständigen
+> Testlauf nach dem Neu-Generieren fällt er gar nicht auf.
+
 > **`--project` = `Infrastructure`, `--startup-project` = `Server`:** DbContext und Migrationen liegen
 > im `Infrastructure`-Projekt (ADR-S041-2), die DI-/Host-Konfiguration in `Server`. `dotnet ef` braucht
 > beide Angaben – nur `--project Server` scheitert mit „target project doesn't match migrations assembly".

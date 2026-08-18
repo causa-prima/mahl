@@ -162,7 +162,7 @@ Führe diese Checkliste explizit durch und dokumentiere das Ergebnis:
 - [ ] **Linter- und Duplikat-Gate:**
   - TypeScript: `npm run lint` (ESLint inkl. Complexity ≤ 10, Funktionslänge ≤ 20 Zeilen) – muss 0 Errors haben
   - C#: `dotnet build` – SonarAnalyzer (S3776 Cognitive Complexity, S138 Methodenlänge) ist Teil des Builds; kein Fehler erlaubt
-  - Duplikate: `npm run lint:duplicates` (jscpd über TypeScript + C#) – Findings im Suppression-Report dokumentieren; kein hartes Gate, aber jeder Fund muss adressiert oder mit Begründung ignoriert werden
+  - Duplikate: `python3 .claude/scripts/jscpd-run.py` (jscpd über TypeScript + C#) – Findings im Suppression-Report dokumentieren; kein hartes Gate, aber jeder Fund muss adressiert oder mit Begründung ignoriert werden
 
   **PFLICHT-OUTPUT:** *"ESLint: [0 Errors / N Errors (Liste)] | dotnet build: [clean / N Fehler (Liste)] | jscpd: [Keine Duplikate / N Duplikate: Datei:Zeile – Adressierung oder Begründung]"*
 
@@ -221,7 +221,7 @@ Schemaänderungen: Kommt ein neues Pflichtfeld hinzu, wird nur der Builder angep
 protected static IngredientDbType AnIngredient(
     string name = "Butter", string unit = "g",
     bool alwaysInStock = false, DateTimeOffset? deletedAt = null) =>
-    new() { Name = name, DefaultUnit = unit, AlwaysInStock = alwaysInStock, DeletedAt = deletedAt };
+    new() { Name = name, BaseUnit = unit, AlwaysInStock = alwaysInStock, DeletedAt = deletedAt };
 
 // Im Test:
 SeedIngredients([AnIngredient("Salz"), AnIngredient("Pfeffer", deletedAt: DateTimeOffset.UtcNow)]);
@@ -283,7 +283,7 @@ response.StatusCode.Should().Be(HttpStatusCode.Created);
 var created = await response.Content.ReadFromJsonAsync<IngredientDto>();
 created!.Name.Should().Be("Butter");
 GetAllIngredientsFromDb().Should().BeEquivalentTo(
-    [new IngredientDbType { Name = "Butter", DefaultUnit = "g" }],
+    [new IngredientDbType { Name = "Butter", BaseUnit = "g" }],
     o => o.Excluding(x => x.Id));
 // Excluding(x => x.Id): Id ist auto-generiert – explizit benennen, was ignoriert wird.
 // ExcludingMissingMembers() ist VERBOTEN (ignoriert stillschweigend alle fehlenden Properties).
@@ -298,11 +298,11 @@ GetAllIngredientsFromDb().Should().BeEquivalentTo(
 **Lesbarkeit in Expected-Objekten:**
 Bei der Konstruktion datenführender Typen (Records, Structs, Klassen als Datencontainer) **müssen** benannte Argumente verwendet werden, damit sofort klar ist, welches Property welchen Wert hat:
 ```csharp
-// FALSCH: Positionale Parameter ohne Namen – welcher Wert ist Name, welcher DefaultUnit?
+// FALSCH: Positionale Parameter ohne Namen – welcher Wert ist Name, welcher BaseUnit?
 new IngredientDto(id, "Butter", "g", false)
 
 // RICHTIG: Benannte Argumente – jedes Property spricht für sich
-new IngredientDto(Id: id, Name: "Butter", DefaultUnit: "g", AlwaysInStock: false)
+new IngredientDto(Id: id, Name: "Butter", BaseUnit: "g", AlwaysInStock: false)
 ```
 Für `class`-basierte DB-Entities (EF Core) gilt dies nicht – dort werden ohnehin Object-Initializer mit Property-Namen verwendet: `new IngredientDbType { Name = "Butter", ... }`.
 
@@ -320,7 +320,7 @@ Für Fehlerfälle gilt dasselbe – der erwartete Zustand nach einem Fehler ist 
 GetAllIngredients().Should().BeEmpty();
 
 // Nach einem fehlgeschlagenen POST auf eine DB mit Pre-Seed: Ausgangszustand unverändert
-SeedIngredients([new() { Name = "Butter", DefaultUnit = "g" }]);
+SeedIngredients([new() { Name = "Butter", BaseUnit = "g" }]);
 var stateBeforeAction = GetAllIngredients();
 // ... POST mit Duplikat-Namen ...
 GetAllIngredients().Should().BeEquivalentTo(stateBeforeAction); // exakt unverändert

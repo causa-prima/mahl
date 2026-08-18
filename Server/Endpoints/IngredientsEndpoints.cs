@@ -7,7 +7,13 @@ using mahl.Server.Types;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using OneOf;
-using OneOf.Types;
+using static mahl.Server.OneOfExtensions;
+
+// Die validierte Nutzlast eines Ingredient-Schreibzugriffs – Name und Einheit, keine Identität.
+// Ein Tupel-Alias statt eines eigenen Typs: der Typ hätte keine Invariante zu wahren (die halten
+// IngredientName und Unit), bräuchte aber nach §3 einen Ktor-Guard samt Suppression. Der Alias
+// hält die ROP-Typargumente unten lesbar, ohne diesen Preis.
+using IngredientValues = (mahl.Server.Domain.IngredientName Name, mahl.Server.Domain.Unit BaseUnit);
 
 namespace mahl.Server.Endpoints;
 
@@ -30,41 +36,16 @@ internal static class IngredientsEndpoints
                     .Where(i => i.DeletedAt == null)
                     .OrderBy(i => i.Name)
                     // ADR-S108-1: per-Zeile xmin-ETag im Body – If-Match-Quelle für ein DELETE aus der Liste.
-                    .Select(i => new IngredientDto(i.Id, i.Name, i.DefaultUnit, XminETag.Format(EF.Property<uint>(i, "xmin"))))
+                    .Select(i => new IngredientDto(i.Id, i.Name, i.BaseUnit, XminETag.Format(EF.Property<uint>(i, "xmin"))))
                     .ToListAsync()));
 
         group.MapPost(
             // Stryker disable once String : Route patterns "/" and "" are treated equivalently by ASP.NET Core routing
             "/",
-            async (IngredientValuesDto dto, MahlDbContext db, HttpContext httpContext) =>
-                await dto.ToDomain()
-                    .MapError<Ingredient, IReadOnlyList<IngredientValidationError>, IResult>(IngredientMappings.ValidationProblemFor)
-                    .BindAsync<Ingredient, IngredientDto, IResult>(async ingredient =>
-                    {
-                        // ADR-S105-2: Eindeutigkeit ist ein DB-Constraint (funktionaler LOWER(name)-Unique-
-                        // Index, ADR-S051-3/ADR-S004-1 Addendum S105) – kein App-Layer-Check-then-Insert
-                        // (TOCTOU-Race). Der schreibende Endpoint fängt die Unique-Violation (Postgres 23505).
-                        var dbType = ingredient.ToDbType();
-                        db.Ingredients.Add(dbType);
-                        try
-                        {
-                            await db.SaveChangesAsync();
-                        }
-                        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
-                        {
-                            return await IngredientMappings.SoftDeletedOrDuplicateConflict(dbType, ingredient, db);
-                        }
-                        // ADR-S058-3: der ETag der neu angelegten Zeile geht mit dem 201 heraus, damit ein
-                        // Client ihn als If-Match auf ein späteres DELETE/PUT/PATCH mitschicken kann.
-                        // ADR-S108-1: derselbe xmin füllt zusätzlich das DTO-Feld etag – einmal gelesen,
-                        // für Header UND Body verwendet (kein doppelter xmin-Read).
-                        var xmin = (uint) db.Entry(dbType).Property("xmin").CurrentValue!;
-                        httpContext.Response.Headers.ETag = XminETag.Format(xmin);
-                        return ingredient.ToDto(xmin);
-                    })
-                    .MatchAsync(
-                        created => Results.Created($"/api/ingredients/{created.Id}", created),
-                        error => error));
+            // Handler-Logik ausgelagert (IngredientMappings.CreateIngredient) statt inline lambda – hält
+            // die Cognitive Complexity von MapIngredientsEndpoints niedrig und diese Methode eine
+            // Routentabelle (docs/guidelines/coding-guideline-general.md); analog RestoreIngredient.
+            IngredientMappings.CreateIngredient);
 
         group.MapDelete(
             "/{id:guid}",
@@ -111,78 +92,99 @@ internal static class IngredientsEndpoints
     }
 }
 
+// ADR-S120-1: der akkumulierte Fehlertyp IST das Antwortformat (ADR-S090-1: Feld-Key + Meldung),
+// keine Zwischenstufe. Reiner Transport-Record an der API-Grenze – kein Domänentyp, deshalb ohne
+// Factory und ohne Guards: er hat keine Invariante, die er durchsetzen müsste.
+// `file`-scoped wie der Mapping-Layer: der zweite Endpoint mit Feldvalidierung zieht ihn hoch, bis
+// dahin gäbe es für einen geteilten Typ keinen Aufrufer.
+file readonly record struct FieldError(string Key, string Message);
+
 file static class IngredientMappings
 {
-    // ADR-S051-3: name max. 30 Zeichen, nach Trimming gemessen.
-    private const int MaxNameLength = 30;
-    // ADR-S051-3: defaultUnit max. 20 Zeichen, nach Trimming gemessen.
-    private const int MaxUnitLength = 20;
+    // Collect-all validation of the independent required fields (ADR-S090-1): name and unit are
+    // validated independently and ALL errors collected, so both-fields-empty reports both field
+    // errors at once. Collect ist der Applicative-Kombinator dafür (ADR-S119-2) – Bind schlösse
+    // beim ersten Fehler kurz. Die Feldregeln (Länge, Leere) stehen in IngredientName/Unit, nicht
+    // mehr hier (ADR-S119-1/ADR-S120-1).
+    // Ergebnis ist die validierte Nutzlast OHNE Identität: die vergibt allein der anlegende Pfad
+    // (ADR-S030-1), und der Restore-Pfad identifiziert die Zeile über den Routenparameter. So kann
+    // kein Ingredient ohne brauchbare Id entstehen.
+    internal static OneOf<IngredientValues, IReadOnlyList<FieldError>> ToValues(this IngredientValuesDto dto) =>
+        Collect(
+            IngredientName.Create(dto.Name).MapError<IngredientName, IngredientNameError, FieldError>(DescribeName),
+            Unit.Create(dto.BaseUnit).MapError<Unit, UnitError, FieldError>(DescribeBaseUnit),
+            (name, unit) => (Name: name, BaseUnit: unit));
 
-    // Collect-all validation of the independent required fields (ADR-S000-1, gültig laut ADR-S090-1):
-    // name and unit are validated independently and all errors collected, so both-fields-empty reports both
-    // field errors at once. The Bind/Map chain carries the validated values on success; MapError replaces the
-    // chain's first error with the full collected set.
-    internal static OneOf<Ingredient, IReadOnlyList<IngredientValidationError>> ToDomain(this IngredientValuesDto dto)
-    {
-        var name = ValidateName(dto.Name);
-        var unit = ValidateUnit(dto.DefaultUnit);
-
-        // 0-or-1 error per field, concatenated -> the collect-all error set (empty when both fields are valid).
-        IReadOnlyList<IngredientValidationError> errors = [.. name.ErrorOrEmpty(), .. unit.ErrorOrEmpty()];
-
-        // ADR-S030-1: server-side UUIDv7 primary key.
-        return name
-            .Bind(validName => unit.Map(validUnit => Ingredient.Create(Guid.CreateVersion7(), validName, validUnit)))
-            .MapError<Ingredient, IngredientValidationError, IReadOnlyList<IngredientValidationError>>(_ => errors);
-    }
-
-    // ADR-S051-3: max. Länge je Feld, nach Trimming gemessen -> Länge wird auf dem bereits getrimmten
-    // NonEmptyTrimmedString-Wert geprüft. Leer und zu lang schließen sich strukturell aus (Bind stoppt bei Empty).
-    // Gemeinsamer Helper für name/unit – identische Struktur, nur Grenzwert und Error-Cases unterscheiden sich.
-    private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateField(
-        string input, int maxLength, IngredientValidationError emptyError, IngredientValidationError tooLongError) =>
-        NonEmptyTrimmedString.Create(input)
-            .MapError<NonEmptyTrimmedString, Error, IngredientValidationError>(_ => emptyError)
-            .Bind<NonEmptyTrimmedString, NonEmptyTrimmedString, IngredientValidationError>(value =>
-                value.Value.Length > maxLength
-                    ? (OneOf<NonEmptyTrimmedString, IngredientValidationError>) tooLongError
-                    : value);
-
-    private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateName(string input) =>
-        ValidateField(input, MaxNameLength, IngredientValidationError.NameEmpty, IngredientValidationError.NameTooLong);
-
-    private static OneOf<NonEmptyTrimmedString, IngredientValidationError> ValidateUnit(string input) =>
-        ValidateField(input, MaxUnitLength, IngredientValidationError.UnitEmpty, IngredientValidationError.UnitTooLong);
-
-    // 0-or-1 error for a validated field: empty when valid, the field's error otherwise.
-    private static IEnumerable<IngredientValidationError> ErrorOrEmpty(
-        this OneOf<NonEmptyTrimmedString, IngredientValidationError> field) =>
-        field.Match(_ => Enumerable.Empty<IngredientValidationError>(), e => [e]);
+    // ADR-S105-2: Eindeutigkeit ist ein DB-Constraint (funktionaler LOWER(name)-Unique-Index,
+    // ADR-S051-3/ADR-S004-1 Addendum S105) – kein App-Layer-Check-then-Insert (TOCTOU-Race). Der
+    // schreibende Endpoint fängt die Unique-Violation (Postgres 23505).
+    // ADR-S030-1: hier – und nur hier – entsteht die Identität, weil hier die Zeile entsteht.
+    internal static async Task<IResult> CreateIngredient(IngredientValuesDto dto, MahlDbContext db, HttpContext httpContext) =>
+        await dto.ToValues()
+            .MapError<IngredientValues, IReadOnlyList<FieldError>, IResult>(ValidationProblemFor)
+            .Map(values => Ingredient.Create(IngredientId.New(), values.Name, values.BaseUnit))
+            .BindAsync<Ingredient, IngredientDto, IResult>(async ingredient =>
+            {
+                var dbType = ingredient.ToDbType();
+                db.Ingredients.Add(dbType);
+                try
+                {
+                    await db.SaveChangesAsync();
+                }
+                catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
+                {
+                    return await SoftDeletedOrDuplicateConflict(dbType, ingredient, db);
+                }
+                // ADR-S058-3: der ETag der neu angelegten Zeile geht mit dem 201 heraus, damit ein
+                // Client ihn als If-Match auf ein späteres DELETE/PUT/PATCH mitschicken kann.
+                // ADR-S108-1: derselbe xmin füllt zusätzlich das DTO-Feld etag – einmal gelesen,
+                // für Header UND Body verwendet (kein doppelter xmin-Read).
+                var xmin = (uint) db.Entry(dbType).Property("xmin").CurrentValue!;
+                httpContext.Response.Headers.ETag = XminETag.Format(xmin);
+                return ingredient.ToDto(xmin);
+            })
+            .MatchAsync(
+                created => Results.Created($"/api/ingredients/{created.Id}", created),
+                error => error);
 
     // ADR-S090-1: field-keyed 422 body { "errors": { "<jsonPropertyName>": ["<msg>"] } } – multiple field
     // errors group into one dictionary so all messages appear simultaneously.
-    internal static IResult ValidationProblemFor(IReadOnlyList<IngredientValidationError> errors) =>
+    internal static IResult ValidationProblemFor(IReadOnlyList<FieldError> errors) =>
         Results.ValidationProblem(
-            errors.Select(Describe)
-                .GroupBy(d => d.Key, d => d.Message, StringComparer.Ordinal)
+            errors.GroupBy(e => e.Key, e => e.Message, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.Ordinal),
             statusCode: StatusCodes.Status422UnprocessableEntity);
 
-    // ADR-S051-2 / ADR-S090-1: one error case maps to one (request-JSON-property key, fixed German message) pair.
-    // Mapping lives here at the API boundary that knows the request shape – NonEmptyTrimmedString stays
-    // field-agnostic. Exhaustive .Match – a new field variant breaks this signature at compile time.
-    private static (string Key, string Message) Describe(IngredientValidationError error) => error.Match(
-        onNameEmpty: () => ("name", "Name darf nicht leer sein."),
-        onNameTooLong: () => ("name", "Name darf maximal 30 Zeichen lang sein."),
-        onUnitEmpty: () => ("defaultUnit", "Einheit darf nicht leer sein."),
-        onUnitTooLong: () => ("defaultUnit", "Einheit darf maximal 20 Zeichen lang sein."),
-        onNameDuplicate: name => ("name", $"Eine Zutat mit dem Namen '{name}' existiert bereits."));
+    // ADR-S051-2 / ADR-S090-1: ein Fehlerfall des Konzepts -> ein (Request-JSON-Property, fester
+    // deutscher Text). Die Zuordnung liegt hier an der API-Grenze, die das Request-Format kennt –
+    // der Domänentyp bleibt feldagnostisch (ADR-S120-1, Regel 5). Je Verwendungsstelle eine eigene
+    // Zuordnung: die Rezept-Einheit bekommt später ihre eigene, der Typ `Unit` bleibt einer.
+    private static FieldError DescribeName(IngredientNameError error) => error switch
+    {
+        IngredientNameError.Empty => new FieldError("name", "Name darf nicht leer sein."),
+        IngredientNameError.TooLong => new FieldError("name", "Name darf maximal 30 Zeichen lang sein."),
+        _ => SumType.Unreachable<FieldError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
+    };
+
+    private static FieldError DescribeBaseUnit(UnitError error) => error switch
+    {
+        UnitError.Empty => new FieldError("baseUnit", "Einheit darf nicht leer sein."),
+        UnitError.TooLong => new FieldError("baseUnit", "Einheit darf maximal 20 Zeichen lang sein."),
+        _ => SumType.Unreachable<FieldError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
+    };
+
+    // ADR-S004-1 (Addendum S105): aktives Duplikat, case-insensitiv (ADR-S051-3). Anders als die
+    // Feldregeln entsteht dieser Fehler erst NACH der abgelehnten Insert-Operation (ADR-S111-2),
+    // also bereits an der Grenze – er wird direkt zum FieldError. Die Meldung braucht den getrimmten
+    // EINGEGEBENEN Namen, nicht den gespeicherten.
+    private static FieldError DuplicateName(string enteredName) =>
+        new("name", $"Eine Zutat mit dem Namen '{enteredName}' existiert bereits.");
 
     internal static IngredientDbType ToDbType(this Ingredient domain) =>
-        new() { Id = domain.Id, Name = domain.Name.Value, DefaultUnit = domain.DefaultUnit.Value };
+        new() { Id = domain.Id.Value, Name = domain.Name.Value, BaseUnit = domain.BaseUnit.Value };
 
     internal static IngredientDto ToDto(this Ingredient domain, uint xmin) =>
-        new(domain.Id, domain.Name.Value, domain.DefaultUnit.Value, XminETag.Format(xmin));
+        new(domain.Id.Value, domain.Name.Value, domain.BaseUnit.Value, XminETag.Format(xmin));
 
     // ADR-S108-1: derselbe Zeilen-DTO, hier direkt aus der DB-Zeile gebaut (Restore-Pfade lesen den
     // Stand einer schon existierenden Zeile, nicht eines frisch validierten Domain-Objekts). Bewusste
@@ -190,7 +192,7 @@ file static class IngredientMappings
     // hier einen ungeübten DB-Inkonsistenz-Fehlerzweig einführen, den kein Szenario fordert.
     // Gleiche Abweichung auf dem GET-Pfad, dort als Schuld erfasst (TD-S083-5).
     private static IngredientDto ToDto(this IngredientDbType row, uint xmin) =>
-        new(row.Id, row.Name, row.DefaultUnit, XminETag.Format(xmin));
+        new(row.Id, row.Name, row.BaseUnit, XminETag.Format(xmin));
 
     // ADR-S111-2: Lookup NACH der abgelehnten Insert-Operation (kein Vorab-Check, ADR-S105-2) –
     // entscheidet nur noch, welche Fehlerantwort rausgeht: 409 (soft-deleted) oder 422 (aktives
@@ -222,7 +224,7 @@ file static class IngredientMappings
 #pragma warning restore CA1862
 
         var duplicateProblem = OneOf<IngredientDto, IResult>.FromT1(
-            ValidationProblemFor([IngredientValidationError.NameDuplicate(ingredient.Name.Value)]));
+            ValidationProblemFor([DuplicateName(ingredient.Name.Value)]));
 
         if (conflicting is null)
             return duplicateProblem;
@@ -232,19 +234,18 @@ file static class IngredientMappings
             : duplicateProblem;
     }
 
-    // ADR-S111-1: Pflicht-Body, validiert über denselben Pfad wie POST (ToDomain()) – die sync
+    // ADR-S111-1: Pflicht-Body, validiert über denselben Pfad wie POST (ToValues()) – die sync
     // Validierungskette läuft VOR dem DB-Lookup, ein invalider Body liefert also 422 auch für eine
     // nicht existente id. Kein Widerspruch zu ADR-S000-5s Not-Found-Dominanz: die dortige Abwägung
     // betrifft Not-Found vs. Precondition (If-Match, ein 412 würde fälschlich Ressourcen-Existenz
     // suggerieren) – ein 422 redet über den Request-Body, nicht über die Ressource. Query ohne
     // DeletedAt-Filter: Restore muss sowohl aktive als auch soft-deleted Zeilen finden.
-    // ToDomain() wird hier NUR als Validator genutzt, nicht als Id-Factory: die dabei per
-    // Guid.CreateVersion7() (ADR-S030-1) erzeugte Id des `requested`-Ingredient wird nie gelesen –
-    // beide Restore-Zweige identifizieren die Zeile über den `id`-Routenparameter (`row.Id`).
+    // Restore braucht nur die Werte, keine Entity: beide Zweige identifizieren die Zeile über den
+    // `id`-Routenparameter (`row.Id`) und schreiben Name/Einheit auf die gefundene Zeile.
     internal static async Task<IResult> RestoreIngredient(Guid id, IngredientValuesDto dto, MahlDbContext db) =>
-        await dto.ToDomain()
-            .MapError<Ingredient, IReadOnlyList<IngredientValidationError>, IResult>(ValidationProblemFor)
-            .BindAsync<Ingredient, IngredientDto, IResult>(async requested =>
+        await dto.ToValues()
+            .MapError<IngredientValues, IReadOnlyList<FieldError>, IResult>(ValidationProblemFor)
+            .BindAsync<IngredientValues, IngredientDto, IResult>(async requested =>
             {
                 var row = await db.Ingredients.FirstOrDefaultAsync(i => i.Id == id);
                 if (row is null)
@@ -260,11 +261,11 @@ file static class IngredientMappings
     // Schreibvorgang) vs. Konflikt (409, fremde Werte bleiben unangetastet). Der case-insensitive
     // Duplikat-Check (ADR-S051-3) beantwortet "ist das dieselbe Zutat", hier zählt nur "sind die
     // WERTE identisch" – deshalb Ordinal, nicht die case-insensitive Namensgleichheit.
-    private static Task<OneOf<IngredientDto, IResult>> RestoreActiveRow(IngredientDbType row, Ingredient requested, MahlDbContext db)
+    private static Task<OneOf<IngredientDto, IResult>> RestoreActiveRow(IngredientDbType row, IngredientValues requested, MahlDbContext db)
     {
         var xmin = (uint) db.Entry(row).Property("xmin").CurrentValue!;
         var isUnchanged = string.Equals(row.Name, requested.Name.Value, StringComparison.Ordinal)
-            && string.Equals(row.DefaultUnit, requested.DefaultUnit.Value, StringComparison.Ordinal);
+            && string.Equals(row.BaseUnit, requested.BaseUnit.Value, StringComparison.Ordinal);
 
         OneOf<IngredientDto, IResult> result = isUnchanged
             ? row.ToDto(xmin)
@@ -277,10 +278,10 @@ file static class IngredientMappings
     // Schreib-Endpoint (kein bloßes DeletedAt-Clear mehr) und braucht deshalb dieselbe
     // Exception-Behandlung wie jeder andere Schreibpfad (Review run-11: RestoreSoftDeletedRow war der
     // einzige Schreibpfad ohne sie, TD-S106-1 – kein globaler Exception-Handler im Projekt).
-    private static async Task<OneOf<IngredientDto, IResult>> RestoreSoftDeletedRow(IngredientDbType row, Ingredient requested, MahlDbContext db)
+    private static async Task<OneOf<IngredientDto, IResult>> RestoreSoftDeletedRow(IngredientDbType row, IngredientValues requested, MahlDbContext db)
     {
         row.Name = requested.Name.Value;
-        row.DefaultUnit = requested.DefaultUnit.Value;
+        row.BaseUnit = requested.BaseUnit.Value;
         row.DeletedAt = null;
         try
         {
@@ -314,7 +315,7 @@ file static class IngredientMappings
             // erreichbar (der Client sendet nur LOWER-gleiche Namen), über die API sehr wohl -> derselbe
             // 422-Pfad wie POST (ADR-S090-1/ADR-S051-2).
             return OneOf<IngredientDto, IResult>.FromT1(
-                ValidationProblemFor([IngredientValidationError.NameDuplicate(requested.Name.Value)]));
+                ValidationProblemFor([DuplicateName(requested.Name.Value)]));
         }
         var xmin = (uint) db.Entry(row).Property("xmin").CurrentValue!;
         return row.ToDto(xmin);

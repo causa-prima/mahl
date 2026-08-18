@@ -6,8 +6,8 @@ const E2E_API_BASE = 'http://localhost:5059'
 // Low-Level-Seed über den API-Port: legt eine Zutat an und gibt Id + xmin-ETag zurück (der ETag
 // wird für ein nachfolgendes If-Match beim DELETE gebraucht, ADR-S058-3). Gemeinsame Basis für
 // alle Seed-Varianten und den Löschen·Konflikt-Test – so lebt der POST-201-Block an einer Stelle.
-async function createIngredientViaApi(request: Readonly<APIRequestContext>, name: string, defaultUnit: string): Promise<{ id: string; etag: string }> {
-  const response = await request.post(`${E2E_API_BASE}/api/ingredients`, { data: { name, defaultUnit } })
+async function createIngredientViaApi(request: Readonly<APIRequestContext>, name: string, baseUnit: string): Promise<{ id: string; etag: string }> {
+  const response = await request.post(`${E2E_API_BASE}/api/ingredients`, { data: { name, baseUnit } })
   expect(response.status(), 'Seed-Zutat muss angelegt werden (201)').toBe(201)
   const { id } = await response.json() as { id: string }
   return { id, etag: response.headers()['etag'] }
@@ -16,15 +16,15 @@ async function createIngredientViaApi(request: Readonly<APIRequestContext>, name
 // Legt eine Zutat direkt über die API an (Vorbedingung "die Zutat X existiert"), vor dem Laden der
 // Seite. Ein zweiter POST käme als Duplikat nicht durch – der direkte API-Seed ist der saubere Weg,
 // den Ausgangszustand über den ausgehenden Port herzustellen. Id/ETag werden hier nicht gebraucht.
-async function seedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, defaultUnit: string): Promise<void> {
-  await createIngredientViaApi(request, name, defaultUnit)
+async function seedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, baseUnit: string): Promise<void> {
+  await createIngredientViaApi(request, name, baseUnit)
 }
 
 // Legt eine Zutat an und löscht sie direkt wieder (soft-delete) – Vorbedingung "die Zutat X
 // existiert und wurde gelöscht". Der ETag aus dem POST-Response geht als If-Match ins DELETE
 // (Plumbing: DELETE verlangt als mutierender Single-Resource-Endpoint einen If-Match, ADR-S058-1).
-async function seedDeletedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, defaultUnit: string): Promise<{ id: string }> {
-  const { id, etag } = await createIngredientViaApi(request, name, defaultUnit)
+async function seedDeletedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, baseUnit: string): Promise<{ id: string }> {
+  const { id, etag } = await createIngredientViaApi(request, name, baseUnit)
   const deleteResponse = await request.delete(`${E2E_API_BASE}/api/ingredients/${id}`, { headers: { 'If-Match': etag } })
   expect(deleteResponse.status(), 'Seed-Löschen muss gelingen (204)').toBe(204)
   return { id }
@@ -32,8 +32,8 @@ async function seedDeletedIngredientViaApi(request: Readonly<APIRequestContext>,
 
 // Stellt eine soft-deleted Zutat direkt über die API wieder her – der "jemand anderes"-Zugriff der
 // beiden Parallelfall-Szenarien. Body ist Pflicht, Erfolgs-Status 200 (ADR-S111-1).
-async function restoreIngredientViaApi(request: Readonly<APIRequestContext>, id: string, name: string, defaultUnit: string): Promise<void> {
-  const response = await request.post(`${E2E_API_BASE}/api/ingredients/${id}/restore`, { data: { name, defaultUnit } })
+async function restoreIngredientViaApi(request: Readonly<APIRequestContext>, id: string, name: string, baseUnit: string): Promise<void> {
+  const response = await request.post(`${E2E_API_BASE}/api/ingredients/${id}/restore`, { data: { name, baseUnit } })
   expect(response.status(), 'Paralleles Wiederherstellen muss gelingen (200)').toBe(200)
 }
 
@@ -45,10 +45,10 @@ async function restoreIngredientViaApi(request: Readonly<APIRequestContext>, id:
 // sähe schon der POST eine aktive Zeile und liefe in den Duplikat-Fehler (422), statt zu reaktivieren.
 // `times: 1` greift nur den einen erwarteten Restore ab.
 async function restoreInFlightBeforeClientRestore(
-  page: Readonly<Page>, request: Readonly<APIRequestContext>, id: string, name: string, defaultUnit: string,
+  page: Readonly<Page>, request: Readonly<APIRequestContext>, id: string, name: string, baseUnit: string,
 ): Promise<void> {
   await page.route('**/api/ingredients/*/restore', async (route) => {
-    await restoreIngredientViaApi(request, id, name, defaultUnit)
+    await restoreIngredientViaApi(request, id, name, baseUnit)
     await route.continue()
   }, { times: 1 })
 }
@@ -329,6 +329,23 @@ test.describe('US904_EdgeCase: Zutaten verwalten', () => {
     await expect(page.getByRole('dialog')).toBeHidden()
   })
 
+  // Szenario: Name mit 30 Zeichen und versehentlichen Leerzeichen wird akzeptiert
+  test('US904_EdgeCase_CreateIngredient_PaddedNameAt30CharLimit_AppearsTrimmedInList', async ({ page }) => {
+    // When: Dialog öffnen, 30 Zeichen MIT umgebenden Leerzeichen (34 roh) eingeben, speichern.
+    //   ADR-S051-1 + ADR-S051-3: erst trimmen, dann messen -> die 30-Zeichen-Grenze gilt für den
+    //   getrimmten Wert. Würde roh gemessen, käme hier fälschlich "maximal 30 Zeichen" zurück.
+    const nameWith30Chars = 'a'.repeat(30)
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill(`  ${nameWith30Chars}  `)
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: die Zutat erscheint mit dem getrimmten Namen in der Liste
+    await expect(page.getByTestId('ingredient-list').getByText(nameWith30Chars, { exact: true })).toBeVisible()
+    // Then: der Dialog ist geschlossen (Erfolgspfad, kein Validierungsfehler)
+    await expect(page.getByRole('dialog')).toBeHidden()
+  })
+
   // Szenario: Einheit mit exakt 20 Zeichen wird akzeptiert
   test('US904_EdgeCase_CreateIngredient_UnitExactly20Chars_AppearsInList', async ({ page }) => {
     // When: Dialog öffnen, "Salz" als Name, eine Einheit mit genau 20 Zeichen (Grenzwert,
@@ -343,6 +360,24 @@ test.describe('US904_EdgeCase: Zutaten verwalten', () => {
     await expect(page.getByTestId('ingredient-list').getByText('Salz')).toBeVisible()
     await expect(page.getByTestId('ingredient-list').getByText(unitWith20Chars)).toBeVisible()
     // Then: der "Zutat anlegen"-Dialog ist geschlossen (Erfolgspfad)
+    await expect(page.getByRole('dialog')).toBeHidden()
+  })
+
+  // Szenario: Einheit mit 20 Zeichen und versehentlichen Leerzeichen wird akzeptiert
+  test('US904_EdgeCase_CreateIngredient_PaddedUnitAt20CharLimit_AppearsTrimmedInList', async ({ page }) => {
+    // When: Dialog öffnen, "Salz" als Name, 20 Zeichen MIT umgebenden Leerzeichen (24 roh) als
+    //   Einheit, speichern. Gegenstück zum Namen oben: ADR-S051-1 + ADR-S051-3, erst trimmen,
+    //   dann messen – die 20er-Grenze gilt für den getrimmten Wert.
+    const unitWith20Chars = 'a'.repeat(20)
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Name').fill('Salz')
+    await page.getByLabel('Einheit').fill(`  ${unitWith20Chars}  `)
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // Then: die Zutat erscheint mit der getrimmten Einheit in der Liste
+    await expect(page.getByTestId('ingredient-list').getByText('Salz')).toBeVisible()
+    await expect(page.getByTestId('ingredient-list').getByText(unitWith20Chars, { exact: true })).toBeVisible()
+    // Then: der Dialog ist geschlossen (Erfolgspfad, kein Validierungsfehler)
     await expect(page.getByRole('dialog')).toBeHidden()
   })
 })

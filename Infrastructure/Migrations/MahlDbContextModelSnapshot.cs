@@ -28,7 +28,7 @@ namespace mahl.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("DefaultUnit")
+                    b.Property<string>("BaseUnit")
                         .IsRequired()
                         .HasColumnType("text");
 
