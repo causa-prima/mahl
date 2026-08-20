@@ -63,15 +63,34 @@ def get(text: str, oid: str, mit_vorpraegung: bool = False) -> str | None:
     if not span:
         return None
     block = text[span[0]:span[1]].rstrip()
-    if mit_vorpraegung or not _VORPRAEGUNG_RE.search(block):
-        return block
+    if not (mit_vorpraegung or not _VORPRAEGUNG_RE.search(block)):
+        hinweis = (
+            f"- ⚠ {VORPRAEGUNG_FELD} vorhanden (Lösungsideen/Ursachenvermutungen) – erst eigene "
+            f"Kandidaten bilden und dem User vorlegen, dann abrufen:\n"
+            f"    python3 .claude/scripts/obs.py get {oid} --vorprägung"
+        )
+        block = _VORPRAEGUNG_RE.sub(lambda _: hinweis, block, count=1)
 
-    hinweis = (
-        f"- ⚠ {VORPRAEGUNG_FELD} vorhanden (Lösungsideen/Ursachenvermutungen) – erst eigene "
-        f"Kandidaten bilden und dem User vorlegen, dann abrufen:\n"
-        f"    python3 .claude/scripts/obs.py get {oid} --vorprägung"
-    )
-    return _VORPRAEGUNG_RE.sub(lambda _: hinweis, block, count=1)
+    # Eingehende Kanten anzeigen, statt sie zu spiegeln: Die Kante steht nur einmal (beim
+    # nennenden Eintrag) und kann darum nicht auseinanderlaufen – wer diesen Eintrag liest,
+    # sieht trotzdem, dass er Teil einer Einheit ist.
+    eingehend = eingehende_kanten(text, oid)
+    if eingehend:
+        block += f"\n- {EINGEHEND_MARKER} {', '.join(eingehend)}"
+    return block
+
+
+def eingehende_kanten(text: str, oid: str) -> list[str]:
+    """IDs, die `oid` in ihrem `Zusammen-erledigen`-Feld nennen."""
+    treffer = []
+    for andere, span in entry_spans(text).items():
+        if andere == oid:
+            continue
+        feld = re.search(rf"^- {re.escape(ZUSAMMEN_FELD)}:\s*(.+)$",
+                         text[span[0]:span[1]], flags=re.M)
+        if feld and oid in re.findall(r"OBS-S\d{3}-\d+", feld.group(1)):
+            treffer.append(andere)
+    return sorted(treffer)
 
 
 def next_id(text: str, session: int) -> str:
@@ -89,9 +108,58 @@ def _pruefe(name: str, wert: str, erlaubt: tuple[str, ...]) -> None:
         raise ValueError(f"{name}: '{wert}' ist nicht zulässig. Erlaubt: {', '.join(erlaubt)}")
 
 
+ZUSAMMEN_FELD = "Zusammen-erledigen"
+ZUSAMMEN_KEINER = "keiner"
+_OBS_ID_RE = re.compile(r"^OBS-S\d{3}-\d+$")
+
+
+EINGEHEND_MARKER = "⇦ von hier aus zusammen erledigbar (eingehende Kante, steht im anderen Eintrag):"
+
+
+def _pruefe_ziele(oid: str, ziele: list[str], text: str) -> None:
+    """Referenzielle Integrität der Kanten – zur Schreibzeit, nicht als späterer Audit.
+
+    Bewusst KEINE Spiegelung A<->B: `obs-drain.cluster()` macht die Kante beim Lesen ohnehin
+    ungerichtet, eine zweite Kopie könnte nur auseinanderlaufen. Was der Mechanismus dagegen
+    nicht selbst merkt, ist ein Ziel, das es gar nicht gibt – unbekannte IDs verwirft er
+    stillschweigend, die Kante fällt also lautlos aus. Genau das wird hier verhindert.
+    """
+    bekannt = set(entry_spans(text))
+    if oid in ziele:
+        raise ValueError(f"{ZUSAMMEN_FELD}: {oid} kann nicht auf sich selbst zeigen.")
+    unbekannt = [z for z in ziele if z not in bekannt]
+    if unbekannt:
+        raise ValueError(
+            f"{ZUSAMMEN_FELD}: {', '.join(unbekannt)} existiert nicht in {OBS_FILE}. "
+            f"Offene Einträge zeigt `obs.py list-offen` (Vertipper? falsche Session-Nummer?).")
+
+
+def _pruefe_zusammen(wert: str) -> str:
+    """Pflichtangabe: OBS-IDs oder `keiner`.
+
+    Pflicht statt optional, weil ein fehlendes Feld von „geprüft, es gibt keine" nicht zu
+    unterscheiden wäre. Keine Freitexte, weil ein unlesbarer Wert im Drain still auf „keine
+    Kante" zurückfiele – und damit wieder wie eine echte Negativ-Angabe aussähe.
+    """
+    wert = (wert or "").strip()
+    if not wert:
+        raise ValueError(
+            f"{ZUSAMMEN_FELD} ist Pflicht: OBS-IDs, die *eine* Lösung mit erledigen würde, "
+            f"sonst '{ZUSAMMEN_KEINER}'. Offene Titel zeigt `obs.py list-offen`.")
+    if wert.lower() == ZUSAMMEN_KEINER:
+        return ZUSAMMEN_KEINER
+    teile = [t.strip() for t in wert.split(",") if t.strip()]
+    ungueltig = [t for t in teile if not _OBS_ID_RE.match(t)]
+    if ungueltig:
+        raise ValueError(
+            f"{ZUSAMMEN_FELD}: '{', '.join(ungueltig)}' ist keine OBS-ID. Erlaubt sind "
+            f"OBS-S<NNN>-<n> (komma-getrennt) oder '{ZUSAMMEN_KEINER}'.")
+    return ", ".join(teile)
+
+
 def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: str,
                  kategorie: str, kontext: str, beobachtung: str, bezug: str | None,
-                 vorpraegung: str | None = None) -> str:
+                 zusammen: str = "", vorpraegung: str | None = None) -> str:
     """Baut einen formatgetreuen Eintrag. `Entscheidung/Maßnahme` ist bewusst nicht setzbar.
 
     `vorpraegung` nimmt auf, was die Kandidatenbildung prägen würde – genannte Lösungen,
@@ -101,6 +169,7 @@ def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: st
     _pruefe("Impact", impact, IMPACT_WERTE)
     _pruefe("Häufigkeit", haeufigkeit, HAEUFIGKEIT_WERTE)
     _pruefe("Kategorie", kategorie, KATEGORIE_WERTE)
+    zusammen_wert = _pruefe_zusammen(zusammen)
     if not titel.strip() or not beobachtung.strip():
         raise ValueError("Titel und Beobachtung dürfen nicht leer sein.")
 
@@ -117,6 +186,7 @@ def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: st
     if vorpraegung and vorpraegung.strip():
         zeilen.append(f"- {VORPRAEGUNG_FELD}: {vorpraegung.strip()}")
     zeilen += [
+        f"- {ZUSAMMEN_FELD}: {zusammen_wert}",
         f"- Entscheidung/Maßnahme: {KANON_OFFEN}",
     ]
     if bezug and bezug.strip():
@@ -127,18 +197,38 @@ def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: st
 def add(text: str, session: int, **felder) -> tuple[str, str]:
     """Hängt einen neuen Eintrag an. Liefert (neuer Dateiinhalt, vergebene ID)."""
     oid = next_id(text, session)
+    _pruefe_ziele(oid, re.findall(r"OBS-S\d{3}-\d+", felder.get("zusammen") or ""), text)
     eintrag = format_entry(oid, **felder)
     return text.rstrip("\n") + "\n\n" + eintrag, oid
 
 
 def set_fields(text: str, oid: str, status: str | None = None,
-               entscheidung: str | None = None) -> str:
-    """Ersetzt Status und/oder Entscheidung eines bestehenden Eintrags."""
+               entscheidung: str | None = None, zusammen: str | None = None) -> str:
+    """Ersetzt Status, Entscheidung und/oder die `Zusammen-erledigen`-Kanten eines Eintrags.
+
+    `zusammen` wird **eingefügt**, wenn das Feld fehlt – Einträge aus der Zeit vor der
+    Pflichtangabe haben es nicht, und der Drain muss Kanten beidseitig korrigieren können.
+    """
     span = entry_spans(text).get(oid)
     if not span:
         raise ValueError(f"{oid} existiert nicht in {OBS_FILE}.")
 
     block = text[span[0]:span[1]]
+    if zusammen is not None:
+        _pruefe_ziele(oid, re.findall(r"OBS-S\d{3}-\d+", zusammen), text)
+        zeile = f"- {ZUSAMMEN_FELD}: {_pruefe_zusammen(zusammen)}"
+        vorhanden = re.compile(rf"^- {re.escape(ZUSAMMEN_FELD)}:.*$", re.M)
+        if vorhanden.search(block):
+            block = vorhanden.sub(lambda _: zeile, block, count=1)
+        else:
+            # Dieselbe Position wie bei neuen Einträgen: hinter der Beobachtung (bzw. der
+            # Vorprägung, die zwischen beiden steht), vor der Entscheidung.
+            anker = re.compile(r"^- Entscheidung/Maßnahme:", re.M)
+            if not anker.search(block):
+                raise ValueError(f"{oid} hat kein Feld `- Entscheidung/Maßnahme:` – "
+                                 f"Datei von Hand prüfen.")
+            block = anker.sub(lambda m: zeile + "\n" + m.group(0), block, count=1)
+
     for feld, wert in (("Status", status), ("Entscheidung/Maßnahme", entscheidung)):
         if wert is None:
             continue

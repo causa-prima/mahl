@@ -36,7 +36,7 @@
 | Retro durchführen | Skill `kaizen` verwenden |
 | Technische Schuld tracken | `docs/tech-debt.md` |
 | Offene Fragen / geparkte Diskussionen | `docs/open-questions.md` |
-| Wohin gehört dieser Eintrag – ADR, TD oder OQ? | Sektion "Ablage: ADR, TD oder offene Frage?" (unten in dieser Datei) |
+| Wohin gehört dieser Eintrag – ADR, TD, OQ oder OBS/CM/LL? | Sektion "Ablage: in welchen Tracker gehört dieser Eintrag?" (unten in dieser Datei) |
 | Langsame Befehle dokumentieren | `docs/process/slow-commands.md` |
 | Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "Befehlsauswahl & Timeouts") |
 | Warum wurde X so entschieden? | `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`) |
@@ -47,11 +47,13 @@
 
 ---
 
-## Ablage: ADR, TD oder offene Frage?
+## Ablage: in welchen Tracker gehört dieser Eintrag?
 
-Kanonische Taxonomie für die drei **produkt**-seitigen Tracker. Die Datei-Header von
-`docs/history/adr.md`, `docs/tech-debt.md` und `docs/open-questions.md` tragen je die
-Aufnahmebedingung ihrer Datei und verweisen hierher für die Abgrenzung untereinander.
+**Einstieg für alle sechs Tracker.** Schnitt 1 unten entscheidet Produkt vs. Prozess und gilt für
+jeden Eintrag; Schnitt 2 und 3 führen die **produkt**-seitigen aus (ADR/TD/OQ). Fällt Schnitt 1 auf
+Prozess, geht es in `docs/kaizen/process.md`, Sektion „Wann gehört etwas wohin?" weiter (OBS/CM/LL) –
+hier nicht wiederholt. Die Datei-Header aller sechs tragen je die Aufnahmebedingung ihrer Datei und
+verweisen hierher für die Abgrenzung untereinander.
 
 Drei Trennschnitte, jeder für sich eindeutig:
 

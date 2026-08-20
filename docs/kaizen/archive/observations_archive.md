@@ -799,3 +799,49 @@ Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – äl
 
 ---
 
+## OBS-S105-2 – C#-String-Ops triggern unter `TreatWarningsAsErrors` kulturbezogene Analyzer
+- Quelle: Subagent + Orchestrator
+- Status: VERWORFEN (umgezogen in coding-guideline-csharp.md)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: C#-Code
+- Beobachtung: Naive String-Operationen brechen unter `TreatWarningsAsErrors` den Build über kulturbezogene Analyzer – in S105 zweifach getroffen: (1) `.ToLower()` in einem EF-Core-LINQ-Prädikat → CA1304/CA1311/CA1862/MA0011 (Analyzer nehmen Laufzeit-`CurrentCulture` an, obwohl der Ausdruck zu SQL `LOWER()` übersetzt wird → braucht ein gezieltes `#pragma`); (2) `IndexOf(char)` / `==` / im `.env`-Parser → CA1307/MA0006 (hier ist der Nudge berechtigt → `Split`/`StringComparison.Ordinal`/`string.Equals`). Beide Male kostete es einen Trial-and-Error-Zyklus.
+- Entscheidung/Maßnahme: Wissen ueber eine Werkzeug-Falle, kein Vorhaben und kein Prozess-Thema: Als OBS wartete es auf eine Behandlung, die es nie gebraucht haette. Steht jetzt als eigene Sektion in coding-guideline-csharp.md neben dem JIT-Fallstrick, mit der Unterscheidung 'Analyzer hat recht / Analyzer irrt' – dort wird es beim Schreiben von C#-Code gelesen.
+- Bezug: LL-S105-1
+
+## OBS-S103-2 – Stryker 100 % pinnt nicht die Reihenfolge von „erstes-von-N"-Prioritätslogik
+- Quelle: Orchestrator
+- Status: VERWORFEN (umgezogen in tdd-process.md)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: QUALITÄT    Kontext: Mutation-Testing
+- Beobachtung: Bei der Fokus-aufs-erste-Fehlerfeld-Logik (`nameError ? nameRef : unitError ? unitRef : undefined`) töteten die zwei Einzelfeld-Tests alle Stryker-Mutanten (100 %), aber der Mehrfeld-Fall (beide fehlerhaft → Priorität Name) war **nicht** gepinnt: ein menschlicher Prioritäts-Swap (Einheit vor Name) mutiert identisch und bliebe bei 100 % unentdeckt (im Review als FC-F1 gefunden, mit explizitem Mehrfeld-Assert geschlossen). Verallgemeinert: „erstes-von-N"-/Prioritäts-Auswahllogik braucht einen expliziten Mehrfach-Fall-Test; Stryker-100 % über Einzelfälle genügt nicht.
+- Entscheidung/Maßnahme: Der konkrete Fall war schon in S105 mit einem Mehrfeld-Assert geschlossen; wertvoll blieb allein die verallgemeinerte Regel. Die ist Wissen, kein Vorhaben – sie steht jetzt in docs/process/tdd-process.md (Sektion Mutation Testing, Absatz '100 % Mutation Score pinnt keine Reihenfolge') und wirkt dort bei jedem Test statt auf eine Behandlung zu warten.
+- Bezug: –
+
+## OBS-S101-3 – useResultMutation: 4er-Positions-Tupel → Objekt-Rückgabe
+- Quelle: Subagent
+- Status: VERWORFEN (umgezogen nach TD-S122-1)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: QUALITÄT    Kontext: TS-Code
+- Beobachtung: `useResultMutation` gibt jetzt ein 4-Tupel `[mutate, error, isPending, reset]` zurück – zwei davon Funktionen. Positions-Tupel werden mit wachsender Länge fehleranfällig (Call-Sites müssen exakt in Reihenfolge destrukturieren, `error`/`isPending` leicht verwechselbar). Ein Objekt `{ save, error, isPending, reset }` wäre selbstdokumentierend und reihenfolgeunabhängig.
+- Entscheidung/Maßnahme: Kein Prozess-Thema, sondern Produkt-Refactoring am Client-Code – nach der Taxonomie (CLAUDE.md, Schnitt 1) gehoert es in die technische Schuld. Inhalt unveraendert nach TD-S122-1 uebernommen; dort altert es ohne Drain-Kapazitaet zu binden, bis der Faellig-Anker Phase:MVP eintritt.
+- Bezug: TD-S101-1
+
+## OBS-S108-5 – Restore-Endpoint ist als CORS-„Simple Request" ohne Preflight erreichbar
+- Quelle: Subagent (security-auditor, Review run-8)
+- Status: VERWORFEN (umgezogen nach TD-S122-2)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: QUALITÄT    Kontext: Security
+- Beobachtung: `POST /api/ingredients/{id}/restore` verlangt weder Custom-Header noch Request-Body und ist damit ein CORS-„Simple Request": Ein Browser sendet ihn cross-origin **ohne** Preflight, CORS verhindert nur das Auslesen der Antwort, nicht die serverseitige Ausführung. Alle übrigen mutierenden Endpoints sind hier zufällig geschützt – `DELETE` durch den verpflichtenden `If-Match`-Header, `POST /api/ingredients` durch `Content-Type: application/json`; beide erzwingen dadurch eine Preflight, die mangels CORS-Policy scheitert. Der Verzicht auf If-Match beim Restore ist in ADR-S108-2 bewusst und mit Concurrency-Argumenten begründet – dass If-Match nebenbei auch die Preflight erzwungen hätte, ist ein Nebeneffekt, den die ADR nicht betrachtet. Praktische Tragweite im aktuellen Stand begrenzt: Der Angreifer braucht die Ziel-UUIDv7 (~74 nicht erratbare Zufallsbits), wer sie kennt hat über das ungeschützte GET ohnehin direkten API-Zugriff, und der Schaden beschränkt sich auf das Rückgängigmachen eines Soft-Deletes. Relevant wird es, sobald Auth existiert – dann ist es die einzige Stelle, an der ein fremder Browser eine Zustandsänderung auslösen kann. Kein User-Entscheid nötig (kein Business-Impact, technische Härtungsfrage im Sinne der `CLAUDE.md`-Faustregel) – die Abwägung „Preflight erzwingen vs. bewusst tragen" gehört in den Drain, das Ergebnis in eine ADR.
+- Entscheidung/Maßnahme: Kein Prozess-Thema, sondern ein Security-Befund am Produkt – nach Schnitt 1 der Taxonomie gehoert er in die technische Schuld. Inhalt nach TD-S122-2 uebernommen, Faellig Phase:MVP.
+- Bezug: –
+
+---
+
+## OBS-S121-2 – Drain-Rate und Backlog-Ziel widersprechen sich - fester Satz gegen variablen Zielwert
+- Quelle: User
+- Status: UMGESETZT (S122)
+- Impact: HOCH    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: Skill-Nutzung
+- Beobachtung: Der OBS-Drain arbeitet je Session einen Satz fester Groesse ab (aktuell 7 Eintraege: Wert-Lane, Alters-Lane, faellige Wiedervorlagen). Der Backlog liegt seit Laengerem weit ueber dem als gesund definierten Wert (Session-Start S121: 29 drainbar bei Ziel <=8) und sinkt langsamer, als neue Eintraege dazukommen - in S121 wurden fuenf aufgeloest und einer neu erfasst, netto minus vier bei 29 Ausgangslage. Der User weist auf einen zweiten, strukturellen Widerspruch hin: Mit dem neuen Startup soll gedraint werden, bis das Backlog unter einem Schwellwert steht (Groessenordnung 12). Ein Skill, der pro Durchlauf eine feste Anzahl Eintraege vorlegt, passt dazu nicht - er endet, waehrend das Backlog noch ueberfuellt ist, und die Rate ist von dem Ziel entkoppelt, das sie erreichen soll. Zu klaeren ist damit nicht nur die Hoehe der Rate, sondern ihre Form: fester Satz je Session, Abarbeiten bis zum Schwellwert, oder eine Rate, die sich aus dem Abstand zum Ziel ergibt. Mitzudenken ist die Gegenkraft - ein Drain-Durchlauf kostet real Kontext und User-Aufmerksamkeit (in S121 fuellte er eine ganze Session fuer fuenf Eintraege), ein reines Hochdrehen der Zahl verlagert das Problem also nur. KORREKTUR S122 (vom User): Die Erfassung gab den Kern unvollstaendig wieder. Vergessen und nachgetragen: Eine Drain-Session enthaelt bisher nie etwas anderes als den Drain, weil er allein schon die Session fuellt; so folgt eine Drain-Session auf die naechste, nur von Retros unterbrochen. Waehrend des Drains entstehen zudem fast immer neue OBS, sodass das Backlog langsamer schrumpft als vorgesehen. Die Folge ist der eigentliche Schaden: Es wird nicht mehr entwickelt. Gemessen in S122 ueber die Commit-Historie: Zwischen S112 und S121 wurde kein einziger Gherkin-Lauf implementiert - S113 bis S119 und S121 beruehrten null Produktdateien, S120 nur ueber die Umsetzung eines Prozess-Ergebnisses.
+- Entscheidung/Maßnahme: Die Rate war das falsche Stellrad: Der Deckel 7 wurde nie erreicht (real ~4-5 Eintraege je Drain-Session), und 17 der 26 Eintraege lagen so tief, dass die Wert-Lane sie nie aufgriff. Umgesetzt wurde stattdessen ein Modell aus vier Teilen (kanonisch in process.md, Abschnitte 'Score und Behandlungswuerdigkeit' + 'Lanes und Trigger'): (1) Score = Impact x Haeufigkeit mit GERING=0 - die Rubrik definiert GERING als folgenlos, folglich traegt es auch gehaeuft und im Cluster nichts bei; behandlungswuerdig ab 2. (2) Pflichtfeld 'Verwandt' bei der Erfassung: gemeinsam loesbare Eintraege bilden eine Einheit, deren Scores summiert werden - so kommen kleine Eintraege mit dran, wenn man am Thema ohnehin arbeitet. (3) Trigger statt Backlog-Zahl: Top-5-Summe >= 9 ODER >= 4 Eintraege aelter als 15 Sessions. Die Backlog-Zahl mass Menge statt Wert und hielt sich selbst ueber der Schwelle, weil jeder Drain neue Eintraege erzeugt. (4) Alters-Lane nimmt alle ueber 15 Sessions statt nur des aeltesten - ein Slot fuehrte den Zufluss nicht ab. Verworfen: Rate erhoehen (der Deckel war nie bindend), Zielwert aufgeben (Alt-Eintraege veralten dann und tragen falsche Fakten), Log-gewichtete Alterssumme (der Logarithmus daempft das Alter so stark, dass daraus ein Anzahl-Trigger wird - die Alters-Lane existiert aber gerade fuer die uralten). Vorhersage zum Nachpruefen: Bei 1,32 behandlungswuerdigen Eintraegen je Session feuert der Wert-Trigger etwa jede dritte Session.
+

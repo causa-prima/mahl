@@ -42,8 +42,10 @@ _OBS_OK = "obs-ok"
 # Feld-Zeile = uneingerückt, benannt, mit Doppelpunkt. Eingerückte Bullets sind Prosa.
 _FIELD_RE = re.compile(r"^- ([^:\n]{1,40}?):", re.M)
 ALLOWED_FIELDS = ("Quelle", "Status", "Impact", "Kategorie", "Beobachtung", "Vorprägung",
-                  "Entscheidung/Maßnahme", "Bezug")
-# `Vorprägung` und `Bezug` sind laut Header optional.
+                  "Zusammen-erledigen", "Entscheidung/Maßnahme", "Bezug")
+# `Vorprägung` und `Bezug` sind laut Header optional. `Verwandt` ist Pflicht (S122): Der Drain
+# bildet daraus Einheiten, und ein fehlendes Feld wäre von "geprüft, es gibt keine" nicht zu
+# unterscheiden – deshalb die explizite Negativ-Angabe `keiner`.
 _OPTIONAL_FIELDS = ("Vorprägung", "Bezug")
 REQUIRED_FIELDS = tuple(f for f in ALLOWED_FIELDS if f not in _OPTIONAL_FIELDS)
 

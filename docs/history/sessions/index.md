@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 122 | 2026-08-21 | SKELETON (OBS-Drain) | Drain steuert über Score statt Backlog-Größe: `GERING`=0, Pflichtfeld `Zusammen-erledigen:` (Cluster mit Summen-Score), Trigger Top-5≥9 oder ≥4 älter als 15 Sessions. 5 OBS aufgelöst (26→22), 4 davon als Fehlablage umgezogen → TD-S122-1/-2 + 2 Guidelines. OQ-S094-2/-S119-4 terminiert. |
 | 121 | 2026-08-20 | SKELETON (OBS-Drain) | 5 OBS aufgelöst (29→24): `check-bash-permission.py` zerlegt Newline/Heredoc/Zuweisung/Substitution/Schleifen/`-exec`, Scratchpad statt `.claude/tmp/`, Mehrzeilen-Lücke geschlossen. `_hook_io.py`; OQ-`Fällig` Pflicht. LL-S121-1..-3, OBS-S121-1..-3. |
 | 120 | 2026-08-17/18 | SKELETON (US-904 Domänentypen) | TD-S118-1/-2 umgesetzt: `IngredientName`/`Unit`/`IngredientId`, Baukasten `StringConstraints.cs` + `Uuid7`, `Collect`; `IngredientValidationError` gelöscht (ADR-S120-1 aus OQ-S119-2). `DefaultUnit`→`BaseUnit`. TD-S120-1..-5, LL-S120-1..-4, OBS-S120-1..-4. |
 | 119 | 2026-08-13/15 | SKELETON (S118-Verankerung) | E1/E2/E4 verankert: ADR-S119-1/-2, ADR-S083-1/-2 → TD-S083-5/TD-S101-1, §2 Drei-Ebenen-Regel + Beispiel-Lesekonvention. Neu: `check-adr-capture`, `check-oq-capture`, `check-dangling-refs`; `primitives.py` und OQ-`Fällig` umgebaut. OQ-S119-4, OBS-S119-1/-2. |

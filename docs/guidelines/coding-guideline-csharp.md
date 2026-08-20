@@ -222,6 +222,13 @@ public static class IngredientsEndpoints { ... }
 - Provider-/Assembly-spezifische Aufrufe (EF-Relational `MigrateAsync()`, Npgsql o.ä.), die nur unter einer bestimmten Umgebung laufen (z.B. hinter `if (env.IsE2E)`), **nicht inline** in `Program.<Main>$` setzen, sondern in eine **eigene Methode** auslagern.
 - Grund: JIT ist per-Methode lazy, löst aber **innerhalb** einer Methode beim Kompilieren alle referenzierten Assemblies auf – ein *nicht genommener* `if`-Branch schützt nicht. Ein Test-Host mit anderem Provider (`WebApplicationFactory` + InMemory) scheitert sonst schon beim JIT von `Main` mit `FileNotFoundException` auf der Relational-Assembly, obwohl der Zweig nie ausgeführt wird. Der Body der ausgelagerten Methode JITtet erst beim tatsächlichen Aufruf.
 
+### Kulturbezogene String-Analyzer brechen unter `TreatWarningsAsErrors` den Build
+
+Naive String-Operationen lösen kulturbezogene Analyzer aus – und weil Warnungen hier Fehler sind, ist das kein Hinweis, sondern ein Build-Abbruch. Vor dem Schreiben unterscheiden, welcher der beiden Fälle vorliegt; blindes Probieren kostet sonst einen Trial-and-Error-Zyklus pro Stelle (in S105 zweimal getroffen):
+
+- **Der Analyzer hat recht** – die Operation läuft wirklich zur Laufzeit in .NET: `IndexOf(char)`, `==`, `Contains` in gewöhnlichem Code → **CA1307/MA0006**. Richtige Antwort ist die Korrektur, nicht die Suppression: `Split`, `StringComparison.Ordinal`, `string.Equals(a, b, StringComparison.Ordinal)`.
+- **Der Analyzer irrt** – der Ausdruck wird gar nicht in .NET ausgeführt, sondern übersetzt: `.ToLower()` **in einem EF-Core-LINQ-Prädikat** → **CA1304/CA1311/CA1862/MA0011**. Die Analyzer nehmen `CurrentCulture` zur Laufzeit an, obwohl EF daraus SQL `LOWER()` macht. Hier ist eine Suppression richtig: `#pragma warning disable/restore` **an der Zeile**, mit Begründung – nie ein `disable` ohne `restore` am Dateianfang (das sieht lokal aus, wirkt aber bis Dateiende).
+
 ### Dependency Rule
 
 ```

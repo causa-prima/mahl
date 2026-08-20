@@ -12,7 +12,7 @@ Union **aufgeschoben**") waren beide Hybride ohne terminalen Rest und mussten in
 `tech-debt.md` umgehängt werden – ADR-S083-2 hatte sich bis dahin über zwei Addenda
 weiterentwickelt und war aus dem TD-Header heraus sogar als Vorbild zitiert worden.
 
-Die Regel ist kanonisch in `CLAUDE.md`, Sektion „Ablage: ADR, TD oder offene Frage?"
+Die Regel ist kanonisch in `CLAUDE.md`, Sektion „Ablage: in welchen Tracker gehört dieser Eintrag?"
 (Hybrid-Regel) und in der Aufnahmebedingung im Header von `docs/history/adr.md`.
 
 Scope:
@@ -138,7 +138,7 @@ def check(data: dict) -> str | None:
         "  Ist die Entscheidung teils terminal, teils aufgeschoben, wird der Aufschub-Teil ein "
         "eigener TD-Eintrag; die ADR behält nur den terminalen Rest. Bleibt kein terminaler "
         "Rest, war es nie eine ADR.\n"
-        "  Kanonisch: `CLAUDE.md`, Sektion „Ablage: ADR, TD oder offene Frage?“. Präzedenz: "
+        "  Kanonisch: `CLAUDE.md`, Sektion „Ablage: in welchen Tracker gehört dieser Eintrag?“. Präzedenz: "
         "ADR-S083-1 und ADR-S083-2 waren genau solche Hybride und wurden in S119 nach "
         "`tech-debt.md` umgehängt.\n"
         "  Bewusster Einzelfall (z.B. eine ADR, die den Aufschub eines anderen Artefakts nur "

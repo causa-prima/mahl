@@ -47,6 +47,7 @@ FELDER = dict(
     kontext="Doku",
     beobachtung="Etwas fiel auf.",
     bezug=None,
+    zusammen="keiner",
 )
 
 
@@ -90,6 +91,100 @@ def test_add_appends_and_reports_the_new_id():
 def test_add_keeps_existing_entries_untouched():
     neu, _ = oe.add(BESTAND, 114, **FELDER)
     assert oe.get(neu, "OBS-S110-1") == oe.get(BESTAND, "OBS-S110-1")
+
+
+# --- Zusammen-erledigen: Pflichtangabe (S122) ------------------------------------------
+# Cluster-Bildung im Drain braucht erfasste Verwandtschaft. Sie entsteht nur bei der Erfassung
+# verlässlich – dort ist der Kontext frisch. Deshalb Pflichtfeld mit expliziter Negativ-Angabe
+# ("keiner") statt optionalem Feld, das schweigend entfällt: Ein fehlendes Feld ist von
+# "geprüft, es gibt keine" nicht unterscheidbar.
+def test_zusammen_is_written():
+    eintrag = oe.format_entry("OBS-S114-1", **{**FELDER, "zusammen": "OBS-S110-1"})
+    assert "- Zusammen-erledigen: OBS-S110-1" in eintrag
+
+
+def test_zusammen_keiner_is_written_explicitly():
+    eintrag = oe.format_entry("OBS-S114-1", **{**FELDER, "zusammen": "keiner"})
+    assert "- Zusammen-erledigen: keiner" in eintrag
+
+
+def test_zusammen_is_required():
+    import pytest
+    with pytest.raises(ValueError, match="Zusammen-erledigen"):
+        oe.format_entry("OBS-S114-1", **{**FELDER, "zusammen": ""})
+
+
+def test_zusammen_rejects_unparseable_value():
+    # Freitext wie "vielleicht sowas wie das andere" wäre für den Drain unlesbar und
+    # fiele still auf "keine Kante" zurück – also blocken statt verschlucken.
+    import pytest
+    with pytest.raises(ValueError, match="Zusammen-erledigen"):
+        oe.format_entry("OBS-S114-1", **{**FELDER, "zusammen": "das mit den Scripten"})
+
+
+def test_set_writes_zusammen_into_an_existing_entry():
+    # Der Drain muss die Kanten korrigieren können (Skill: „beider Seiten korrigieren") – und
+    # Bestands-Einträge ohne das Feld brauchen es nachgetragen. Beides ginge sonst nur per Edit.
+    neu = oe.set_fields(BESTAND, "OBS-S110-1", zusammen="OBS-S110-2")
+    assert "- Zusammen-erledigen: OBS-S110-2" in oe.get(neu, "OBS-S110-1")
+
+
+def test_set_inserts_the_field_when_missing():
+    # Migrationsfall: Der Eintrag stammt aus der Zeit vor dem Pflichtfeld.
+    assert "Zusammen-erledigen" not in BESTAND
+    neu = oe.set_fields(BESTAND, "OBS-S110-1", zusammen="keiner")
+    eintrag = oe.get(neu, "OBS-S110-1")
+    zeilen = [z.split(":")[0] for z in eintrag.splitlines() if z.startswith("- ")]
+    # Position wie bei neuen Einträgen: nach Beobachtung, vor der Entscheidung.
+    assert zeilen.index("- Beobachtung") < zeilen.index("- Zusammen-erledigen") \
+        < zeilen.index("- Entscheidung/Maßnahme")
+
+
+def test_set_validates_zusammen_like_the_capture_does():
+    import pytest
+    with pytest.raises(ValueError, match="Zusammen-erledigen"):
+        oe.set_fields(BESTAND, "OBS-S110-1", zusammen="irgendwas Unlesbares")
+
+
+# --- Referenzielle Integrität der Kanten -------------------------------------
+# Bewusst KEINE Spiegelung (A<->B): `cluster()` macht die Kante beim Lesen ohnehin ungerichtet,
+# eine zweite Kopie könnte nur auseinanderlaufen. Was fehlt, ist die Prüfung, dass das Ziel
+# überhaupt existiert – ein Vertipper fällt sonst lautlos aus, weil unbekannte Ziele im Cluster
+# stillschweigend verworfen werden.
+def test_add_rejects_an_unknown_target():
+    import pytest
+    with pytest.raises(ValueError, match="OBS-S999-9"):
+        oe.add(BESTAND, 114, **{**FELDER, "zusammen": "OBS-S999-9"})
+
+
+def test_add_accepts_an_existing_target():
+    neu, oid = oe.add(BESTAND, 114, **{**FELDER, "zusammen": "OBS-S110-1"})
+    assert "- Zusammen-erledigen: OBS-S110-1" in oe.get(neu, oid)
+
+
+def test_set_rejects_an_unknown_target():
+    import pytest
+    with pytest.raises(ValueError, match="OBS-S999-9"):
+        oe.set_fields(BESTAND, "OBS-S110-1", zusammen="OBS-S999-9")
+
+
+def test_an_entry_cannot_point_at_itself():
+    import pytest
+    with pytest.raises(ValueError, match="sich selbst"):
+        oe.set_fields(BESTAND, "OBS-S110-1", zusammen="OBS-S110-1")
+
+
+def test_incoming_edges_are_shown_when_reading_an_entry():
+    # Ersetzt die Spiegelung: Wer B liest, sieht die Kante von A – ohne sie zu duplizieren.
+    # Auf den Marker prüfen, nicht auf die nackte ID: OBS-S110-2 trägt bereits `Bezug: OBS-S110-1`,
+    # ein ID-Vergleich wäre also auch ohne jede Funktion grün.
+    text = oe.set_fields(BESTAND, "OBS-S110-1", zusammen="OBS-S110-2")
+    gelesen = oe.get(text, "OBS-S110-2")
+    assert oe.EINGEHEND_MARKER in gelesen and "OBS-S110-1" in gelesen.split(oe.EINGEHEND_MARKER)[1]
+
+
+def test_no_incoming_note_without_edges():
+    assert oe.EINGEHEND_MARKER not in oe.get(BESTAND, "OBS-S110-1")
 
 
 def test_bezug_is_omitted_when_not_given():
@@ -191,20 +286,20 @@ VORPRAEGUNG_BESTAND = """## OBS-S115-9 – Etwas ist nicht ideal
 
 def test_format_entry_writes_the_field_when_given():
     eintrag = oe.format_entry("OBS-S115-1", "T", "User", "MITTEL", "häufig", "TOOLING",
-                              "Hook/Script", "Beobachtet.", None, vorpraegung="Ansatz Z.")
+                              "Hook/Script", "Beobachtet.", None, "keiner", vorpraegung="Ansatz Z.")
     assert "- Vorprägung: Ansatz Z." in eintrag
 
 
 def test_format_entry_omits_the_field_when_absent():
     eintrag = oe.format_entry("OBS-S115-1", "T", "User", "MITTEL", "häufig", "TOOLING",
-                              "Hook/Script", "Beobachtet.", None)
+                              "Hook/Script", "Beobachtet.", None, "keiner")
     assert "Vorprägung" not in eintrag
 
 
 def test_field_sits_between_observation_and_decision():
     """Reihenfolge ist Teil des Formats – und macht beim Lesen der Datei die Trennung sichtbar."""
     eintrag = oe.format_entry("OBS-S115-1", "T", "User", "MITTEL", "häufig", "TOOLING",
-                              "Hook/Script", "Beobachtet.", None, vorpraegung="Ansatz Z.")
+                              "Hook/Script", "Beobachtet.", None, "keiner", vorpraegung="Ansatz Z.")
     zeilen = [z.split(":")[0] for z in eintrag.splitlines() if z.startswith("- ")]
     assert zeilen.index("- Beobachtung") < zeilen.index("- Vorprägung") < zeilen.index("- Entscheidung/Maßnahme")
 

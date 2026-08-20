@@ -17,8 +17,15 @@ from pathlib import Path
 OBS_FILE = "docs/kaizen/observations.md"
 SESSIONS_DIR = "docs/history/sessions"
 
-IMPACT = {"KRITISCH": 4, "HOCH": 3, "MITTEL": 2, "GERING": 1}
-FREQ = {"dauerhaft": 3, "häufig": 2, "gelegentlich": 1}
+# Score = Impact × Häufigkeit (Gesamtschaden = Schaden je Vorfall × Vorfälle). GERING = 0, weil
+# die Rubrik es als "keine Prozessfolge" definiert – folgenlos bleibt folgenlos, auch gehäuft und
+# auch in einer Cluster-Summe. Herleitung der Werte: process.md, "Score und Behandlungswürdigkeit".
+IMPACT = {"KRITISCH": 9, "HOCH": 3, "MITTEL": 1, "GERING": 0}
+FREQ = {"dauerhaft": 4, "häufig": 2, "gelegentlich": 1}
+
+# Ab hier lohnt die Einzelbehandlung: 2 = MITTEL × häufig, die kleinste Kombination, in der beide
+# Dimensionen über der Bagatellstufe liegen. Darunter führt die Alters-Lane den Eintrag ab.
+WUERDIG_AB = 2
 
 
 def repo_root() -> Path:
@@ -91,6 +98,11 @@ def score_from_keywords(text: str, table: dict, field: str = "Wert") -> float:
     return 1.0
 
 
+def score(entry: dict) -> float:
+    """Score eines einzelnen Eintrags: Impact × Häufigkeit (Skala oben)."""
+    return entry["impact"] * entry["freq"]
+
+
 def parse_entries(text: str):
     parts = re.split(r"^## (OBS-S\d+-\d+)", text, flags=re.M)
     entries = []
@@ -122,9 +134,15 @@ def parse_entries(text: str):
                 if re.search(r"\.(py|md|cs|ts|tsx|json|sh|js|yml|yaml|editorconfig)$", word) or "/" in word:
                     files.add(word.strip(".,"))
 
+        # Verwandt: erfasste Verwandtschaft für die Cluster-Bildung (S122). Bewusst NICHT
+        # `Bezug:` mitbenutzt – das ist ein freier Querverweis (LL/CM/OBS) und sagt nichts
+        # über gemeinsame Lösbarkeit. "keiner" ist die explizite Negativ-Angabe: erfasst,
+        # aber keine Kante.
+        verwandt = re.findall(r"OBS-S\d+-\d+", field("Zusammen-erledigen"))
+
         entries.append({
             "id": oid, "session": session, "sub": sub, "status": status,
-            "title": title, "bezug": bezug, "files": files,
+            "title": title, "bezug": bezug, "files": files, "zusammen": verwandt,
             "wiedervorlage": wiedervorlage,
             # Nur die Existenz, nicht der Inhalt: Das Feld ist beim Standardzugriff bewusst
             # verborgen (OBS-S112-8), damit es die Kandidatenbildung nicht prägt. Genau

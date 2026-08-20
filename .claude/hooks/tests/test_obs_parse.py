@@ -22,13 +22,70 @@ def parse(*blocks):
 def test_fields_parsed():
     e = parse(make("OBS-S091-4", freq="dauerhaft", bezug="OBS-S085-1"))[0]
     assert e["id"] == "OBS-S091-4" and e["session"] == 91 and e["sub"] == 4
-    assert e["status"] == "NEU" and e["impact"] == 2 and e["freq"] == 3
+    assert e["status"] == "NEU" and e["impact"] == 1 and e["freq"] == 4
     assert e["bezug"] == "OBS-S085-1" and e["files"] == {"a.py"}
 
 
 def test_impact_range_averaged():
     e = parse(make("OBS-S090-1", impact="MITTEL–HOCH (von GERING revidiert)"))[0]
-    assert e["impact"] == 2.5  # MITTEL(2)+HOCH(3) /2, Klammer ignoriert
+    assert e["impact"] == 2.0  # MITTEL(1)+HOCH(3) /2, Klammer ignoriert
+
+
+# --- Score-Skala (S122) -------------------------------------------------------
+# Kanonisch: docs/kaizen/process.md, Abschnitt "Backlog-Abbau" → Unterabschnitt "Score".
+# Die Skala ist NICHT frei gewählt: GERING = 0, weil die Rubrik GERING als "keine
+# Qualitäts- oder Prozessfolge" definiert. Was folgenlos ist, bleibt es auch gehäuft –
+# und darf in einer Cluster-Summe nichts beitragen.
+def test_gering_scores_zero_at_every_frequency():
+    for f in ("gelegentlich", "häufig", "dauerhaft"):
+        e = parse(make("OBS-S090-1", impact="GERING", freq=f))[0]
+        assert op.score(e) == 0, f"GERING × {f} muss 0 sein, nicht {op.score(e)}"
+
+
+def test_hoch_gelegentlich_beats_mittel_at_any_frequency_below_dauerhaft():
+    # Der Defekt der alten Multiplikation (GERING×dauerhaft = HOCH×gelegentlich = 3) ist weg.
+    hoch_gel = op.score(parse(make("OBS-S090-1", impact="HOCH", freq="gelegentlich"))[0])
+    gering_dau = op.score(parse(make("OBS-S090-2", impact="GERING", freq="dauerhaft"))[0])
+    mittel_hae = op.score(parse(make("OBS-S090-3", impact="MITTEL", freq="häufig"))[0])
+    assert hoch_gel == 3 and gering_dau == 0 and mittel_hae == 2
+    assert hoch_gel > gering_dau and hoch_gel > mittel_hae
+
+
+def test_kritisch_gelegentlich_outranks_hoch_haeufig():
+    krit = op.score(parse(make("OBS-S090-1", impact="KRITISCH", freq="gelegentlich"))[0])
+    hoch = op.score(parse(make("OBS-S090-2", impact="HOCH", freq="häufig"))[0])
+    assert krit == 9 and hoch == 6 and krit > hoch
+
+
+def test_behandlungswuerdig_threshold():
+    # >= 2: MITTEL×gelegentlich (1) fällt durch, MITTEL×häufig (2) und HOCH×gelegentlich (3) nicht.
+    def s(impact, freq):
+        return op.score(parse(make("OBS-S090-1", impact=impact, freq=freq))[0])
+    assert s("MITTEL", "gelegentlich") == 1 < op.WUERDIG_AB
+    assert s("MITTEL", "häufig") == 2 >= op.WUERDIG_AB
+    assert s("HOCH", "gelegentlich") == 3 >= op.WUERDIG_AB
+
+
+# --- Feld `Zusammen-erledigen:` (S122) ----------------------------------------------------
+# Cluster-Bildung braucht erfasste Verwandtschaft. `Bezug:` taugt dafür nicht: Es ist ein
+# freier Querverweis (LL/CM/OBS) ohne Aussage über gemeinsame Lösbarkeit.
+def test_zusammen_parsed_as_id_list():
+    e = parse(make("OBS-S090-1") + "- Zusammen-erledigen: OBS-S085-1, OBS-S088-2\n")[0]
+    assert e["zusammen"] == ["OBS-S085-1", "OBS-S088-2"]
+
+
+def test_zusammen_keiner_is_empty():
+    # "keiner" ist die explizite Negativ-Angabe – erfasst, aber keine Kante.
+    assert parse(make("OBS-S090-1") + "- Zusammen-erledigen: keiner\n")[0]["zusammen"] == []
+
+
+def test_zusammen_absent_is_empty():
+    assert parse(make("OBS-S090-1"))[0]["zusammen"] == []
+
+
+def test_bezug_is_not_read_as_zusammen():
+    # Ein Bezug allein bildet KEIN Cluster (sonst würden LL-Querverweise Scores addieren).
+    assert parse(make("OBS-S090-1", bezug="OBS-S085-1"))[0]["zusammen"] == []
 
 
 def test_unknown_frequency_falls_back(capsys):

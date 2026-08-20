@@ -65,21 +65,54 @@ Der proaktive Track für System-Design-Beobachtungen. **Eintrags-Format, ID-Sche
 
 Offene OBS (Status `NEU`) werden **kontinuierlich pro Session** abgebaut, **nicht** in der Retro. Grund: OBS-Verarbeitung ist *generatives Design* (Reibung → Kandidaten → lohnt-sich-Entscheidung), die Retro ist *diagnostisch* (Symptom → Muster → Root Cause). Design in den Diagnose-Container zu zwingen, lässt die Retro mit OBS-Themen volllaufen (OBS-S095-1).
 
-**Trigger:** Der SessionStart-Hook schlägt jede Session einen Drain-Satz vor (un-vergessbar – Disziplin allein scheiterte). Orchestrator schlägt vor, User bestätigt/vertagt. Der Zustand ist **sichtbar** („N vorgeschlagen, Backlog bei M, gesund ≤ 8"), aber **ohne Strafscore** – OBS speisen Jenga nicht.
+**Trigger:** Der SessionStart-Hook schlägt jede Session einen Drain-Satz vor (un-vergessbar – Disziplin allein scheiterte). Orchestrator schlägt vor, User bestätigt/vertagt. Der Zustand ist **sichtbar** („N vorgeschlagen, Backlog bei M, davon K behandlungswürdig"), aber **ohne Strafscore** – OBS speisen Jenga nicht.
 
-**Wie viele pro Session** (B = offenes `NEU`-Backlog): `clamp(round(0.4·B), 3, 7)`. Untergrenze 3 (matcht den Inflow ~3/Session), Obergrenze 7 (Session-Schutz bei Überlast), Gleichgewicht ~8. Zahlen aus dem realen Backlog kalibriert (S085–S095); später anpassbar. Steigt B über **12** (1,5× Gleichgewicht), markiert der Drain-Satz das Backlog sichtbar als *überfüllt* und mahnt, die Drain-Ausführung zu priorisieren (advisory, kein Strafscore).
+### Score und Behandlungswürdigkeit (S122)
+
+**Score = Impact × Häufigkeit** – Gesamtschaden = Schaden je Vorfall × Zahl der Vorfälle. Die Werte sind nicht frei gewählt (mechanisch in `obs_parse.py`, `IMPACT`/`FREQ`):
+
+| | gelegentlich (1) | häufig (2) | dauerhaft (4) |
+|---|---|---|---|
+| **GERING (0)** | 0 | 0 | 0 |
+| **MITTEL (1)** | 1 | 2 | 4 |
+| **HOCH (3)** | 3 | 6 | 12 |
+| **KRITISCH (9)** | 9 | 18 | 36 |
+
+**GERING = 0**, weil die Impact-Rubrik GERING als „*keine* Qualitäts- oder Prozessfolge" definiert – nicht als „wenig". Was folgenlos ist, bleibt es auch gehäuft, und darf in einer Cluster-Summe nichts beitragen; fünf folgenlose Einträge sind zusammen immer noch folgenlos. Die Impact-Stufen springen um Faktor 3 (qualitativ verschieden, nicht linear), die Häufigkeit verdoppelt je Stufe. Eine naheliegende lineare Skala (1–4 × 1–3) scheitert daran, dass `GERING × dauerhaft` dann gleichauf mit `HOCH × gelegentlich` läge – ein folgenloses Dauerärgernis so schwer wie ein seltener schwerer Befund.
+
+**Behandlungswürdig ab Score 2** = `MITTEL × häufig`: die kleinste Kombination, in der beide Dimensionen über der Bagatellstufe liegen. Darunter kostet die Einzelbehandlung mehr, als sie einbringt – solche Einträge verlassen den Pool über die Alters-Lane, nicht die Wert-Lane.
+
+**Einheit = Cluster oder Einzeleintrag.** Einträge, die sich **in einem Zug miterledigen lassen** (Feld `- Zusammen-erledigen:`, Pflichtangabe bei der Erfassung), bilden über die transitive Hülle eine Einheit mit summiertem Score; sie wird gemeinsam priorisiert **und gemeinsam bearbeitet**. Maßstab ist **Bearbeitungs-Kolokation**, nicht Problem-Identität:
+
+> *Wenn ich A bearbeite – liegt B dann ohnehin offen vor mir, und kostet es dadurch deutlich weniger?*
+
+Typisch trifft das zu, wenn dieselben Artefakte in ähnlicher Weise berührt sind oder dieselbe Sache betroffen ist. **Nicht** gemeint sind: (a) zwei Einträge, die *dasselbe* Problem beschreiben – die gehören **konsolidiert** (s. unten), nicht geclustert; (b) eine **Vorfrage**, die vor dem anderen zu entscheiden wäre – eine Reihenfolge-Abhängigkeit macht nichts billiger; (c) bloße Themen-Ähnlichkeit ohne gemeinsames Artefakt.
+
+Beim Aufgreifen ist die Zusammengehörigkeit am Volltext zu prüfen und ein nicht tragendes Mitglied herauszulösen (es behält seinen Einzel-Score) – die teure Beurteilung gehört in den Drain, nicht in die billige Erfassung. Kanten zu erledigten Einträgen bilden keine Einheit, bleiben aber als Kontext auffindbar: Ein neuer Eintrag am selben Artefakt sagt, dass die frühere Lösung dort unvollständig war.
+
+*Reichweite:* Cluster entstehen vor allem im Rückstau. Bei gesundem Backlog sind verwandte Einträge selten gleichzeitig offen (der S122-Bestand trug genau einen echten Cluster, aus Einträgen über fünf Sessions hinweg) – das Cluster-Scoring ist daher überwiegend ein Altlast-Werkzeug, das `Zusammen-erledigen:`-Feld dagegen dauerhaft nützlich.
+
+### Lanes und Trigger
+
+**Wie viele pro Session:** Der Satz zeigt **alle** behandlungswürdigen Einheiten – ungedeckelt. Ein Deckel begrenzte nur den Vorschlag, nicht die Arbeit, und versteckte damit Behandlungswürdiges; für verdauliche Portionen sorgt der Skill, der wenige Einheiten auf einmal vorlegt. Die **Backlog-Größe steuert bewusst nichts**: Sie misst Menge, nicht Wert.
 
 **Lanes des Drain-Satzes:**
-- **Wert-Lane:** Top nach Impact × Häufigkeit (Hauptbudget).
-- **Alters-Lane:** das **älteste** `NEU`-Item (1 Slot), gezwungen zur Entscheidung → Anti-Starvation (reine Prioritäts-Ordnung verhungert das Tail sonst dauerhaft). Alter = aktuelle Session − Erfassungs-Session (aus der OBS-ID). Max. Verweildauer ≈ B Sessions.
-- **Wiedervorlage-Lane:** fällige geparkte Items (s. „Drei Ausgänge"), garantiert und außerhalb des Rate-Budgets.
+- **Wert-Lane:** behandlungswürdige Einheiten nach Score (Hauptbudget).
+- **Alters-Lane:** **alle** Einträge älter als `ALT_AB` = **15 Sessions**, sonst das älteste (1 Slot) – gezwungen zur Entscheidung → Anti-Starvation. Alter = aktuelle Session − Erfassungs-Session (aus der OBS-ID). Der Vollzugriff ist nötig, weil mehr als ein Eintrag pro Session nachaltert; ein Slot je Drain führte den Zufluss nicht ab. **`ALT_AB` steuert nicht den Durchsatz** – der entspricht im Gleichgewicht dem Zufluss, unabhängig von der Grenze – sondern den **stehenden Bestand** ≈ Zufluss × `ALT_AB` (bei ~1,4 nicht-behandlungswürdigen Einträgen je Session also ~20).
+- **Wiedervorlage-Lane:** fällige geparkte Items (s. „Drei Ausgänge"), garantiert und außerhalb des Budgets.
 *(Offene Fragen hingen bis S116 als vierte Lane hier mit dran; seit S117 sind sie ein eigenes Modul der Session-Agenda – s. unten.)*
 
-**Same-Artefakt-Kolokation:** Berührt ein anderes offenes OBS dieselbe Datei (Skript/Hook *oder* Skill/Doc), Mitnahme erwägen – spart Kontext-Laden, vermeidet Konflikt-Fixes über Sessions, bündelt teure Doc-QA.
+**Trigger – wann beansprucht der Drain die Session?** Zwei Lanes, zwei Auslöser, ODER-verknüpft (`obs-drain.triggers()`):
+1. **Wert:** Summe der **Top-5**-Einheiten ≥ **9**. Die Kappung bei 5 ist die gemessene Kapazität einer Drain-Session (S109…S121: 7/5/5/5/3/1/3): Was mehr wert ist, als eine Session abarbeiten kann, darf nicht mittriggern – sonst löst eine lange Liste Bagatellen dieselbe Summe aus wie ein schwerer Befund. Die **9** = `KRITISCH × gelegentlich`, der kleinste Einzelbefund, der eine Session allein rechtfertigt. Gedeckelt ist nur die Trigger-*Frage*, nicht der Satz.
+2. **Alter:** ≥ **4** Einträge über `ALT_AB`. Ohne eigenen Auslöser hinge die Alters-Lane am Wert-Trigger und käme genau dann nie zum Zug, wenn sie am nötigsten ist – wenn nur noch Bagatellen übrig sind.
+
+**Warum nicht die Backlog-Größe** (bis S121: `B ≥ 13`): Sie misst Menge statt Wert, und sie ist selbsterhaltend – jede Drain-Session erzeugt neue Einträge und hält B damit über der Schwelle. Zwischen S112 und S121 kam so zehn Sessions lang keine Feature-Arbeit mehr dran.
+
+**Same-Artefakt-Kolokation:** Berührt ein anderes offenes OBS dieselbe Datei (Skript/Hook *oder* Skill/Doc), Mitnahme erwägen – spart Kontext-Laden, vermeidet Konflikt-Fixes über Sessions, bündelt teure Doc-QA. Verhältnis zu `Zusammen-erledigen:`: Beide fragen nach Bearbeitungs-Kolokation, auf verschiedenen Wegen – die Kolokation **mechanisch** (gleiche Datei, aus dem Text erkannt), als bloßer Hinweis; das Feld **beurteilt**, und es trägt auch über Dateigrenzen (dieselbe Sache in mehreren Dateien). Nur das Feld bildet die Einheit.
 
 **Drei Ausgänge je Item:** umsetzen / **verwerfen** (mit Grund → Archiv) / **aufschieben** → `IN BEOBACHTUNG bis S<NNN>` (mit Grund + **Pflicht-Wiedervorlage**: ab dieser Session kommt das Item automatisch zurück in den Drain). Geparkte Items fallen bis dahin aus dem Pool; zum Termin injiziert `obs-drain.py` sie als fällige Wiedervorlage. Fehlt das `bis S<NNN>`, gilt das Item **sofort** als fällig (+ Warnung) – so kann ein geparktes Item nie still liegenbleiben. Für event-basierte Reaktivierung („wieder aktiv wenn X") zusätzlich eine Re-Trigger-Notiz; der Termin bleibt der verlässliche Backstop.
 
-**Bias-Auslöschung (Relevanz wird zweimal beurteilt):** heiß bei der Erfassung (Bias *für* Aufnahme), kalt bei der Behandlung (Bias *zur* Abwertung) – entgegengesetzt, daher kalibrierter zusammen. Damit die kalte Abwertung nichts Wertvolles killt, wendet der Drain (Skill `draining-observations`, Schritt 5) den **Kalt-Abwertungs-Prüfsatz** an.
+**Bias-Auslöschung (Relevanz wird zweimal beurteilt):** heiß bei der Erfassung (Bias *für* Aufnahme), kalt bei der Behandlung (Bias *zur* Abwertung) – entgegengesetzt, daher kalibrierter zusammen. Damit die kalte Abwertung nichts Wertvolles killt, wendet der Drain (Skill `draining-observations`, Schritt „**Entscheiden**") den **Kalt-Abwertungs-Prüfsatz** an.
 
 **Vorprägung (Anker-Bias, getrennt vom Obigen):** Schon genanntes Lösungswissen – vom User geäußerte Maßnahmen, vermutete Ursachen, Analogieschlüsse – wird nicht getilgt (Informationsverlust) und nicht in die Beobachtung gemischt, sondern steht im optionalen Feld `- Vorprägung:`. Es wird beim normalen `obs.py get` **nicht mitgelesen**, nur als Hinweis angekündigt; Abruf per `--vorprägung`, und zwar erst **nach** eigener Kandidatenbildung. Begründung (S115): Eine Verifikationspflicht *nach* dem Lesen kommt zu spät – wer den Volltext gesehen hat, ist geprägt, unabhängig davon, was die Regel danach fordert. Umgekehrt wäre stilles Verbergen so schädlich wie Tilgen, deshalb sind Hinweis im `get` und `+Vorprägung`-Marker im Drain-Satz Pflicht. Der Inhalt ist zudem **agentenformuliert** und daher beim Drain gegen das tatsächliche Ziel des Users zu verifizieren, nicht als Auftrag zu lesen – genau daran ist der S115-Drain zunächst gescheitert.
 
@@ -123,7 +156,7 @@ ehesten wirkt. Die Agenda enthält zusammenhängend:
 | Rang | Modul | Beansprucht, wenn |
 |------|-------|-------------------|
 | 1 | `retro` | Jenga ≤ 0 |
-| 2 | `obs-drain` | B ≥ 13 |
+| 2 | `obs-drain` | `triggers()` erfüllt – Top-5-Score ≥ 9 oder ≥ 4 Einträge über 15 Sessions alt |
 | 3 | `priorities` | ein AGENT_MEMORY-Punkt trägt `Fällig: jetzt` |
 | 4 | `next-run` | die aktuelle Story hat einen offenen Lauf |
 
@@ -146,10 +179,7 @@ beides: `next-run` beansprucht nur für die aktuelle Story, und `ungeplante-szen
 sichtbar, was geschrieben ist, aber auf keinem Weg vorgelegt wird. Der Status dort ist
 **ungeklärt**, nicht „fällig".
 
-**Warum B ≥ 13 und nicht ≥ 9 (Gleichgewicht):** Nicht die Backlog-Größe entscheidet, sondern die
-**Satzgröße**. `clamp(round(0,4·B), 3, 7)` schlägt bei B=8 drei Items vor (Nebentätigkeit), ab
-B=13 fünf und mehr (Sessionarbeit). Politik-Regler, keine Messgröße: Bei ≥ 9 gewänne der Drain
-fast immer und Produktarbeit käme nie dran.
+**Warum der Drain nicht an der Backlog-Größe hängt:** s. „Lanes und Trigger" oben.
 
 **Keine Extremschwellen** (etwa „sehr volles Backlog schlägt fällige Retro"): nicht
 kalibrierbar – in S116 zeigten Backlog-Rückgang und tiefer Jenga-Stand gleichzeitig auf die

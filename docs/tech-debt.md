@@ -13,7 +13,7 @@ aufnahmebedingung: Hier steht eine **entschiedene** Sache am Produkt (Code + Bui
             `Superseded` stehen). Noch nicht entschieden → `docs/open-questions.md`. Hierher
             gehört auch der **Aufschub-Teil** einer Entscheidung, deren terminaler Rest als ADR
             abgelegt ist – eine ADR trägt keinen Aufschub. Abgrenzung ADR/TD/OQ kanonisch:
-            `CLAUDE.md`, Sektion „Ablage: ADR, TD oder offene Frage?"
+            `CLAUDE.md`, Sektion „Ablage: in welchen Tracker gehört dieser Eintrag?"
 
 Sortierung: nach ID (Session) aufsteigend – neue Einträge unten anfügen (kein Umsortieren).
 
@@ -289,3 +289,19 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 - **Betrifft die Diagnose einzelne Zeilen → `#pragma warning disable/restore` dort**, mit Begründung. Grund: Die Begründung ist dann Pflicht und wird bei jedem Edit an der Stelle mitgelesen; die Form verrät zugleich die Reichweite.
 - **Gilt sie wirklich dateiweit → `.editorconfig`**, als begründete Ausnahme, jedes Mal kritisch geprüft. Tragfähiger Fall: eine Datei, in der Mehrtypigkeit die *erwartete* Eigenschaft ist (`StringConstraints.cs`, MA0048) – dann ist ein Eintrag, der das einmal festhält, ehrlicher als N Pragmas.
 - **Kein `#pragma` ohne `restore` am Dateianfang.** Es sieht aus wie eine lokale Suppression, wirkt aber bis Dateiende – diese Tarnung ist schlechter als ein offener `.editorconfig`-Eintrag.
+
+---
+
+## TD-S122-1 — `useResultMutation` gibt ein 4er-Positions-Tupel zurück
+**Fällig:** Phase:MVP – der MVP-Ausbau der Formulare fasst die Aufrufstellen ohnehin an; bei den heutigen wenigen Call-Sites trägt das Tupel noch.
+**Problem:** `useResultMutation` liefert `[mutate, error, isPending, reset]` – vier Positionen, zwei davon Funktionen. Positions-Tupel werden mit wachsender Länge fehleranfällig: Jede Call-Site muss exakt in der richtigen Reihenfolge destrukturieren, und `error`/`isPending` sind beim Lesen leicht zu verwechseln. Eine vertauschte Reihenfolge fängt der Compiler nur, wenn sich die Typen unterscheiden.
+**Behebung:** Rückgabe auf ein Objekt `{ save, error, isPending, reset }` umstellen – selbstdokumentierend und reihenfolgeunabhängig; Aufrufstellen mitziehen.
+**Herkunft:** OBS-S101-3 (S101), in S122 hierher umgezogen.
+
+---
+
+## TD-S122-2 — Restore-Endpoint ist ein CORS-„Simple Request" ohne Preflight-Schutz
+**Fällig:** Phase:MVP – vor der ersten Nutzung außerhalb der lokalen Entwicklung; bis dahin ist der Schutz der übrigen mutierenden Endpoints ein Nebeneffekt, kein Entwurf.
+**Problem:** `POST /api/ingredients/{id}/restore` verlangt weder Custom-Header noch Request-Body und ist damit ein CORS-„Simple Request": Ein Browser sendet ihn cross-origin **ohne** Preflight. CORS verhindert dann nur das Auslesen der Antwort, nicht die serverseitige Ausführung – der Restore liefe also durch. Alle übrigen mutierenden Endpoints sind nur **zufällig** geschützt: `DELETE` durch den verpflichtenden `If-Match`-Header, `POST /api/ingredients` durch `Content-Type: application/json`; beide erzwingen dadurch eine Preflight, die mangels CORS-Policy scheitert. Dass der Restore kein `If-Match` verlangt, ist in ADR-S108-2 bewusst und mit Concurrency-Argumenten entschieden – dass `If-Match` nebenbei auch die Preflight erzwingt, war dabei nicht Teil der Abwägung.
+**Behebung:** Den Schutz zur Entwurfsentscheidung machen, statt ihn der Header-Wahl einzelner Endpoints zu überlassen – explizite CORS-Policy serverseitig.
+**Herkunft:** OBS-S108-5 (S108), in S122 hierher umgezogen.

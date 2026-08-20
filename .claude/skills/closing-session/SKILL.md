@@ -40,12 +40,22 @@ user-invocable: true
    - Dokumente anpassen, dann weiter mit Schritt 4.
    - **Neue Beobachtungen** (aus dem Beobachtungs-Prompt) → **per Script erfassen**, nicht per Edit:
      ```
+     python3 .claude/scripts/obs.py list-offen        # erst die offenen Titel ansehen – für --zusammen-erledigen
      python3 .claude/scripts/obs.py add --titel "…" --quelle User --impact MITTEL \
-         --haeufigkeit dauerhaft --kategorie PROZESS --kontext Doku --beobachtung "…"
+         --haeufigkeit dauerhaft --kategorie PROZESS --kontext Doku --beobachtung "…" \
+         --zusammen-erledigen keiner
      ```
      Das vergibt die ID, hängt den Eintrag an und setzt das Entscheidungsfeld auf den einzigen bei
      der Erfassung zulässigen Wert – ein Eintrag kann so nicht in der Form entstehen, die
      `check-obs-capture.py` blocken müsste. Nebeneffekt: Die Datei muss dafür nicht gelesen werden.
+     **`--zusammen-erledigen` ist Pflicht** und verlangt eine echte Prüfung: Nennt einen offenen
+     Eintrag nur, wenn er sich **in einem Zug miterledigen** ließe: Bearbeite ich den neuen,
+     liegt jener dann ohnehin offen vor mir und kostet deutlich weniger? Typisch bei denselben
+     Artefakten. Nicht bei bloß ähnlichem Thema, nicht bei einer Vorfrage. Sonst `keiner`.
+     **Impact/Häufigkeit ehrlich wählen** – sie entscheiden nicht nur die Reihenfolge, sondern ob
+     der Drain überhaupt eine Session beansprucht. `GERING` zählt 0 („keine Folge", nicht „wenig")
+     und wird nie einzeln behandelt: Hochstufen aus Höflichkeit kauft dem Projekt eine Session ab,
+     Abstufen aus Bequemlichkeit versenkt den Eintrag.
      KEINE Lösung jetzt umsetzen, wenn sie aufgeschoben/nicht-trivial ist – die Retro evaluiert
      (Evaluierungs-Gate).
 

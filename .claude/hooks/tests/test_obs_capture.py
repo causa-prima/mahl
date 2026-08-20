@@ -20,9 +20,11 @@ def _obs(
     beobachtung: str = "irgendwas fiel auf",
     extra: str = "",
     bezug: str | None = "–",
+    verwandt: str | None = "keiner",
 ) -> str:
     """Minimaler, formatgetreuer OBS-Block."""
     entscheidung = "" if decision is None else f"- Entscheidung/Maßnahme: {decision}\n"
+    verwandt_zeile = "" if verwandt is None else f"- Zusammen-erledigen: {verwandt}\n"
     return (
         f"## {oid} – Kurztitel\n"
         "- Quelle: Orchestrator\n"
@@ -30,6 +32,7 @@ def _obs(
         "- Impact: MITTEL    Häufigkeit: gelegentlich\n"
         "- Kategorie: PROZESS    Kontext: Skill-Nutzung\n"
         f"- Beobachtung: {beobachtung}\n"
+        f"{verwandt_zeile}"
         f"{entscheidung}"
         f"{extra}"
         + ("" if bezug is None else f"- Bezug: {bezug}\n")

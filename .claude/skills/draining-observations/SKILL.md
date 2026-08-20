@@ -36,7 +36,9 @@ Meldet das Script „Backlog leer", bestätige das kurz und beende – nichts zu
 Der Satz liefert **Wert-Lane** + **Alters-Lane**, dazu ggf. **fällige Wiedervorlagen** (geparkte Items, deren
 Termin erreicht ist), **offene Fragen** und einen **Hygiene-Reminder** (aufgelöst, aber noch nicht archiviert).
 Definitionen: `process.md`. Ein **`+Koloc:`-Marker** an
-einer Zeile nennt offene OBS an derselben Datei (Kandidaten für Same-Artefakt-Mitnahme, s. Schritt 3).
+einer Zeile nennt offene OBS an derselben Datei (Kandidaten für Same-Artefakt-Mitnahme, s. Schritt
+„**Kolokation & Konsolidierung erwägen**"). Eine `Einheit [Σ …]` fasst *verwandte* Einträge zusammen, die
+gemeinsam bearbeitet werden – dazu der Schritt „**Cluster kritisch prüfen**".
 
 **Offene Fragen sind kein Drain-Item.** Erscheint die Sektion „Offene Fragen", leg die Einträge dem **User
 zur Klärung** vor (Volltext: `docs/open-questions.md`) – sie werden nicht wie OBS selbst entschieden, denn
@@ -52,6 +54,14 @@ Leg die Items in **sinnvoll gruppierten, kleinen Blöcken** vor (z.B. 2–3 them
 zusammengehörige, dann die nächsten) und nur **wenige auf einmal** – schon wenige Items gleichzeitig
 sind für den User kognitiv anstrengend (Kontext-Switch), erst recht wenn über sie in mehreren Runden
 diskutiert wird. Für jedes Item:
+
+0. **Tracker-Check – Prozess oder Produkt?** In einem Satz vorab. Betrifft der Eintrag das **Produkt**
+   (Code samt Build-/Test-Kette), endet die Behandlung hier: Er **zieht um** – nach `tech-debt.md`,
+   `adr.md`, `open-questions.md` oder in die passende Guideline, wenn er reines Wissen ist („diese Falle
+   gibt es"). Keine Kandidatenbildung; Status `VERWORFEN (umgezogen nach …)`, der Inhalt lebt am neuen
+   Ort weiter. Grund für den Vorrang: Nur dieser Pool ist ratenbegrenzt – ein Produkt-Thema hier kostet
+   Kapazität, die es an seinem Ort nie gebraucht hätte. Taxonomie: `CLAUDE.md`, Sektion „Ablage: in
+   welchen Tracker gehört dieser Eintrag?".
 
 1. **Verstehen zuerst.** Sorge dafür, dass Ziel/Problem der Beobachtung wirklich klar ist. Bei Unklarheit
    nutze `grill-me`, bevor Kandidaten entstehen – eine falsch verstandene OBS produziert plausible, aber
@@ -78,7 +88,17 @@ diskutiert wird. Für jedes Item:
    verifizieren, bevor sie eine Empfehlung stützt. Eine auf veralteten Angaben gefällte Verwerfung
    schließt den Punkt *und* hinterlässt die falsche Begründung als Präzedenz im Archiv.
 
-3. **Kolokation & Konsolidierung erwägen** (zwei getrennte Fälle):
+3. **Cluster kritisch prüfen, bevor er gemeinsam bearbeitet wird.** Eine `Einheit [Σ …]` im Drain-Satz
+   ist eine **Behauptung der Erfassung**, keine geprüfte Tatsache – gemacht, als der spätere Partner noch
+   gar nicht existierte. Volltexte der Mitglieder lesen und je Mitglied fragen: *Wird es beim Bearbeiten
+   der anderen wirklich mit erledigt – oder ist es nur dasselbe Themenfeld?* Wer danebensteht, wird
+   **herausgelöst** und behält seinen Einzel-Score (bei Zweifel Rücksprache); dann die Kante entfernen
+   (`obs.py set <ID> --zusammen-erledigen …`) – **auf beiden Seiten prüfen**, denn eine einzige
+   verbliebene Kante hält die Einheit zusammen, egal in welcher Richtung sie steht. Welche Einträge auf
+   den vorliegenden zeigen, blendet `obs.py get` als eingehende Kanten mit ein. Der typische Fehltreffer ist die **Vorfrage**, die vor den anderen zu entscheiden wäre –
+   eine Reihenfolge-Abhängigkeit macht nichts billiger.
+
+4. **Kolokation & Konsolidierung erwägen** (zwei getrennte Fälle):
    - **Same-Artefakt-Kolokation** (gemeinsam *lösen*): Berührt ein Kandidat dieselbe Datei wie ein anderes
      offenes OBS, erwäge die Mitnahme (auch bei verschiedenen Problemen; Begründung: `process.md`). Nur bei
      **gleicher Datei**, nicht bei bloßer Themen-Nähe. Marker: `+Koloc:`.
@@ -89,12 +109,12 @@ diskutiert wird. Für jedes Item:
      und Drain-Last. (Die teure „ist das dasselbe Problem?"-Beurteilung gehört hierher in den Drain, nicht in
      die billige Erfassung – `process.md` „Erfassung ist billig, Klassifikation ist teuer".)
 
-4. **Gefahr & CM-Gate** (s. `process.md` „Gefahr & Kandidaten-Bewertung" + „Wann gehört etwas wohin?"): Bei
+5. **Gefahr & CM-Gate** (s. `process.md` „Gefahr & Kandidaten-Bewertung" + „Wann gehört etwas wohin?"): Bei
    höher-Gefahr/nicht-trivialen Items erst absichern/belegen, dann umsetzen – Sorgfalt und Beweisbarkeit
    skalieren mit der Gefahr. Steht eine *stehende, wiederkehrende* Leitplanke dahinter, lege eine CM an; bei
    einer Einmal-Änderung halte sie inline als `Maßnahme:` fest.
 
-5. **Entscheiden.** Wägst du *verwerfen* ab, prüfe zuerst den **Kalt-Abwertungs-Bias**: Du liest die OBS
+6. **Entscheiden.** Wägst du *verwerfen* ab, prüfe zuerst den **Kalt-Abwertungs-Bias**: Du liest die OBS
    lange nach der Beobachtung und bist strukturell versucht, sie als „nicht mehr dringend" einzustufen.
    Gegenprobe: **„Wäre dieser Punkt noch wertvoll, wenn er gerade jetzt erst beobachtet worden wäre?"** –
    wenn ja, halte ihn (nicht wegen Zeitablauf verwerfen). Ist sein **Gegenstand objektiv entfallen** (z.B.

@@ -336,6 +336,15 @@ Diese Regel gilt für POST (anlegen), PUT/PATCH (ändern), DELETE (löschen/soft
 - **Konfiguration:** `stryker-config.json` im Root (mit `coverage-analysis: "off"` für WebApplicationFactory)
 - **Ausnahmen** (äquivalente Mutanten, müssen dokumentiert werden): Generated Code (EF Migrations), Framework-Boilerplate (Program.cs)
 
+**100 % Mutation Score pinnt keine Reihenfolge.** Bei „erstes-von-N"-Auswahl- oder Prioritätslogik
+(`nameError ? nameRef : unitError ? unitRef : undefined`) töten schon die Einzelfall-Tests alle
+Mutanten – der **Mehrfach-Fall** bleibt trotzdem ungepinnt: Vertauscht jemand die Priorität
+(Einheit vor Name), mutiert der Code identisch und die Änderung bliebe bei 100 % unentdeckt.
+Deshalb: Auswahl-/Prioritätslogik braucht **immer einen expliziten Test mit mehreren zugleich
+zutreffenden Fällen**, der die gewählte Reihenfolge behauptet. Stryker-Grün über Einzelfälle
+genügt hier nicht — ein Fall, in dem ein grünes Ergebnis nur belegt, dass der Aufbau lief.
+(Gefunden in S105 im Review als FC-F1; der konkrete Fall ist mit einem Mehrfeld-Assert geschlossen.)
+
 ### Stryker-Survivor behandeln
 
 **Ein Survivor bedeutet: Es fehlt eine Test-Assertion für echtes Verhalten.**

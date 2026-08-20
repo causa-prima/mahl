@@ -39,6 +39,7 @@ Ausfallverhalten: Jedes Modul scheitert EINZELN und sichtbar; die Agenda läuft 
 Totalausfall wäre von „nichts zu tun" ununterscheidbar.
 """
 import argparse
+import importlib.util
 import os
 import re
 import subprocess
@@ -51,6 +52,14 @@ import open_questions  # noqa: E402
 import td_anchors  # noqa: E402
 import td_due  # noqa: E402
 from obs_parse import current_session, parse_entries  # noqa: E402
+
+# obs-drain.py trägt einen Bindestrich (CLI-Name) und ist deshalb nicht direkt importierbar.
+# Der Trigger lebt trotzdem dort, nicht hier: Wer den Drain-Satz berechnet, entscheidet auch,
+# ob er eine Session beansprucht – zwei Stimmen dazu wären eine Quelle für stille Divergenz.
+_drain_spec = importlib.util.spec_from_file_location(
+    "obs_drain", os.path.join(os.path.dirname(os.path.abspath(__file__)), "obs-drain.py"))
+_drain = importlib.util.module_from_spec(_drain_spec)
+_drain_spec.loader.exec_module(_drain)
 
 SCRIPTS = Path(__file__).resolve().parent
 ROOT = SCRIPTS.parent.parent
@@ -139,20 +148,21 @@ def modul_retro() -> Block:
     )
 
 
-# Ab hier beansprucht der Drain den Slot: Die Rate `clamp(round(0,4·B), 3, 7)` schlägt dann
-# ≥ 5 Items vor – das ist Sessionarbeit, keine Nebentätigkeit. Unterhalb davon absorbiert der
-# Trickle das Backlog nebenher. (Politik-Regler, keine Messgröße – process.md.)
-DRAIN_SESSION_AB = 13
-
-
 def modul_obs_drain() -> Block:
+    """Der Drain beansprucht den Slot, wenn `obs-drain.triggers()` erfüllt ist.
+
+    Die Entscheidung lebt bewusst dort, nicht hier: Wer den Drain-Satz berechnet, weiß auch, ob
+    er eine Session wert ist. Herleitung: docs/kaizen/process.md, „Lanes und Trigger".
+    """
     text = _laufe("python3", str(SCRIPTS / "obs-drain.py"))
     eintraege = parse_entries(_lies(ROOT / "docs" / "kaizen" / "observations.md"))
     b = sum(1 for e in eintraege if e["status"].upper().startswith("NEU"))
+    wuerdig = sum(len(u) for u in _drain.wert_einheiten(
+        [e for e in eintraege if e["status"].upper().startswith("NEU")]))
     return Block(
-        stub=f"OBS-Drain: Backlog {b} drainbar (gesund ≤ 8, Drain-Session ab {DRAIN_SESSION_AB})",
+        stub=f"OBS-Drain: Backlog {b} drainbar, davon {wuerdig} behandlungswürdig",
         inhalt=text,
-        beansprucht=b >= DRAIN_SESSION_AB,
+        beansprucht=_drain.triggers(eintraege, current_session(ROOT)),
     )
 
 

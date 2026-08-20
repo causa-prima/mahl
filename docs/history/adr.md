@@ -15,7 +15,7 @@ aufnahmebedingung: Hier steht eine **entschiedene** Sache am Produkt (Code + Bui
             nach `docs/tech-debt.md` – eine ADR trägt keinen Aufschub. Bei **neu** erfassten
             Einträgen mechanisch geprüft: `.claude/hooks/check-adr-capture.py` blockt
             Aufschub-Vokabular (Escape für bewusste Einzelfälle: `adr-ok`-Marker im Eintrag).
-            Abgrenzung ADR/TD/OQ kanonisch: `CLAUDE.md`, Sektion „Ablage: ADR, TD oder offene Frage?"
+            Abgrenzung ADR/TD/OQ kanonisch: `CLAUDE.md`, Sektion „Ablage: in welchen Tracker gehört dieser Eintrag?"
 kritische-regeln:
   - Jede selbst getroffene technische Entscheidung hier dokumentieren
   - Format: Status + Tags + Entscheidung + Begründung + Verworfen

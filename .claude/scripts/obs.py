@@ -21,6 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from obs_parse import parse_entries, score  # noqa: E402
 from obs_entry import (  # noqa: E402
     HAEUFIGKEIT_WERTE,
     IMPACT_WERTE,
@@ -65,6 +66,7 @@ def cmd_add(args) -> int:
         kontext=args.kontext,
         beobachtung=args.beobachtung,
         bezug=args.bezug,
+        zusammen=args.zusammen_erledigen,
         vorpraegung=args.vorpraegung,
     )
     path.write_text(neu, encoding="utf-8")
@@ -72,21 +74,43 @@ def cmd_add(args) -> int:
     return 0
 
 
+def cmd_list_offen(args) -> int:
+    """Offene Einträge als Titelliste mit Score – die Datenbasis für `--zusammen-erledigen` (S122).
+
+    Ohne sie wäre die Pflichtangabe eine Zumutung: Verwandtschaft lässt sich nur beurteilen,
+    wenn man weiß, was offen ist. Bewusst nur Titel und Score, nicht die Volltexte – für die
+    Frage „gehört das zusammen?" reicht der Titel als Aufhänger, und ein Volltext-Dump
+    würde bei jeder Erfassung das kosten, was die Tracker-Scripte gerade einsparen sollen.
+    """
+    eintraege = parse_entries(obs_path().read_text(encoding="utf-8"))
+    offen = [e for e in eintraege if e["status"].upper().startswith("NEU")]
+    if not offen:
+        print("Keine offenen Einträge.")
+        return 0
+    for e in sorted(offen, key=lambda x: (-score(x), x["session"], x["sub"])):
+        print(f"{e['id']:<14}[{score(e):>2g}]  {e['title']}")
+    print(f"\n{len(offen)} offen. Für `--zusammen-erledigen`: nur Einträge nennen, die mit dem neuen "
+          f"in einem Zug miterledigt wären – nicht solche mit bloß ähnlichem Thema.")
+    return 0
+
+
 def cmd_set(args) -> int:
-    if args.status is None and args.entscheidung is None and args.beobachtung_anhaengen is None:
-        print("Nichts zu ändern – --status, --entscheidung und/oder "
+    if (args.status is None and args.entscheidung is None
+            and args.beobachtung_anhaengen is None and args.zusammen_erledigen is None):
+        print("Nichts zu ändern – --status, --entscheidung, --zusammen-erledigen und/oder "
               "--beobachtung-anhängen angeben.", file=sys.stderr)
         return 1
     path = obs_path()
     inhalt = path.read_text(encoding="utf-8")
-    if args.status is not None or args.entscheidung is not None:
-        inhalt = set_fields(inhalt, args.id,
-                            status=args.status, entscheidung=args.entscheidung)
+    if args.status is not None or args.entscheidung is not None or args.zusammen_erledigen is not None:
+        inhalt = set_fields(inhalt, args.id, status=args.status,
+                            entscheidung=args.entscheidung, zusammen=args.zusammen_erledigen)
     if args.beobachtung_anhaengen is not None:
         inhalt = append_beobachtung(inhalt, args.id, args.beobachtung_anhaengen)
     path.write_text(inhalt, encoding="utf-8")
     geaendert = ", ".join(n for n, v in (("Status", args.status),
                                          ("Entscheidung", args.entscheidung),
+                                         ("Zusammen-erledigen", args.zusammen_erledigen),
                                          ("Beobachtung erweitert",
                                           args.beobachtung_anhaengen)) if v is not None)
     print(f"✓ {args.id}: {geaendert} aktualisiert.")
@@ -124,15 +148,31 @@ def main() -> None:
                        help="optional: was die Bewertung prägen würde – genannte Lösungen, "
                             "vermutete Ursachen, Analogieschlüsse. Wird erfasst, aber beim "
                             "normalen `get` nicht mitgelesen (nur als Hinweis)")
-    p_add.add_argument("--bezug", help="optional: LL-/OBS-/CM-IDs")
+    p_add.add_argument("--zusammen-erledigen", required=True,
+                       help="PFLICHT: OBS-IDs, die sich in einem Zug miterledigen lassen "
+                            "(komma-getrennt) – sonst 'keiner'. Test: Bearbeite ich den einen, "
+                            "liegt der andere ohnehin offen vor mir und kostet dadurch deutlich "
+                            "weniger? Typisch bei denselben Artefakten. Nicht: dasselbe Problem "
+                            "(konsolidieren), eine Vorfrage, bloße Themen-Nähe. Offene Einträge "
+                            "zeigt `obs.py list-offen`.")
+    p_add.add_argument("--bezug", help="optional: LL-/OBS-/CM-IDs (freier Querverweis – bildet "
+                                       "KEINE Drain-Einheit, dafür ist --zusammen-erledigen da)")
     p_add.add_argument("--session", type=int, help="überschreibt die erkannte Session-Nummer")
     p_add.set_defaults(func=cmd_add)
+
+    p_list = sub.add_parser("list-offen",
+                            help="offene Einträge als Titelliste mit Score (Basis für --zusammen-erledigen)")
+    p_list.set_defaults(func=cmd_list_offen)
 
     p_set = sub.add_parser("set", help="Status/Entscheidung eines Eintrags ändern (Drain)")
     p_set.add_argument("id", metavar="OBS-ID")
     p_set.add_argument("--status", help='z.B. "UMGESETZT (S114)", "VERWORFEN (Grund)", '
                                         '"IN BEOBACHTUNG bis S120"')
     p_set.add_argument("--entscheidung", help="gewählte Lösung + warum statt der Alternativen")
+    p_set.add_argument("--zusammen-erledigen", metavar="IDS",
+                       help="Kanten setzen/korrigieren: OBS-IDs oder 'keiner'. Wird eingefügt, "
+                            "wenn das Feld fehlt (Einträge von vor der Pflichtangabe). Beim "
+                            "Herauslösen aus einem Cluster **beide** Seiten korrigieren.")
     p_set.add_argument("--beobachtung-anhängen", dest="beobachtung_anhaengen",
                        metavar="TEXT",
                        help="Text an die Beobachtung anhängen – für die Konsolidierung, wenn "

@@ -8,12 +8,16 @@ od = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(od)
 
 
-def make(oid, status="NEU", impact="MITTEL", freq="gelegentlich", bezug="", title="T", files="`a.py`"):
+def make(oid, status="NEU", impact="MITTEL", freq="häufig", bezug="", title="T", files="`a.py`",
+         zusammen=""):
+    # Default MITTEL × häufig = Score 2 = gerade behandlungswürdig, damit Tests, die nicht das
+    # Scoring prüfen, Einträge in der Wert-Lane sehen.
     return f"""## {oid} – {title}
 - Status: {status}
 - Impact: {impact}    Häufigkeit: {freq}
 - Beobachtung: irgendwas {files}
 - Bezug: {bezug}
+- Zusammen-erledigen: {zusammen}
 """
 
 
@@ -44,39 +48,162 @@ def test_in_beobachtung_geparkt_excluded():
     assert b == 1 and drainable[0]["id"] == "OBS-S090-1"
 
 
-def test_rate_clamp_lower_upper():
-    # B=3: round(0.4*3)=1, aber Clamp hebt auf Untergrenze 3 -> count=3 (echte Rate-Assertion, nicht nur b).
-    wert, oldest, b, _ = od.compute(parse(*[make(f"OBS-S090-{i}") for i in range(1, 4)]))
-    assert b == 3 and len(wert) + (1 if oldest else 0) == 3
-    small = parse(*[make(f"OBS-S090-{i}") for i in range(1, 6)])                     # B=5
-    wert, oldest, b, _ = od.compute(small)
-    assert b == 5 and len(wert) + 1 == 3                                             # clamp lo=3
-    big = parse(*[make(f"OBS-S09{i//10}-{i%10}") for i in range(10, 40)])            # B=30
-    wert, oldest, b, _ = od.compute(big)
-    assert len(wert) + 1 == 7                                                        # clamp hi=7
+def ids(einheiten):
+    """Flache ID-Liste über Einheiten (jede Einheit ist eine Liste von Einträgen)."""
+    return [e["id"] for u in einheiten for e in u]
 
 
-def test_backlog_boundaries_zero_one_two():
-    # Die drei kleinsten Backlog-Größen haben eigene Pfade (rest[:0] bei B=1).
-    assert od.compute(parse()) == ([], None, 0, [])                                  # B=0: leer-Branch
-    wert, oldest, b, _ = od.compute(parse(make("OBS-S090-1")))                       # B=1
-    assert b == 1 and oldest["id"] == "OBS-S090-1" and wert == []                    #   nur Alters-Lane
-    wert, oldest, b, _ = od.compute(parse(make("OBS-S090-2"), make("OBS-S090-1")))   # B=2
-    assert b == 2 and oldest["id"] == "OBS-S090-1"                                   #   kleineres sub = älter
-    assert [e["id"] for e in wert] == ["OBS-S090-2"]                                 #   1 Wert + 1 Alters
+# --- Wert-Lane: behandlungswürdige Einheiten, gedeckelt auf die Session-Kapazität ---------
+# Die frühere Rate clamp(round(0.4*B), 3, 7) ist entfallen (S122): Sie war an die Backlog-GRÖSSE
+# gekoppelt und damit an eine Zahl, die nichts über den enthaltenen Wert sagt – ein Backlog aus
+# lauter Bagatellen erzeugte denselben Sieben-Satz wie eines voller schwerer Befunde.
+def test_value_lane_only_takes_behandlungswuerdige():
+    wert, _, _, _ = od.compute(parse(
+        make("OBS-S090-1", impact="HOCH", freq="dauerhaft"),      # 12
+        make("OBS-S090-2", impact="MITTEL", freq="gelegentlich"), # 1  -> unter der Schwelle
+        make("OBS-S090-3", impact="GERING", freq="dauerhaft"),    # 0  -> folgenlos
+    ))
+    assert ids(wert) == ["OBS-S090-1"]
 
 
-def test_oldest_is_alters_lane():
-    entries = parse(make("OBS-S093-2"), make("OBS-S085-9"), make("OBS-S085-3"))
-    _, oldest, _, _ = od.compute(entries)
-    assert oldest["id"] == "OBS-S085-3"  # gleiche Session, kleineres sub = früher erfasst
+def test_value_lane_is_not_capped():
+    # Der Satz zeigt ALLES Behandlungswürdige. Ein Deckel begrenzte nur den Vorschlag, nicht die
+    # Arbeit – er versteckte sie. Verdauliche Portionen macht der Skill, nicht dieser Satz.
+    wert, _, _, _ = od.compute(parse(*[make(f"OBS-S09{i}-1") for i in range(0, 9)]))
+    assert len(ids(wert)) == 9
 
 
-def test_value_lane_tiebreak_older_first():
-    # Gleicher Impact×Häufigkeit -> älteres (kleinere session/sub) zuerst in der Wert-Lane.
-    wert, oldest, _, _ = od.compute(parse(*[make(f"OBS-S09{i}-1") for i in range(0, 6)]))  # S090..S095
-    assert oldest["id"] == "OBS-S090-1"
-    assert [e["id"] for e in wert][:2] == ["OBS-S091-1", "OBS-S092-1"]
+def test_value_lane_sorted_by_unit_score_then_age():
+    wert, _, _, _ = od.compute(parse(
+        make("OBS-S090-1", impact="MITTEL", freq="häufig"),      # 2
+        make("OBS-S091-1", impact="HOCH", freq="dauerhaft"),     # 12
+        make("OBS-S092-1", impact="HOCH", freq="gelegentlich"),  # 3
+    ))
+    assert ids(wert) == ["OBS-S091-1", "OBS-S092-1", "OBS-S090-1"]
+
+
+# --- Cluster: Einheiten über das `Zusammen-erledigen:`-Feld ------------------------------------------
+def test_cluster_merges_related_entries_into_one_unit():
+    wert, _, _, _ = od.compute(parse(
+        make("OBS-S090-1", impact="MITTEL", freq="gelegentlich", zusammen="OBS-S090-2"),
+        make("OBS-S090-2", impact="MITTEL", freq="gelegentlich"),
+    ))
+    # Einzeln je 1 (unter der Schwelle) – zusammen 2 und damit behandlungswürdig.
+    assert len(wert) == 1 and set(ids(wert)) == {"OBS-S090-1", "OBS-S090-2"}
+
+
+def test_cluster_is_transitive():
+    wert, _, _, _ = od.compute(parse(
+        make("OBS-S090-1", zusammen="OBS-S090-2"),
+        make("OBS-S090-2", zusammen="OBS-S090-3"),
+        make("OBS-S090-3"),
+    ))
+    assert len(wert) == 1 and len(ids(wert)) == 3
+
+
+def test_cluster_warns_about_a_dead_edge(capsys):
+    # Ein Ziel, das nicht mehr drainbar ist, verwirft cluster() – korrekt, aber es darf nicht
+    # STUMM geschehen: Die Kante entsteht zwangsläufig, sobald der Partner archiviert wird,
+    # und ein lautloser Ausfall wäre von "nie eine Kante gehabt" nicht unterscheidbar.
+    od.cluster(od.compute(parse(
+        make("OBS-S090-1", zusammen="OBS-S088-1"),
+        make("OBS-S088-1", status="UMGESETZT (S089)"),
+    ))[3])
+    err = capsys.readouterr().err
+    assert "OBS-S090-1" in err and "OBS-S088-1" in err
+
+
+def test_cluster_is_silent_without_dead_edges(capsys):
+    od.cluster(od.compute(parse(make("OBS-S090-1", zusammen="OBS-S090-2"),
+                                make("OBS-S090-2", zusammen="OBS-S090-1")))[3])
+    assert capsys.readouterr().err == ""
+
+
+def test_cluster_ignores_links_to_non_drainable():
+    # Verwandtschaft zu einem erledigten Eintrag ist als Kontext wertvoll, bildet aber keine
+    # Einheit – sonst addierte ein längst gelöster Eintrag Score zu einem offenen.
+    wert, _, _, _ = od.compute(parse(
+        make("OBS-S090-1", zusammen="OBS-S088-1"),
+        make("OBS-S088-1", status="UMGESETZT (S089)"),
+    ))
+    assert len(wert) == 1 and ids(wert) == ["OBS-S090-1"]
+
+
+def test_gering_cluster_stays_below_threshold():
+    # Fünf folgenlose Einträge sind zusammen immer noch folgenlos (GERING = 0).
+    wert, _, _, _ = od.compute(parse(*[
+        make(f"OBS-S090-{i}", impact="GERING", freq="dauerhaft", zusammen="OBS-S090-1")
+        for i in range(1, 6)]))
+    assert wert == []
+
+
+# --- Alters-Lane: alle über ALT_AB, sonst das älteste --------------------------------------
+def test_alters_lane_takes_all_beyond_threshold():
+    entries = parse(
+        make("OBS-S080-1", impact="GERING"), make("OBS-S081-1", impact="GERING"),
+        make("OBS-S099-1", impact="GERING"),
+    )
+    _, alt, _, _ = od.compute(entries, cur=100)   # ALT_AB=15 -> S080/S081 sind 20/19 alt
+    assert [e["id"] for e in alt] == ["OBS-S080-1", "OBS-S081-1"]
+
+
+def test_alters_lane_falls_back_to_single_oldest():
+    entries = parse(make("OBS-S093-2", impact="GERING"), make("OBS-S085-9", impact="GERING"),
+                    make("OBS-S085-3", impact="GERING"))
+    _, alt, _, _ = od.compute(entries, cur=95)    # keiner älter als 15
+    assert [e["id"] for e in alt] == ["OBS-S085-3"]  # gleiche Session, kleineres sub = früher
+
+
+def test_alters_lane_excludes_entries_already_in_value_lane():
+    entries = parse(make("OBS-S080-1", impact="HOCH", freq="dauerhaft"))
+    wert, alt, _, _ = od.compute(entries, cur=100)
+    assert ids(wert) == ["OBS-S080-1"] and alt == []
+
+
+def test_alters_lane_without_current_session():
+    # cur None (Alter unbestimmbar) -> Rückfall auf "das älteste", nie auf "alle".
+    _, alt, _, _ = od.compute(parse(make("OBS-S080-1", impact="GERING"),
+                                    make("OBS-S099-1", impact="GERING")), cur=None)
+    assert [e["id"] for e in alt] == ["OBS-S080-1"]
+
+
+def test_backlog_boundaries_zero_one():
+    assert od.compute(parse())[2] == 0
+    wert, alt, b, _ = od.compute(parse(make("OBS-S090-1", impact="GERING")), cur=95)
+    assert b == 1 and ids(wert) == [] and [e["id"] for e in alt] == ["OBS-S090-1"]
+
+
+# --- Trigger: beansprucht der Drain die Session? -------------------------------------------
+# Ersetzt "B >= 13" (S117). Die Backlog-Zahl misst Menge, nicht Wert – ein Berg aus Bagatellen
+# beanspruchte damit dieselbe Session wie ein Satz schwerer Befunde.
+def test_trigger_fires_on_value():
+    entries = parse(make("OBS-S090-1", impact="HOCH", freq="dauerhaft"))  # 12 >= 9
+    assert od.triggers(entries, cur=95) is True
+
+
+def test_trigger_silent_below_value_threshold():
+    entries = parse(make("OBS-S090-1", impact="HOCH", freq="häufig"))     # 6 < 9
+    assert od.triggers(entries, cur=95) is False
+
+
+def test_trigger_caps_at_top_n_units():
+    # Beliebig viele MITTEL×häufig (je 2) dürfen NICHT auslösen: Top-5 gedeckelt = 10 ... aber
+    # 5*2=10 >= 9 wäre ein Fehltrigger. Deshalb hier die kleinste Klasse: MITTEL×gelegentlich (1).
+    entries = parse(*[make(f"OBS-S0{90+i}-1", impact="MITTEL", freq="gelegentlich")
+                      for i in range(0, 9)])
+    assert od.triggers(entries, cur=95) is False   # Top-5-Summe = 5 < 9
+
+
+def test_trigger_fires_on_age_even_without_value():
+    # Die Alters-Lane hängt sonst am Wert-Trigger: ohne eigenen Auslöser könnten Bagatellen
+    # unbegrenzt wachsen, weil nie ein Drain liefe, der sie herausholt.
+    entries = parse(*[make(f"OBS-S08{i}-1", impact="GERING") for i in range(0, 5)])
+    assert od.triggers(entries, cur=100) is True
+
+
+def test_trigger_silent_with_few_old_entries():
+    entries = parse(*[make(f"OBS-S08{i}-1", impact="GERING") for i in range(0, 3)])  # 3 < 4
+    assert od.triggers(entries, cur=100) is False
 
 
 def test_colocation_same_file():
@@ -92,7 +219,10 @@ def test_colocation_same_file():
 
 def test_render_contains_lanes(monkeypatch):
     monkeypatch.setattr(od, "current_session", lambda root: 96)
-    out = od.render(od.Path("."), parse(make("OBS-S090-2"), make("OBS-S085-1")))
+    out = od.render(od.Path("."), parse(
+        make("OBS-S090-2"),                     # behandlungswürdig -> Wert-Lane
+        make("OBS-S085-1", impact="GERING"),    # folgenlos -> nur über die Alters-Lane
+    ))
     assert out.startswith("OBS-Drain – Backlog:")  # selbsterklärend ohne Rahmenzeile
     assert "Wert-Lane" in out and "Alters-Lane" in out
     assert "OBS-S085-1" in out and "Alter ~11 Sessions" in out  # 96 - 85 = 11
@@ -130,24 +260,25 @@ def test_render_leaves_plain_entries_unmarked(monkeypatch):
 # `open_questions.py`, Tests in `test_open_questions.py`).
 
 
-def test_render_b1_no_empty_value_lane_header(monkeypatch):
-    # B=1: nur Alters-Lane, KEIN leerer "Wert-Lane:"-Header.
+def test_render_no_empty_value_lane_header(monkeypatch):
+    # Nichts Behandlungswürdiges: nur Alters-Lane, KEIN leerer "Wert-Lane:"-Header.
     monkeypatch.setattr(od, "current_session", lambda root: 96)
-    out = od.render(od.Path("."), parse(make("OBS-S090-1")))
+    out = od.render(od.Path("."), parse(make("OBS-S090-1", impact="GERING")))
     assert "Wert-Lane" not in out
     assert "Alters-Lane" in out and "OBS-S090-1" in out
 
 
 def test_render_colocation_excludes_selected(monkeypatch):
-    # +Koloc weist nur Items aus, die NICHT schon im Drain-Satz stehen.
+    # +Koloc weist nur Items aus, die NICHT schon im Drain-Satz stehen. Unselektiert bleibt, was
+    # weder behandlungswürdig noch das älteste ist.
     monkeypatch.setattr(od, "current_session", lambda root: 96)
     out = od.render(od.Path("."), parse(
-        make("OBS-S090-1", files="`f1.py`"),   # Alters-Lane, selektiert
-        make("OBS-S090-2", files="`x.py`"),    # Wert-Lane, selektiert
-        make("OBS-S090-3", files="`f3.py`"),   # Wert-Lane, selektiert
-        make("OBS-S090-4", files="`x.py`"),    # teilt x.py mit -2, aber UNselektiert
+        make("OBS-S090-1", impact="HOCH", freq="dauerhaft", files="`x.py`"),  # Wert-Lane
+        make("OBS-S090-2", files="`f2.py`"),                                  # Wert-Lane
+        make("OBS-S089-1", impact="GERING", files="`alt.py`"),                # Alters-Lane (ältestes)
+        make("OBS-S090-9", impact="GERING", files="`x.py`"),   # teilt x.py mit -1, in keiner Lane
     ))
-    assert "+Koloc: OBS-S090-4" in out      # -2 weist das unselektierte -4 aus
+    assert "+Koloc: OBS-S090-9" in out      # -1 weist das unselektierte -9 aus
     assert "+Koloc: OBS-S090-2" not in out  # kein selektiertes Item als Koloc
 
 

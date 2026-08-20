@@ -68,6 +68,7 @@ Eintrag-Format:
 
 ## OQ-S094-2 — Mobile-Ansicht: welche Szenarien, ab wann?
 **Frage:** Welche Mobile-spezifischen Szenarien braucht die App, und ab welcher Phase?
+**Fällig:** Phase:MVP – User-Entscheid S122 auf die zweite Hälfte der Frage („ab wann"): Beim Phasenwechsel SKELETON→MVP läuft ein `gherkin-workshop`, der die Mobile-Szenarien für die dann bestehenden Seiten systematisch entdeckt. Bis dahin trägt die UX-Guideline (Prinzip 8, Reorder-Schutz) die Mobile-Anforderung allein.
 **Hintergrund:** Mobile-First ist NFR (`ux-ui-auditor`, MUI v7), aber `features/` enthält bisher **keine** Mobile-Szenarien. Laut Stories MVP/V1-Scope. Der responsive Reorder-Schutz für Formulare („Felder nicht per CSS umsortieren", weil das die Autofokus-/Fokus-Reihenfolge bricht) ist bereits in UX-Guideline Prinzip 8 verankert. Systematisch beim MVP/V1 angehen – nicht vergessen.
 
 ---
@@ -88,10 +89,12 @@ Eintrag-Format:
 
 ## OQ-S119-4 — Gilt „Regeln in den Typ, Meldungen an die Grenze" auch im Frontend?
 **Frage:** Wird der Frontend-Fehlertyp `ValidationError = { readonly message: string }` auf Fehler**fälle** statt Meldungstexte umgestellt – oder gilt die Regel bewusst nur backend-seitig?
-**Fällig:** jetzt – der tragende Trigger, die Entscheidung über das **Backend**-Fehlermodell, ist mit **ADR-S120-1** gefallen (ein Fehlertyp je Domänentyp, feldagnostisch, Feldbezug an der Grenze). Damit steht das Vorbild fest, an dem sich diese Frage messen lässt. Der frühere Backstop `S132` begründete sich damit, der tragende Anker sei nicht ausdrückbar – das traf schon damals nicht mehr zu (`open_questions.py` verwendet seit S119 `td_anchors.py`).
+**Fällig:** Phase:V1, S140 – User-Entscheid S122: gekoppelt an **OQ-S094-1** (client-seitige Validierung) und darum auf dessen Anker gesetzt, damit beide zusammen entschieden werden. Begründung: Solange das Frontend keine Regeln prüft (ADR-S112-4), entstehen dort keine Fehler**fälle** – die Frage nach deren Typform hat bis dahin keinen Gegenstand. Vorherige Fassungen (`S132`, dann `jetzt` nach ADR-S120-1) hingen am Backend-Vorbild; maßgeblich ist aber, ob es im Frontend überhaupt etwas zu typisieren gibt.
 
 **Hintergrund:** Aufgekommen im S119-Review beim Verankern von E2. `docs/reference/architecture.md` §2 erklärt das Domain-Modeling-Kapitel ausdrücklich für „C# und TypeScript gleichermaßen" gültig und verweist für die Ausformulierung auf die sprachspezifischen Guidelines. Die dort in §2 verankerte **Regel 5** lautet: „Ein Domänentyp gibt einen Fehler**fall** zurück, nie einen Meldungstext" (ADR-S051-2: die Zuordnung Fall → deutscher Text lebt an der API-Grenze). `coding-guideline-typescript.md` schreibt aber das Gegenteil vor: `ValidationError` trägt ein `message: string` als einziges Feld.
 
 **Nicht automatisch ein Fehler.** ADR-S112-4 hält fest, dass Domänenregeln das **Backend** durchsetzt und Frontend-Brands rein nominal sind – die Factory validiert nicht. Wo nichts validiert wird, entstehen kaum Fehlerfälle, und ein Meldungstext, der vom Server kommt und nur durchgereicht wird, ist an dieser Stelle womöglich das Richtige. Genau das ist zu entscheiden statt anzunehmen.
+
+**Befund S122, am Bestand geprüft (spart die Recherche beim Wiederaufgreifen):** `ValidationError` existiert im Client-**Code** nicht. `Client/src/types/` enthält allein `apiError.ts`; `grep -rn "ValidationError" Client/src` liefert null Treffer. Der Typ lebt ausschließlich in `coding-guideline-typescript.md` (Fehlertyp-Absatz in §2 „Branded Types" sowie das `neverthrow`-Beispiel in §4). Real verwendet wird `ApiError` (`Client/src/types/apiError.ts`) – bereits eine kind-getaggte Union (`FieldErrors` | `Unexpected`), also schon in der von Regel 5 verlangten Form. Es ist heute folglich **nichts umzustellen**; zu entscheiden ist, ob die Guideline einen Typ für einen Fall vorschreiben soll, den ADR-S112-4 ausschließt.
 
 **Aktueller Stand:** In `architecture.md` §2 ist vermerkt, dass die Regeln für C# ausformuliert sind und die TypeScript-Seite nicht nachgezogen ist – die Doku behauptet also keine Parität mehr, die es nicht gibt. Mit der Entscheidung hier ist dieser Vermerk aufzulösen.
