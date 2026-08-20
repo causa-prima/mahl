@@ -40,6 +40,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _hook_io import compute_post_content, read_file_text  # noqa: E402
+
 ADR_FILE = "docs/history/adr.md"
 
 _ENTRY_SPLIT_RE = re.compile(r"^### (ADR-S\d+-\d+)", re.M)
@@ -99,26 +102,6 @@ def find_violations(pre: str, post: str) -> list[tuple[str, list[str]]]:
         for aid, body in parse_adr_entries(post).items()
         if aid not in known and _ADR_OK not in body and (hits := deferral_hits(body))
     ]
-
-
-def read_file_text(file_path: str) -> str:
-    """Aktueller Datei-Inhalt; "" wenn die Datei (noch) nicht existiert."""
-    path = Path(file_path)
-    return path.read_text(encoding="utf-8") if path.exists() else ""
-
-
-def compute_post_content(tool: str, tool_input: dict, pre: str) -> str | None:
-    """Simuliert den Datei-Inhalt nach Anwendung des Edits/Writes."""
-    if tool == "Write":
-        return tool_input.get("content", "")
-    if tool == "Edit":
-        old = tool_input.get("old_string", "")
-        new = tool_input.get("new_string", "")
-        if old and old in pre:
-            count = -1 if tool_input.get("replace_all") else 1
-            return pre.replace(old, new, count)
-        return pre  # old_string nicht gefunden → echter Edit schlägt ohnehin fehl
-    return None
 
 
 def check(data: dict) -> str | None:

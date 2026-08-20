@@ -88,6 +88,29 @@ def test_session_logs_and_archives_are_skipped(monkeypatch, tmp_path):
     assert hook.find_references(["TD-S001-1"], tmp_path / "x.md") == []
 
 
+def test_tooling_test_fixtures_are_skipped(monkeypatch, tmp_path):
+    """IDs in Tooling-Tests sind Fixtures, keine Verweise (OBS-S119-2)."""
+    monkeypatch.setattr(hook, "_REPO_ROOT", tmp_path)
+    for rel in ((".claude", "hooks", "tests"), (".claude", "scripts", "tests")):
+        d = tmp_path.joinpath(*rel)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "test_x.py").write_text('fixture = "## TD-S001-1 — Beispiel"\n', encoding="utf-8")
+
+    assert hook.find_references(["TD-S001-1"], tmp_path / "x.md") == []
+
+
+def test_real_reference_outside_tests_still_blocks(monkeypatch, tmp_path):
+    """GEGENPROBE: die Fixture-Ausnahme darf den Check nicht stilllegen."""
+    monkeypatch.setattr(hook, "_REPO_ROOT", tmp_path)
+    scripts = tmp_path / ".claude" / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "dotnet-test.py").write_text("# siehe TD-S001-1\n", encoding="utf-8")
+
+    hits = hook.find_references(["TD-S001-1"], tmp_path / "x.md")
+    assert len(hits) == 1
+    assert hits[0][0].endswith("dotnet-test.py")
+
+
 def test_tracker_itself_is_excluded(monkeypatch, tmp_path):
     monkeypatch.setattr(hook, "_REPO_ROOT", tmp_path)
     docs = tmp_path / "docs"

@@ -53,7 +53,8 @@ Globben statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
   `python3 .claude/scripts/decisions.py` nachschlagen, nicht vollständig lesen.
 - Produkt-/Anwendungs-Inhalt: `Server/` und `Client/` (Anwendungscode → Gegenstand von review-code),
   `*_SPEC.md`, `docs/stories/` – sie definieren *was* gebaut wird, nicht *wie der Workflow läuft*.
-- `.claude/tmp/` – Scratch-/Zwischenartefakte.
+- `.claude/tmp/` – enthält nur noch die Bash-Permission-Logs (Scratch-Artefakte liegen seit
+  S121 im Session-Scratchpad außerhalb des Repos).
 
 Fällt dir beim Überblick dennoch etwas echt Prozess-Relevantes auf, das oben nicht genannt ist, bezieh
 es ein – die Include-Liste ist Orientierung, keine abschließende Aufzählung.

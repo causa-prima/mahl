@@ -25,12 +25,14 @@ Sortierung: nach ID (Session) aufsteigend – neue Einträge unten anfügen.
 Eintrag-Format:
   ## OQ-S<NNN>-<n> — <Kurztitel>
   **Frage:** <die offene, mit dem User zu klärende Frage>
-  **Fällig:** <Anker>[, <Anker>…] – <Prosa>   (optional – wann vorlegen?)
+  **Fällig:** <Anker>[, <Anker>…] – <Prosa>   (Pflicht – wann vorlegen?)
   **Hintergrund:** <Auslöser / Kontext / betroffene Artefakte>
 
   ID: OQ-S<NNN>-<n> – 3-stellige Session (geparkt), laufende Nummer innerhalb der Session.
 
-  `Fällig` ist **optional** und steuert die Vorlage. Es nutzt dieselbe Anker-Grammatik wie
+  `Fällig` ist **Pflicht** und steuert die Vorlage (`check-oq-capture.py` erzwingt es). Ohne
+  Termin fiele der Eintrag auf die Alters-Regel zurück – dann ist eine seit Dutzenden Sessions
+  treibende Frage von einer frisch gestellten nicht mehr unterscheidbar. Es nutzt dieselbe Anker-Grammatik wie
   `docs/tech-debt.md` – kanonisch in `.claude/scripts/td_anchors.py`, von `open_questions.py`
   wiederverwendet (nicht kopiert). Der Kopf vor dem Gedankenstrich ist maschinenlesbar:
 

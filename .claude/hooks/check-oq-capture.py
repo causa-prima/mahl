@@ -11,9 +11,11 @@ Fehlermodus, den die Grammatik gerade beseitigt hat: `open_questions.py` kannte 
 Der TD-Tracker hat diese Absicherung längst (`check-td-capture.py`); für offene Fragen fehlte
 sie. Dieselbe Prüfung, andere Pflichtenlage:
 
-- **`Fällig` ist hier optional.** Fehlt das Feld, greift die Alters-Regel (~10 Sessions) –
-  ein Eintrag ohne Termin ist also zulässig und wird nicht beanstandet.
-- **Ist es gesetzt, muss es tragen.** Ein gesetzter Anker unterdrückt die Alters-Regel; ein
+- **`Fällig` ist Pflicht** (seit S121, OBS-S117-4). Vorher war das Feld optional und ein
+  Eintrag ohne Termin fiel auf die Alters-Regel zurück – damit blieb eine seit Dutzenden
+  Sessions treibende Frage von einer frisch gestellten ununterscheidbar. Die Alters-Regel
+  in `open_questions.py` bleibt als Netz für Bestandseinträge, ist aber kein Zielzustand.
+- **Der Anker muss tragen.** Ein gesetzter Anker unterdrückt die Alters-Regel; ein
   unauswertbarer oder nicht terminierender Anker ließe die Frage damit dauerhaft verwaisen –
   schlechter als gar kein Feld. Deshalb gelten dann die vollen Regeln aus `td_anchors.validiere`:
   Kopf maschinenlesbar, mindestens ein terminierter Anker, Referenziertes existiert.
@@ -34,7 +36,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import td_anchors  # noqa: E402
+from _hook_io import compute_post_content, read_file_text  # noqa: E402
 
 OQ_FILE = "docs/open-questions.md"
 
@@ -63,10 +67,11 @@ def check_entry(oq_id: str, body: str, ktx: td_anchors.Kontext | None = None) ->
     """Begründungen, warum die Fälligkeit dieses Eintrags nicht trägt (leer = in Ordnung)."""
     faellig = faellig_of(body)
     if faellig is None:
-        return []  # Feld ist optional – ohne es greift die Alters-Regel.
+        return ["`**Fällig:**` fehlt – jede offene Frage schuldet einen Termin oder ein "
+                "auslösendes Ereignis. Ohne Feld greift nur die Alters-Regel, und die macht "
+                "eine treibende Frage von einer frisch gestellten ununterscheidbar"]
     if not faellig:
-        return ["`**Fällig:**` ist leer – entweder einen Anker setzen oder das Feld weglassen "
-                "(dann greift die Alters-Regel nach ~10 Sessions)"]
+        return ["`**Fällig:**` ist leer – Anker setzen (Termin `S<NNN>` oder Ereignis)"]
     return td_anchors.validiere(oq_id, faellig, ktx or td_anchors.Kontext())
 
 
@@ -81,30 +86,10 @@ def find_violations(pre: str, post: str,
     ]
 
 
-def read_file_text(file_path: str) -> str:
-    """Aktueller Datei-Inhalt; "" wenn die Datei (noch) nicht existiert."""
-    path = Path(file_path)
-    return path.read_text(encoding="utf-8") if path.exists() else ""
-
-
 def repo_root_for(oq_path: str) -> Path:
     """Repo-Wurzel, abgeleitet aus dem Pfad der bearbeiteten `open-questions.md`."""
     posix = Path(oq_path).as_posix()
     return Path(posix[: -len(OQ_FILE)] if posix.endswith(OQ_FILE) else ".")
-
-
-def compute_post_content(tool: str, tool_input: dict, pre: str) -> str | None:
-    """Simuliert den Datei-Inhalt nach Anwendung des Edits/Writes."""
-    if tool == "Write":
-        return tool_input.get("content", "")
-    if tool == "Edit":
-        old = tool_input.get("old_string", "")
-        new = tool_input.get("new_string", "")
-        if old and old in pre:
-            count = -1 if tool_input.get("replace_all") else 1
-            return pre.replace(old, new, count)
-        return pre  # old_string nicht gefunden → echter Edit schlägt ohnehin fehl
-    return None
 
 
 def check(data: dict) -> str | None:
@@ -135,7 +120,7 @@ def check(data: dict) -> str | None:
 
     lines = "\n".join(f"  - {oid}: {reason}" for oid, reason in violations)
     return (
-        "❌ OQ-Fälligkeit (Poka-Yoke): `**Fällig:**` ist gesetzt, trägt aber nicht:\n"
+        "❌ OQ-Fälligkeit (Poka-Yoke): `**Fällig:**` fehlt oder trägt nicht:\n"
         f"{lines}\n"
         "  Das Feld ist optional – ohne es wird die Frage nach ~10 Sessions als überaltert "
         "vorgelegt. Ist es aber gesetzt, unterdrückt es genau diese Alters-Regel: Ein Anker, "

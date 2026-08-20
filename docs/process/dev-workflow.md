@@ -39,6 +39,10 @@ kritische-regeln:
 - **Auto-deny**: Alle anderen Befehle werden automatisch abgelehnt.
 - **`# --allow-once`**: Marker an den Befehl hängen → Hook fragt den User. Wird geloggt in `.claude/tmp/denied-commands.log`.
 
+**Wegwerf-Artefakte gehören ins Session-Scratchpad**, nicht ins Repo: Analyse-Scripte, Zwischenergebnisse, Diffs, Redirect-Ziele. Es liegt außerhalb des Repos, wird nicht committet und verschwindet mit der Session – nichts muss aufgeräumt werden. `python3 <scratchpad>/<name>.py` und Redirects dorthin sind erlaubt; den konkreten Pfad zeigt `check-bash-permission.py --list`. In `.claude/tmp/` leben nur die beiden Permission-Logs.
+
+**Zusammengesetzte Befehle** sind erlaubt, solange jedes Teilstück erlaubt ist – Verkettung, Zeilenumbruch, Variablenzuweisung, Substitution, Heredoc, Schleifen (im Rumpf nur lesende Befehle) und Sub-Befehle aus `find -exec`/`xargs`. Nicht erlaubt ist indirekte Ausführung (`$CMD`, `eval`, `bash -c`), weil sie jede Prüfung aushebelt.
+
 **Vollständige Liste:** `python3 .claude/hooks/check-bash-permission.py --list` zeigt alle erlaubten Befehle, die Projekt-Task-Wrapper (Tests/Lint/Mutation) und die Deny-Mechanik. Wird am Session-Start automatisch in den Kontext geladen.
 
 **Timeouts:** Vor jedem lang laufenden Prozess überlegen: *Wann sollte ich abbrechen?* Das Bash-Tool akzeptiert einen `timeout`-Parameter (Millisekunden). Richtwerte:

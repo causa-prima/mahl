@@ -33,10 +33,12 @@ def test_ignores_other_trackers():
     assert not hook.is_oq_file("docs/history/adr.md")
 
 
-# --- check_entry: Feld optional ----------------------------------------------
-def test_missing_due_field_is_allowed():
-    # Ohne Feld greift die Alters-Regel – das ist ein gültiger Zustand, kein Verstoß.
-    assert hook.check_entry("OQ-S001-1", "**Frage:** Was gilt?\n") == []
+# --- check_entry: Feld ist Pflicht -------------------------------------------
+def test_missing_due_field_is_rejected():
+    """Seit S121 Pflicht (OBS-S117-4): ohne Termin ist eine treibende Frage von einer
+    frisch gestellten nicht unterscheidbar."""
+    reasons = hook.check_entry("OQ-S001-1", "**Frage:** Was gilt?\n")
+    assert reasons and "fehlt" in reasons[0]
 
 
 def test_empty_due_field_is_rejected():
@@ -149,11 +151,13 @@ def test_check_passes_valid_entry(tmp_path):
                                       "old_string": old, "new_string": new}}) is None
 
 
-def test_check_passes_entry_without_due_field(tmp_path):
+def test_check_blocks_entry_without_due_field(tmp_path):
+    """Das Feld zu entfernen ist seit S121 ein Verstoß, kein Rückfall auf die Alters-Regel."""
     old = oq("OQ-S001-1", faellig="S140 – sauber")
     target = _write_tracker(tmp_path, old)
     new = oq("OQ-S001-1")
 
-    assert hook.check({"tool_name": "Edit",
-                       "tool_input": {"file_path": str(target),
-                                      "old_string": old, "new_string": new}}) is None
+    grund = hook.check({"tool_name": "Edit",
+                        "tool_input": {"file_path": str(target),
+                                       "old_string": old, "new_string": new}})
+    assert grund and "fehlt" in grund

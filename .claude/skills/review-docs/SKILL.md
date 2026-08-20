@@ -164,7 +164,7 @@ Falls nach Pre-Filter und Deduplizierung keine Findings verbleiben: dem User mit
 
 ### Findings speichern
 
-Schreibe die vollständigen Findings in `.claude/tmp/doc-review-YYYY-MM-DD.md` (aktuelles Datum einsetzen). Diese Datei wird in Phase 2 zum Nachschlagen verwendet.
+Schreibe die vollständigen Findings in `<scratchpad>/doc-review.md` – das Session-Scratchpad liegt außerhalb des Repos und verschwindet mit der Session, es bleibt also nichts liegen. Diese Datei wird in Phase 2 zum Nachschlagen verwendet.
 
 Format der gespeicherten Datei:
 ```
@@ -211,7 +211,7 @@ Zeige dem User **nur**:
 ... [oder: "Keine Konflikte gefunden."]
 
 ---
-Vollständige Analyse: `.claude/tmp/doc-review-YYYY-MM-DD.md`
+Vollständige Analyse: `<scratchpad>/doc-review.md`
 ```
 
 **Hinweise zur CEO-Übersicht:**
@@ -237,7 +237,7 @@ Den folgenden Loop durchlaufen bis alle Einträge abgearbeitet sind oder der Use
 
 **Pro Eintrag (Einzelfinding oder Gruppe):**
 
-1. **Lies** die betreffenden Findings aus `.claude/tmp/doc-review-YYYY-MM-DD.md`.
+1. **Lies** die betreffenden Findings aus `<scratchpad>/doc-review.md`.
 
 2. **Zeige** dem User:
    - Fortschrittsindikator: `Eintrag X von Y – [Titel / Gruppenname]` (bei Gruppen: alle enthaltenen Finding-Titel in Kurzform auflisten)

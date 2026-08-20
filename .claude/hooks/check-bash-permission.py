@@ -22,7 +22,7 @@ One-time-Ausnahme:
 Wenn ein Befehl regelmäßig benötigt wird: beim User anfragen ob er auf die Allow-Liste soll.
 
 Output-Redirects (>, >>):
-  Erlaubt: .claude/tmp/  – temporäres Verzeichnis für Analyse-Ausgaben
+  Erlaubt: <scratchpad>/ – Arbeitsverzeichnis der Session, außerhalb des Repos
   Erlaubt: /dev/null, /dev/stderr, /dev/stdout
   Sonst:   deny
   Hinweis: 2>&1 und >&N (keine Datei) sind immer erlaubt.
@@ -45,20 +45,36 @@ import sys
 # ---------------------------------------------------------------------------
 # Konfiguration
 # ---------------------------------------------------------------------------
-SAFE_REDIRECT_PREFIXES: list[str] = [
-    '/dev/null',
-    '/dev/stderr',
-    '/dev/stdout',
-    '.claude/tmp/',
-    '../.claude/tmp/',   # relativ aus Unterverzeichnissen (Client/, Server/, ...)
-]
-
 ONE_TIME_MARKER = '# --allow-once'
 
 _REPO_ROOT = os.environ.get(
     "CLAUDE_PROJECT_DIR",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'),
 )
+
+def _resolve_scratchpad() -> str | None:
+    """Pfad des Session-Scratchpads (Arbeitsverzeichnis außerhalb des Repos), oder None.
+
+    Muster: /tmp/claude-<uid>/<repo-pfad-mit-bindestrichen>/<session-id>/scratchpad
+    Exakt aufgelöst statt per Wildcard – Schreibziel ist nur das eigene Scratchpad,
+    nicht das fremder Sessions.
+    """
+    session_id = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    if not session_id:
+        return None
+    slug = os.path.normpath(_REPO_ROOT).replace('/', '-')
+    return f"/tmp/claude-{os.getuid()}/{slug}/{session_id}/scratchpad"
+
+
+_SCRATCHPAD = _resolve_scratchpad()
+
+SAFE_REDIRECT_PREFIXES: list[str] = [
+    '/dev/null',
+    '/dev/stderr',
+    '/dev/stdout',
+]
+if _SCRATCHPAD:
+    SAFE_REDIRECT_PREFIXES.append(_SCRATCHPAD + '/')
 _LOG_FILE = os.path.join(_REPO_ROOT, '.claude', 'tmp', 'denied-commands.log')
 # Separates Log für erlaubte Befehle (OBS-S085-3 D): dient dem Aufspüren von
 # Misuse-Patterns (z.B. Wrapper-Scripts mit nachgelagertem tail/grep), ohne das
@@ -288,10 +304,13 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         'jscpd immer via Script aufrufen:\n'
         '  python3 .claude/scripts/jscpd-run.py [--verbose]',
     ),
-    # python3 mit absolutem Pfad (Ausnahme: globales recall-session-Script, s.
-    # ALLOW_PATTERNS – read-only Session-Log-Analyse, liegt außerhalb des Repos)
+    # python3 mit absolutem Pfad (Ausnahmen, beide in ALLOW_PATTERNS: das globale
+    # recall-session-Script und das Session-Scratchpad – beide liegen zwangsläufig
+    # außerhalb des Repos, ein relativer Pfad existiert dafür nicht)
     (
-        re.compile(r'\bpython3\s+(?!\S*\.claude/skills/recall-session/scripts/recall\.py)[/~]'),
+        re.compile(r'\bpython3\s+(?!\S*\.claude/skills/recall-session/scripts/recall\.py)'
+                   + (r'(?!' + re.escape(_SCRATCHPAD) + r'/)' if _SCRATCHPAD else '')
+                   + r'[/~]'),
         'python3 mit absolutem Pfad ist nicht erlaubt.\n'
         'Projekt-Scripts immer mit relativem Pfad aufrufen:\n'
         '  python3 .claude/scripts/dotnet-test.py\n'
@@ -430,9 +449,10 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     ),
     # docker compose up|down (v2-Plugin, nativ in WSL). docker-compose (v1) → Smart-Deny-Hint.
     (
-        re.compile(r'^docker\s+compose\s+(up|down)\b'),
+        # `config` rendert die effektive Compose-Konfiguration und startet nichts.
+        re.compile(r'^docker\s+compose\s+(up|down|config)\b'),
         None,
-        'docker compose up|down',
+        'docker compose up|down|config',
     ),
     # npm run/audit/outdated/update/ci (nativ). npm run test|lint → WRONG_APPROACH; npm install [pkg] → deny.
     # `--prefix <dir>` ist erlaubt, damit npm-Scripts nicht erst ein `cd Client` erzwingen – dieses
@@ -462,6 +482,10 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     (re.compile(r'^diff\b'), 'Lesen', 'diff'),
     # Shell: allgemeine Hilfsbefehle, Textverarbeitung, Pfad-Tools
     (re.compile(r'^echo\b'), 'Shell', 'echo'),
+    (re.compile(r'^printf\b'), 'Shell', 'printf'),   # wie echo: schreibt nur nach stdout
+    # Bedingungs-Builtin, wertet nur aus.
+    (re.compile(r'^test\s'), 'Shell', 'test'),
+    (re.compile(r'^\[\s'), 'Shell', '[ … ]  (test)'),
     # cd: reine Navigation. Gefährliche Kombis (cd + dotnet run / npx) sind unabhängig
     # via WRONG_APPROACH (Gesamtbefehl, vor Split) gedeckt; jedes Folge-Segment wird
     # ohnehin einzeln geprüft.
@@ -472,12 +496,16 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     # xargs nur mit read-only Child-Command (xargs führt sein Argument als Befehl aus –
     # darum eng auf Lese-Werkzeuge begrenzt; xargs rm/mv/bash etc. bleibt deny).
     (
-        re.compile(r'^xargs\s+(?:-\S+\s+(?:\{\}\s+)?)*(?:grep|cat|wc|head|tail|file|stat|sort|uniq|cut|ls)\b'),
+        # `xargs` selbst genügt: expand_segment trennt das Sub-Kommando ab und prüft
+        # es voll – strenger als eine Namens-Whitelist, die Argumente ungesehen ließe.
+        re.compile(r'^xargs\b'),
         'Shell',
         'xargs grep|cat|wc|head|tail|file|stat|sort|uniq|cut|ls',
     ),
     (re.compile(r'^pwd$'), 'Shell', 'pwd'),
-    (re.compile(r'^date$'), 'Shell', 'date'),
+    (re.compile(r'^date\b'), 'Shell', 'date'),
+    # Liest/verarbeitet wie sed/cut/tr, schreibt nichts – Parität zu `cat`/`head`/`sed -n`.
+    (re.compile(r'^awk\b'), 'Shell', 'awk (read-only)'),
     (re.compile(r'^which\b'), 'Shell', 'which'),
     (re.compile(r'^sort\b'), 'Shell', 'sort'),
     (re.compile(r'^uniq\b'), 'Shell', 'uniq'),
@@ -500,6 +528,12 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         None,
         'python3 .claude/scripts/<script>.py  /  python3 .claude/hooks/<hook>.py',
     ),
+    # Wegwerf-Scripte im Session-Scratchpad – der reguläre Ort für Ad-hoc-Auswertungen.
+    *([(
+        re.compile(r'^python3\s+(?!-)' + re.escape(_SCRATCHPAD) + r'/\S+\.py\b'),
+        None,
+        'python3 <scratchpad>/<script>.py  (Wegwerf-Auswertungen)',
+    )] if _SCRATCHPAD else []),
     # Globales recall-session-Script (read-only Session-Log-Analyse, liegt unter
     # ~/.claude/skills/ außerhalb des Repos). Absoluter Pfad ist hier erlaubt –
     # die WRONG_APPROACH-Regel für absolute python3-Pfade nimmt es explizit aus.
@@ -511,9 +545,9 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     ),
     # git read-only (optional mit -C <pfad>, um in anderem Repo/Worktree zu lesen)
     (
-        re.compile(r'^git\s+(?:-C\s+\S+\s+)?(status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog)\b'),
+        re.compile(r'^git\s+(?:-C\s+\S+\s+)?(status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog|check-ignore)\b'),
         None,
-        'git [-C <pfad>] status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog',
+        'git [-C <pfad>] status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog|check-ignore',
     ),
     # git safe write (explizit kein -f/--force – das ist in WRONG_APPROACH_PATTERNS)
     (re.compile(r'^git\s+add\b(?!.*\s(?:-f\b|--force\b))'), None, 'git add <datei>  (ohne -f/--force)'),
@@ -565,15 +599,18 @@ _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r'^python3\s+-c\b'),
         "python3 -c führt beliebigen Code aus (nicht erlaubt).\n"
-        "Für Ad-hoc-Analyse: Script nach .claude/tmp/foo.py schreiben (Write-Tool), dann\n"
-        "  python3 .claude/tmp/foo.py   (anschließend löschen).\n"
+        "Für Ad-hoc-Analyse: Script ins Scratchpad schreiben (Write-Tool), dann\n"
+        "  python3 <scratchpad>/foo.py\n"
+        "Das Scratchpad liegt außerhalb des Repos und verschwindet mit der Session –\n"
+        "nichts muss aufgeräumt werden.\n"
         "Für Datei-Inspektion: Read/Grep/Glob-Tools statt Python.",
     ),
     (
         re.compile(r'^(?:for|while)\b'),
-        "Shell-Schleifen sind nicht erlaubt.\n"
-        "Über mehrere Dateien iterieren: Glob/Grep-Tools nutzen, oder ein\n"
-        "Analyse-Script nach .claude/tmp/ schreiben und mit python3 .claude/tmp/<name>.py ausführen.",
+        "Schleifen sind erlaubt, solange jeder Befehl im Rumpf erlaubt und lesend ist.\n"
+        "Geblockt wurde also ein Befehl im Rumpf, nicht die Schleife selbst – der Hinweis\n"
+        "oben nennt ihn. Datei-Operationen (rm/mv/cp/chmod) sind im Rumpf grundsätzlich\n"
+        "gesperrt: wie oft sie laufen, ist vor der Ausführung nicht sichtbar.",
     ),
 ]
 
@@ -602,7 +639,7 @@ _NO_HINT_MESSAGE = (
     "Befehl nicht auf der Allow-Liste. Erlaubte Befehle + Alternativen ansehen:\n"
     "  python3 .claude/hooks/check-bash-permission.py --list\n"
     "\n"
-    "Für Ad-hoc-Logik: Script nach .claude/tmp/foo.py schreiben, dann python3 .claude/tmp/foo.py.\n"
+    "Für Ad-hoc-Logik: Script ins Scratchpad schreiben, dann python3 <scratchpad>/foo.py.\n"
     "\n"
     "Falls --list nichts Passendes zeigt – dem User erklären:\n"
     "  (1) Was der Befehl tun soll\n"
@@ -622,12 +659,30 @@ _ONE_TIME_UNNEEDED_HINT = (
     "Deny-Fälle gedacht (sonst inflationär)."
 )
 
+_INDIRECT_EXEC_DENY_REASON = (
+    "Indirekte Befehlsausführung ist nicht erlaubt.\n"
+    "Der auszuführende Befehl steht hier nicht im Klartext (Variable, Substitution, "
+    "eval/source/bash -c) – damit lässt sich jede Prüfung umgehen:\n"
+    "  CMD=\"rm -rf /\"; $CMD\n"
+    "Befehl direkt hinschreiben. Braucht es wirklich Shell-Logik, gehört sie in ein "
+    "Script im Scratchpad statt in einen Einzeiler."
+)
+
+_LOOP_WRITE_DENY_REASON = (
+    "Datei-Operationen im Schleifenrumpf sind nicht erlaubt.\n"
+    "`rm`/`mv`/`cp` sind einzeln erlaubt, in einer Schleife baut man daraus aber ein "
+    "`rm -rf` – und wie oft der Rumpf läuft, ist vor der Ausführung nicht sichtbar.\n"
+    "Betroffene Dateien einzeln nennen, oder ein Script im Scratchpad schreiben, das "
+    "vorher anzeigt was es täte."
+)
+
 _UNSAFE_REDIRECT_DENY_REASON = (
     "Output-Redirect auf nicht erlaubtes Ziel.\n"
     "Bevorzugte Alternative: Output in Variable capturen (kein Datei-Müll):\n"
     "  output=$(dotnet build)\n"
     "  echo \"$output\" | grep ...\n"
-    "Falls Datei-Redirect nötig (sehr großer Output): nur .claude/tmp/ erlaubt; Datei danach löschen.\n"
+    "Falls Datei-Redirect nötig (sehr großer Output): nur ins Scratchpad – es liegt außerhalb\n"
+    "des Repos und verschwindet mit der Session, es bleibt also nichts liegen.\n"
     "Sonstige erlaubte Redirect-Ziele: /dev/null, /dev/stderr, /dev/stdout.\n"
     "Für dotnet test/stryker: Projekt-Scripts verwenden statt Redirect:\n"
     "  python3 .claude/scripts/dotnet-test.py / dotnet-stryker.py"
@@ -642,7 +697,7 @@ def has_unsafe_output_redirect(command: str) -> bool:
     """Gibt True zurück wenn der Befehl einen unquotierten Output-Redirect (>, >>)
     auf ein nicht-erlaubtes Ziel enthält.
 
-    Erlaubt: SAFE_REDIRECT_PREFIXES (z.B. .claude/tmp/, /dev/null)
+    Erlaubt: SAFE_REDIRECT_PREFIXES (Session-Scratchpad, /dev/null)
     Erlaubt: >&N / N>&M (redirect zu File-Descriptor, keine Datei)
     """
     in_single_quote = False
@@ -684,9 +739,194 @@ def has_unsafe_output_redirect(command: str) -> bool:
     return False
 
 
+def strip_heredoc_bodies(command: str) -> str:
+    """Entfernt Heredoc-Bodies – sie sind Daten, kein Code.
+
+    Sonst sucht der Splitter im Fließtext nach `|`/`;`/`&&` und zerlegt ihn in
+    „Befehle", die kein Allow-Muster treffen.
+
+    Der Konsument bleibt geprüft: nach dem Strippen steht noch `python3 -` bzw.
+    `bash` da, beides ohne Allow-Muster. Ein Heredoc erkauft keine Freigabe.
+
+    Fail-closed bei fehlendem Endmarker: Rest bleibt stehen und wird geprüft.
+    """
+    in_single = in_double = False
+    i = 0
+    while i < len(command):
+        c = command[i]
+
+        if c == '\\' and not in_single:
+            i += 2
+            continue
+        if c == "'" and not in_double:
+            in_single = not in_single
+            i += 1
+            continue
+        if c == '"' and not in_single:
+            in_double = not in_double
+            i += 1
+            continue
+        if in_single or in_double:
+            i += 1
+            continue
+
+        # Ab hier: außerhalb von Quotes. `<<` startet ein Heredoc – aber `<<<`
+        # ist ein Here-String (einzeiliger Wert, kein Body zum Entfernen).
+        if command.startswith('<<', i) and not command.startswith('<<<', i):
+            m = re.match(r"<<-?\s*(['\"]?)(\w+)\1", command[i:])
+            if not m:
+                i += 2
+                continue
+            marker = m.group(2)
+            body_start = command.find('\n', i)
+            if body_start == -1:
+                return command[:i]  # Heredoc angekündigt, aber kein Body → Rest ist leer
+            # Endmarker: eigene Zeile, nur der Marker (bei <<- mit führendem Whitespace)
+            end_re = re.compile(r'^[ \t]*' + re.escape(marker) + r'[ \t]*$', re.M)
+            end = end_re.search(command, body_start)
+            if not end:
+                i += 2  # fail-closed: Body bleibt stehen und wird geprüft
+                continue
+            # Heredoc-Operator und Body herausschneiden, Rest weiter untersuchen
+            command = command[:i] + command[end.end():]
+            continue
+
+        i += 1
+
+    return command
+
+
+# Shell-Strukturwörter, die selbst kein Kommando sind (Schleifen/Bedingungen).
+_LOOP_OPEN_RE = re.compile(r'^(for|while|until)\b')
+_STRUCT_ONLY_RE = re.compile(r'^(do|done|then|fi|else|elif|esac|;;)\b|^(do|done|then|fi|else|esac)$')
+_LEADING_STRUCT_RE = re.compile(r'^(?:do|then|else)\s+')
+_IF_OPEN_RE = re.compile(r'^(if|case)\b')
+
+# Variablen-Zuweisungs-Präfixe: `FOO=bar cmd`, `out=$(cmd)`, `A=1 B=2 cmd`
+_ASSIGN_PREFIX_RE = re.compile(r'^[A-Za-z_][A-Za-z_0-9]*=(?:"[^"]*"|\'[^\']*\'|[^\s;|&]*)\s*')
+
+# Kommando-Substitution und Prozess-Substitution
+_SUBST_RE = re.compile(r'\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)|`([^`]*)`|<\(([^()]*)\)|>\(([^()]*)\)')
+
+# Indirekte Ausführung: der Befehlsname selbst stammt aus einer Expansion, oder
+# ein Interpreter führt beliebigen Text aus. Beides umgeht jede Musterprüfung,
+# weil zur Prüfzeit nur `$CMD` bzw. der Interpreter dasteht.
+_INDIRECT_EXEC_RE = re.compile(
+    r'^\s*(?:"?\$\{?[A-Za-z_]|\$\()'                      # $VAR …, ${VAR} …, "$VAR" …, $(…) …
+    r'|^\s*(?:eval|exec|source)\b'
+    r'|^\s*\.\s+\S'                                        # . script.sh
+    r'|^\s*(?:ba|da|k|z)?sh\s+-c\b'
+    r'|^\s*sh\s+-c\b'
+)
+
+
+# Befehle, die einen übergebenen String AUSFÜHREN statt ihn als Daten zu behandeln.
+# Nur bei diesen darf ein quotiertes Argument die Wrapper-Pflicht auslösen; bei allen
+# anderen ist ein String ein Suchmuster, ein Beschreibungstext oder eine Commit-Message.
+_STRING_EXECUTING_CMDS = re.compile(
+    r'^\s*(?:eval|exec|source|\.|bash|sh|dash|ksh|zsh|xargs|watch|env|nohup|sudo|timeout|find)\b'
+)
+
+_QUOTED_STRING_RE = re.compile(r'"[^"]*"|\'[^\']*\'')
+
+
+def mask_data_strings(command: str) -> str:
+    """Maskiert quotierte Argumente, sofern der Befehl sie als Daten behandelt.
+
+    Die Wrapper-Pflicht prüft den rohen Befehlstext und trifft sonst auch Befehle, die
+    einen Namen nur ERWÄHNEN – eine Volltextsuche nach 'npx vitest' galt als Start.
+
+    `eval "npx vitest"` und `xargs npx vitest` bleiben voll geprüft: dort ist der String
+    Code. Segmentweise, damit `grep "…" | eval "…"` nicht mitmaskiert wird.
+    """
+    parts = []
+    for segment in split_compound_command(command):
+        if _STRING_EXECUTING_CMDS.match(segment):
+            parts.append(segment)
+        else:
+            parts.append(_QUOTED_STRING_RE.sub('TEXT', segment))
+    return ' ; '.join(parts)
+
+
+def _split_exec_argument(segment: str) -> tuple[str, str | None]:
+    """Trennt `find … -exec CMD …` / `xargs [flags] CMD …` in (Träger, Sub-Kommando).
+
+    Der -exec-Teil ist ein vollwertiges Kommando und wird wie ein eigenes Segment
+    geprüft: `find … -exec cat {} \\;` ist damit erlaubt (cat steht auf der Liste),
+    `find … -exec rm {} \\;` bleibt destruktiv.
+    """
+    m = re.search(r'\s-(?:exec|execdir|ok)\s+(.*?)(?:\s+\\;|\s+\+|$)', segment)
+    if m:
+        return segment[:m.start()], m.group(1).replace('{}', 'DATEI').strip()
+
+    m = re.match(r'^xargs\s+((?:-\S+\s+|\{\}\s+)*)(.+)$', segment)
+    if m:
+        return 'xargs ' + m.group(1).strip(), m.group(2).replace('{}', 'DATEI').strip()
+
+    return segment, None
+
+
+def expand_segment(segment: str) -> list[tuple[str, bool]]:
+    """Zerlegt ein Segment in die tatsächlich ausgeführten Kommandos.
+
+    Ein Segment kann mehrere enthalten, ohne Top-Level-Operator: `out=$(python3 x.py)`
+    führt `python3 x.py` aus, `find … -exec cat {} \\;` führt `cat` aus.
+
+    Gibt (kommando, ist_massenoperation)-Paare zurück; leer bei reiner Struktur oder
+    Wertzuweisung. `ist_massenoperation` markiert Kommandos aus `-exec`/`xargs`: die
+    laufen einmal pro Fundstelle, also dieselben Grenzen wie ein Schleifenrumpf.
+    """
+    segment = segment.strip()
+    if not segment:
+        return []
+
+    # Führendes Strukturwort abstreifen: `do echo $f` → `echo $f`
+    segment = _LEADING_STRUCT_RE.sub('', segment).strip()
+    if not segment or _STRUCT_ONLY_RE.match(segment):
+        return []
+
+    out: list[tuple[str, bool]] = []
+
+    # Eingebettete Substitutionen zuerst einsammeln – sie werden ausgeführt,
+    # egal an welcher Stelle sie stehen.
+    def collect_substitutions(text: str) -> str:
+        def repl(m: re.Match[str]) -> str:
+            inner = next((g for g in m.groups() if g is not None), '')
+            if inner.strip():
+                out.extend(expand_segment(inner))
+            return 'WERT'
+        return _SUBST_RE.sub(repl, text)
+
+    segment = collect_substitutions(segment)
+
+    # Schleifen-/Bedingungskopf: `for f in a b`, `while [ -f x ]` – der Kopf führt
+    # selbst kein Kommando aus (Substitutionen darin sind oben schon erfasst).
+    if _LOOP_OPEN_RE.match(segment) or _IF_OPEN_RE.match(segment):
+        return out
+
+    # Zuweisungs-Präfixe abstreifen: `FOO=bar ls -la` → `ls -la`; `SP=/pfad` → nichts
+    while True:
+        stripped = _ASSIGN_PREFIX_RE.sub('', segment, count=1)
+        if stripped == segment:
+            break
+        segment = stripped.strip()
+    if not segment:
+        return out
+
+    carrier, sub = _split_exec_argument(segment)
+    out.append((carrier, False))
+    if sub:
+        out.extend((cmd, True) for cmd, _ in expand_segment(sub))
+    return out
+
+
 def split_compound_command(command: str) -> list[str]:
-    """Splittet einen Compound-Command an bash-level Operatoren (|, ||, &&, ;).
+    """Splittet einen Compound-Command an bash-level Operatoren (|, ||, &&, ;, Newline).
+
     Respektiert Anführungszeichen. Gibt immer mindestens [command] zurück.
+
+    Newline ist seit S121 Trenner (OBS-S111-4): vorher war jeder mehrzeilige Befehl
+    per Konstruktion ein einziges unbekanntes Segment und wurde immer abgelehnt.
 
     Hinweis: Backtick-Command-Substitution (`...`) und $(...) werden nicht als
     Quote-Kontext behandelt. Praktisch unkritisch, weil WRONG_APPROACH- und
@@ -742,7 +982,10 @@ def split_compound_command(command: str) -> list[str]:
             i += 2
             continue
 
-        if c == ';':
+        if c == ';' or c == '\n':
+            # Newline trennt wie `;`. Ohne das ist ein mehrzeiliger Befehl EIN Segment,
+            # und da Allow-Muster per .search() greifen, erlaubt eine passende erste
+            # Zeile den ganzen Rest mit (`ls -la\nrm -rf /tmp/x` lief durch).
             flush()
             i += 1
             continue
@@ -758,16 +1001,25 @@ def split_compound_command(command: str) -> list[str]:
 # Kern-Logik
 # ---------------------------------------------------------------------------
 
-def check_simple_command(command: str) -> tuple[str, str, str]:
-    """Prüft ein einzelnes Segment: ALLOW → DESTRUCTIVE → deny.
+def check_simple_command(command: str, in_loop: bool = False) -> tuple[str, str, str]:
+    """Prüft ein einzelnes Segment: INDIRECT → ALLOW → DESTRUCTIVE → deny.
 
     WRONG_APPROACH wird nicht geprüft – das übernimmt check_command auf dem
     Gesamtbefehl vor dem Split.
 
+    in_loop: Kommando aus einem Schleifenrumpf oder aus `-exec`/`xargs`. Dort sind
+    Dateiverwaltungs-Befehle gesperrt – `rm` ist einzeln erlaubt, wiederholt ergibt
+    es ein `rm -rf`, und die Wiederholungszahl ist zur Prüfzeit unsichtbar.
+
     Gibt (decision, reason, log_type) zurück. decision: 'allow' | 'deny'.
     """
-    for pattern, _, _ in ALLOW_PATTERNS:
+    if _INDIRECT_EXEC_RE.search(command):
+        return ("deny", _INDIRECT_EXEC_DENY_REASON, "INDIRECT_EXEC")
+
+    for pattern, category, _ in ALLOW_PATTERNS:
         if pattern.search(command):
+            if in_loop and category == 'Dateiverwaltung':
+                return ("deny", _LOOP_WRITE_DENY_REASON, "LOOP_WRITE")
             if has_unsafe_output_redirect(command):
                 return ("deny", _UNSAFE_REDIRECT_DENY_REASON, "UNSAFE_REDIRECT")
             return ("allow", _ALLOW_REASON, "ALLOW")
@@ -808,9 +1060,15 @@ def check_command(command: str) -> tuple[str, str, str]:
     #    zu python3 .claude/... und matcht die Allow-Liste statt WRONG_APPROACH).
     command, _ = normalize_repo_paths(command)
 
-    # 3. WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells)
+    # 2b. Heredoc-Bodies sind Daten, kein Code (OBS-S111-4) – vor jeder weiteren
+    #     Analyse entfernen, sonst wird Fließtext als Befehlsfolge gelesen.
+    command = strip_heredoc_bodies(command)
+
+    # 3. WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells).
+    #    String-Argumente nicht-ausführender Befehle werden dabei maskiert: eine
+    #    ERWÄHNUNG ist keine Ausführung (OBS-S111-4).
     for pattern, reason in WRONG_APPROACH_PATTERNS:
-        if pattern.search(command):
+        if pattern.search(mask_data_strings(command)):
             return ("deny", reason, "WRONG_APPROACH")
 
     # 3b. Schreibende Zugriffs-Scripte → ask. Muss VOR dem Segment-Check liegen, sonst greift
@@ -829,12 +1087,34 @@ def check_command(command: str) -> tuple[str, str, str]:
     if cd_npm_conflict(segments):
         return ("deny", _CD_NPM_HINT, "WRONG_APPROACH")
 
+    # 4b. Jedes Segment in die tatsächlich ausgeführten Kommandos zerlegen und einzeln
+    #     prüfen. `loop_depth` verfolgt Schleifenrümpfe über Segmentgrenzen hinweg –
+    #     `for f in …; do rm "$f"; done` zerfällt beim Split in drei Segmente, die
+    #     Schleifen-Eigenschaft steckt also nicht im Segment selbst.
+    loop_depth = 0
+    checked_any = False
     for segment in segments:
-        decision, reason, log_type = check_simple_command(segment)
-        if decision == "deny":
-            if is_compound:
-                log_type = f"COMPOUND_{log_type}"
-            return ("deny", reason, log_type)
+        bare = segment.strip()
+        if _STRUCT_ONLY_RE.match(bare) and bare.startswith('done'):
+            loop_depth = max(0, loop_depth - 1)
+            continue
+
+        for cmd, is_mass in expand_segment(segment):
+            checked_any = True
+            decision, reason, log_type = check_simple_command(
+                cmd, in_loop=loop_depth > 0 or is_mass)
+            if decision == "deny":
+                if is_compound:
+                    log_type = f"COMPOUND_{log_type}"
+                return ("deny", reason, log_type)
+
+        if _LOOP_OPEN_RE.match(bare):
+            loop_depth += 1
+
+    # Kein einziges prüfbares Kommando (leerer Befehl, nur Struktur/Zuweisung) →
+    # nicht durchwinken. Fail-closed: was wir nicht klassifizieren, erlauben wir nicht.
+    if not checked_any:
+        return ("deny", _get_smart_hint(command), "UNKNOWN")
 
     return ("allow", _ALLOW_REASON, "ALLOW")
 
@@ -917,8 +1197,26 @@ def _print_allow_list() -> None:
             print(f"    {', '.join(items)}")
 
     print()
-    print("Verknüpfung mit |, ||, &&, ; ist erlaubt – jedes Segment wird einzeln geprüft.")
+    print(
+        "Zusammensetzen (jedes Teilstück wird einzeln geprüft – erlaubt ist die Struktur,\n"
+        "nicht ein Freibrief für ihren Inhalt):\n"
+        "  Verkettung   |  ||  &&  ;  sowie Zeilenumbruch\n"
+        "  Zuweisung    out=$(befehl); echo \"$out\"\n"
+        "  Substitution $(…), `…`, Prozess-Substitution <(…)\n"
+        "  Heredoc      befehl <<'EOF' … EOF   (Body gilt als Text, nicht als Befehl)\n"
+        "  Schleifen    for/while – im Rumpf nur lesende Befehle, keine Datei-Operationen\n"
+        "  Sub-Befehle  find … -exec <befehl> \\;  und  xargs <befehl>\n"
+        "\n"
+        "Nicht erlaubt, weil es jede Prüfung aushebelt: indirekte Ausführung – der Befehl\n"
+        "kommt aus einer Variablen ($CMD), aus eval/source oder aus bash -c."
+    )
     print()
+    if _SCRATCHPAD:
+        print("Scratchpad (Wegwerf-Scripte, Zwischenergebnisse, Redirect-Ziel):")
+        print(f"  {_SCRATCHPAD}/")
+        print("  Liegt außerhalb des Repos, verschwindet mit der Session – kein Aufräumen nötig.")
+        print("  python3 <scratchpad>/<name>.py ist erlaubt, .claude/tmp/ ist KEIN Schreibziel mehr.")
+        print()
     print("Schreiben in Projektdokumente (User-Freigabe nötig, kein Marker):")
     print("  python3 .claude/scripts/obs.py add|set …       → docs/kaizen/observations.md")
     print("  python3 .claude/scripts/lessons.py add …       → docs/kaizen/lessons_learned.md")
@@ -994,7 +1292,11 @@ def main() -> None:
         sys.exit(0)
 
     if decision == "ask":
-        _log_command(command, "ONE_TIME")
+        # Echten log_type schreiben statt pauschal "ONE_TIME" (OBS-S111-4): sonst sind
+        # Design-Rückfragen (WRITE_ACCESS beim Tracker-Schreiben) im Log nicht von
+        # echter Reibung (--allow-once, weil kein regulärer Weg existiert) zu trennen –
+        # und genau diese Unterscheidung braucht man, um die Allow-Liste zu justieren.
+        _log_command(command, log_type)
         hso = {"hookEventName": "PreToolUse", "permissionDecision": "ask"}
         if reason:  # Deny-Grund/Gefahr des nackten Befehls am User-Prompt zeigen (statt kontextlos)
             hso["permissionDecisionReason"] = reason

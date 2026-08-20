@@ -42,7 +42,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import td_anchors  # noqa: E402
+from _hook_io import compute_post_content, read_file_text  # noqa: E402
 
 TD_FILE = "docs/tech-debt.md"
 MEMORY_FILE = "docs/AGENT_MEMORY.md"
@@ -132,12 +134,6 @@ def find_violations(pre: str, post: str, memory_text: str,
     ]
 
 
-def read_file_text(file_path: str) -> str:
-    """Aktueller Datei-Inhalt; "" wenn die Datei (noch) nicht existiert."""
-    path = Path(file_path)
-    return path.read_text(encoding="utf-8") if path.exists() else ""
-
-
 def repo_root_for(td_path: str) -> Path:
     """Repo-Wurzel, abgeleitet aus dem Pfad der bearbeiteten `tech-debt.md`."""
     posix = Path(td_path).as_posix()
@@ -164,20 +160,6 @@ def memory_text_for(td_path: str) -> str:
     posix = Path(td_path).as_posix()
     root = posix[: -len(TD_FILE)] if posix.endswith(TD_FILE) else ""
     return read_file_text(str(Path(root) / MEMORY_FILE))
-
-
-def compute_post_content(tool: str, tool_input: dict, pre: str) -> str | None:
-    """Simuliert den Datei-Inhalt nach Anwendung des Edits/Writes."""
-    if tool == "Write":
-        return tool_input.get("content", "")
-    if tool == "Edit":
-        old = tool_input.get("old_string", "")
-        new = tool_input.get("new_string", "")
-        if old and old in pre:
-            count = -1 if tool_input.get("replace_all") else 1
-            return pre.replace(old, new, count)
-        return pre  # old_string nicht gefunden → echter Edit schlägt ohnehin fehl
-    return None
 
 
 def check(data: dict) -> str | None:

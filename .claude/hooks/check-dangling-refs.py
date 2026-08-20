@@ -32,6 +32,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _hook_io import compute_post_content, read_file_text  # noqa: E402
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Tracker, aus denen Einträge ersatzlos verschwinden (im Gegensatz zu OBS/LL: archiviert).
@@ -50,7 +53,13 @@ _SKIP_DIRS = {
     ".git", "node_modules", "bin", "obj", "dist", "coverage", "__pycache__",
     ".venv", "TestResults", "StrykerOutput", "playwright-report",
 }
-_SKIP_PREFIXES = ("docs/history/sessions/", "docs/kaizen/archive/", ".claude/tmp/")
+_SKIP_PREFIXES = (
+    "docs/history/sessions/", "docs/kaizen/archive/", ".claude/tmp/",
+    # Tooling-Tests nennen IDs als Fixture, nicht als Verweis – ohne diese Ausnahme
+    # blockieren sie die Löschung erledigter Einträge (OBS-S119-2). Produktionsscripte
+    # liegen nicht in tests/ und bleiben geprüft.
+    ".claude/hooks/tests/", ".claude/scripts/tests/",
+)
 
 # Nur Textquellen, in denen Referenzen überhaupt vorkommen.
 _SCAN_SUFFIXES = {".md", ".cs", ".ts", ".tsx", ".py", ".json", ".feature", ".yml", ".yaml"}
@@ -121,26 +130,6 @@ def find_references(ids: list[str], exclude: Path) -> list[tuple[str, int, str]]
             for match in wanted.finditer(line):
                 hits.append((rel, lineno, match.group(1)))
     return hits
-
-
-def read_file_text(file_path: str) -> str:
-    """Aktueller Datei-Inhalt; "" wenn die Datei (noch) nicht existiert."""
-    path = Path(file_path)
-    return path.read_text(encoding="utf-8") if path.exists() else ""
-
-
-def compute_post_content(tool: str, tool_input: dict, pre: str) -> str | None:
-    """Simuliert den Datei-Inhalt nach Anwendung des Edits/Writes."""
-    if tool == "Write":
-        return tool_input.get("content", "")
-    if tool == "Edit":
-        old = tool_input.get("old_string", "")
-        new = tool_input.get("new_string", "")
-        if old and old in pre:
-            count = -1 if tool_input.get("replace_all") else 1
-            return pre.replace(old, new, count)
-        return pre  # old_string nicht gefunden → echter Edit schlägt ohnehin fehl
-    return None
 
 
 def check(data: dict) -> str | None:

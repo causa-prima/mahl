@@ -30,6 +30,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _hook_io import compute_post_content, read_file_text  # noqa: E402
+
 OBS_FILE = "docs/kaizen/observations.md"
 
 _ENTRY_SPLIT_RE = re.compile(r"^## (OBS-S\d+-\d+)", re.M)
@@ -123,26 +126,6 @@ def find_violations(pre: str, post: str) -> list[tuple[str, str]]:
         for oid, body in parse_obs_entries(post).items()
         if oid not in known and _OBS_OK not in body and (reasons := check_entry(body))
     ]
-
-
-def read_file_text(file_path: str) -> str:
-    """Aktueller Datei-Inhalt; "" wenn die Datei (noch) nicht existiert."""
-    path = Path(file_path)
-    return path.read_text(encoding="utf-8") if path.exists() else ""
-
-
-def compute_post_content(tool: str, tool_input: dict, pre: str) -> str | None:
-    """Simuliert den Datei-Inhalt nach Anwendung des Edits/Writes."""
-    if tool == "Write":
-        return tool_input.get("content", "")
-    if tool == "Edit":
-        old = tool_input.get("old_string", "")
-        new = tool_input.get("new_string", "")
-        if old and old in pre:
-            count = -1 if tool_input.get("replace_all") else 1
-            return pre.replace(old, new, count)
-        return pre  # old_string nicht gefunden → echter Edit schlägt ohnehin fehl
-    return None
 
 
 def check(data: dict) -> str | None:

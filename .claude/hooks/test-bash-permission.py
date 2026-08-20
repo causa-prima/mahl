@@ -6,6 +6,12 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 from importlib import import_module
 
+# Scratchpad-Auflösung deterministisch machen: Der Hook baut den Pfad aus
+# CLAUDE_CODE_SESSION_ID. Ohne gesetzte Variable (CI, nackte Shell) gäbe es kein
+# Scratchpad und die zugehörigen Regeln blieben ungetestet – also setzen wir eine
+# feste Test-Session, BEVOR das Modul seine Konfiguration auswertet.
+os.environ.setdefault("CLAUDE_CODE_SESSION_ID", "test-session-0000")
+
 hook = import_module("check-bash-permission")
 check_command = hook.check_command
 split_compound_command = hook.split_compound_command
@@ -13,8 +19,17 @@ has_unsafe_output_redirect = hook.has_unsafe_output_redirect
 normalize_repo_paths = hook.normalize_repo_paths
 build_allow_output = hook._build_allow_output
 
+strip_heredoc_bodies = hook.strip_heredoc_bodies
+expand_segment = hook.expand_segment
+mask_data_strings = hook.mask_data_strings
+
 # Repo-Root wie der Hook ihn auf dieser Maschine auflöst (für Pfad-Normalisierungs-Tests).
 REPO_ROOT = hook._NORMALIZE_ROOT
+
+# Scratchpad-Pfad wie der Hook ihn auflöst. Ohne CLAUDE_CODE_SESSION_ID (z.B. in CI)
+# gibt es keins – dann greifen wir auf einen Dummy zurück und die betroffenen Fälle
+# erwarten konsequenterweise ein Deny.
+SCRATCH = hook._SCRATCHPAD
 
 
 class Colors:
@@ -94,8 +109,11 @@ def test_redirect_detection() -> int:
         # Sicher: erlaubte Ziele
         ("echo text > /dev/null", False, "/dev/null"),
         ("cat file > /dev/null", False, "cat > /dev/null"),
-        ("echo text > .claude/tmp/output.txt", False, ".claude/tmp/"),
-        ("grep foo file >> .claude/tmp/results.txt", False, "append zu .claude/tmp/"),
+        (f"echo text > {SCRATCH}/output.txt", False, "Scratchpad"),
+        (f"grep foo file >> {SCRATCH}/results.txt", False, "append zu Scratchpad"),
+        # .claude/tmp/ ist seit S121 KEIN Schreibziel mehr (OBS-S111-4): Wegwerf-
+        # Artefakte gehören ins Scratchpad, sonst bleiben sie im Repo liegen.
+        ("echo text > .claude/tmp/output.txt", True, ".claude/tmp/ nicht mehr erlaubt"),
         ("cat file > /dev/stderr", False, "/dev/stderr"),
         # Sicher: File-Descriptor-Redirect (2>&1 etc.)
         ("dotnet build 2>&1", False, "2>&1 kein Datei-Redirect"),
@@ -267,8 +285,8 @@ def test_allow_patterns() -> int:
         ("python3 /home/kieritz/.claude/skills/recall-session/scripts/recall.py extract --session last | head -50",
          "recall.py | head (Compound, read-only)"),
         # Redirects auf erlaubte Ziele
-        ("echo 'output' > .claude/tmp/debug.txt", "echo > .claude/tmp/"),
-        ("grep errors log > .claude/tmp/errors.txt", "grep > .claude/tmp/"),
+        (f"echo 'output' > {SCRATCH}/debug.txt", "echo > Scratchpad"),
+        (f"grep errors log > {SCRATCH}/errors.txt", "grep > Scratchpad"),
         ("cat file > /dev/null", "cat > /dev/null"),
         # git read-only
         ("git status", "git status"),
@@ -755,6 +773,112 @@ def test_wrapper_filter_strip() -> int:
     return failures
 
 
+def test_segment_expansion() -> int:
+    """Konstrukte, die vorher pauschal als unbekannt galten (OBS-S111-4).
+
+    Zu jeder Freigabe gehört die Gegenprobe: dieselbe Struktur mit destruktivem
+    Kern muss weiter blocken, sonst wurde nur ein Loch geöffnet.
+    """
+    print(f"\n{Colors.BOLD}=== Segment-Expansion: neue Konstrukte (S121) ==={Colors.RESET}")
+    failures = 0
+
+    cases = [
+        # --- Newline als Trenner -------------------------------------------------
+        ("ls -la\ngit status --short", "allow", "Newline: zwei erlaubte Zeilen"),
+        ("ls -la\nrm -rf /tmp/x", "deny", "GEGENPROBE Newline: destruktive zweite Zeile"),
+
+        # --- Variablenzuweisung --------------------------------------------------
+        ('out=$(git status --short); echo "$out"', "allow", "Zuweisung aus Substitution"),
+        ("FOO=bar ls -la", "allow", "Zuweisungs-Präfix vor erlaubtem Befehl"),
+        # Eine alleinstehende Zuweisung führt kein Kommando aus und überlebt den
+        # Aufruf nicht – es gibt nichts zu erlauben. Fail-closed statt Durchwinken.
+        ("SP=/pfad/zum/ding", "deny", "reine Wertzuweisung führt nichts aus"),
+        ("SP=/pfad\ncat $SP/datei.txt", "allow", "Zuweisung + Nutzung in Folgezeile"),
+        ("out=$(rm -rf /tmp/x)", "deny", "GEGENPROBE: destruktiv in Substitution"),
+        ('CMD="rm -rf /"; $CMD', "deny", "GEGENPROBE: indirekte Ausführung via Variable"),
+        ("eval \"git status\"", "deny", "GEGENPROBE: eval"),
+        ("bash -c 'ls -la'", "deny", "GEGENPROBE: bash -c"),
+
+        # --- Heredoc -------------------------------------------------------------
+        ("cat <<'EOF'\nfoo | bar; baz && qux\nEOF", "allow",
+         "Heredoc-Body ist Text, kein Befehl"),
+        # Der Body verschwindet aus der Analyse, der Träger bleibt geprüft: übrig
+        # bleibt `git commit …`, und das ist weiterhin WRONG_APPROACH (mit
+        # --allow-once freigabefähig). Der Heredoc erkauft keine Freigabe.
+        ("git commit -q -F - <<'MSG'\nSession 121: irgendwas\nMSG", "deny",
+         "Heredoc: commit bleibt User-Aktion"),
+        ("bash <<'EOF'\nrm -rf /\nEOF", "deny", "GEGENPROBE: Interpreter frisst Heredoc"),
+        ("python3 - <<'PY'\nprint(1)\nPY", "deny", "GEGENPROBE: python3 - bleibt gesperrt"),
+
+        # --- Schleifen -----------------------------------------------------------
+        ("for f in a b; do echo $f; done", "allow", "Schleife mit lesendem Rumpf"),
+        ("for f in a b; do\n  grep foo $f\ndone", "allow", "mehrzeilige Schleife, lesend"),
+        ("for f in a b; do rm $f; done", "deny", "GEGENPROBE: rm im Schleifenrumpf"),
+        ("for f in a b; do mv $f x; done", "deny", "GEGENPROBE: mv im Schleifenrumpf"),
+
+        # --- find -exec / xargs --------------------------------------------------
+        ("find . -name '*.cs' -exec cat {} \\;", "allow", "find -exec mit erlaubtem Kern"),
+        ("find . -name '*.cs' -exec rm {} \\;", "deny", "GEGENPROBE: find -exec rm"),
+        ("find . -name '*.md' | xargs wc -l", "allow", "xargs mit erlaubtem Kern"),
+        ("find . -type f | xargs rm", "deny", "GEGENPROBE: xargs rm"),
+
+        # --- Prozess-Substitution ------------------------------------------------
+        ("diff <(git show HEAD:README.md) README.md", "allow", "Prozess-Substitution, lesend"),
+        ("diff <(rm -rf /tmp/x) README.md", "deny", "GEGENPROBE: destruktiv in <(…)"),
+
+        # --- Scratchpad ----------------------------------------------------------
+        (f"python3 {SCRATCH}/auswertung.py", "allow", "Wegwerf-Script im Scratchpad"),
+        (f"git diff > {SCRATCH}/run.diff", "allow", "Redirect ins Scratchpad"),
+        ("python3 /home/kieritz/beliebig/script.py", "deny",
+         "GEGENPROBE: python3 außerhalb Scratchpad/Repo"),
+        ("git diff > /etc/passwd", "deny", "GEGENPROBE: Redirect außerhalb"),
+
+        # --- String-Maskierung (Erwähnung ≠ Ausführung) --------------------------
+        ('grep -rn "npm run lint" docs/', "allow", "Suchmuster nennt Wrapper-Befehl"),
+        ("git log -S'npx vitest' -- .claude/", "allow", "Pickaxe-Suche nach Befehlsnamen"),
+        ('eval "npx vitest"', "deny", "GEGENPROBE: eval führt den String aus"),
+        ("xargs npx vitest", "deny", "GEGENPROBE: xargs führt den String aus"),
+        ("npx vitest run", "deny", "GEGENPROBE: echter Aufruf bleibt gesperrt"),
+
+        # --- awk / date ----------------------------------------------------------
+        ("awk '/^## /' docs/tech-debt.md", "allow", "awk liest"),
+        ("grep -c foo docs/x.md | awk '{print $1}'", "allow", "awk in der Kette"),
+        ("date +%F", "allow", "date mit Format-Argument"),
+        ('printf "%s\\n" hallo', "allow", "printf schreibt nach stdout"),
+
+        # --- S121: blockten bisher nur zufällig über die Mehrzeilen-Lücke --------
+        ("test -f README.md && echo da", "allow", "test als Bedingung"),
+        ("[ -f README.md ] && echo da", "allow", "[ … ] als Bedingung"),
+        ("docker compose config", "allow", "docker compose config startet nichts"),
+        ("git check-ignore -v .claude/tmp/x.log", "allow", "git check-ignore ist lesend"),
+        ("git checkout features/ingredients.feature", "deny",
+         "GEGENPROBE: git checkout <datei> verwirft lokale Änderungen"),
+    ]
+    for command, expected, desc in cases:
+        if not assert_decision(command, expected, desc):
+            failures += 1
+
+    # Heredoc-Stripping isoliert: Body raus, Träger bleibt prüfbar
+    stripped = strip_heredoc_bodies("git commit -F - <<'EOF'\nfoo | bar\nEOF")
+    if "foo | bar" not in stripped and "git commit" in stripped:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [heredoc    ] Body entfernt, Träger bleibt")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [heredoc    ] Body entfernt, Träger bleibt")
+        print(f"       Got: {stripped!r}")
+        failures += 1
+
+    # Unbeendetes Heredoc: fail-closed, der Rest darf nicht verschwinden
+    stripped = strip_heredoc_bodies("cat <<'EOF'\nrm -rf /")
+    if "rm -rf /" in stripped:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [heredoc    ] unbeendet → Rest bleibt geprüft")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [heredoc    ] unbeendet → Rest bleibt geprüft")
+        print(f"       Got: {stripped!r}")
+        failures += 1
+
+    return failures
+
+
 def test_allowed_logging() -> int:
     print(f"\n{Colors.BOLD}=== Allowed-Command-Logging (OBS-3 D) ==={Colors.RESET}")
     import tempfile
@@ -796,6 +920,7 @@ def main() -> None:
     total_failures += test_path_normalization()
     total_failures += test_cd_npm_deny()
     total_failures += test_wrapper_filter_strip()
+    total_failures += test_segment_expansion()
     total_failures += test_allowed_logging()
 
     print(f"\n{'=' * 60}")
