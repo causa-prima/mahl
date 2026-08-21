@@ -171,3 +171,77 @@ def test_session_span_ends_before_the_next_heading():
     abschnitt = BESTAND[start:ende]
     assert "LL-S113-2" in abschnitt
     assert "LL-S112-1" not in abschnitt
+
+
+# --- CM-Bezug ----------------------------------------------------------------
+# `process.md` verlangt für jedes KRITISCH-/HOCH-Finding einen Countermeasure-Eintrag; der
+# Bezug entsteht bei der Erfassung, wo der Kontext noch frisch ist, statt in der Retro.
+def _mit(**abweichung) -> dict:
+    return {**FELDER, **abweichung}
+
+
+def test_high_impact_requires_a_cm_reference():
+    for impact in ("HOCH", "KRITISCH"):
+        try:
+            le.format_entry("LL-S114-1", **_mit(impact=impact))
+        except ValueError:
+            continue
+        raise AssertionError(f"{impact} ohne CM-Bezug wurde akzeptiert")
+
+
+def test_lower_impact_does_not_require_a_cm_reference():
+    """Gegenprobe: Ein Fix, der den Bezug pauschal für alle fordert, fällt hier auf."""
+    for impact in ("MITTEL", "GERING"):
+        le.format_entry("LL-S114-1", **_mit(impact=impact))
+
+
+def test_cm_reference_appears_as_its_own_body_line():
+    zeilen = le.format_entry("LL-S114-1", **_mit(impact="HOCH", cm_bezug="CM-S116-1")).splitlines()
+    assert "  CM-Bezug: CM-S116-1" in zeilen
+    assert zeilen[-1].startswith("  CM-Bezug:"), "das Feld steht hinter Regel, sonst brechen Parser"
+
+
+def test_cm_reference_accepts_neu_when_no_measure_exists_yet():
+    """Ohne diesen Wert wäre ein Finding ohne passende Bestands-CM nicht erfassbar."""
+    bullet = le.format_entry("LL-S114-1", **_mit(impact="HOCH", cm_bezug="neu"))
+    assert "  CM-Bezug: neu" in bullet
+
+
+def test_cm_reference_rejects_free_text():
+    """Gegenprobe: Ohne Formprüfung wäre die Pflicht eine Formalie – jeder String erfüllte sie."""
+    for wert in ("irgendwas", "siehe oben", "CM", "S116-1", ""):
+        try:
+            le.format_entry("LL-S114-1", **_mit(impact="HOCH", cm_bezug=wert))
+        except ValueError:
+            continue
+        raise AssertionError(f"ungültiger CM-Bezug '{wert}' wurde akzeptiert")
+
+
+def test_cm_reference_is_kept_when_given_for_lower_impact():
+    bullet = le.format_entry("LL-S114-1", **_mit(impact="MITTEL", cm_bezug="CM-S047-1"))
+    assert "  CM-Bezug: CM-S047-1" in bullet
+
+
+def test_known_cm_ids_are_read_from_the_measures_file():
+    """Ein Bezug auf eine nicht existierende CM wäre form-gültig und inhaltlich leer –
+    eine tote Referenz. Deshalb kennt das Modul den Bestand."""
+    bestand = (
+        "# Countermeasures\n\n## Aktive Maßnahmen\n\n"
+        "### CM-S116-1 – Titel\n**Impact:** HOCH\n\n"
+        "### CM-S078-2 – Anderer Titel\n**Impact:** MITTEL\n"
+    )
+    assert le.cm_ids(bestand) == {"CM-S116-1", "CM-S078-2"}
+
+
+def test_cm_ids_ignores_mentions_outside_headings():
+    """Gegenprobe: Eine im Fließtext erwähnte ID ist kein Eintrag – sonst gälte jede
+    Erwähnung als Existenznachweis und die Prüfung liefe faktisch leer."""
+    bestand = "### CM-S116-1 – Titel\n**Maßnahme:** vgl. CM-S999-9 und CM-S888-8.\n"
+    assert le.cm_ids(bestand) == {"CM-S116-1"}
+
+
+def test_entry_with_cm_reference_is_found_by_the_own_parser():
+    """Rundlauf: Das neue Feld darf `entry_spans` nicht aus dem Tritt bringen."""
+    neu, lid = le.add(BESTAND, 114, **_mit(impact="HOCH", cm_bezug="neu"))
+    assert le.get(neu, lid) is not None
+    assert "CM-Bezug: neu" in le.get(neu, lid)

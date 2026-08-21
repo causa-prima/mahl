@@ -13,12 +13,21 @@ Eintrag-Format:
     Was: Ein Satz – was ist passiert?
     Warum: Ein Satz – Ursache.
     Regel: Die destillierte Erkenntnis (imperative Form).
+    CM-Bezug: <CM-ID> | neu     (Pflicht bei KRITISCH/HOCH, sonst optional)
 
   Beispiel:
   - **[HOCH] [PROZESS] [TDD] LL-S084-1 – Content-Hash ohne stabile Sortierung nicht killbar**
     Was: ETag-Mutant überlebte, weil die Collection-Reihenfolge nicht deterministisch war.
     Warum: OrderBy(name) fehlte → Insertion-Order ≠ alphabetisch.
     Regel: Content-Hash über Collections immer auf eine stabile Sortierung stützen.
+    CM-Bezug: neu
+
+  Zum Feld CM-Bezug: Die ID der Maßnahme, an die das Finding anschließt, oder `neu`, wenn
+  dafür erst eine entstehen muss (die ID muss in countermeasures.md existieren). Pflicht bei
+  KRITISCH und HOCH; bei MITTEL/GERING optional – besteht ein Bezug, gehört er hinein, sonst
+  entfällt die Zeile. `lessons.py add --cm-bezug` erzwingt und prüft es.
+  (Zeilenanfang bewusst nicht „CM-Bezug:" – sonst zählt der Auswertungs-grep des kaizen-Skills
+  diese Erklärung als Eintrag mit.)
 
   ID (neue Einträge): LL-S<NNN>-<n>, HINTER den Tags – vor [ würde es die Script-Regexes brechen.
   Vorausschauende Beobachtungen → docs/kaizen/observations.md.

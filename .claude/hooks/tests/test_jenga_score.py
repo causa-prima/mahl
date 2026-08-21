@@ -1,4 +1,4 @@
-"""Tests für jenga_score.py – Finding-Parser (Slash- und Bindestrich-Kontexte)."""
+"""Tests für jenga_score.py – Finding-Parser (Slash- und Bindestrich-Kontexte) und Exit-Code."""
 import os
 import sys
 
@@ -56,3 +56,34 @@ def test_parse_zaehlt_beispiel_eintrag_im_header_kommentar_nicht_mit(tmp_path):
 
     assert sessions == 1
     assert [f["impact"] for f in findings] == ["MITTEL"]
+
+
+# --- Exit-Code: Report, kein Gate --------------------------------------------
+# jenga_score.py ist ein Report-Script wie obs-drain.py oder td_due.py: Sein Befund steht
+# im stdout, der Exit-Code sagt nur, ob der Lauf gelang. Meldete es „Retro fällig" per
+# Exit ≠ 0, wertete ein generischer Aufrufer das als Ausfall – und das Script fiele genau
+# dann aus, wenn es etwas zu melden hat.
+def _lauf(tmp_path, findings: str) -> int:
+    datei = tmp_path / "lessons_learned.md"
+    datei.write_text("# Lessons Learned\n\n## Session 200 – 2026-01-01\n\n" + findings,
+                     encoding="utf-8")
+    sys.argv = ["jenga_score.py", "--file", str(datei)]
+    return js.main()
+
+
+def test_exit_code_is_zero_when_a_retro_is_due(tmp_path, capsys):
+    code = _lauf(tmp_path, "- **[KRITISCH] [TOOLING] [Hook/Script] LL-1 – a**\n" * 5)
+    ausgabe = capsys.readouterr().out
+    assert "RETRO FÄLLIG" in ausgabe, "der Befund muss im stdout stehen"
+    assert code == 0, "ein Report meldet seinen Befund im Text, nicht über den Exit-Code"
+
+
+def test_exit_code_is_zero_when_the_score_is_healthy(tmp_path, capsys):
+    assert _lauf(tmp_path, "") == 0
+    assert "OK" in capsys.readouterr().out
+
+
+def test_exit_code_is_nonzero_when_the_input_file_is_missing(tmp_path):
+    """Gegenprobe: Der echte Fehlerfall muss weiterhin ≠ 0 liefern."""
+    sys.argv = ["jenga_score.py", "--file", str(tmp_path / "fehlt.md")]
+    assert js.main() != 0

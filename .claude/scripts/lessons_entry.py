@@ -16,9 +16,17 @@ from pathlib import Path
 from obs_parse import repo_root, running_session
 
 LL_FILE = "docs/kaizen/lessons_learned.md"
+CM_FILE = "docs/kaizen/countermeasures.md"
 
 IMPACT_WERTE = ("KRITISCH", "HOCH", "MITTEL", "GERING")
 KATEGORIE_WERTE = ("PROZESS", "AGENT", "QUALITÄT", "TOOLING")
+
+# `process.md` verlangt für diese beiden Impacts sofort einen Countermeasure-Eintrag. Der
+# Bezug wird deshalb schon bei der Erfassung eingefordert, solange der Kontext des Findings
+# frisch ist; die Übertragung nach `countermeasures.md` zieht die Retro nach (CM-S078-2).
+CM_BEZUG_PFLICHT = ("KRITISCH", "HOCH")
+CM_BEZUG_NEU = "neu"  # zulässig, wenn (noch) keine passende Maßnahme existiert
+_CM_ID = re.compile(r"CM-S\d+-\d+")
 
 _BULLET = re.compile(r"^- \*\*\[[^\]]+\] \[[^\]]+\] \[[^\]]+\] (LL-S\d+-\d+)", re.M)
 _SESSION_HEADING = re.compile(r"^## Session (\d+)\b.*$", re.M)
@@ -26,6 +34,10 @@ _SESSION_HEADING = re.compile(r"^## Session (\d+)\b.*$", re.M)
 
 def ll_path(root: Path | None = None) -> Path:
     return (root or repo_root()) / LL_FILE
+
+
+def cm_path(root: Path | None = None) -> Path:
+    return (root or repo_root()) / CM_FILE
 
 
 def entry_spans(text: str) -> dict[str, tuple[int, int]]:
@@ -65,14 +77,44 @@ def _pruefe(name: str, wert: str, erlaubt: tuple[str, ...]) -> None:
         raise ValueError(f"{name}: '{wert}' ist nicht zulässig. Erlaubt: {', '.join(erlaubt)}")
 
 
+def cm_ids(text: str) -> set[str]:
+    """Die IDs aller Maßnahmen in `countermeasures.md` – nur Überschriften, nicht Erwähnungen.
+
+    Eine im Fließtext genannte ID belegt keine Existenz; zählte sie mit, ginge jeder
+    Verweis auf eine gelöschte Maßnahme als gültig durch.
+    """
+    return set(re.findall(r"^#{2,3} (CM-S\d+-\d+)", text, re.M))
+
+
+def _pruefe_cm_bezug(impact: str, cm_bezug: str | None) -> str:
+    """Gibt den normalisierten Bezug zurück ('' = keiner, für MITTEL/GERING zulässig)."""
+    wert = (cm_bezug or "").strip()
+    if not wert:
+        if impact in CM_BEZUG_PFLICHT:
+            raise ValueError(
+                f"CM-Bezug ist für {impact}-Findings Pflicht (docs/kaizen/process.md). "
+                f"Erlaubt: eine bestehende CM-ID (z.B. CM-S116-1) oder '{CM_BEZUG_NEU}', "
+                f"wenn dafür erst eine Maßnahme entstehen muss."
+            )
+        return ""
+    if wert != CM_BEZUG_NEU and not _CM_ID.fullmatch(wert):
+        raise ValueError(
+            f"CM-Bezug: '{wert}' ist keine CM-ID und nicht '{CM_BEZUG_NEU}'. "
+            f"Freitext ist unzulässig – er erfüllte die Pflicht, ohne etwas zu benennen."
+        )
+    return wert
+
+
 def format_entry(lid: str, titel: str, impact: str, kategorie: str, kontext: str,
-                 quelle: str, was: str, warum: str, regel: str) -> str:
+                 quelle: str, was: str, warum: str, regel: str,
+                 cm_bezug: str | None = None) -> str:
     """Baut einen formatgetreuen Learning-Bullet."""
     _pruefe("Impact", impact, IMPACT_WERTE)
     _pruefe("Kategorie", kategorie, KATEGORIE_WERTE)
     for name, wert in (("Titel", titel), ("Was", was), ("Warum", warum), ("Regel", regel)):
         if not wert.strip():
             raise ValueError(f"{name} darf nicht leer sein.")
+    bezug = _pruefe_cm_bezug(impact, cm_bezug)
 
     return (
         f"- **[{impact}] [{kategorie}] [{kontext.strip()}] {lid} – {titel.strip()}**\n"
@@ -80,6 +122,9 @@ def format_entry(lid: str, titel: str, impact: str, kategorie: str, kontext: str
         f"  Was: {was.strip()}\n"
         f"  Warum: {warum.strip()}\n"
         f"  Regel: {regel.strip()}\n"
+        # Bewusst ans Ende: `jenga_score.py` und `retro_report.py` lesen die Bullet-Zeile
+        # und die Reihenfolge darunter; ein Feld dazwischen bräche sie.
+        + (f"  CM-Bezug: {bezug}\n" if bezug else "")
     )
 
 

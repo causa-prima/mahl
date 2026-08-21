@@ -17,9 +17,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lessons_entry import (  # noqa: E402
+    CM_BEZUG_NEU,
+    CM_BEZUG_PFLICHT,
     IMPACT_WERTE,
     KATEGORIE_WERTE,
     add,
+    cm_ids,
+    cm_path,
     get,
     laufende_session,
     ll_path,
@@ -43,7 +47,21 @@ def cmd_get(args) -> int:
     return 0
 
 
+def _pruefe_cm_existenz(bezug: str | None) -> None:
+    """Eine benannte Maßnahme muss es geben – sonst ist der Bezug eine tote Referenz."""
+    if not bezug or bezug.strip() in ("", CM_BEZUG_NEU):
+        return
+    bekannt = cm_ids(cm_path().read_text(encoding="utf-8"))
+    if bezug.strip() not in bekannt:
+        raise ValueError(
+            f"CM-Bezug: '{bezug.strip()}' existiert nicht in docs/kaizen/countermeasures.md. "
+            f"Entweder die richtige ID nennen oder '{CM_BEZUG_NEU}', wenn die Maßnahme "
+            f"erst noch entstehen muss."
+        )
+
+
 def cmd_add(args) -> int:
+    _pruefe_cm_existenz(args.cm_bezug)
     path = ll_path()
     neu, lid = add(
         path.read_text(encoding="utf-8"),
@@ -56,9 +74,13 @@ def cmd_add(args) -> int:
         was=args.was,
         warum=args.warum,
         regel=args.regel,
+        cm_bezug=args.cm_bezug,
     )
     path.write_text(neu, encoding="utf-8")
     print(f"✓ {lid} erfasst.")
+    if args.cm_bezug and args.cm_bezug.strip() == CM_BEZUG_NEU:
+        print("  ⚠ CM-Bezug 'neu' – die Maßnahme muss noch entstehen "
+              "(spätestens in der nächsten Retro nach countermeasures.md übertragen).")
     return 0
 
 
@@ -84,6 +106,10 @@ def main() -> None:
     p_add.add_argument("--was", required=True, help="Was ist passiert?")
     p_add.add_argument("--warum", required=True, help="Ursache.")
     p_add.add_argument("--regel", required=True, help="Destillierte Erkenntnis, imperativ.")
+    p_add.add_argument("--cm-bezug", dest="cm_bezug", metavar="CM-ID|neu",
+                       help=f"Pflicht für {'/'.join(CM_BEZUG_PFLICHT)}: bestehende CM-ID "
+                            f"(z.B. CM-S116-1) oder '{CM_BEZUG_NEU}', wenn die Maßnahme "
+                            f"erst entstehen muss.")
     p_add.add_argument("--session", type=int, help="überschreibt die erkannte Session-Nummer")
     p_add.set_defaults(func=cmd_add)
 

@@ -200,6 +200,8 @@ die Agenda läuft weiter. Ein Totalausfall wäre von „nichts zu tun" ununtersc
 
 **Quelle-Markierung:** Pflicht-Zeile `Quelle: User | Subagent | Orchestrator` – Herkunft des Eintrags (KEINE Session – die steckt in der ID); `Subagent`/`Orchestrator` machen die Feedback-Quelle beobachtbar (z.B. ob Schicht-Implementer-Feedback ankommt). Keine Noise-Filter-Ausnahme: der 3-Fragen-Test gilt auch für user-gemeldete Einträge.
 
+**CM-Bezug bei KRITISCH/HOCH:** Die Maßnahmen-Pflicht aus „Wann gehört etwas wohin?" wird **bei der Erfassung** eingelöst, nicht in der Retro: `lessons.py add --cm-bezug` erzwingt für diese beiden Impacts eine in `countermeasures.md` existierende CM-ID oder `neu`. Die Übertragung dorthin zieht die Retro nach (Skill `kaizen`, Schritt 3). Feldform: Header von `lessons_learned.md`; Hintergrund: CM-S078-2.
+
 **Keine retroaktiven IDs:** Bestands-Einträge bekommen NICHT nachträglich IDs (bewusste Entscheidung).
 
 ---

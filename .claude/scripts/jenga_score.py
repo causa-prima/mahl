@@ -141,7 +141,7 @@ def main() -> int:
         print("Zähltabelle:")
         print(render_table(findings))
 
-    return 0 if score > 0 else 2  # exit 2 = Retro fällig
+    return 0  # Report, kein Gate: Der Befund steht oben im stdout, nicht im Exit-Code
 
 
 if __name__ == "__main__":

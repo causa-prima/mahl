@@ -183,6 +183,40 @@ def test_warnings_are_rendered_into_the_agenda():
     assert "WARNUNG: Modul `x` ausgefallen" in out
 
 
+# --- Der Retro-Anspruch hängt am Befund, nicht am Exit-Code ------------------
+# Ein Agenda-Modul wertet ausschließlich das stdout seines Scripts aus; Exit ≠ 0 heißt
+# einheitlich „ausgefallen". Ein Score-Script, das seinen Befund über den Exit-Code
+# meldete, fiele deshalb GENAU DANN aus, wenn eine Retro fällig ist – der lauteste Fall
+# würde der stummste.
+class _Lauf:
+    def __init__(self, returncode: int, stdout: str) -> None:
+        self.returncode, self.stdout, self.stderr = returncode, stdout, ""
+
+
+def test_retro_is_claimed_when_the_score_report_says_it_is_due(monkeypatch):
+    monkeypatch.setattr(agenda.subprocess, "run",
+                        lambda *a, **k: _Lauf(0, "Jenga-Score: -14 / 100  [RETRO FÄLLIG]\n"))
+    block = agenda.modul_retro()
+    assert block.beansprucht
+    assert "-14" in block.stub
+
+
+def test_retro_is_not_claimed_when_the_score_is_healthy(monkeypatch):
+    monkeypatch.setattr(agenda.subprocess, "run",
+                        lambda *a, **k: _Lauf(0, "Jenga-Score: 42 / 100  [OK]\n"))
+    assert not agenda.modul_retro().beansprucht
+
+
+def test_a_crash_of_the_score_script_still_fails_the_module(monkeypatch):
+    """Gegenprobe: Der Ausfallpfad muss weiterhin greifen, sonst prüft der Rest nichts."""
+    monkeypatch.setattr(agenda.subprocess, "run", lambda *a, **k: _Lauf(1, ""))
+    try:
+        agenda.modul_retro()
+    except RuntimeError:
+        return
+    raise AssertionError("Exit 1 muss als Ausfall gelten")
+
+
 # --- Ungeplante Szenarien ----------------------------------------------------
 # Ein Szenario fällt auf zwei Wegen aus jedem Plan: seine Feature-Datei trägt keinen
 # `@US-`Tag (die Lauf-Auflösung läuft über die aktuelle Story und erreicht sie nie), oder

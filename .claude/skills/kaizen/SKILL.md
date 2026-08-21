@@ -89,6 +89,19 @@ Ergebnis intern festhalten für Schritt 5.
 
 ## 3. countermeasures.md reviewen
 
+**Zuerst die CM-Bezüge der Periode einlösen** – diese Retro ist der letzte Moment dafür,
+danach sind die Einträge archiviert:
+
+```bash
+grep "^  CM-Bezug:" docs/kaizen/lessons_learned.md | sort | uniq -c
+```
+
+- `CM-Bezug: <CM-ID>` → **Nachtrag** an dieser Maßnahme (Instanz/Rückfall dort vermerken).
+  Ohne ihn zählt `retro_report.py` den Rückfall nicht (CM-S078-2).
+- `CM-Bezug: neu` → Maßnahme **anlegen** (durch das CM-Eingangs-Gate, s. Schritt 2).
+
+Erst danach der Review der bestehenden Einträge.
+
 Lies `docs/kaizen/countermeasures.md`. Für jeden AKTIV/OFFEN-Eintrag:
 
 **Anwendbarkeit prüfen:** Lies zunächst `docs/history/sessions/index.md` und identifiziere anhand der Kurzfassungen welche Sessions ab "Neue Sessions ab: NNN" (laut Script-Output) die relevante Arbeit enthielten. Lies dann die vollständigen Session-Dateien dieser gefilterten Sessions um zu beurteilen ob das Problem aufgetreten ist (Nachweis für BEWÄHRT / Rückfall). Falls eine Session-Datei fehlt: Fehler melden – nicht als "nicht beobachtbar" werten (fehlende Datei = Datenverlust oder Prozessbruch, keine valide Aussage möglich).

@@ -242,16 +242,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: CM-S064-2
 
-## OBS-S116-5 – Kein Mechanismus stellt sicher, dass ein HOCH-Finding einen CM-Anschluss bekommt
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Skill-Nutzung
-- Beobachtung: process.md verlangt fuer jedes KRITISCH- oder HOCH-Finding sofort einen countermeasures-Eintrag. Geprueft wird das nur weich beim closing-session. In der Periode S107-115 entstanden 8 HOCH-Findings bei 2 neuen CMs. Ein Finding blieb ganz ohne Anschluss (LL-S113-3); bei vier weiteren existierte die inhaltlich passende Maßnahme, aber der Nachtrag an ihr fehlte. Die zweite Form ist die unauffaelligere und zugleich schaedlichere: Ohne Nachtrag zaehlt retro_report.py den Rueckfall nicht, die Maßnahme erscheint wirksamer als sie ist, und die naechste Retro bewertet sie auf zu guenstiger Datenlage - genau der Fehler, den LL-S107-2 fuer die BEWAEHRT-Hochstufung beschreibt. Der Punkt war als CM-S078-2 schon einmal offen und wurde in S095 verworfen, weil zwei Perioden ohne Fehlausgang vergingen; die Verwerf-Begruendung nannte ausdruecklich den Fall, der jetzt eingetreten ist. Erschwerend: Der Anschluss ist keine rein syntaktische Eigenschaft - ob eine bestehende CM inhaltlich passt, ist ein Urteil, weshalb ein rein mechanischer Abgleich Impact gegen CM-Existenz Fehlalarme erzeugen wuerde.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: CM-S078-2
-
 ## OBS-S117-1 – Geschriebene Szenarien ohne Lauf-Zuordnung haben keinen Weg in die Implementierung
 - Quelle: Orchestrator
 - Status: NEU
@@ -276,7 +266,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: dauerhaft
 - Kategorie: PROZESS    Kontext: Doku
 - Beobachtung: principles.md ist mit 7.417 Bytes der groesste einzelne Block der Session-Start-Injektion – groesser als AGENT_MEMORY, dessen Volumen in S116/S117 als Problem behandelt wurde (OBS-S116-2). Der Block ist ein Immer-Block und wird bewusst nie unterdrueckt: Verhaltensregeln, die nicht geladen sind, fallen lautlos aus. Die Groesse ist damit nicht per Unterdrueckung adressierbar, sondern nur redaktionell. User-Einschaetzung S117: Der Text liesse sich kuerzen, und beim Hineinschreiben muesste rigoroser auf Knappheit ohne Verlust von Vollstaendigkeit geachtet werden. Bewusst nicht in S117 mitgemacht, weil das Kuerzen von Verhaltensregeln inhaltliche Arbeit ist und nicht als Nebenprodukt einer Tooling-Aenderung passieren sollte.
-- Zusammen-erledigen: keiner
+- Zusammen-erledigen: OBS-S123-1
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
 ## OBS-S118-1 – TD-Einträge mit Fälligkeit jetzt werden von Hand in AGENT_MEMORY dupliziert, statt dort erzeugt zu werden
@@ -357,3 +347,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Der in S122 eingefuehrte Drain-Trigger (Top-5-Summe >= 9 ODER >= 4 Eintraege aelter als 15 Sessions) entscheidet jede Session darueber, ob der Drain die Session beansprucht. Seine Schwellwerte sind aus Bestandsdaten abgeleitet, aber nie im Betrieb geprueft: Die tragende Groesse - 1,32 behandlungswuerdige Eintraege je Session - stammt aus einer Auswertung von S100 bis S121 und wurde mit der neuen Score-Skala rueckwirkend auf Eintraege angewandt, die unter der alten Skala erfasst und bewertet wurden. Daraus folgt die Erwartung, der Wert-Ausloeser feuere etwa jede dritte Session. Ob das eintritt, haengt an zwei Unbekannten: wie Agenten Impact und Haeufigkeit unter der neuen Skala tatsaechlich vergeben (GERING zaehlt jetzt 0, was die Vergabe veraendern kann), und wie oft Cluster entstehen, seit das Feld Zusammen-erledigen gepflegt wird. Faellt der Trigger zu selten, waechst der Rueckstau wieder; faellt er zu haeufig, ist genau die Verdraengung der Feature-Arbeit zurueck, gegen die er gebaut wurde. Beides zeigt sich erst an mehreren Sessions Betrieb und ist ohne bewusste Wiedervorlage nicht auffaellig, weil ein Trigger, der schweigt, keine Spur hinterlaesst.
 - Zusammen-erledigen: keiner
 - Entscheidung/Maßnahme: Nicht behandeln, sondern messen - und der Termin muss hinter der Abbauphase liegen: Bei aktuell 12 behandlungswuerdigen Eintraegen und rund 4 bis 5 je Drain-Session feuert der Wert-Ausloeser die naechsten etwa drei Drain-Sessions zwangslaeufig. Eine Messung davor bestaetigte nur den Rueckstau, nicht die Kalibrierung. Ab S132 zu pruefen: In wie vielen der vorangegangenen Sessions hat der Drain beansprucht (erwartet im Gleichgewicht etwa jede dritte), und ist der Backlog dabei gesunken? Weicht die reale Frequenz ab, sind TRIGGER_WERT und TRIGGER_ALT in obs-drain.py nachzuziehen, nicht das Modell. Re-Trigger vor dem Termin: Der Drain beansprucht nach dem Abbau drei Sessions in Folge, oder er schweigt fuenf Sessions am Stueck.
+
+## OBS-S123-1 – Frisch geschriebene Doku wird nie auf Verdichtbarkeit geprueft
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: Neu geschriebene Doku enthaelt regelmaessig Text, der ohne Informationsverlust deutlich kuerzer sein koennte - bemerkt wird das nur, wenn der User es ausdruecklich anstoesst. Der User berichtet, dass er diese Durchsicht wiederholt angefordert hat und das Ergebnis jedes Mal dasselbe war: Es liess sich einiges kuerzen. Befund einer solchen Durchsicht in S123: eine Format-Beschreibung dupliziert in genau dem Abschnitt, der einleitend 'hier nicht duplizieren' anordnet; dieselbe Session-Statistik in vier Dokumenten verteilt; CM-Nachtraege zwei- bis zweieinhalbmal so lang wie die bestehenden Nachtraege derselben Maßnahme. Kein Schritt im Session-Abschluss prueft die in der Session geschriebenen Texte auf Verdichtbarkeit. Dem Schreibenden faellt es im Moment des Schreibens strukturell nicht auf: Der Text entsteht aus dem gerade praesenten Kontext, in dem jede Erklaerung noetig scheint, und die Redundanz wird erst sichtbar, wenn man die fertigen Stellen nebeneinander liest. Kosten in zwei Richtungen: Dokumente, die bei jedem Session-Start injiziert werden (principles.md, CLAUDE.md, AGENT_MEMORY), kosten jede ueberfluessige Zeile dauerhaft; und ueberlange Tracker-Eintraege verduennen die Signale, die eine Retro aus ihnen ziehen soll. Verschaerfend: Kuerzen ist selbst fehleranfaellig - in derselben Session wurde beim Verdichten aus einer optionalen Angabe ein scheinbares Verbot (LL-S123-5), was fuer die Ausgestaltung mitbedacht gehoert.
+- Vorprägung: User-Vorschlag: Die Durchsicht beim Session-Abschluss ansetzen, vor dem Commit - also wenn alle Dateien geschrieben sind. Moeglicherweise als eigener Skill, moeglicherweise in Teilen geteilt mit review-docs.
+- Zusammen-erledigen: OBS-S117-3
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
