@@ -104,6 +104,48 @@ def find_violations(pre: str, post: str) -> list[tuple[str, list[str]]]:
     ]
 
 
+def _laufende_session(adr_pfad: str) -> int | None:
+    """Laufende Session-Nummer, oder None wenn sie sich nicht sicher bestimmen lässt.
+
+    Fail-open mit Absicht: Rät der Hook, blockt er irgendwann einen korrekten Eintrag –
+    und ein Poka-Yoke, dem man nicht traut, wird umgangen statt befolgt.
+    """
+    try:
+        pfad = Path(adr_pfad).resolve()
+        wurzel = next((p for p in pfad.parents if (p / ADR_FILE).exists()), None)
+        if wurzel is None:
+            return None
+        sys.path.insert(0, str(wurzel / ".claude" / "scripts"))
+        from obs_parse import running_session  # noqa: PLC0415 – nur im Bedarfsfall
+        return running_session(wurzel)
+    except Exception:  # noqa: BLE001 – s. Docstring
+        return None
+
+
+def falsche_session(pre: str, post: str, laufend: int | None) -> list[str]:
+    """Neu erfasste ADR-IDs, deren Session-Nummer nicht die laufende ist (OBS-S107-1).
+
+    Ein Subagent mitten in der Session hat kein Signal für die laufende Nummer – der
+    Session-Index zeigt die letzte ABGESCHLOSSENE – und setzt naiv die höchste bestehende
+    Serie fort. In S106 geschah das zweimal; die Korrektur kostete eine Umnummerierung samt
+    ~7 Code- und Doku-Referenzen (LL-S106-2). Der Fehler ist zur Schreibzeit trivial zu
+    sehen und danach teuer.
+
+    Geprüft werden nur **neu hinzukommende** Einträge: Jeder Bestandseintrag trägt
+    naturgemäß eine ältere Session, und eine Prüfung darauf machte die Datei unänderbar.
+    Ohne verlässliche Session-Nummer (`laufend is None`) wird nicht geprüft – ein Blocker,
+    der raten muss, blockt irgendwann das Richtige.
+    """
+    if laufend is None:
+        return []
+    known = parse_adr_entries(pre).keys()
+    return [
+        aid for aid, body in parse_adr_entries(post).items()
+        if aid not in known and _ADR_OK not in body
+        and (m := re.match(r"ADR-S(\d+)-", aid)) and int(m.group(1)) != laufend
+    ]
+
+
 def check(data: dict) -> str | None:
     """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py.
 
@@ -120,6 +162,21 @@ def check(data: dict) -> str | None:
     post = compute_post_content(tool, tool_input, pre)
     if post is None:
         return None
+
+    fremde = falsche_session(pre, post, _laufende_session(file_path))
+    if fremde:
+        return (
+            "❌ ADR-Erfassung (Poka-Yoke): neu erfasste ADR trägt nicht die laufende "
+            f"Session-Nummer:\n  - {', '.join(fremde)}\n"
+            "  Die ID nennt die Session, in der die Entscheidung fällt – nicht die jüngste "
+            "bestehende Serie. Der Session-Index zeigt die letzte ABGESCHLOSSENE Session; wer "
+            "von dort weiterzählt, liegt um eins daneben (LL-S106-2: zwei Subagenten, "
+            "Umnummerierung über ~7 Referenzen).\n"
+            "  Laufende Nummer: `python3 .claude/scripts/session-agenda.py` oder die höchste "
+            "Datei in `docs/history/sessions/` + 1, solange sie noch nicht committet ist.\n"
+            "  Bewusster Einzelfall (Nachtrag zu einer alten Serie) → `adr-ok`-Marker in den "
+            "Eintrag."
+        )
 
     violations = find_violations(pre, post)
     if not violations:

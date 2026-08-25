@@ -41,6 +41,14 @@ import os
 import re
 import sys
 
+# Vorschau für Tracker-Schreibbefehle (OBS-S116-1). Bewusst fail-safe importiert: Dieser Hook
+# entscheidet über JEDEN Bash-Aufruf – ein Fehler in der Darstellung darf ihn nie lahmlegen.
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    import tracker_preview
+except Exception:  # noqa: BLE001 – bewusst jede Ursache, s.o.
+    tracker_preview = None
+
 
 # ---------------------------------------------------------------------------
 # Konfiguration
@@ -343,7 +351,35 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 #
 # Bewusst NICHT hier: rein mechanische Umbauten ohne neuen Text (`obs-archive.py` verschiebt
 # aufgelöste Einträge ins Archiv) und alle `get`-Unterbefehle (read-only).
+def _mit_vorschau(command: str, reason: str) -> str:
+    """Hängt die lesbare Eintrags-Vorschau an den Freigabe-Grund (OBS-S116-1).
+
+    Jeder Fehlschlag fällt auf den reinen Hinweistext zurück: Ohne Vorschau ist der Dialog
+    so gut wie vorher, mit einer abgestürzten Prüfung wäre er unbrauchbar.
+    """
+    if tracker_preview is None:
+        return reason
+    try:
+        block = tracker_preview.vorschau(command, root=_REPO_ROOT)
+    except Exception:  # noqa: BLE001 – Darstellung darf die Entscheidung nie kippen
+        return reason
+    return f"{block}\n\n{reason}" if block else reason
+
+
 WRITE_ACCESS_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(r'\.claude/scripts/td\.py\s+(?:add|set|remove)\b'),
+        'td.py add/set/remove ändert docs/tech-debt.md – bei `Fällig: jetzt` zusätzlich den '
+        'Prioritäten-Punkt in docs/AGENT_MEMORY.md. Freigabe wie bei einem Edit, damit der '
+        'Text vor dem Schreiben sichtbar ist.',
+    ),
+    (
+        re.compile(r'\.claude/scripts/oq\.py\s+(?:add|set|remove)\b'),
+        'oq.py add/set/remove ändert docs/open-questions.md. Freigabe wie bei einem Edit, '
+        'damit der Text vor dem Schreiben sichtbar ist. `remove` löscht den Eintrag '
+        'ersatzlos – das Ergebnis gehört vorher an einen stabilen Ort (ADR, Guideline, '
+        'tech-debt.md).',
+    ),
     (
         re.compile(r'\.claude/scripts/obs\.py\s+(?:add|set)\b'),
         'obs.py add/set schreibt einen Eintrag nach docs/kaizen/observations.md. Freigabe wie '
@@ -1073,10 +1109,11 @@ def check_command(command: str) -> tuple[str, str, str]:
 
     # 3b. Schreibende Zugriffs-Scripte → ask. Muss VOR dem Segment-Check liegen, sonst greift
     #     das generische Allow-Muster für `.claude/scripts/<script>.py` und der Text ginge
-    #     ohne Freigabe durch.
+    #     ohne Freigabe durch. Der Grund trägt zusätzlich eine lesbare Vorschau des Eintrags
+    #     (OBS-S116-1) – ohne sie steht im Dialog nur die Kommandozeile.
     for pattern, reason in WRITE_ACCESS_PATTERNS:
         if pattern.search(command):
-            return ("ask", reason, "WRITE_ACCESS")
+            return ("ask", _mit_vorschau(command, reason), "WRITE_ACCESS")
 
     # 4. Compound-Split + Segment-Check (check_simple_command ohne WRONG_APPROACH)
     segments = split_compound_command(command)
@@ -1220,6 +1257,11 @@ def _print_allow_list() -> None:
     print("Schreiben in Projektdokumente (User-Freigabe nötig, kein Marker):")
     print("  python3 .claude/scripts/obs.py add|set …       → docs/kaizen/observations.md")
     print("  python3 .claude/scripts/lessons.py add …       → docs/kaizen/lessons_learned.md")
+    print("  python3 .claude/scripts/td.py add|set|remove … → docs/tech-debt.md "
+          "(+ AGENT_MEMORY bei `jetzt`)")
+    print("  python3 .claude/scripts/oq.py add|set|remove … → docs/open-questions.md")
+    print("  Die Freigabe zeigt den Eintrag im Klartext (bei `set` mit Vorher/Nachher).")
+    print("  Überblick über alle Tracker: python3 .claude/scripts/tracker.py")
     print()
     print("Destruktive Befehle (nur mit # --allow-once, User-Freigabe nötig):")
     for _pattern, _hint, label in sorted(

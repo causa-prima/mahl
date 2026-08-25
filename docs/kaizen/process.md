@@ -258,6 +258,14 @@ Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
 | `Kommunikation` | Aussagen ggü. dem User – Verifikation vor Behauptung, Mechanismus-Präzision, Hypothesen-Framing |
 | `Sonstiges` | Passt in keinen anderen Tag. **Staging-Area:** dünne/unklare Cluster (z.B. Build/Deps, Harness-Tool-Bedienung wie Edit/replace_all) hier parken – graduieren zu eigenem Tag, sobald ein Muster wächst |
 
+**Diese Tabelle ist die einzige Quelle der erlaubten Tags – auch für die Scripte.**
+`.claude/scripts/kontext_tags.py` liest sie zur Laufzeit; `obs.py`/`lessons.py` weisen einen
+unbekannten Tag beim Anlegen ab, `retro_report.py` meldet ihn im Bestand (Abschnitt 2). Ein
+neuer Tag entsteht daher durch Ergänzen **hier**, ohne Code-Änderung. Erhalten bleiben muss
+dafür nur die Form: Überschrift `## Kontext-Tags`, und jede Tag-Zeile beginnt mit
+`| `-Backtick-Tag-Backtick. Wird der Abschnitt umbenannt oder die Tabelle aufgelöst, scheitern
+die Scripte **laut** (`TabelleFehlt`) – eine stumme Leerliste wäre der gefährlichere Ausgang.
+
 **Pflege der Kontext-Tags:**
 - Alle `Sonstiges`-Einträge werden in jeder Retro explizit gesichtet – Ziel: fehlende Tags ableiten
 - Sehr häufige Tags (>30% aller Einträge) werden auf sinnvolle Aufteilung untersucht

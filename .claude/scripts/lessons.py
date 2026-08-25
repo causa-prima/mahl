@@ -100,7 +100,7 @@ def main() -> None:
     p_add.add_argument("--titel", required=True)
     p_add.add_argument("--impact", required=True, choices=IMPACT_WERTE)
     p_add.add_argument("--kategorie", required=True, choices=KATEGORIE_WERTE)
-    p_add.add_argument("--kontext", required=True,
+    p_add.add_argument("--kontext", required=True,  # gegen process.md geprüft, s. kontext_tags.py
                        help="z.B. TDD, C#-Code, TS-Code, Hook/Script, Review, Doku, Testing")
     p_add.add_argument("--quelle", required=True, help="User | Subagent | Orchestrator")
     p_add.add_argument("--was", required=True, help="Was ist passiert?")

@@ -19,6 +19,7 @@ kanonisch festgelegt – dieselbe Kopplung wie `obs_parse.py` und `check-obs-cap
 import re
 from pathlib import Path
 
+import kontext_tags
 from obs_parse import OBS_FILE, repo_root, running_session
 
 IMPACT_WERTE = ("KRITISCH", "HOCH", "MITTEL", "GERING")
@@ -108,6 +109,39 @@ def _pruefe(name: str, wert: str, erlaubt: tuple[str, ...]) -> None:
         raise ValueError(f"{name}: '{wert}' ist nicht zulässig. Erlaubt: {', '.join(erlaubt)}")
 
 
+# Felder, die je Eintrag auf einer EIGENEN Zeile stehen. `Häufigkeit` und `Kontext` fehlen
+# absichtlich – sie teilen sich eine Zeile mit `Impact` bzw. `Kategorie`.
+FELDER_EIGENE_ZEILE = ("Quelle", "Status", "Impact", "Kategorie", "Beobachtung",
+                       "Vorprägung", "Zusammen-erledigen", "Entscheidung/Maßnahme", "Bezug")
+
+
+def pruefe_wohlgeformt(oid: str, block: str) -> None:
+    """Jedes vorkommende Feld steht genau einmal am Zeilenanfang – sonst Abbruch.
+
+    Bewusst KEINE Vollständigkeitsprüfung: Einträge aus der Zeit vor `Zusammen-erledigen`
+    führen das Feld legitim nicht, und ein Vollständigkeits-Check würde sie unänderbar machen.
+    Unterschieden wird stattdessen „fehlt" (Feldname kommt gar nicht vor – in Ordnung) von
+    „verrutscht" (kommt vor, aber nicht am Zeilenanfang – Strukturbruch).
+
+    Läuft vor UND nach jedem Umbau. Vorher, weil ein einmal verrutschtes Feld jeden weiteren
+    Anhang zum Strukturbruch macht und der Schaden sonst wächst; nachher, weil ein Wert, der
+    wie eine Feldzeile aussieht, die Struktur sonst kapern könnte. Der Ausfall war bisher
+    still – nichts schlug fehl, OBS-S111-4 fiel erst zehn Sessions später auf (LL-S121-1).
+    """
+    for feld in FELDER_EIGENE_ZEILE:
+        marke = f"- {feld}:"
+        am_zeilenanfang = len(re.findall(rf"^{re.escape(marke)}", block, re.M))
+        insgesamt = block.count(marke)
+        if am_zeilenanfang > 1:
+            raise ValueError(
+                f"{oid}: Feld `{feld}` steht {am_zeilenanfang}× am Zeilenanfang – "
+                f"jedes Feld darf nur einmal vorkommen. Datei von Hand prüfen.")
+        if insgesamt != am_zeilenanfang:
+            raise ValueError(
+                f"{oid}: Feld `{feld}` steht nicht am Zeilenanfang (Strukturbruch). "
+                f"Der Eintrag muss von Hand repariert werden, bevor er änderbar ist.")
+
+
 ZUSAMMEN_FELD = "Zusammen-erledigen"
 ZUSAMMEN_KEINER = "keiner"
 _OBS_ID_RE = re.compile(r"^OBS-S\d{3}-\d+$")
@@ -169,6 +203,8 @@ def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: st
     _pruefe("Impact", impact, IMPACT_WERTE)
     _pruefe("Häufigkeit", haeufigkeit, HAEUFIGKEIT_WERTE)
     _pruefe("Kategorie", kategorie, KATEGORIE_WERTE)
+    # Kontext-Tags stehen in process.md, nicht hier – siehe kontext_tags.py (OBS-S116-4).
+    _pruefe("Kontext", kontext, kontext_tags.erlaubte())
     zusammen_wert = _pruefe_zusammen(zusammen)
     if not titel.strip() or not beobachtung.strip():
         raise ValueError("Titel und Beobachtung dürfen nicht leer sein.")
@@ -214,6 +250,7 @@ def set_fields(text: str, oid: str, status: str | None = None,
         raise ValueError(f"{oid} existiert nicht in {OBS_FILE}.")
 
     block = text[span[0]:span[1]]
+    pruefe_wohlgeformt(oid, block)
     if zusammen is not None:
         _pruefe_ziele(oid, re.findall(r"OBS-S\d{3}-\d+", zusammen), text)
         zeile = f"- {ZUSAMMEN_FELD}: {_pruefe_zusammen(zusammen)}"
@@ -242,6 +279,7 @@ def set_fields(text: str, oid: str, status: str | None = None,
         neuer_wert = f"- {feld}: {wert}"
         block = muster.sub(lambda _: neuer_wert, block, count=1)
 
+    pruefe_wohlgeformt(oid, block)
     return text[:span[0]] + block + text[span[1]:]
 
 
@@ -261,6 +299,7 @@ def append_beobachtung(text: str, oid: str, zusatz: str) -> str:
         raise ValueError(f"{oid} existiert nicht in {OBS_FILE}.")
 
     block = text[span[0]:span[1]]
+    pruefe_wohlgeformt(oid, block)
     muster = re.compile(r"^- Beobachtung:.*$", re.M)
     treffer = muster.search(block)
     if not treffer:
@@ -269,6 +308,7 @@ def append_beobachtung(text: str, oid: str, zusatz: str) -> str:
     # Ersetzung als Funktion: der Text bleibt literal (kein Regex-Template, s. set_fields).
     erweitert = f"{treffer.group(0).rstrip()} {zusatz.strip()}"
     block = muster.sub(lambda _: erweitert, block, count=1)
+    pruefe_wohlgeformt(oid, block)
     return text[:span[0]] + block + text[span[1]:]
 
 

@@ -5,7 +5,7 @@ Aufruf:
 
 Standard-Output (Agenten-Modus, retro-relevant):
   1. Aktuelle Periode – Aggregationstabelle
-  2. Sonstiges-Einträge (Tag-Pflege)
+  2. Sonstiges-Einträge + unbekannte Kontext-Tags (Tag-Pflege)
   6. Pattern-Kandidaten (aktuelle Periode + letzte 3 Archiv-Sessions)
   9. Eskalierte Maßnahmen
 
@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import kontext_tags
 from kaizen_constants import IMPACT_WEIGHTS
 from _util import REPO_ROOT
 
@@ -443,18 +444,50 @@ def render_aggregation(sessions: list[SessionData]) -> str:
     return "\n".join(lines)
 
 
-def render_sonstiges(sessions: list[SessionData]) -> str:
+def unbekannte_tags(all_sessions: list[SessionData],
+                    cms: list[Countermeasure]) -> list[tuple[str, str]]:
+    """(Fundstelle, Tag) für jeden Kontext im Bestand, den `process.md` nicht kennt.
+
+    Deckt bewusst auch das Archiv und `countermeasures.md` ab: Die CM-Datei wird von Hand
+    editiert, an keinem Schreibscript vorbei – die Prüfung beim Anlegen (obs.py/lessons.py)
+    kann sie prinzipiell nicht erreichen. Ein unbekannter Tag fällt aus dem Clustering bzw.
+    aus `cm_matches` heraus, ohne dass irgendetwas fehlschlägt (OBS-S116-4).
+    """
+    erlaubt = kontext_tags.erlaubte()
+    treffer = []
+    for s in all_sessions:
+        for f in s.findings:
+            for tag in kontext_tags.unbekannte(f.kontext, erlaubt):
+                treffer.append((f"S{f.session_num} {f.titel[:44]}", tag))
+    for cm in cms:
+        for tag in kontext_tags.unbekannte(", ".join(cm.kontexte), erlaubt):
+            treffer.append((cm.cm_id or cm.problem[:44], tag))
+    return treffer
+
+
+def render_sonstiges(sessions: list[SessionData], all_sessions: list[SessionData],
+                     cms: list[Countermeasure]) -> str:
     hits = [f for s in sessions for f in s.findings if f.kontext == "Sonstiges"]
     lines = [section("2. Sonstiges-Einträge (Tag-Pflege)")]
     if not hits:
         lines.append("  Keine Einträge mit Kontext 'Sonstiges'.")
+    else:
+        lines.append(f"  {len(hits)} Einträge – fehlende Tags ableiten:\n")
+        for f in hits:
+            lines.append(f"  [{f.impact}] S{f.session_num}: {f.titel}")
+            if f.was:   lines.append(f"    Was:   {f.was}")
+            if f.warum: lines.append(f"    Warum: {f.warum}")
+            lines.append("")
+
+    fremd = unbekannte_tags(all_sessions, cms)
+    lines.append("")
+    if not fremd:
+        lines.append("  Unbekannte Tags: keine (Bestand deckt sich mit process.md).")
         return "\n".join(lines)
-    lines.append(f"  {len(hits)} Einträge – fehlende Tags ableiten:\n")
-    for f in hits:
-        lines.append(f"  [{f.impact}] S{f.session_num}: {f.titel}")
-        if f.was:   lines.append(f"    Was:   {f.was}")
-        if f.warum: lines.append(f"    Warum: {f.warum}")
-        lines.append("")
+    lines.append(f"  {len(fremd)} unbekannte Tags – aus dem Clustering gefallen, "
+                 f"korrigieren oder in process.md aufnehmen:")
+    for fundstelle, tag in fremd:
+        lines.append(f"    '{tag}'  ←  {fundstelle}")
     return "\n".join(lines)
 
 
@@ -735,7 +768,7 @@ def main() -> int:
     print(f"{'═'*64}")
 
     print(render_aggregation(current_sessions))
-    print(render_sonstiges(current_sessions))
+    print(render_sonstiges(current_sessions, all_sessions, cms))
     if args.verbose:
         print(render_zeitreihen(all_sessions))
         print(render_stack(all_sessions))

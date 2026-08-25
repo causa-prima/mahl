@@ -78,16 +78,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
-## OBS-S107-1 – Subagenten nummerieren neue ADRs mit der jüngsten Serie statt der laufenden Session
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Skill-Nutzung
-- Beobachtung: Zwei Backend-Subagenten legten neue ADRs mit der jüngsten bestehenden Serien-Nummer (S105-3/-4) statt der laufenden Session (106) an → nachträgliche Umnummerierung inkl. ~7 Code-/Doku-Referenzen (LL-S106-2). Ein Subagent mitten in der Session hat kein klares Signal für die laufende Session-Nummer (der Index zeigt die letzte ABGESCHLOSSENE) und setzt naiv die höchste bestehende ADR-Serie fort. Bislang 1× beobachtet; die auslösende Klasse (Subagent legt ADR mitten in Session an) wiederholt sich potentiell in jedem Lauf.
-- Zusammen-erledigen: OBS-S116-1, OBS-S116-4, OBS-S120-1, OBS-S120-2, OBS-S121-1
-- Entscheidung/Maßnahme: Aufgeschoben (S107-Retro) bis zum 2. Vorkommen – 1× liegt unter der 2×-Muster-Schwelle für eine stehende CM. Lösungsrichtung bewusst offen (Drain/Retro entscheidet frisch). Re-Trigger: 2. Auftreten einer mit falscher Session nummerierten ADR-ID.
-- Bezug: LL-S106-2
-
 ## OBS-S101-1 – Flaky-Timeout einzelner Vitest-Tests unter Stryker-Systemlast
 - Quelle: Subagent
 - Status: NEU
@@ -211,17 +201,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Gemessen über 48 Sessions (`read-breakdown.py`): `docs/guidelines` und `docs/process` machen zusammen 21,4 % des gesamten Read-Volumens aus – in Implementierungs-Sessions sogar 27,9 %, hinter Client/ und Server/ der zweitgrößte Block. Die Einzelwerte sind hoch: Ø 12.234 Zeichen je Read auf `docs/guidelines`, 11.410 auf `docs/process`, und der Anteil gezielter Reads (mit offset/limit) liegt bei 3 % bzw. 7 % – praktisch jeder Aufruf liest das ganze Dokument. Ursache ist die Konstruktion: Die Agenten-Prompts schreiben diese Dateien als Pflichtlektüre vor, und jeder Subagent startet kalt. Anders als bei ADRs (`decisions.py` filtert nach Tags) und seit S114 bei Testdateien (`test-inventory.py` liefert eine Inventur) existiert für Guidelines kein Weg, gezielt nur den relevanten Abschnitt zu holen. Für die Gegenrichtung liegt eine Rechnung vor: Einen ADR in eine Guideline zu überführen kostet das 7- bis 12-Fache, weil eine Guideline von jedem Subagenten gelesen wird (180 Reads im Messzeitraum) statt on demand von den wenigen, die sie brauchen (14). Offen ist die umgekehrte Frage – ob selten gebrauchte Guideline-Abschnitte aus der Pflichtlektüre gelöst und abrufbar gemacht werden können, und woran „selten gebraucht" überhaupt erkennbar wäre. Der Block wächst mit +21 % über fünf Sessions langsamer als der Code, aber er schrumpft nicht.
 - Entscheidung/Maßnahme: **Aufgeschoben S115 – gekoppelt an OBS-S112-7.** Der gezielte Abruf soll **anker-basiert** entstehen (`guideline.py get <Anker>`), nicht über eine eigene Zeilennummern-Lösung: ein Werkzeug statt zwei, und keine Zwischenlösung zum Wegwerfen (User-Entscheid). Die naheliegende Baseline – ein `doc-outline.py` analog zum bewährten `test-inventory.py`, das Abschnitte mit Zeilenbereich ausgibt – wurde deshalb ausdrücklich **nicht** gebaut; sie hätte sofort gewirkt, aber ein zweites Werkzeug für dieselbe Aufgabe hinterlassen (der Punkt aus OBS-S114-1). Preis der Kopplung: Die 14 % bleiben unangetastet, bis die Anker-Migration weit genug ist. **Messung S115 erneut bestätigt:** `docs/guidelines` ist mit 14,0 % der zweitgrößte Read-Bereich überhaupt – nur `Client/` liegt mit 23,2 % darüber –, 180 Reads, Ø 12.234 Zeichen, **3 % gezielt**; mit `docs/process` (7,3 %, Ø 11.319, 7 % gezielt) zusammen 21,3 %. Unverändert gegenüber S114, weil seit dem keine Implementierungs-Session lief. **Die offene Frage des Eintrags ist beantwortet:** „Woran wäre 'selten gebraucht' erkennbar?" – beide Pflichtlektüre-Dateien führen im TOC bereits eine **`Wann lesen`-Spalte** (`e2e-testing.md`, `coding-guideline-typescript.md`). Das Metadatum existiert also; es fehlt allein das Werkzeug, das Abschnitt plus Fundstelle ausliefert. Damit ist beim Wiederaufgreifen keine neue Erhebung nötig.
 
-## OBS-S116-1 – Tracker-Schreibscripte machen die vorgenommene Änderung schlechter erkennbar als ein Datei-Edit
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Einträge in observations.md und lessons_learned.md werden seit S114 über obs.py/lessons.py geschrieben statt über Edit/Write. Für den User ist dadurch schwerer nachvollziehbar, was genau erfasst oder geändert wird: Ein Edit/Write zeigt in der Freigabe einen Diff mit Vorher/Nachher im Datei-Kontext; ein Script-Aufruf zeigt eine Kommandozeile mit langen Argumenten und quittiert danach nur mit einer Bestätigungszeile. Bei set-/anhängen-Aufrufen ist zusätzlich der Ausgangszustand unsichtbar, sodass sich aus dem Aufruf allein nicht ablesen lässt, was ersetzt wird. Die Umstellung war beabsichtigt und hat einen belegten Nutzen (CM-S114-2: Tracker-Dateien waren zu 50 Prozent erzwungener Vor-Edit-Read); die Einbusse an Nachvollziehbarkeit fuer den freigebenden User war dabei nicht Teil der Abwaegung. Spannungsfeld: Wer den Diff wiederherstellen will, muss entweder den Vorzustand lesen - womit die Token-Ersparnis entfaellt - oder ihn anders sichtbar machen. Konkreter Schadensfall in S117: Ein `obs.py set --entscheidung "…"`-Aufruf enthielt Backticks im Text; die Shell fuehrte sie als Kommando-Substitution aus, sodass der Modulname aus dem geschriebenen Text verschwand. Das Script quittierte trotzdem mit „✓ aktualisiert" – der Erfolgshinweis bezieht sich auf den Schreibvorgang, nicht auf den Inhalt. Bei einem Edit waere die Luecke im Diff sichtbar gewesen; hier fiel sie nur auf, weil die Shell zufaellig eine Fehlermeldung („command not found") ausgab und danach aktiv nachgelesen wurde. Verschaerft die Beobachtung um eine Dimension: Es geht nicht nur um schlechtere Erkennbarkeit fuer den freigebenden User, sondern um einen stillen Korruptionspfad – Shell-Metazeichen im Argument veraendern den geschriebenen Inhalt, ohne dass Script oder Aufrufer es bemerken.
-- Zusammen-erledigen: OBS-S107-1, OBS-S116-4, OBS-S120-1, OBS-S120-2, OBS-S121-1
-- Vorprägung: Vom User bei der S116-Retro genannt: Ideal waere, wenn der Script-Aufruf beziehungsweise dessen Freigabe eine Darstellung liefert, an der sich die Aenderung diff-maessig erkennen laesst.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: CM-S114-2
-
 ## OBS-S116-3 – retro_report.py zeigt je Muster nur zwei Beispiel-Einträge, auch wenn es mehr sind
 - Quelle: Orchestrator
 - Status: NEU
@@ -229,16 +208,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: In Abschnitt 6 (Pattern-Kandidaten) sammelt retro_report.py:523 pro Tag-Tripel hoechstens zwei Beispiele, gibt aber die volle Anzahl aus. In der S116-Retro meldete ein Kandidat '3x' und listete zwei Eintraege; der dritte (LL-S114-3) war nur ueber einen eigenen grep auffindbar. Der kaizen-Skill verlangt an derselben Stelle ausdruecklich, vor jedem Vorschlag die konkreten Eintraege zu lesen, weil Cluster Tag-Kombinationen sind und keine semantischen Gruppen - die Kappung entzieht dieser Pflicht gerade bei den groessten und damit wichtigsten Mustern die Grundlage. Wer die Diskrepanz zwischen Zahl und Liste nicht bemerkt, haelt die zwei gezeigten Eintraege fuer das ganze Muster.
 - Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: CM-S064-2
-
-## OBS-S116-4 – Kontext-Tags in lessons_learned werden nirgends gegen die erlaubte Liste geprüft
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Der Noise-Review der S116-Retro fand drei Eintraege mit Kontext-Tags, die es in process.md nie gab: '[Subagenten]' (LL-S108-1) und zweimal '[Kaizen]' (LL-S102-1, LL-S099-1). Sie stammen aus drei verschiedenen Sessions und lagen bis zu 17 Sessions unbemerkt. Die Wirkung ist nicht kosmetisch: retro_report.py clustert auf dem Tripel Impact/Kategorie/Kontext, ein Tag ausserhalb der Liste kann daher mit keinem anderen Eintrag zusammenfallen und faellt aus der Musteranalyse heraus - der Eintrag zaehlt zwar in der Statistik mit, kann aber nie ein Muster bilden. Impact und Kategorie sind durch die argparse-choices von lessons.py abgesichert, --kontext ist als freier String deklariert. Damit ist ausgerechnet die feinste der drei Dimensionen die einzige ungeschuetzte.
-- Zusammen-erledigen: OBS-S107-1, OBS-S116-1, OBS-S120-1, OBS-S120-2, OBS-S121-1
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: CM-S064-2
 
@@ -269,17 +238,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: OBS-S123-1
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S118-1 – TD-Einträge mit Fälligkeit jetzt werden von Hand in AGENT_MEMORY dupliziert, statt dort erzeugt zu werden
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Ein TD-Eintrag mit '**Fällig:** jetzt' muss zusätzlich als Punkt in docs/AGENT_MEMORY.md unter 'Nächste Prioritäten' stehen. Das ist keine Konvention, sondern Gate: check-td-capture.py:114 blockt das Schreiben von tech-debt.md, wenn die TD-ID dort fehlt. Fuer alle anderen Anker-Arten macht das Startup-Script es dagegen mechanisch - td_due.faellige() liest tech-debt.md und rendert die faellig gewordenen Eintraege in die Session-Agenda, ohne dass irgendwo eine zweite Kopie gepflegt wird. Nur der jetzt-Anker ist davon ausgenommen; td_anchors.faellig_gruende erzeugt fuer ihn bewusst keinen Grund, mit der Begruendung, solche Eintraege stuenden 'bereits in AGENT_MEMORY und werden von dort vorgelegt - hier nochmals zu melden waere die Doppelung, die OBS-S116-2 beanstandet'. Das Argument adressiert doppelte Vorlage und erzeugt dabei doppelte Pflege: Titel und Existenz des Eintrags leben an zwei Orten und koennen driften, und beim Beheben der Schuld muessen zwei Dateien geraeumt werden. Belegt in S118: Beim Anlegen von TD-S118-1 und TD-S118-2 mussten drei Zeilen von Hand nach AGENT_MEMORY geschrieben werden, bevor tech-debt.md ueberhaupt beschreibbar war. Was die AGENT_MEMORY-Zeile heute zusaetzlich traegt und bei einer Loesung nicht verloren gehen darf: (1) die Rangfolge - laut Header der Datei ist die Reihenfolge dort die Auswahl, welcher jetzt-Punkt die 'Naechste Aufgabe' der Session beansprucht, und tech-debt.md kennt keine Ordnung; (2) das Done-Kriterium, das im TD-Eintragsformat (Faellig/Problem/Behebung) kein Feld hat; (3) die Liste mischt TD-Punkte mit Punkten aus anderen Quellen (OBS, ADR, Story) zu einer gemeinsamen Rangfolge.
-- Vorprägung: User: 'das doppelt doch nur das TD und koennte mechanisch gemacht werden (wie es fuer die anderen Eintraege auch gemacht wird)'. Orchestrator-Vermutung: Das Anti-Doppelungs-Argument in td_anchors.py ist auf der falschen Ebene angesetzt - es vermeidet doppelte Vorlage, nicht doppelte Pflege. Denkbare Richtungen, ungeprueft: jetzt-TDs vom Script injizieren und AGENT_MEMORY nur noch Rangfolge-Ueberschreibungen tragen lassen; oder das Done-Kriterium als Feld ins TD-Format aufnehmen, damit die Zeile vollstaendig generierbar wird.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: OBS-S116-2
-
 ## OBS-S119-1 – Deny-Text des Bash-Hooks lenkt in Einmalscripte, statt die Werkzeugfrage zu stellen
 - Quelle: User
 - Status: NEU
@@ -290,27 +248,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: OBS-S112-5
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S120-1 – Offene Fragen sind der einzige Tracker ohne Pflege-Werkzeug – Löschen braucht jedes Mal ein Wegwerf-Script
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Doku/Script
-- Beobachtung: Um OQ-S119-2 aus docs/open-questions.md zu entfernen, entstand in S120 ein Wegwerf-Script unter .claude/tmp/ – ein fast identisches gab es in einer der vorangegangenen Sessions schon einmal. Der User wertet die Wiederholung als Bedarfsnachweis. Der Befund am Bestand: open_questions.py ist ein reines Import-Modul (parse/due) für session-agenda.py und obs-drain.py und hat gar keine CLI; es gibt also weder get noch add noch remove. Zum Vergleich bietet obs.py get/add/set, lessons.py get/add. Ein Eintrag in open-questions.md ist mehrzeilig mit Pflichtfeldern (Fällig-Anker nach td_anchors-Grammatik, geprüft von check-oq-capture.py) – also genau die Struktur, für die andere Tracker ein Script haben, weil freihändiges Editieren Formfehler produziert und die Datei zum Lesen komplett geöffnet werden muss. Beim Löschen kommt hinzu, dass Fundstellen in anderen Dokumenten hängenbleiben können: In S120 wurde der erste Löschversuch von check-dangling-refs.py geblockt, danach blieb der Eintrag versehentlich stehen, weil nach dem Bereinigen der Fundstellen nicht nachgefasst wurde.
-- Zusammen-erledigen: OBS-S107-1, OBS-S116-1, OBS-S116-4, OBS-S120-2, OBS-S121-1
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: OBS-S114-1
-
-## OBS-S120-2 – Fünf Eintrags-Tracker, drei verschiedene Pflege-Strategien – gewachsen statt entworfen
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: dauerhaft
-- Kategorie: TOOLING    Kontext: Doku/Script
-- Beobachtung: Das Projekt führt inzwischen fünf Dokumente, die strukturierte Einträge mit Pflichtfeldern und IDs tragen: observations.md, lessons_learned.md, adr.md, tech-debt.md, open-questions.md. Wie ein Eintrag entsteht, ist je Datei anders gelöst und die Abdeckung ist ungleich: obs.py kann get/add/set, lessons.py nur get/add, decisions.py ist trotz 463 Zeilen reines Lesen (list/get/check/tags/refs) ohne add, für tech-debt.md existiert überhaupt kein Script (nur die Anker-Helfer td_anchors.py/td_due.py), und open-questions.md hat nicht einmal eine CLI. Parallel dazu bewachen vier Hooks die Form beim Editieren – check-adr-capture, check-obs-capture, check-oq-capture, check-td-capture. Damit koexistieren zwei gegenläufige Strategien für dasselbe Problem: 'Script garantiert die Form beim Schreiben' (OBS, LL) gegen 'Edit von Hand, Hook blockt hinterher' (ADR, TD, OQ). Wer einen Eintrag anlegen will, muss erst wissen, welche der beiden Welten für seine Datei gilt; wer eine Datei ergänzt, dupliziert Parsing, ID-Vergabe, Session-Erkennung und Session-Abschnitts-Logik ein weiteres Mal. Der User schlägt vor zu prüfen, ob ein einziges Werkzeug für alle fünf Dateien den vielen Einzelscripten überlegen wäre. Offen und zu bewerten ist dabei auch, ob die Vereinheitlichung die Trennschärfe der Tracker aufweicht – die Ablage-Taxonomie (CLAUDE.md, process.md) lebt davon, dass die Dateien verschieden sind.
-- Vorprägung: Der User nannte als Veranschaulichung eine gemeinsame CLI im Stil 'create-doc-entry ADR --title ...' und wies ausdrücklich darauf hin, dass der Name nur illustrativ ist. Nicht als gesetzte Lösung behandeln: Ebenso denkbar sind ein geteiltes Modul mit weiterhin fünf dünnen Einstiegspunkten, oder nur das Schließen der Abdeckungslücken bei gleichbleibender Struktur.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Zusammen-erledigen: OBS-S107-1, OBS-S116-1, OBS-S116-4, OBS-S120-1, OBS-S121-1
-- Bezug: OBS-S120-1, OBS-S114-1
-
 ## OBS-S120-3 – Der qa-check-Übergabe-Hash erzwingt einen zweiten Stryker-Volllauf, wenn nach dem ersten noch aufgeräumt wird
 - Quelle: Orchestrator
 - Status: NEU
@@ -319,16 +256,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Der Übergabe-Hash von qa-check.py bindet unter anderem den Inhalt des Working-Tree-Codes (compute_hash: TREE + Report-Hash + Testdateien + Suppressions). Das ist bewusst so gebaut und richtig – es macht den Hash manipulationsresistent und verhindert, dass ein Subagent nach dem Lauf noch etwas nachschiebt. Die Reibung entsteht am typischen Sessionende: Nach einem grünen Lauf fällt beim Review noch eine Kleinigkeit auf – ein Kommentar, eine Suppressions-Begründung, eine Umbenennung –, und der Hash ist ungültig. Weil der Hash nur aus einem Frisch-Lauf entsteht (--skip-stryker gibt bewusst keinen aus), kostet die Neu-Attestierung den vollen Stryker-Durchgang, in S120 rund zwei Minuten je Schicht, obwohl die Änderung das Mutations-Ergebnis nicht berühren kann. Das Script kann das nicht wissen: Ein inhaltsbasierter Hash unterscheidet semantisch neutrale Edits nicht von echten. Der Anreiz, den die Konstruktion damit setzt, ist der eigentlich unerwünschte – Aufräumarbeiten lieber zu unterlassen oder ungeprüft zu lassen, statt einen zweiten Volllauf zu bezahlen.
 - Zusammen-erledigen: keiner
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
-## OBS-S121-1 – Tracker-Schreibscripte pruefen die Eintragsstruktur nach dem Schreiben nicht
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Vorausschauende Haelfte zu LL-S121-1 (dort der eingetretene Schaden). obs.py und lessons.py garantieren die Eintragsform beim ANLEGEN per Konstruktion – aber kein Schreibpfad prueft nach dem AENDERN, ob der Eintrag noch wohlgeformt ist. Genau dort entsteht der Schaden: append_beobachtung haengt an eine Zeile an, und ein einmal verrutschtes Folgefeld macht jeden weiteren Anhang zum Strukturbruch. Ein Nachher-Check waere billig: nach jedem Schreibzugriff pruefen, dass der geaenderte Eintrag jedes Pflichtfeld genau einmal am Zeilenanfang traegt, sonst Abbruch mit unveraenderter Datei. Das meldet den Schaden im Moment seiner Entstehung statt Sessions spaeter beim naechsten Schreibversuch. Offen ist die Reichweite: Der Check koennte je Script sitzen oder gemeinsam in obs_entry/lessons_entry; und er beruehrt dieselbe Frage wie OBS-S120-2 (fuenf Eintrags-Tracker, drei Pflege-Strategien) und OBS-S116-1 (Schreibscripte machen die Aenderung schlechter erkennbar als ein Datei-Edit) – bei einer gemeinsamen Loesung waeren die drei zusammen zu betrachten. Eine Pruefung ueber observations.md, lessons_learned.md und das Archiv ergab genau einen betroffenen Eintrag, das Muster ist also selten, aber stumm und rueckwirkend teuer.
-- Zusammen-erledigen: OBS-S107-1, OBS-S116-1, OBS-S116-4, OBS-S120-1, OBS-S120-2
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: LL-S121-1
 
 ## OBS-S121-3 – Session-Dateien werden zu vier Fuenfteln nie gelesen; ihre Erfassung ist zudem unmechanisiert
 - Quelle: User

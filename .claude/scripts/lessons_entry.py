@@ -13,6 +13,7 @@ import re
 from datetime import date
 from pathlib import Path
 
+import kontext_tags
 from obs_parse import repo_root, running_session
 
 LL_FILE = "docs/kaizen/lessons_learned.md"
@@ -111,6 +112,8 @@ def format_entry(lid: str, titel: str, impact: str, kategorie: str, kontext: str
     """Baut einen formatgetreuen Learning-Bullet."""
     _pruefe("Impact", impact, IMPACT_WERTE)
     _pruefe("Kategorie", kategorie, KATEGORIE_WERTE)
+    # Kontext-Tags stehen in process.md, nicht hier – siehe kontext_tags.py (OBS-S116-4).
+    _pruefe("Kontext", kontext, kontext_tags.erlaubte())
     for name, wert in (("Titel", titel), ("Was", was), ("Warum", warum), ("Regel", regel)):
         if not wert.strip():
             raise ValueError(f"{name} darf nicht leer sein.")

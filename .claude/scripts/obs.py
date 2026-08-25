@@ -140,7 +140,9 @@ def main() -> None:
     p_add.add_argument("--impact", required=True, choices=IMPACT_WERTE)
     p_add.add_argument("--haeufigkeit", required=True, choices=HAEUFIGKEIT_WERTE)
     p_add.add_argument("--kategorie", required=True, choices=KATEGORIE_WERTE)
-    p_add.add_argument("--kontext", required=True, help="Kontext-Tag, z.B. Doku, TDD, Hook/Script")
+    p_add.add_argument("--kontext", required=True,
+                       help="Kontext-Tag aus der Tabelle in docs/kaizen/process.md "
+                            "(z.B. Doku, TDD, Hook/Script); ein unbekannter wird abgewiesen")
     p_add.add_argument("--beobachtung", required=True,
                        help="Was ist nicht ideal? Ausführlich – Lösungen gehören NICHT hierher, "
                             "die entstehen im Drain.")

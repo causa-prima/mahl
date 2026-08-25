@@ -227,6 +227,61 @@ def test_rejects_unknown_impact():
         raise AssertionError("ungültiger Impact wurde akzeptiert")
 
 
+# --- Struktur-Invariante nach dem Ändern (OBS-S121-1) ------------------------
+# Beim ANLEGEN garantiert `format_entry` die Form per Konstruktion; beim ÄNDERN tat das
+# nichts. Genau dort entstand der Schaden (LL-S121-1): Ein einmal in eine andere Zeile
+# gerutschtes Feld macht jeden weiteren Anhang zum Strukturbruch, und weil nichts fehlschlägt,
+# fiel es erst zehn Sessions später auf. Geprüft wird deshalb nicht Vollständigkeit (die
+# Altbestand bräche), sondern dass ein Schreibvorgang kein Feld verliert oder verdoppelt.
+KAPUTT = BESTAND.replace(
+    "- Beobachtung: irgendwas\n- Entscheidung/Maßnahme:",
+    "- Beobachtung: irgendwas - Entscheidung/Maßnahme:")
+
+
+def test_verrutschtes_feld_wird_beim_aendern_erkannt():
+    try:
+        oe.set_fields(KAPUTT, "OBS-S110-1", status="UMGESETZT (S124)")
+    except ValueError as fehler:
+        assert "Entscheidung/Maßnahme" in str(fehler)
+    else:
+        raise AssertionError("Strukturbruch beim Ändern wurde nicht erkannt")
+
+
+def test_intakter_eintrag_laesst_sich_weiter_aendern():
+    """Gegenprobe: Ohne sie könnte der Check alles ablehnen und wäre trotzdem grün."""
+    neu = oe.set_fields(BESTAND, "OBS-S110-1", status="UMGESETZT (S124)")
+    assert "- Status: UMGESETZT (S124)" in neu
+
+
+def test_anhaengen_an_kaputten_eintrag_bricht_ab():
+    try:
+        oe.append_beobachtung(KAPUTT, "OBS-S110-1", "Zusatz")
+    except ValueError:
+        return
+    raise AssertionError("Anhängen an einen strukturell kaputten Eintrag wurde zugelassen")
+
+
+def test_feldzeile_im_wert_verdoppelt_kein_feld():
+    """Ein Wert, der wie eine Feldzeile aussieht, darf die Struktur nicht kapern."""
+    try:
+        oe.set_fields(BESTAND, "OBS-S110-1",
+                      entscheidung="fertig\n- Status: HEIMLICH")
+    except ValueError:
+        return
+    raise AssertionError("Feldzeile im Wert wurde nicht abgewiesen")
+
+
+def test_rejects_unknown_kontext():
+    """Tags außerhalb der Tabelle in process.md – sie fallen still aus dem Clustering
+    (OBS-S116-4). Die erlaubte Liste kommt aus `kontext_tags`, nicht aus einer Kopie hier."""
+    try:
+        oe.format_entry("OBS-S114-1", **{**FELDER, "kontext": "Kaizen"})
+    except ValueError as fehler:
+        assert "Kontext" in str(fehler)
+    else:
+        raise AssertionError("unbekannter Kontext-Tag wurde akzeptiert")
+
+
 def test_rejects_unknown_frequency_and_category():
     for feld, wert in (("haeufigkeit", "immer"), ("kategorie", "SONSTIGES")):
         try:

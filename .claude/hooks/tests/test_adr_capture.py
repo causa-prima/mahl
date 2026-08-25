@@ -125,6 +125,41 @@ def test_adr_ok_marker_exempts_entry():
     assert hook.find_violations(pre, post) == []
 
 
+# --- Session-Nummer neuer Einträge (OBS-S107-1) ------------------------------
+# Ein Subagent mitten in der Session hat kein Signal für die laufende Session-Nummer – der
+# Index zeigt die letzte ABGESCHLOSSENE – und setzt naiv die höchste bestehende ADR-Serie
+# fort. In S106 legten zwei Subagenten so ADRs mit der Vorgänger-Session an; die Korrektur
+# kostete eine Umnummerierung samt ~7 Code- und Doku-Referenzen (LL-S106-2).
+def test_neuer_eintrag_mit_fremder_session_wird_gemeldet():
+    pre = _adr("ADR-S105-3")
+    post = pre + _adr("ADR-S105-4")
+    assert hook.falsche_session(pre, post, 106) == ["ADR-S105-4"]
+
+
+def test_neuer_eintrag_mit_laufender_session_passt():
+    """Gegenprobe – ohne sie meldete der Check womöglich jeden neuen Eintrag."""
+    pre = _adr("ADR-S105-3")
+    post = pre + _adr("ADR-S106-1")
+    assert hook.falsche_session(pre, post, 106) == []
+
+
+def test_bestandseintrag_mit_alter_session_bleibt_unberuehrt():
+    """Jeder Bestandseintrag trägt eine ältere Session – sonst wäre nichts mehr änderbar."""
+    pre = _adr("ADR-S105-3")
+    post = _adr("ADR-S105-3", entscheidung="Detail ergänzt.")
+    assert hook.falsche_session(pre, post, 106) == []
+
+
+def test_adr_ok_marker_exempts_session_check():
+    post = _adr("ADR-S105-4", entscheidung="Nachtrag zur alten Serie. <!-- adr-ok -->")
+    assert hook.falsche_session("", post, 106) == []
+
+
+def test_unbekannte_session_prueft_nicht():
+    """Ohne verlässliche Session-Nummer lieber gar nicht prüfen als falsch blocken."""
+    assert hook.falsche_session("", _adr("ADR-S105-4"), None) == []
+
+
 # --- check() – Dispatcher-Vertrag --------------------------------------------
 def test_check_ignores_non_adr_file(tmp_path):
     target = tmp_path / "tech-debt.md"

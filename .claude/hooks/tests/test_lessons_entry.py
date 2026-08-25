@@ -107,7 +107,11 @@ def test_generated_bullet_is_found_by_the_own_parser():
 
 
 def test_rejects_unknown_impact_and_category():
-    for feld, wert in (("impact", "SEHR HOCH"), ("kategorie", "SONSTIGES")):
+    # Kontext steht bewusst mit dabei: Er ist die feinste der drei Clustering-Dimensionen und
+    # war als einzige lange ungeprüft – ein Tag außerhalb von process.md bildet nie ein
+    # Muster, ohne dass etwas fehlschlägt (OBS-S116-4).
+    for feld, wert in (("impact", "SEHR HOCH"), ("kategorie", "SONSTIGES"),
+                       ("kontext", "Kaizen")):
         try:
             le.format_entry("LL-S114-1", **{**FELDER, feld: wert})
         except ValueError:

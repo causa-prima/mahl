@@ -205,6 +205,17 @@ def modul_priorities() -> Block:
     """Die „Nächste Prioritäten"-Liste. Beansprucht den Slot, wenn ein Punkt `Fällig: jetzt` trägt."""
     text = _laufe("python3", str(SCRIPTS / "next_run.py"), "--render",
                   str(ROOT / "docs" / "AGENT_MEMORY.md"))
+    # TD-Punkte stehen in AGENT_MEMORY nur als Platzhalter (ID + Done); Titel und Fälligkeit
+    # werden hier aus tech-debt.md aufgelöst, damit sie nur an einer Stelle leben und nicht
+    # driften können (OBS-S118-1). Fällt das Auflösen aus, bleibt der Platzhalter stehen –
+    # sichtbar, statt den Punkt zu verschlucken.
+    try:
+        import td_entry
+        text = td_entry.memory_aufloesen(
+            text, td_entry.td_path().read_text(encoding="utf-8"))
+    except Exception as fehler:  # noqa: BLE001 – ein Modulfehler darf die Agenda nicht kippen
+        text += f"\n\n(Warnung: TD-Platzhalter nicht aufgelöst – {fehler.__class__.__name__})"
+
     eintraege = prioritaets_eintraege(_abschnitt(text, "## Nächste Prioritäten"))
     jetzt = sum(1 for e in eintraege if JETZT in e[0])
     return Block(

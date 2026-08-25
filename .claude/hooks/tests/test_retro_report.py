@@ -7,11 +7,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"
 import retro_report as rr  # noqa: E402
 
 
-def _cm(impact="HOCH", kategorie="AGENT", kontexte=None, status="AKTIV"):
+def _cm(impact="HOCH", kategorie="AGENT", kontexte=None, status="AKTIV", cm_id=""):
     return rr.Countermeasure(
         problem="x", impact=impact, kategorie=kategorie,
-        kontexte=kontexte if kontexte is not None else [], status=status,
+        kontexte=kontexte if kontexte is not None else [], status=status, cm_id=cm_id,
     )
+
+
+def _session(kontext: str, num=99):
+    f = rr.Finding(session_num=num, impact="MITTEL", kategorie="PROZESS",
+                   kontext=kontext, titel="t")
+    return rr.SessionData(num=num, date="2026-01-01", findings=[f])
 
 
 # --- cm_matches: Match auf das volle Tripel (Impact exakt) -------------------
@@ -144,3 +150,26 @@ def test_archive_start_sessions(tmp_path):
         (d / f"session_{s:03d}_to_{s + 8:03d}.md").write_text("x", encoding="utf-8")
     (d / "README.md").write_text("x", encoding="utf-8")  # Nicht-Pattern-Datei wird ignoriert
     assert sorted(rr.archive_start_sessions(str(d))) == [70, 78, 85]
+
+
+# --- unbekannte_tags: Bestandsprüfung gegen process.md ------------------------
+# Der Wert liegt darin, dass die Prüfung auch CMs erreicht: countermeasures.md wird von Hand
+# editiert, an obs.py/lessons.py vorbei – eine Validierung beim Anlegen sieht sie nie.
+def test_unbekannter_tag_in_einem_finding_wird_gemeldet():
+    treffer = rr.unbekannte_tags([_session("Kaizen")], [])
+    assert [tag for _, tag in treffer] == ["Kaizen"]
+
+
+def test_bekannter_tag_wird_nicht_gemeldet():
+    """Gegenprobe – ohne sie wäre ein leeres Ergebnis nicht von 'prüft nichts' zu trennen."""
+    assert rr.unbekannte_tags([_session("Hook/Script")], []) == []
+
+
+def test_unbekannter_tag_in_einer_cm_wird_gemeldet():
+    cm = _cm(kontexte=["Hook/Script", "tech-debt"], cm_id="CM-S999-1")
+    assert rr.unbekannte_tags([], [cm]) == [("CM-S999-1", "tech-debt")]
+
+
+def test_cm_ohne_kontext_ist_kein_verstoss():
+    """Leere Kontextliste heißt Wildcard, nicht 'fehlerhaft'."""
+    assert rr.unbekannte_tags([], [_cm(kontexte=[])]) == []

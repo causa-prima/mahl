@@ -12,6 +12,21 @@ Teile und passt in zwei bis drei Zeilen:
 
   - **<Titel>** — `Fällig: <Anker>` · Quelle: <Zeiger auf den besitzenden Tracker> · Done: <Kriterium>
 
+**TD-Punkte stehen kurz** – nur ID und Done-Kriterium, den Rest löst `session-agenda.py`
+beim Rendern aus `tech-debt.md` auf (`td_entry.memory_aufloesen`):
+
+  - TD-S089-1 · Done: <Kriterium>
+
+  Titel und Fälligkeit stünden sonst hier ein zweites Mal und könnten driften; beim Beheben
+  der Schuld wären zwei Dateien zu räumen (OBS-S118-1). Was hier bleibt, ist genau das, was
+  es nur hier gibt: die **Rangfolge** (durch die Position in der Liste) und das
+  **Done-Kriterium** (im TD-Format kein Feld). Erzeugt und entfernt wird der Punkt von
+  `td.py add|set|remove` – nicht von Hand. Folge: Der Punkt trägt den Titel des TD-Eintrags,
+  nicht einen eigens formulierten; die Handlungsrichtung gehört ins Done-Kriterium.
+  Ein Platzhalter ohne TD-Eintrag wird beim Rendern sichtbar als Warnung ausgewiesen.
+
+Alle übrigen Punkte (OBS, ADR, Story, offene Fragen) stehen weiterhin voll ausgeschrieben:
+
   1. **Titel** – fettgesetzter Vorspann, wird von `session-agenda.py` als Kurzform gelesen.
   2. **Fällig** – dieselbe Anker-Grammatik wie in `docs/tech-debt.md` (kanonisch dort im Header
      und in `.claude/scripts/td_anchors.py`). `jetzt` = vor dem Beginn der nächsten Story.
@@ -36,13 +51,13 @@ Auswahl. TD-Einträge mit
 - **Querschnitts-Testfundament aufsetzen (ADR-S112-5, Schritte 2+3)** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/decisions.py get ADR-S112-5` · Done: Ein Page-Object-Interface existiert, die Suite läuft parametrisiert gegen die Zutaten-Seite, alle bisherigen Tests sind grün.
   Berührt nur Testcode. Jetzt, weil die Umformung teurer wird, sobald neue Seitenarbeit dazwischenliegt.
 
-- **Backend-Branch-Coverage-Gate reaktivieren (TD-S089-1)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S089-1 · Done: `collect_coverage` ist reaktiviert und `dotnet-test.py` meldet 100% Branch-Coverage grün.
+- TD-S089-1 · Done: `collect_coverage` ist reaktiviert und `dotnet-test.py` meldet 100% Branch-Coverage grün.
 
-- **Theme-Foundation ziehen (TD-S083-2)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S083-2 · Done: Alle interaktiven Controls messen ≥ 44×44px, der Infra-Test hält das fest.
+- TD-S083-2 · Done: Alle interaktiven Controls messen ≥ 44×44px, der Infra-Test hält das fest.
 
-- **Nominale Brands für die Frontend-Domänentypen (TD-S083-4)** — `Fällig: jetzt` · Quelle: `docs/tech-debt.md` → TD-S083-4 · Done: `Client/src` führt in Domänentypen keine nackten `string`-Felder mehr, alle Tests grün.
+- TD-S083-4 · Done: `Client/src` führt in Domänentypen keine nackten `string`-Felder mehr, alle Tests grün.
 
-- **Zwei fehlende Szenarien mitschreiben: „DB nicht erreichbar" und Fehlerpfad Löschen/Undo** — `Fällig: Phase:MVP` · Quelle: `docs/tech-debt.md` → TD-S108-1 · Done: `features/resilience.feature` übt auch DELETE aus.
+- TD-S108-1 · Done: `features/resilience.feature` übt auch DELETE aus.
   Kein Workshop nötig – beide entstehen bei der Resilience-Arbeit ohnehin.
 
 - **gherkin-workshop US-904, weitere Stufen** — `Fällig: Phase:MVP` · Quelle: `docs/stories/szenario_9_datenpflege.md` · Done: Feature-Datei trägt die MVP-Stufe (Modifier + Bearbeiten), Läufe sind geclustert.
