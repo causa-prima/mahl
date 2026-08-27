@@ -24,7 +24,9 @@ Beispiel: `/gherkin-workshop US-904`
 <a id="GHW-pflicht-lektuere"></a>
 ## Pflicht-Lektüre
 
-Lies vor dem Start:
+Lies vor dem Start – **abschnittsweise, nicht als Volldatei**, soweit das Projekt einen Weg dafür
+anbietet (Navigationstabelle in `CLAUDE.md`). Ganz lesen nur, wenn du fast alles brauchst.
+
 - `docs/stories/user-stories.md` (Index) → `docs/stories/szenario_N_*.md` – Akzeptanzkriterien der Ziel-US (US-Präfix = Szenario-Nummer, oder `Grep "US-NNN" docs/stories/`)
 - `docs/reference/glossary.md` – Ubiquitäre Sprache (nur Begriffe daraus in Szenarien)
 - `docs/process/e2e-testing.md` – Gherkin-Konventionen, Tag-Schema, Traceability-Regeln
@@ -79,7 +81,8 @@ Welche Felder nimmt jede Operation als Eingabe?
 Pro Feld: Name, Typ (String / Zahl / Enum / Referenz), bekannte Constraints (NOT NULL, max. Länge, unique, etc.)
 
 <a id="GHW-ux-kontext"></a>
-**UX-Kontext (für die [Scenario-Entdeckung](#GHW-scenario-entdeckung), alle Agents):**
+### UX-Kontext (für die [Scenario-Entdeckung](#GHW-scenario-entdeckung), alle Agents)
+
 Prüfe für jede Operation aus dem [Story-Kern](#GHW-story-kern) welche UX-Prinzipien zutreffen – notiere je "Relevant" oder "Nicht relevant" mit einem Satz Begründung:
 - **[Leerer Zustand](../../../docs/guidelines/coding-guideline-ux.md#CGU-leerer-zustand):** Gibt es Listen oder Ansichten, die leer sein können? Bei "Relevant": Leerer Zustand erfordert Erklärungstext ("Noch keine X angelegt.") + nächste Aktion.
 - **[Sichtbares Feedback](../../../docs/guidelines/coding-guideline-ux.md#CGU-feedback):** Gibt es mutierende Operationen, die auf eine Server-Antwort warten? Bei "Relevant": Lade- und Bestätigungszustand beschreiben.
@@ -183,7 +186,8 @@ Frage pro Mechanismus zuerst: *Liefert das Framework / HTML-native das Verhalten
 - **Nein (eigene Logik) → Szenario/Assert.** Dabei: statische Affordance (Markierung) → **eigenes** Szenario beim Öffnen (one-behavior, eigener Fehlergrund). Nur im Fehlerzustand beobachtbare Mechanik (Fokus aufs erste fehlerhafte Feld) → **Asserts an bestehende Error-Szenarien**, weil „erstes fehlerhaftes Feld" mehrere Input-Partitionen braucht, die die Error-Szenarien schon liefern. Begründung + Details: [UX-Guideline „Formular-/Dialog-Baseline"](../../../docs/guidelines/coding-guideline-ux.md#CGU-formular-baseline).
 
 <a id="GHW-ablage-regel"></a>
-**Ablage-Regel (gehört das Szenario in die Story-Feature-Datei?):**
+#### Ablage-Regel (gehört das Szenario in die Story-Feature-Datei?)
+
 Der Workshop läuft je User Story und legt Szenarien standardmäßig in deren Feature-Datei ab.
 Prüfe jedes Szenario aus dieser Checkliste vorher gegen den **Querschnitts-Test**:
 

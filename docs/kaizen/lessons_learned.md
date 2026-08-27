@@ -131,3 +131,31 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Die Befundliste lebte nur im Gespraechsverlauf. Ein eingehender Bericht verdraengt die laufende Liste, ohne dass irgendwo sichtbar bleibt, was davon noch offen ist - und es gab keinen Abgleich am Ende.
   Regel: Bei mehreren parallel liefernden Subagenten die Befunde nach Eingang in einer sichtbaren Liste mit Status je Eintrag fuehren und vor dem Abschluss gegen den Ist-Zustand abgleichen - nicht im Kontext mitfuehren.
   CM-Bezug: neu
+
+## Session 125 – 2026-08-28
+
+- **[HOCH] [PROZESS] [Skill-Nutzung] LL-S125-1 – Zaehleinheit stillschweigend getauscht: Vorkommen als Sessions ausgegeben**
+  Quelle: User
+  Was: Als tragendes Argument dafuer, OBS-S124-1 zu behandeln, wurde gemeldet, das Prioritaeten-Modul habe "in 30 Session-Starts nie den Aufgaben-Slot bekommen". Gemessen hatte das Script 31 Vorkommen der Agenda-Injektion, verteilt auf 11 Session-Logs - eine Session enthaelt die Injektion mehrfach (Resume, /clear, manuelle --only-Aufrufe). Der User hielt die Zahl fuer zu hoch und fragte nach; die Nachmessung ergab 11 statt 30, und das Modul existierte ueberhaupt erst seit acht Sessions. Damit fiel das Hauptargument weg.
+  Warum: Das Script zaehlte Treffer, die Aussage sprach von Ereignissen. Zwischen beiden liegt eine Aggregationsebene, die nie benannt und daher nie geprueft wurde. Der Fehler faellt nicht auf, weil beide Zahlen plausibel klingen und dieselbe Groessenordnung suggerieren.
+  Regel: Vor dem Ausgeben einer gemessenen Zahl die Zaehleinheit ausdruecklich benennen (was genau ist ein Treffer?) und pruefen, ob sie die behauptete Einheit ist. Bei Treffern aus Logs zusaetzlich fragen, ob ein Ereignis mehrere Treffer erzeugen kann - Resume, Wiederholung, Duplikat im selben Log.
+  CM-Bezug: neu
+
+- **[MITTEL] [PROZESS] [Review] LL-S125-2 – Fertig gemeldet nach einer Gegenprobe, die nur einen Teil des Gegenstands beruehrte**
+  Quelle: Orchestrator
+  Was: Nach dem Bau von doc.py wurden drei Mutationen von Hand in die Scope-Logik gesetzt; zwei wurden von mehreren Tests gefangen, die dritte deckte eine Testluecke auf, die geschlossen wurde. Daraufhin wurde dem User "P1 steht" gemeldet, ausdruecklich mit dem Hinweis, die Gegenprobe sei gefahren. Der anschliessende Review durch drei Auditoren fand vier echte Fehler, die keine der Handmutationen beruehrt hatte - darunter einer, der genau die Fehlerklasse einbaute, gegen die das ganze Design entschieden worden war (eine stille Kuerzung in der Funktion, die stille Kuerzungen verhindern soll).
+  Warum: Handmutationen treffen die Stellen, an die der Autor beim Mutieren denkt - dieselbe Auswahl, die schon beim Testschreiben gewirkt hat. Alle drei gesetzten Mutationen lagen in der Kernregel; alle vier gefundenen Fehler lagen an den Nahtstellen zwischen Regeln. Die Gegenprobe war also nicht falsch, sondern deckungsgleich mit dem bereits Getesteten - sie konnte per Konstruktion nichts Neues zeigen.
+  Regel: Eine Gegenprobe rechtfertigt kein "fertig", solange sie nur dort mutiert, wo ohnehin Tests liegen. Vor der Fertig-Meldung fragen, welche Stellen die Mutationen NICHT beruehrt haben - typischerweise die Uebergaenge zwischen zwei Regeln, nicht die Regeln selbst. Ist das nicht abgedeckt, die Meldung entsprechend einschraenken statt sie zu verallgemeinern.
+  CM-Bezug: CM-S116-1
+
+- **[MITTEL] [PROZESS] [Doku] LL-S125-3 – Ausschlusskriterium nur an der neuen Option geprueft, nicht am Status quo**
+  Quelle: User
+  Was: Gegen den Vorschlag, die Session-Historie in die Commit-Nachricht zu verlagern, wurde eingewendet, die Konvention "Session NNN:" sei von niemandem erzwungen - eine ID-Vergabe darauf zu stellen waere ein Rueckschritt. Der User fragte zurueck, wer denn die bestehende Konvention erzwinge. Die Pruefung ergab: niemand. Die Session-Datei wird ebenfalls nur von einem Schritt in closing-session angelegt, kein Hook sichert sie ab, und der Lueckenfall ist im Bestand belegt (session_104 fehlte). Das Argument traf den Status quo genauso hart und fiel damit weg.
+  Warum: Das Kriterium wurde ausschliesslich auf die neue Option angewandt. Was bereits laeuft, erscheint als gesetzt und wird nicht mehr gegen dieselbe Anforderung gehalten - der Status quo bekommt einen Vertrauensvorschuss, den er nicht verdient hat.
+  Regel: Wird eine neue Option mit einem Kriterium verworfen (nicht erzwungen, nicht pruefbar, nicht robust), dasselbe Kriterium vor dem Aussprechen am bestehenden Verfahren pruefen. Faellt der Status quo auch durch, trennt das Kriterium die Optionen nicht und darf die Entscheidung nicht tragen.
+
+- **[MITTEL] [TOOLING] [Bash/Permission] LL-S125-4 – Backticks im Bash-Argument zerstoerten den geschriebenen Tracker-Eintrag**
+  Quelle: Orchestrator
+  Was: Der Entscheidungstext fuer OBS-S124-1 wurde per obs.py set uebergeben, in doppelten Anfuehrungszeichen und mit Markdown-Backticks um Code-Bezeichner (`Fällig: jetzt`, `priorities`). Bash fuehrte die Backtick-Inhalte als Command-Substitution aus - sichtbar an Meldungen wie "Fällig:: command not found" -, und der Eintrag wurde mit geloeschten Passagen geschrieben. Das Script meldete Erfolg. Erst das anschliessende Nachlesen zeigte die Luecken; der Text musste neu gesetzt werden.
+  Warum: Markdown-Backticks sind in Tracker-Texten die Normalform fuer Code-Bezeichner, und in doppelten Anfuehrungszeichen sind sie zugleich Bash-Syntax. Die Substitution schlaegt nicht fehl, sie ersetzt still durch Leerstring - Exit-Code 0, Erfolgsmeldung, beschaedigter Inhalt.
+  Regel: Tracker-Texte immer in EINFACHEN Anfuehrungszeichen an die Scripte uebergeben; dort ist keine Substitution moeglich. Nach jedem Schreibvorgang mit Sonderzeichen den Eintrag einmal per get gegenlesen - die Erfolgsmeldung des Scripts sagt nichts ueber den Inhalt.

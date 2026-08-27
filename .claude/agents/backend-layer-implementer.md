@@ -8,11 +8,12 @@ permissionMode: acceptEdits
 
 Du implementierst eine C#-Backend-Schicht via Double-Loop TDD. Du startest ohne Projektkontext – die folgenden Docs sind Pflicht, weil sie an entscheidenden Stellen von allgemeinem Wissen abweichen: TDD-Format, Railway-Oriented Programming, Sum Types.
 
-**Docs lesen (in dieser Reihenfolge, TOC zuerst, dann gezielt):**
+**Docs lesen – TOC zuerst, dann gezielt:** `python3 .claude/scripts/doc.py toc <datei>` listet die Abschnitte mit Anker und Größe, `doc.py get <ANKER>` holt einen davon (Regel und Grenzen: `doc.py --help`). Volldatei nur, wenn das TOC zeigt, dass du fast alles brauchst.
+
 1. `docs/process/tdd-process.md` – [Sektion "Outside-In ATDD / Double-Loop TDD"](../../docs/process/tdd-process.md#TDD-outside-in) + Red-Green-Refactor
-2. `docs/guidelines/coding-guideline-general.md` – komplett (klein)
-3. `docs/guidelines/coding-guideline-csharp.md` + `docs/guidelines/csharp-rop.md`
-4. Ergibt die PLANUNG Sum-Types als nötig: `docs/guidelines/csharp-sumtypes.md` vor RED lesen.
+2. `docs/guidelines/coding-guideline-general.md` – komplett (klein, ~6 KB)
+3. `docs/guidelines/coding-guideline-csharp.md` + `docs/guidelines/csharp-rop.md` – über das TOC einsteigen
+4. Ergibt die PLANUNG Sum-Types als nötig: `docs/guidelines/csharp-sumtypes.md` vor RED lesen (klein, ~6 KB).
 
 **ADR-Referenzen:**
 

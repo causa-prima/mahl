@@ -77,30 +77,37 @@ Verwende den richtigen Typ je nach Rolle:
 ### Domänentyp und Constraint-Typ – die Regeln
 
 <a id="CGC-regel-schnittstelle"></a>
-**Der Domänentyp ist die Schnittstelle, der Constraint-Typ die Implementierung.**
+#### Der Domänentyp ist die Schnittstelle, der Constraint-Typ die Implementierung
+
 Der Domänentyp *benutzt* Constraint-Typen als Baumaterial; **Constraint-Typen stehen nie in Signaturen** – weder in `Create()`-Parametern noch in Properties einer Entity. Wird die zulässige Menge eines Domänentyps später aufzählbar (Enum) oder strukturiert (Sum-Type), verschwindet der Constraint-Typ ersatzlos. Genau das ist der Ertrag: Steht der Constraint-Typ in Signaturen, ist ein Implementierungsdetail geleckt, und der absehbare Wechsel `Unit`: string → Enum wird zur Breaking Change an jeder Signatur statt zur Änderung in einer Datei.
 
 <a id="CGC-regel-rolle-typ"></a>
-**Rolle ≠ Typ.**
+#### Rolle ≠ Typ
+
 `BaseUnit`, Alternativeinheiten, Rezept- und Einkaufslisten-Einheit sind alle `Unit` – ein geteilter Domänentyp, kein Typ je Verwendungsstelle. Der Grund ist nicht Sparsamkeit: Mehrere Typen für dasselbe Konzept verteilen seine Regeln auf mehrere **Änderungsorte**; eine spätere Verschärfung muss an jedem nachgezogen werden, und ein vergessener ist unsichtbar. Die Regel „keine rohen Primitive" (oben) verbietet nur das Primitive – **nicht** einen eigenen Typ je Property fürs selbe Konzept. Das leistet erst diese Regel.
 
 *Ausnahme, eng zu halten:* eine Rolle mit **eigener Invariante** bekommt einen eigenen Typ. Beispiel: `Amount` und `ConversionFactor` – dieselbe Repräsentation (beide über einem `float > 0`-Constraint-Typ), verschiedene Bedeutung. Der Test ist das **Verhalten unter Operationen**, nicht der Name: `Amount × ConversionFactor = Amount` ist sinnvoll, `Amount + ConversionFactor` ist Unsinn. Ein bloßes Synonym (`CustomerName`/`ClientName`) ist ein *Begriff*, kein Konzept, und bekommt keinen Typ.
 
 <a id="CGC-regel-verwechslungsschutz"></a>
-**Verwechslungsschutz ist Nebenprodukt, kein Entwurfsziel.**
+#### Verwechslungsschutz ist Nebenprodukt, kein Entwurfsziel
+
 Nie fragen „brauche ich hier einen Typ gegen Vertauschen?", sondern „ist das ein eigenes Fachkonzept?". Zwei Parameter desselben Konzepts dürfen denselben Typ haben. Sonst beginnt die Rutschbahn zu einem Typ pro Parameter.
 
 <a id="CGC-regel-abwesenheit"></a>
-**Abwesenheit ist keine Einschränkung.**
+#### Abwesenheit ist keine Einschränkung
+
 Bevor ein Wert einen Sonderfall bekommt (`Guid.Empty`, `-1`, `""`), prüfen, ob eigentlich Optionalität gemeint ist. Optionalität gehört out-of-band (Union/`Option`), nie ins Wertband des Domänentyps – ein In-band-Sentinel ist genau der Zustand, den „Make Illegal States Unrepresentable" ausschließen soll.
 
 <a id="CGC-regel-meldungen-an-die-grenze"></a>
-**Regeln in den Domänentyp, Meldungen an die Grenze.**
+#### Regeln in den Domänentyp, Meldungen an die Grenze
+
 Die Feldregeln (Länge, Wertebereich) leben im Typ. Die Zuordnung *Fehlerfall → deutscher Text* bleibt an der API-Grenze, die das Request-Format kennt (ADR-S051-2). Ein Domänentyp gibt einen Fehler**fall** zurück, nie einen Meldungstext.
 
 Der Fehlertyp gehört dabei zum **Konzept**, nicht zum Feld und nicht zur Entität (ADR-S120-1): `IngredientName.Create` liefert `IngredientNameError`, `Unit.Create` liefert `UnitError`. Er trägt keinen Feldnamen – den kennt die Grenze statisch, und ein geteilter Domänentyp ([Rolle ≠ Typ](#CGC-regel-rolle-typ)) kennt seine Verwendungsstelle ohnehin nicht. Ein geteilter Typ bekommt deshalb **je Verwendungsstelle** eine eigene Zuordnung zum Meldungstext, bleibt aber ein Typ.
 
-**Parametrisierte Einschränkungen stehen im Typ (ADR-S119-1).** Eine Grenze wie „max. 30 Zeichen" ist kein handgeschriebener Check in `Create()`, sondern der Typ des privaten Feldes – so ist sie nicht vergessbar. Da C# keine const generics kennt, trägt ein Marker-Typ je Grenzwert den Wert:
+#### Parametrisierte Einschränkungen stehen im Typ (ADR-S119-1)
+
+Eine Grenze wie „max. 30 Zeichen" ist kein handgeschriebener Check in `Create()`, sondern der Typ des privaten Feldes – so ist sie nicht vergessbar. Da C# keine const generics kennt, trägt ein Marker-Typ je Grenzwert den Wert:
 
 ```csharp
 // Server/Domain/IngredientName.cs

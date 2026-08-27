@@ -37,14 +37,19 @@ Pro Runde eine Status-Zeile ausgeben: „→ Runde N: M grobe Schnitzer".
 <a id="RVW-pro-runde"></a>
 ### Pro Runde
 
-<a id="RVW-auditor-spawnen"></a>**Frischen Auditor spawnen.** Agent-Tool mit `subagent_type: "workflow-auditor"`, ohne Kontext aus
+<a id="RVW-auditor-spawnen"></a>
+#### Frischen Auditor spawnen
+
+Agent-Tool mit `subagent_type: "workflow-auditor"`, ohne Kontext aus
 früheren Runden, **kein** `run_in_background` (sonst werden Berechtigungsanfragen des Agenten abgelehnt).
 Der Agent liest die Workflow-Dateien selbst und kennt seine Prüf-Dimensionen – seine Definition in
 `.claude/agents/workflow-auditor.md` ist die Quelle, hier nicht duplizieren.
 **Modellwahl vor Spawn:** Default ist `model: sonnet` (Frontmatter); nur bei besonders subtilem Workflow-Design den `model`-Parameter gezielt auf `opus` setzen. Rückgabe: Bewertung pro
 Dimension (✅/⚠️/❌), priorisierte Vorschläge, Gesamtfazit.
 
-**Befunde nach Impact sortiert dem User zeigen.** Scanbare Tabelle, ein Befund pro Zeile, sortiert
+#### Befunde nach Impact sortiert dem User zeigen
+
+Scanbare Tabelle, ein Befund pro Zeile, sortiert
 HOCH → MITTEL → NIEDRIG:
 
 ```
@@ -58,12 +63,16 @@ Impact-Maßstab:
 - **MITTEL**: verschlechtert Qualität/Effizienz merklich, aber kein direkter Fehler.
 - **NIEDRIG**: kosmetisch / nice-to-have.
 
-**Grobe Schnitzer = ❌ / HOCH.**
+#### Grobe Schnitzer = ❌ / HOCH
+
 - Keine mehr → **Loop beenden** ([Abschluss](#RVW-abschluss)). Verbleibende ⚠️/MITTEL/NIEDRIG dem User zur optionalen
   Behebung vorlegen.
 - Sonst → [Befunde interaktiv abarbeiten](#RVW-befunde-abarbeiten).
 
-<a id="RVW-befunde-abarbeiten"></a>**Befunde interaktiv abarbeiten.** Pro Befund (oder sinnvoll gruppierten Satz am selben Ort):
+<a id="RVW-befunde-abarbeiten"></a>
+#### Befunde interaktiv abarbeiten
+
+Pro Befund (oder sinnvoll gruppierten Satz am selben Ort):
 - Titel + zitierte Stelle zeigen.
 - Bei klarem Fix: konkrete Empfehlung. Bei Abwägung: 2–3 Optionen mit kurzer Begründung.
 - Auf die Entscheidung des Users warten, dann umsetzen (Dateien editieren).
@@ -71,10 +80,15 @@ Impact-Maßstab:
   klar → **`grill-me` aufrufen, bevor** du änderst. Lieber einmal zu viel fragen als in die falsche
   Richtung ändern.
 
-**Nächste Runde.** Zurück zum [Auditor-Spawn](#RVW-auditor-spawnen): ein neuer frischer Auditor verifiziert unvoreingenommen, ob
+#### Nächste Runde
+
+Zurück zum [Auditor-Spawn](#RVW-auditor-spawnen): ein neuer frischer Auditor verifiziert unvoreingenommen, ob
 die Fixes greifen und ob verbleibende oder neu entstandene grobe Schnitzer existieren.
 
-<a id="RVW-abschluss"></a>**Abschluss.** Kurzes Fazit: welche groben Schnitzer behoben wurden, was bewusst offen bleibt.
+<a id="RVW-abschluss"></a>
+#### Abschluss
+
+Kurzes Fazit: welche groben Schnitzer behoben wurden, was bewusst offen bleibt.
 
 <a id="RVW-terminierung"></a>
 ### Terminierung

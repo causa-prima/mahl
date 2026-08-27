@@ -220,8 +220,13 @@ def modul_priorities() -> Block:
 
     eintraege = prioritaets_eintraege(_abschnitt(text, "## Nächste Prioritäten"))
     jetzt = sum(1 for e in eintraege if JETZT in e[0])
+    # Wortwahl mit Bedacht (S125): Der Stub wird ohne den erklärenden AGENT_MEMORY-Header
+    # injiziert. „4× `Fällig: jetzt`" liest sich dort wie „seit vier Sessions überfällig" –
+    # der Anker sagt aber nur, dass kein Ereignis mehr aussteht. Dass diese Punkte hinter
+    # Retro und Drain warten, ist die designte Rangfolge und kein Rückstand.
     return Block(
-        stub=f"Prioritäten: {len(eintraege)} offen, davon {jetzt}× `{JETZT}`",
+        stub=f"Prioritäten: {len(eintraege)} offen, davon {jetzt} anstehend "
+             f"(`{JETZT}` = wartet auf kein Ereignis mehr – nicht „überfällig“)",
         inhalt=rendere_prioritaeten(eintraege),
         beansprucht=jetzt > 0,
     )

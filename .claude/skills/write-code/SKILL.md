@@ -22,8 +22,14 @@ Immer wenn du C#- oder TypeScript/React-Code schreibst – egal ob im Rahmen von
 <a id="WRC-guidelines-lesen"></a>
 ### Richtige Guidelines lesen
 
+**Abschnittsweise lesen, nicht die ganze Datei** – soweit das Projekt einen Weg dafür anbietet
+(Navigationstabelle in `CLAUDE.md`). Eine Coding-Guideline ist typischerweise um ein Vielfaches
+größer als der Abschnitt, den eine konkrete Aufgabe braucht. Verschaff dir zuerst das
+Inhaltsverzeichnis, dann hol gezielt. Im Zweifel die Datei ganz lesen: Zu eng zu schneiden ist
+der teurere Fehler.
+
 **Immer lesen (sprachunabhängige Grundprinzipien):**
-→ `docs/guidelines/coding-guideline-general.md`
+→ `docs/guidelines/coding-guideline-general.md` – komplett, die Datei ist klein (~6 KB)
 
 **Zusätzlich je nach Sprache:**
 - C# (Backend, Tests) → `docs/guidelines/coding-guideline-csharp.md`

@@ -30,6 +30,7 @@
 | Learnings dokumentieren | `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/process.md`) |
 | Tracker-Eintrag lesen/schreiben (OBS, LL, TD, OQ, ADR) | `python3 .claude/scripts/tracker.py` zeigt, welches Werkzeug welchen Tracker pflegt und welche Befehle es kennt – dann `obs.py` / `lessons.py` / `td.py` / `oq.py` / `decisions.py`, statt Read/Edit auf der ganzen Datei |
 | Wohin geht das Read-/Token-Budget? | `python3 .claude/scripts/read-breakdown.py` (nach Session-Art), `tool-usage.py` |
+| Abschnitt einer Doku lesen (statt Volldatei) | `python3 .claude/scripts/doc.py toc <datei>` zeigt die Abschnitte, `doc.py get <ANKER>` holt einen davon |
 | Abschnitt referenzieren / Anker prüfen | `python3 .claude/scripts/anchors.py list\|check\|refs <ANKER>`; Nummern statt Namen findet `ordinale.py` |
 | Was steht schon in einer Testdatei? | `python3 .claude/scripts/test-inventory.py <datei>` – Testnamen mit Zeilenbereich |
 | Verhaltensprinzipien (immer gültig) | `docs/kaizen/principles.md` |

@@ -1189,6 +1189,20 @@ _PROJECT_TASK_SCRIPTS: list[str] = [
     "Duplikate (jscpd):   python3 .claude/scripts/jscpd-run.py [--verbose]",
 ]
 
+# Lesewege, die einen Ausschnitt liefern statt der ganzen Datei. Anders als oben ist der
+# Direktaufruf hier nicht geblockt – ein `Read` auf die Volldatei bleibt erlaubt und ist
+# manchmal richtig. Sie stehen trotzdem hier, weil genau das die Wirksamkeitsfrage ist:
+# `docs/guidelines` und `docs/process` sind zusammen 20,4 % des Read-Volumens bei 6 %
+# gezielten Zugriffen (OBS-S114-2), und eine Anleitung, die nur in CLAUDE.md steht, erreicht
+# einen kalt gestarteten Subagenten nicht. Gegenbeleg im selben Datensatz: `docs/history`
+# liegt bei 72 % gezielt – dort war der Abrufweg schon da.
+_TARGETED_READ_SCRIPTS: list[str] = [
+    "Doku-Abschnitt:  python3 .claude/scripts/doc.py toc <datei> | get <ANKER>",
+    "ADR:             python3 .claude/scripts/decisions.py list --tag X | get <ID>",
+    "Testdatei:       python3 .claude/scripts/test-inventory.py <datei>",
+    "Tracker-Eintrag: python3 .claude/scripts/tracker.py  (zeigt, welches Werkzeug welchen pflegt)",
+]
+
 # Nutzungshinweis zu den Wrapper-Scripts (OBS-S085-3 C). Erscheint via --list auch in
 # der SessionStart-Injection (session-agenda.py, Modul `bash-allowlist`, ruft --list auf) → eine Quelle.
 _SCRIPT_USAGE_HINT: str = (
@@ -1219,6 +1233,11 @@ def _print_allow_list() -> None:
         print(f"  {line}")
     print()
     print(_SCRIPT_USAGE_HINT)
+    print()
+
+    print("Gezielt lesen statt Volldatei (Volldatei nur, wenn du fast alles brauchst):")
+    for line in _TARGETED_READ_SCRIPTS:
+        print(f"  {line}")
     print()
 
     print("Erlaubte Befehle (Allow-Liste):")

@@ -93,6 +93,14 @@ Agent-Prompts enthalten (je Agent):
   2. Den Auditor ausdrücklich beauftragen, in `docs/history/adr.md` **per Grep selbst nachzusehen** –
      eine zweite Meinung, die nur die Auswahl des Orchestrators kennt, ist keine.
 
+  Aus demselben Grund lesen Auditoren die **Guidelines vollständig** und nicht abschnittsweise über
+  `doc.py get <ANKER>`, obwohl der gezielte Abruf für Implementierer der Regelweg ist: Ohne Bash
+  könnten sie das Script ohnehin nicht ausführen – vor allem aber setzt gezieltes Abrufen voraus,
+  dass man schon weiß, wonach man sucht. Ein Implementierer weiß das (er kennt seine Aufgabe), ein
+  Reviewer nicht: Er sucht Verstöße, deren betroffene Guideline-Stelle vorher niemand kennt. Wer ihm
+  nur die Abschnitte gibt, die der Orchestrator für einschlägig hielt, bekommt genau die Findings
+  zurück, die der Orchestrator ohnehin erwartet hat.
+
   Die ADR-Mitgabe ist nicht optional: Fehlt eine ADR, die ein Finding entkräftet, meldet der Auditor ein
   False Positive, das erst beim Zusammenführen auffliegt. Real passiert: ADR-S106-3 (Querschnitts-/
   Infra-Tests tragen bewusst keinen US-Tag) stand nicht im Prompt, und ein Auditor meldete daraufhin

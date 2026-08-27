@@ -49,13 +49,15 @@ Test ohne vorangehende Domain-Typen nicht schreibbar ist (zirkuläre Abhängigke
 <a id="IMP-architektur-check"></a>
 ## Architektur-Check
 
-Beantworte diese Fragen schriftlich, bevor der erste Test geschrieben wird.
+Beantworte alle Fragen dieses Abschnitts schriftlich, bevor der erste Test geschrieben wird.
 Der Schritt ist wichtig, weil nachträgliche Architekturentscheidungen teuer sind –
 einmal Code da, ist die Versuchung groß, die Entscheidung an den Code anzupassen statt umgekehrt.
+Er ist reine Analyse – noch kein Produktionscode schreiben. Domain-Typen und
+Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 
-**Gezielt lesen, nicht full-read:**
+**Gezielt lesen, nicht full-read** (Abrufwege: Navigationstabelle in `CLAUDE.md`):
 - Akzeptanzkriterien: `docs/stories/szenario_N_*.md` (N = US-Präfix, z.B. US-904 → szenario_9_datenpflege.md; Mapping-Tabelle: `docs/stories/user-stories.md`)
-- Architektur-Patterns: `docs/reference/architecture.md` – TOC lesen, dann nur relevante Sektionen
+- Architektur-Patterns: `docs/reference/architecture.md` – Abschnittsliste holen, dann nur die relevanten Abschnitte
 - Phasen-Spec: Phase aus `docs/AGENT_MEMORY.md` → `docs/reference/skeleton-spec.md` oder `docs/reference/mvp-spec.md` (nur API+DB-Sektion der Story)
 - Feature-Datei: `features/<story>.feature` – nur die Szenarien des Laufs `$ARGUMENTS` vollständig lesen
 
@@ -127,10 +129,6 @@ Fragen:
    Macht die TD-Mitnahme **bewusst und auditierbar** statt zufällig – verhindert beide Fehler: stilles Übergehen *und* ungebremstes Mitnehmen. TD **ohne** Bezug zu den berührten Bereichen bleibt bewusst außen vor (wird erst angefasst, wenn ein Lauf real dorthin kommt).
 
 6. <a id="IMP-modell-eignung"></a>**Modell-Eignung je geplanter Schicht:** Die Komplexitätseinschätzung liegt nach den vorangegangenen Punkten ohnehin vor (YAGNI-Scope, Domain-Typen, ADR-Berührung, TD-Mitnahme). Halte pro erwarteter Schicht fest, welches Modell genügt: **`sonnet` ist der Default** und trägt die normale schichtweise TDD-Arbeit. Im Zweifel beim `sonnet`-Default bleiben. Nur eine Schicht, die klar überdurchschnittlich anspruchsvoll ist (offener Entwurfsraum, mehrschichtig verschränkte Logik), gezielt auf Opus eskalieren (`model`-Parameter beim Spawn). Beim Spawn ([TDD-Zyklus](#IMP-tdd-zyklus)) wird diese Vorab-Einschätzung nur noch bestätigt.
-
-Schriftliche Antwort auf alle Punkte.
-Dieser Schritt ist reine Analyse – noch kein Produktionscode schreiben. Domain-Typen und
-Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 
 <a id="IMP-tdd-zyklus"></a>
 ## TDD-Zyklus (Double-Loop)

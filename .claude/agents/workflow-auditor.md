@@ -49,8 +49,10 @@ Globben statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
 
 **Bewusst ausnehmen** (außerhalb des Prozesses – kostet nur Kontext):
 - `docs/history/sessions/` und `docs/kaizen/archive/` – historische Logs/Archive.
-- `docs/history/adr.md` – bei einer konkreten Prozessfrage gezielt via
-  `python3 .claude/scripts/decisions.py` nachschlagen, nicht vollständig lesen.
+- `docs/history/adr.md` – bei einer konkreten Prozessfrage gezielt per Grep die Fundstelle
+  suchen und nur deren Umgebung lesen, nicht die ganze Datei. (Die Abrufscripte des Projekts
+  stehen dir nicht zur Verfügung: Du hast bewusst kein Bash, damit aus dem Audit keine Änderung
+  werden kann.)
 - Produkt-/Anwendungs-Inhalt: `Server/` und `Client/` (Anwendungscode → Gegenstand von review-code),
   `*_SPEC.md`, `docs/stories/` – sie definieren *was* gebaut wird, nicht *wie der Workflow läuft*.
 - `.claude/tmp/` – enthält nur noch die Bash-Permission-Logs (Scratch-Artefakte liegen seit

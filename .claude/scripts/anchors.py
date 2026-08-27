@@ -44,13 +44,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # Der Slug schließt Großbuchstaben aus, damit Tracker-IDs (`TD-S089-1`) nicht mitgefangen werden.
 _ANKER = r"[A-Z0-9]{2,4}-[a-z][a-z0-9-]*"
 _ANKER_GANZ = re.compile(rf"^{_ANKER}$")
+# Was Markdown als Listeneinstieg zählt. Eigener Name, weil `doc.py` dasselbe Fachwissen für
+# die Einrückungsmessung braucht – dreimal ausgeschrieben driftet es auseinander, sobald ein
+# Format dazukommt.
+_LISTE = r"(?:[-*+]|\d+\.)"
 # Definition: HTML-Anchor am Zeilenanfang – oder direkt hinter einem Listen-Marker. Manche
 # Skills gliedern per nummerierter Liste statt per Überschrift; sie deswegen umzubauen hieße,
 # hundert Zeilen Unterpunkte auszurücken, in Dateien, die den Arbeitsprozess steuern.
 # Ausgeschlossen bleibt der Fließtext: Ein mitten im Satz erwähntes `<a id=…>` ist eine
 # Erwähnung und darf keine zweite Definition erzeugen.
 _DEFINITION = re.compile(
-    rf'^(?:\s*(?:[-*+]|\d+\.)\s+)?<a id="({_ANKER})"></a>', re.M)
+    rf'^(?:\s*{_LISTE}\s+)?<a id="({_ANKER})"></a>', re.M)
 # Verweis: echter Markdown-Link mit Fragment. Der Pfad ist optional (leer = dieselbe Datei).
 _VERWEIS = re.compile(rf"\[[^\]]*\]\(([^)#]*)#({_ANKER})\)")
 # Verweis außerhalb von Markdown: Klartext `datei.md#ANKER`, wie er in einer Hook-Meldung

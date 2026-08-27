@@ -29,7 +29,11 @@ Alle übrigen Punkte (OBS, ADR, Story, offene Fragen) stehen weiterhin voll ausg
 
   1. **Titel** – fettgesetzter Vorspann, wird von `session-agenda.py` als Kurzform gelesen.
   2. **Fällig** – dieselbe Anker-Grammatik wie in `docs/tech-debt.md` (kanonisch dort im Header
-     und in `.claude/scripts/td_anchors.py`). `jetzt` = vor dem Beginn der nächsten Story.
+     und in `.claude/scripts/td_anchors.py`), inklusive der Bedeutung von `jetzt` („sofort" –
+     kein Ereignis steht mehr aus). Hier steuert der Anker zusätzlich die Vorlage: Nur ein
+     Punkt mit `jetzt` kann den Aufgaben-Slot beanspruchen. Er bedeutet **nicht**, dass der
+     Punkt überfällig sei – dass er hinter Retro und OBS-Drain wartet, ist die designte
+     Rangfolge.
   3. **Quelle** – ein Befehl oder Pfad, unter dem der Volltext liegt. **Kein Volltext hier.**
      Bis S116 trug diese Liste die vollständige Begründung jedes Punktes (6.395 Bytes, bei
      jedem Session-Start injiziert), obwohl je Session höchstens einer bearbeitet wird – und

@@ -39,6 +39,35 @@ Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentati
 
 Messe die Zeilenzahl und Dateigröße der kritischen Dateien mit `wc -l` und `wc -c`. Vergleiche mit den Grenzwerten aus der [Tabelle oben](#RVD-grenzwerte). Halte die Ergebnisse fest – sie fließen in den Block „Dateigrößen-Check" des Outputs ein.
 
+<a id="RVD-abrufeinheiten"></a>
+## Abrufeinheiten prüfen
+
+```
+python3 .claude/scripts/doc.py audit
+```
+
+Seit `doc.py` existiert, ist ein Anker nicht mehr nur eine Verweismarke, sondern die **Einheit, in
+der Agenten die Doku lesen**. Was zu ihm gehört, muss deshalb aus der Gliederung folgen und nicht
+aus dem Zusammenhang, den ein menschlicher Leser der Volldatei mitbringt. Das Audit sichtet den
+gesamten Anker-Bestand und meldet zwei Arten:
+
+- **Zurückgelassener Text** – hinter dem Block eines Absatz-Ankers steht Inhalt, der beim Abruf
+  fehlt. Entscheide je Fall: Gehört er dazu, fehlt eine gliedernde Überschrift (dann ergänzen und
+  den Anker dorthin ziehen) oder eine trennende Leerzeile ist falsch gesetzt. Gehört er nicht dazu,
+  ist der Text am falschen Ort. **Nicht** die Regel aufweichen – eine Heuristik, die schlechte
+  Gliederung glattbügelt, verbirgt sie auch vor dem menschlichen Leser.
+- **Anker ohne Einheit** – eine Leerzeile zwischen Anker und Überschrift. Der Abruf findet dann
+  nichts Sinnvolles; die Leerzeile gehört weg.
+- **Unausgeglichene Code-Fences** – ab einem offenen ```-Block gilt jede Überschrift als Code,
+  alle Abschnittsgrenzen darunter sind still falsch. Immer beheben.
+- **Übergroße Abschnitte** – der gezielte Abruf spart hier kaum noch. Ein Gliederungshinweis, kein
+  Fehler: prüfen, ob der Abschnitt eine innere Struktur hat, die Anker verdient.
+
+Die Zahlen gehören in den Output. Die ersten drei Arten sind auf **0** zu bringen; jeder neue
+Befund stammt aus Doku, die seit dem letzten Review geschrieben wurde. Die als
+`Geschwister-Listenpunkt` gezählten Fälle sind ausdrücklich **kein** Befund – sie erscheinen nur
+in der Summenzeile, damit kein Abzug still geschieht.
+
 <a id="RVD-sub-agenten-starten"></a>
 ## Vier parallele Sub-Agenten starten
 

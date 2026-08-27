@@ -2,6 +2,7 @@
 
 | # | Datum | Phase | Kurzfassung |
 |---|-------|-------|-------------|
+| 125 | 2026-08-27/28 | SKELETON (OBS-Drain) | `doc.py` (get/toc/audit) holt Doku-Abschnitte über Anker statt Volldateien; 7 Absatz-Leads zu Überschriften. 4 OBS behandelt (17→13). Entschieden (OBS-S121-3): Historie zieht in den Commit – **letzte Session-Datei + Index-Zeile**. |
 | 124 | 2026-08-25/27 | SKELETON (OBS-S112-7) | Prosa-Verweise → geprüfte Anker (`anchors.py`, `check-anchors.py`); selbstvergebene Nummern durch Namen ersetzt und via `check-ordinale.py` abgesichert; Prüf-Ausschluss zweistufig (Datei vs. Muster); 5 tote Verweise behoben; ADR-S106-3 Guard auf Namen. |
 | 123 | 2026-08-21 | SKELETON (Kaizen-Retro S116–122) | Retro: 8 von 9 HOCH-Findings ohne CM-Anschluss → Pflichtfeld `CM-Bezug` in `lessons.py add`, Rückweg im kaizen-Skill. `jenga_score.py`-Exit-2-Bug (Retro-Modul fiel im Zielfall aus). CM-S078-2 AKTIV, CM-S114-1 BEWÄHRT, 8 Nachträge; 3 Impacts, 1 Tag korrigiert. LL-S123-1..-7, OBS-S123-1. |
 | 122 | 2026-08-21 | SKELETON (OBS-Drain) | Drain steuert über Score statt Backlog-Größe: `GERING`=0, Pflichtfeld `Zusammen-erledigen:` (Cluster mit Summen-Score), Trigger Top-5≥9 oder ≥4 älter als 15 Sessions. 5 OBS aufgelöst (26→22), 4 davon als Fehlablage umgezogen → TD-S122-1/-2 + 2 Guidelines. OQ-S094-2/-S119-4 terminiert. |

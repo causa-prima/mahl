@@ -64,6 +64,17 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Vollprüfung: `python3 .claude/scripts/anchors.py list|check`. Einzelfall-Escape:
   `anchor-ok` in der Zeile. Tracker-IDs (TD-/OBS-/ADR-) sind keine Anker.
 
+- **Ein Anker ist eine Abrufeinheit – was zu ihm gehört, muss aus der Gliederung folgen.**
+  Seit `doc.py get <ANKER>` existiert, liest ein Agent nicht mehr die Volldatei, sondern genau
+  den Abschnitt: bei einem Überschriften-Anker bis zur nächsten gleichrangigen oder
+  höherrangigen Überschrift (Unterabschnitte gehören dazu), bei einem Absatz-Anker nur dessen
+  Block. Damit wird die Gliederung **maschinell wirksam** – ein Nachsatz hinter dem Block, der
+  inhaltlich dazugehört, fehlt beim Abruf, und zwar unbemerkt. Beim Schreiben gilt deshalb:
+  Braucht ein Gedanke mehr als seinen Absatz, bekommt er eine Überschrift, keinen zweiten
+  Absatz. Bestand sichten: `python3 .claude/scripts/doc.py audit` (Teil von `review-docs`).
+  Nicht behoben wird das je durch eine großzügigere Abrufregel – eine Heuristik, die schlechte
+  Gliederung glattbügelt, verbirgt sie auch vor dem menschlichen Leser.
+
 - **Abschnitte, Regeln und Schritte bekommen Namen, keine Nummern.**
   Eine selbstvergebene Nummer ist eine *zweite Adresse* neben dem Anker – und nur der Anker
   wird geprüft. Sie wird bei jeder Umsortierung still falsch; in S124 lagen zwei solche
