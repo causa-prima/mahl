@@ -366,6 +366,9 @@ def _mit_vorschau(command: str, reason: str) -> str:
     return f"{block}\n\n{reason}" if block else reason
 
 
+# Ein echtes Hilfe-Argument: eigenständiges Token, nicht Teil eines längeren Wortes.
+_HILFE_ARGUMENT = re.compile(r"(?:^|\s)(?:--help|-h)(?=\s|$)")
+
 WRITE_ACCESS_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r'\.claude/scripts/td\.py\s+(?:add|set|remove)\b'),
@@ -1071,16 +1074,21 @@ def check_simple_command(command: str, in_loop: bool = False) -> tuple[str, str,
 def check_command(command: str) -> tuple[str, str, str]:
     """Prüft einen Befehl und gibt (decision, reason, log_type) zurück.
 
-    Reihenfolge:
-      1. ONE_TIME_MARKER → nackten Befehl klassifizieren (erlaubt → allow+Hinweis, sonst ask+Grund)
-      2. Repo-Pfad-Normalisierung (absolute Repo-Pfade → relativ)
-      3. WRONG_APPROACH  → deny (auf Gesamtbefehl, vor Split)
-      4. Compound-Split  → check_simple_command je Segment
-      5. check_simple_command für einfache Befehle
+    Reihenfolge (die Namen stehen so auch an den Stellen im Körper – bewusst keine Nummern:
+    zwei Nummerierungen derselben Abfolge liefen bereits auseinander, der Docstring kannte
+    fünf Schritte, der Körper acht, inklusive der Einschübe `2b`/`3b`/`4a`/`4b`):
+      Einmal-Marker      → nackten Befehl klassifizieren (erlaubt → allow+Hinweis, sonst ask+Grund)
+      Pfad-Normalisierung  absolute Repo-Pfade → relativ
+      Heredoc-Ausblendung  Bodies sind Daten, kein Code
+      WRONG_APPROACH     → deny, auf dem Gesamtbefehl vor dem Split
+      Zugriffs-Scripte   → ask, vor dem Segment-Check
+      Compound-Split     → Segmente bilden
+      Verzeichniswechsel   npm-Sonderfall, braucht die Segmente
+      Segment-Prüfung    → check_simple_command je Segment
 
     decision: 'allow' | 'deny' | 'ask'
     """
-    # 1. ONE_TIME_MARKER (# --allow-once): nicht blind fragen, sondern den NACKTEN Befehl klassifizieren.
+    # Einmal-Marker (# --allow-once): nicht blind fragen, sondern den NACKTEN Befehl klassifizieren.
     #    - wäre er ohnehin erlaubt → Marker war unnötig: direkt erlauben + Agent-Hinweis (kein Prompt).
     #    - wäre er deny            → legitimer Einzelfall: ask, und der Deny-Grund/die Gefahr wird dem
     #      User am Freigabe-Prompt als Reason mitgegeben (statt eines kontextlosen „erlauben?").
@@ -1091,40 +1099,44 @@ def check_command(command: str) -> tuple[str, str, str]:
             return ("allow", _ONE_TIME_UNNEEDED_HINT, "ONE_TIME_UNNEEDED")
         return ("ask", reason, "ONE_TIME")
 
-    # 2. Repo-Pfad-Normalisierung: absolute Repo-Pfade → relativ, dann auf dem
+    # Pfad-Normalisierung: absolute Repo-Pfade → relativ, dann auf dem
     #    normalisierten Befehl weiterprüfen (so wird z.B. python3 <absoluter Pfad>
     #    zu python3 .claude/... und matcht die Allow-Liste statt WRONG_APPROACH).
     command, _ = normalize_repo_paths(command)
 
-    # 2b. Heredoc-Bodies sind Daten, kein Code (OBS-S111-4) – vor jeder weiteren
+    # Heredoc-Ausblendung: Bodies sind Daten, kein Code (OBS-S111-4) – vor jeder weiteren
     #     Analyse entfernen, sonst wird Fließtext als Befehlsfolge gelesen.
     command = strip_heredoc_bodies(command)
 
-    # 3. WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells).
+    # WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells).
     #    String-Argumente nicht-ausführender Befehle werden dabei maskiert: eine
     #    ERWÄHNUNG ist keine Ausführung (OBS-S111-4).
     for pattern, reason in WRONG_APPROACH_PATTERNS:
         if pattern.search(mask_data_strings(command)):
             return ("deny", reason, "WRONG_APPROACH")
 
-    # 3b. Schreibende Zugriffs-Scripte → ask. Muss VOR dem Segment-Check liegen, sonst greift
+    # Zugriffs-Scripte (schreibend) → ask. Muss VOR dem Segment-Check liegen, sonst greift
     #     das generische Allow-Muster für `.claude/scripts/<script>.py` und der Text ginge
     #     ohne Freigabe durch. Der Grund trägt zusätzlich eine lesbare Vorschau des Eintrags
     #     (OBS-S116-1) – ohne sie steht im Dialog nur die Kommandozeile.
-    for pattern, reason in WRITE_ACCESS_PATTERNS:
-        if pattern.search(command):
-            return ("ask", _mit_vorschau(command, reason), "WRITE_ACCESS")
+    # `--help` druckt die Doku und schreibt nichts (S124, User-Meldung). Geprüft wird auf der
+    #     maskierten Fassung: `--titel "Warum --help nervt"` ist ein Eintragstext, kein
+    #     Hilfeaufruf. Wer für Doku eine Freigabe klicken muss, liest die Doku seltener.
+    if not _HILFE_ARGUMENT.search(mask_data_strings(command)):
+        for pattern, reason in WRITE_ACCESS_PATTERNS:
+            if pattern.search(command):
+                return ("ask", _mit_vorschau(command, reason), "WRITE_ACCESS")
 
-    # 4. Compound-Split + Segment-Check (check_simple_command ohne WRONG_APPROACH)
+    # Compound-Split + Segment-Check (check_simple_command ohne WRONG_APPROACH)
     segments = split_compound_command(command)
     is_compound = len(segments) > 1
 
-    # 4a. Verzeichniswechsel vor npm (OBS-S091-2): braucht die Segmente, deshalb erst hier
+    # Verzeichniswechsel vor npm (OBS-S091-2): braucht die Segmente, deshalb erst hier
     #     und nicht als WRONG_APPROACH-Regex auf dem Gesamtbefehl.
     if cd_npm_conflict(segments):
         return ("deny", _CD_NPM_HINT, "WRONG_APPROACH")
 
-    # 4b. Jedes Segment in die tatsächlich ausgeführten Kommandos zerlegen und einzeln
+    # Segment-Prüfung: jedes Segment in die tatsächlich ausgeführten Kommandos zerlegen und einzeln
     #     prüfen. `loop_depth` verfolgt Schleifenrümpfe über Segmentgrenzen hinweg –
     #     `for f in …; do rm "$f"; done` zerfällt beim Split in drei Segmente, die
     #     Schleifen-Eigenschaft steckt also nicht im Segment selbst.

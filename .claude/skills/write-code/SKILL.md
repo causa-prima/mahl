@@ -9,15 +9,18 @@ user-invocable: false
 
 # Skill: write-code
 
+<a id="WRC-wann-aktiv"></a>
 ## Wann dieser Skill aktiv wird
 
 Immer wenn du C#- oder TypeScript/React-Code schreibst – egal ob im Rahmen von `/feature` oder ad hoc.
 
 ---
 
+<a id="WRC-pflicht-schritte"></a>
 ## Pflicht-Schritte vor dem ersten Code
 
-### 1. Richtigen Guidelines lesen
+<a id="WRC-guidelines-lesen"></a>
+### Richtige Guidelines lesen
 
 **Immer lesen (sprachunabhängige Grundprinzipien):**
 → `docs/guidelines/coding-guideline-general.md`
@@ -26,7 +29,7 @@ Immer wenn du C#- oder TypeScript/React-Code schreibst – egal ob im Rahmen von
 - C# (Backend, Tests) → `docs/guidelines/coding-guideline-csharp.md`
   - Endpoint oder Validierungskette → zusätzlich `docs/guidelines/csharp-rop.md`
   - Neuer Domain-Typ mit Zustandsvarianten → zusätzlich `docs/guidelines/csharp-sumtypes.md`
-  - Stryker-Survivors behandeln (Phase 3) → zusätzlich `docs/guidelines/csharp-stryker.md`
+  - Stryker-Survivors behandeln ([REFACTOR](../../../docs/process/tdd-process.md#TDD-refactor)) → zusätzlich `docs/guidelines/csharp-stryker.md`
 - TypeScript/React (Frontend) → `docs/guidelines/coding-guideline-typescript.md`
   - React-Komponenten (`src/components/`, `src/pages/`) → zusätzlich `docs/guidelines/coding-guideline-ux.md`
 
@@ -37,16 +40,19 @@ Immer wenn du C#- oder TypeScript/React-Code schreibst – egal ob im Rahmen von
 - **KISS:** Wie halte ich die Lösung minimal? (keine vorzeitigen Abstraktionen)
 - **Fehlerbehandlung:** Welches Pattern nutze ich? (ROP/OneOf/Result – kein `throw` für Business-Fehler)
 
-### 2. Implementieren via TDD
+<a id="WRC-tdd"></a>
+### Implementieren via TDD
 
 → `docs/process/tdd-process.md` (RED → GREEN → REFACTOR)
 
-### 3. Selbst-Review vor Review-Agenten
+<a id="WRC-selbst-review"></a>
+### Selbst-Review vor Review-Agenten
 
 → `docs/process/review-checklist.md` Punkt für Punkt durchgehen und Findings sofort fixen.
 
 ---
 
+<a id="WRC-kurzcheck-alternativen"></a>
 ## Kurzcheck: Pflicht-Alternativen
 
 **C#**

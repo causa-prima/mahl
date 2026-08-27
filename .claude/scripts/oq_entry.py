@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Einzelne offene Fragen in `docs/open-questions.md` lesen, erfassen, ändern, löschen.
 
-Warum (OBS-S120-1): `open-questions.md` war der einzige der fünf Eintrags-Tracker ohne
+Warum (OBS-S120-1): `open-questions.md` war der einzige Eintrags-Tracker ohne
 Pflege-Werkzeug – `open_questions.py` ist ein reines Import-Modul (`parse`/`due`) für die
 Session-Agenda und hat keine CLI. Für das Entfernen eines erledigten Eintrags entstanden
 deshalb zweimal Wegwerf-Scripte, bei drei Löschungen in der gesamten Projekthistorie.

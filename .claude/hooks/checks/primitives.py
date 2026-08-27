@@ -5,7 +5,8 @@ check_blocking: Properties mit nackten Primitives – blockierend (fast immer fa
              Dazu Parameter mit nackten Primitives, aber **nur in Entities** (s.u.).
 check_nonblocking: Parameter mit nackten Primitives außerhalb von Entities – Hinweis.
 
-Warum die Unterscheidung (Drei-Ebenen-Regel, `coding-guideline-csharp.md` §2): In
+Warum die Unterscheidung (Drei-Ebenen-Regel,
+`docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession`): In
 `Server/Domain/` liegen zwei Ebenen mit gegensätzlicher Regel.
 
   - **Constraint-/Domänentyp** (`NonEmptyTrimmedString`, `IngredientName`): `Create()` nimmt
@@ -99,7 +100,8 @@ def is_sum_type(content: str, file_path: str = "") -> bool:
 
 
 def is_entity(inp: HookInput, content: str) -> bool:
-    """True für Aggregate in `Server/Domain/` – weder Wert-Kapselung noch Sum-Type (§2)."""
+    """True für Aggregate in `Server/Domain/` – weder Wert-Kapselung noch Sum-Type
+    (`docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession`)."""
     if not ENTITY_PATH.search(inp.file_path):
         return False
     return not is_value_wrapper(content, inp.file_path) and not is_sum_type(content, inp.file_path)
@@ -124,7 +126,7 @@ def check_blocking(inp: HookInput) -> list[str]:
             "Kapsle sie in Domänentypen (z.B. `RecipeName`, `IngredientId`).\n"
             "Ausnahme: die `Value`-Property eines Constraint-/Domänentyps – sie gibt den gekapselten Wert frei.\n"
             "Ausnahmen: DTOs (`Shared/Dtos/`), EF-Entities (`DatabaseTypes/`), Tests.\n"
-            "Siehe docs/guidelines/coding-guideline-csharp.md §2 (Drei-Ebenen-Regel)."
+            "Siehe docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession"
         )
 
     if PARAM_PATTERN.findall(content) and is_entity(inp, content):
@@ -134,7 +136,7 @@ def check_blocking(inp: HookInput) -> list[str]:
             "`Create(IngredientId id, IngredientName name, …)` die Sollform.\n"
             "Constraint-/Domänentypen (erkennbar an `public <primitive> Value`) dürfen Primitives nehmen –\n"
             "sie SIND die Validierungsebene.\n"
-            "Siehe docs/guidelines/coding-guideline-csharp.md §2 (Drei-Ebenen-Regel)."
+            "Siehe docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession"
         )
 
     return reasons
@@ -162,5 +164,5 @@ def check_nonblocking(inp: HookInput) -> list[str]:
         "Prüfe ob Domänentypen (z.B. `RecipeName`, `IngredientId`) passender wären.\n"
         "Ausnahme: Constraint-/Domänentypen nehmen bewusst Primitives als Input – sie validieren sie.\n"
         "Ausnahmen: DTOs (`Shared/Dtos/`), EF-Entities (`DatabaseTypes/`), Tests.\n"
-        "Siehe docs/guidelines/coding-guideline-csharp.md §2 (Drei-Ebenen-Regel)."
+        "Siehe docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession"
     ]

@@ -34,4 +34,4 @@ PRÜFPUNKTE:
    - Wurden neue NuGet/npm-Pakete hinzugefügt? Sind sie bekannt vertrauenswürdig?
 
 Abschluss: Zusammenfassung (Anzahl ❌/⚠️/✅).
-Kontext: docs/reference/architecture.md (Sektion 8 Security) + docs/process/nfr.md (Sektion Security)
+Kontext: [Authentifizierung](../../docs/reference/architecture.md#ARC-auth) + docs/process/nfr.md ([Sektion Security](../../docs/process/nfr.md#NFR-security))

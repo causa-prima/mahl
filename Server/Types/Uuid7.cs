@@ -2,7 +2,8 @@ namespace mahl.Server.Types;
 
 // Constraint-Typ für einen serverseitig vergebenen Primärschlüssel (ADR-S030-1). Er löst den
 // Guid.Empty-In-band-Sentinel ab: "uninitialisiert" ist kein Wert dieses Typs mehr, sondern ein
-// default(T)-Guard (coding-guideline-csharp.md §2 Regel 4 – Abwesenheit gehört out-of-band, das
+// default(T)-Guard (docs/guidelines/coding-guideline-csharp.md#CGC-regel-abwesenheit –
+// Abwesenheit gehört out-of-band, das
 // leistet IngredientId).
 //
 // Bewusst ohne validierendes Create(Guid) -> OneOf: die einzige Guid-Quelle im Schreibpfad ist

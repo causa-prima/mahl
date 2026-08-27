@@ -63,42 +63,43 @@ es ein – die Include-Liste ist Orientierung, keine abschließende Aufzählung.
 
 Bewerte jeden Aspekt mit **✅ gut / ⚠️ verbesserungswürdig / ❌ Problem** + konkreter Begründung:
 
-### 1. Klarheit & Navigierbarkeit
+### Klarheit & Navigierbarkeit
 - Findet ein Agent ohne menschliche Hilfe das Richtige für eine gegebene Aufgabe?
 - Gibt es Widersprüche oder Inkonsistenzen zwischen Dateien?
 - Gibt es Informationen, die an mehreren Stellen stehen und auseinanderlaufen könnten?
 
-### 2. Vollständigkeit des Feature-Workflows
+### Vollständigkeit des Feature-Workflows
 - Sind alle Schritte in `implementing-scenario/SKILL.md` klar und unmissverständlich?
 - Gibt es Lücken, die zu Fehlern oder Abweichungen führen können?
 - Würde ein Agent, der nur `implementing-scenario/SKILL.md` liest, die richtigen Entscheidungen treffen?
 
-### 3. Qualitätssicherung
+### Qualitätssicherung
 - Sind die Review-Agenten gut genug kalibriert? Zu streng? Zu locker?
 - Wird TDD wirklich erzwungen oder nur empfohlen?
 - Sind die Prüfpunkte in `docs/process/review-checklist.md` ausreichend, um echte Qualitätsprobleme zu finden?
 
-### 4. Entwickler-Belastung
+### Entwickler-Belastung
 - Wie viele Entscheidungen/Bestätigungen muss der Entwickler pro Feature treffen?
 - Welche davon sind wirklich notwendig? Welche könnten automatisiert werden?
 - Gibt es Stellen, wo der Agent unnötig blockiert oder wartet?
 
-### 5. Ressourceneffizienz
+<a id="WFA-ressourceneffizienz"></a>
+### Ressourceneffizienz
 - Welche Schritte verbrauchen unverhältnismäßig viele Tokens/Zeit ohne klaren Mehrwert?
 - Gibt es Redundanzen in den Prompts oder Dokumenten?
 - Ist der SessionStart-Hook (AGENT_MEMORY.md laden) sinnvoll kalibriert?
 - Führt ein Skill einen **deterministischen** Schritt freihändig aus (eindeutig aus dem Zustand
   ableitbar – z.B. nächste Session-/Run-Nummer bestimmen, Status setzen, Eintrag archivieren,
   Metadaten filtern/listen), der zuverlässiger und token-ärmer per **Script** liefe? Bestehende
-  Vorbilder: `obs-archive.py`, `next_run.py`, `decisions.py`. (Prinzip: `docs/kaizen/principles.md`,
-  „Deterministische Skill-Schritte mechanisieren".)
+  Vorbilder: `obs-archive.py`, `next_run.py`, `decisions.py`. (Prinzip:
+  [„Deterministische Skill-Schritte mechanisieren"](../../docs/kaizen/principles.md#KPI-prozess-disziplin).)
 
-### 6. Robustheit & Fehlerresistenz
+### Robustheit & Fehlerresistenz
 - Was passiert, wenn ein Agent einen Schritt überspringt oder falsch interpretiert?
 - Welche Sicherheitsnetze (Hooks, Gates) greifen, welche nicht?
 - Gibt es single points of failure im Workflow?
 
-### 7. Skalierbarkeit
+### Skalierbarkeit
 - Wird die Dokumentation mit wachsendem Projekt unhandhabbar?
 - Gibt es Strukturen, die bei 5x mehr Features / 3x mehr Agenten brechen?
 

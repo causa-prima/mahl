@@ -9,46 +9,51 @@ kritische-regeln:
   - Create() nimmt nur Primitives oder Domain-Typen – niemals DTOs oder DbTypes
 -->
 
+<a id="ARC-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| 0. Design Philosophy | Die 4 Kernprinzipien (Type-Driven Dev, ROP, Layer-Isolation, Immutability) – auch für Test-Code | Immer zuerst beim Einstieg in die Architektur |
-| 0b. Wie Regeln lesen | Guidelines ≠ absolute Gesetze; Abweichungen sofort kommunizieren und dokumentieren | Bei Unsicherheit über Regelauslegung |
-| 0c. Hexagonal Architecture | Ports & Adapters, Projekt-Visibility (public/internal), kein InternalsVisibleTo | Beim Anlegen neuer Projekte, beim Verstehen der Test-Strategie |
-| 1. Tech Stack | Backend (.NET 10, Minimal APIs, EF Core 10), Frontend (React 19, MUI v7, Vite, React Query), DB (PostgreSQL) | Beim Einrichten der Umgebung oder Wahl neuer Abhängigkeiten |
-| 2. Domain Modeling | Make Illegal States Unrepresentable, Validation = Konstruktion, Dependency Rule, bestehende Typen (NonEmptyTrimmedString etc.) | Beim Erstellen neuer Domain-Typen oder Validierungslogik |
-| 3. Endpoint-Pattern | Dateistruktur für Minimal API Endpoints, EF Core Include-Pflicht | Beim Anlegen neuer Endpoints |
-| 4. Projekt-Struktur | Verzeichnis-Layout: mahl.Infrastructure (public) / mahl.Server (internal) – strikt getrennt | Beim Anlegen neuer Dateien oder Projekte |
-| 5. TDD-Prozess | Verweis auf `docs/process/tdd-process.md` (Red→Green→Refactor, Full State Assertion, Mutation Testing) | Beim Schreiben von Produktionscode oder Tests – TDD gilt für jeden Code-Zyklus |
-| 6. Logging | Serilog-Konfiguration, Format, kein Logging sensitiver Daten | Beim Konfigurieren oder Erweitern von Logging |
-| 7–10. API Errors / Auth / Git / Bilder | Querschnittsthemen: Problem Details, Auth-Roadmap, Branch-Strategie, Dateispeicherung | Bei spezifischem Bedarf |
+| [Design Philosophy](#ARC-design-philosophy) | Die Kernprinzipien (Type-Driven Dev, ROP, Layer-Isolation, Immutability) – auch für Test-Code | Immer zuerst beim Einstieg in die Architektur |
+| [Wie Regeln lesen](#ARC-regeln-lesen) | Guidelines ≠ absolute Gesetze; Abweichungen sofort kommunizieren und dokumentieren | Bei Unsicherheit über Regelauslegung |
+| [Hexagonal Architecture](#ARC-hexagonal) | Ports & Adapters, Projekt-Visibility (public/internal), kein InternalsVisibleTo | Beim Anlegen neuer Projekte, beim Verstehen der Test-Strategie |
+| [Tech Stack](#ARC-tech-stack) | Backend (.NET 10, Minimal APIs, EF Core 10), Frontend (React 19, MUI v7, Vite, React Query), DB (PostgreSQL) | Beim Einrichten der Umgebung oder Wahl neuer Abhängigkeiten |
+| [Domain Modeling](#ARC-domain-modeling) | Make Illegal States Unrepresentable, Validation = Konstruktion, Dependency Rule, bestehende Typen (NonEmptyTrimmedString etc.) | Beim Erstellen neuer Domain-Typen oder Validierungslogik |
+| [Endpoint-Pattern](#ARC-endpoint-pattern) | Dateistruktur für Minimal API Endpoints, EF Core Include-Pflicht | Beim Anlegen neuer Endpoints |
+| [Projekt-Struktur](#ARC-projekt-struktur) | Verzeichnis-Layout: mahl.Infrastructure (public) / mahl.Server (internal) – strikt getrennt | Beim Anlegen neuer Dateien oder Projekte |
+| [SKELETON-Phase: Scope-Constraints](#ARC-skeleton-constraints) | Was in der SKELETON-Phase bewusst nicht gebaut wird | Bevor Umfang über den Walking Skeleton hinaus wächst |
+| [TDD-Prozess](#ARC-tdd) | Verweis auf `docs/process/tdd-process.md` (Red→Green→Refactor, Full State Assertion, Mutation Testing) | Beim Schreiben von Produktionscode oder Tests – TDD gilt für jeden Code-Zyklus |
+| [Logging](#ARC-logging) | Serilog-Konfiguration, Format, kein Logging sensitiver Daten | Beim Konfigurieren oder Erweitern von Logging |
+| [API Errors](#ARC-api-errors) / [Auth](#ARC-auth) / [Git](#ARC-git-workflow) / [Bilder](#ARC-bilder) | Querschnittsthemen: Problem Details, Auth-Roadmap, Branch-Strategie, Dateispeicherung | Bei spezifischem Bedarf |
 
 > **Wann lesen:** Beim Implementieren von Backend-/Frontend-Code, beim Schreiben von Tests, bei Architektur-Entscheidungen.
 
 ---
 
-## 0. Design Philosophy
+<a id="ARC-design-philosophy"></a>
+## Design Philosophy
 
 Dieser Codebase folgt vier übergreifenden Paradigmen, die für **alle** Code-Ebenen (Backend, Frontend, Tests) gelten. Die Details und Code-Beispiele stehen in den sprachspezifischen Richtlinien:
 
 - **C# (Backend, Tests):** `docs/guidelines/coding-guideline-csharp.md`
 - **TypeScript/React (Frontend):** `docs/guidelines/coding-guideline-typescript.md`
 
-### Die vier Kernprinzipien
+<a id="ARC-kernprinzipien"></a>
+### Die Kernprinzipien
 
-**1. Type-Driven Development / "Make Illegal States Unrepresentable"**
+**Type-Driven Development / "Make Illegal States Unrepresentable"**
 Primitive Typen (`string`, `int`, `number`) tragen keine Domänen-Semantik. Jedes Domänen-Konzept bekommt einen eigenen Typ (Value Object / Branded Type), der seine Invarianten selbst durchsetzt. Ein Wert, der diesen Typ hat, ist garantiert gültig – der Compiler erzwingt das.
 
-**2. Railway-Oriented Programming (ROP)**
+**Railway-Oriented Programming (ROP)**
 Fehler sind Rückgabewerte, keine Exceptions. Validierungsfehler und erwartbare Fehlerzustände werden über typisierte Ergebnis-Typen kommuniziert (`OneOf<T, Error<string>>` in C#, `Result<T, E>` via `neverthrow` in TypeScript). `try/catch` ist nur für echte technische Ausnahmezustände (Datenbank nicht erreichbar, Netzwerk-Ausfall) erlaubt.
 
-**3. Layer-Isolation**
+**Layer-Isolation**
 Jeder Layer schützt sich aktiv gegen fehlerhafte Daten aus benachbarten Layern. Die Domäne vertraut weder Request-Daten noch DB-Daten – `Create()` ist in beiden Pfaden (Write und Read) die einzige Einstiegsmethode. DB-Inkonsistenzen (z. B. durch manuelle Eingriffe oder Migrations-Fehler) werden im Read-Pfad als `Results.Problem()` (strukturiertes `application/problem+json`) zurückgegeben, nicht als unbehandeltes `throw`.
 
-**4. Immutability**
+**Immutability**
 Objekte und Collections werden nach der Konstruktion nicht verändert. Zustandsänderungen erzeugen neue Objekte. Das gilt für C# (`record`, `init`, `IImmutableList`) wie für TypeScript (`readonly`, `const`, kein direktes Mutieren von Arrays/Objekten).
 
+<a id="ARC-test-code"></a>
 ### Gilt das auch für Test-Code?
 
 Ja, mit pragmatischen Abschwächungen. Tests müssen **lesbar** und **wartbar** sein:
@@ -59,7 +64,8 @@ Ja, mit pragmatischen Abschwächungen. Tests müssen **lesbar** und **wartbar** 
 
 ---
 
-## 0b. Wie diese Regeln zu lesen sind
+<a id="ARC-regeln-lesen"></a>
+## Wie diese Regeln zu lesen sind
 
 **Regeln sind starke Guidelines, keine absoluten Gesetze.** Wenn es sehr gute Gründe gibt, von einer Regel abzuweichen, ist das in Ordnung – aber:
 - Die Entscheidung und Begründung **sofort kommunizieren** (an den Aufrufer: Mensch oder Agent), damit dieser ein Veto einlegen kann
@@ -69,7 +75,8 @@ Ja, mit pragmatischen Abschwächungen. Tests müssen **lesbar** und **wartbar** 
 
 ---
 
-## 0c. Hexagonal Architecture (Ports & Adapters)
+<a id="ARC-hexagonal"></a>
+## Hexagonal Architecture (Ports & Adapters)
 
 Dieser Codebase folgt dem **Ports & Adapters**-Prinzip:
 
@@ -81,6 +88,7 @@ Dieser Codebase folgt dem **Ports & Adapters**-Prinzip:
 - Tests senden HTTP-Requests (eingehender Port) und prüfen DB-State via DbContext (ausgehender Port)
 - Das ist Black-Box-Testing: Die Implementierung kann vollständig ausgetauscht werden, solange das Port-Verhalten gleich bleibt
 
+<a id="ARC-projekt-visibility"></a>
 ### Projekt-Visibility
 
 | Projekt | Sichtbarkeit | Inhalt |
@@ -93,7 +101,8 @@ Kein `InternalsVisibleTo` – das erzwingt, dass Tests ausschließlich über die
 
 ---
 
-## 1. Tech Stack
+<a id="ARC-tech-stack"></a>
+## Tech Stack
 
 ### Backend
 - **.NET 10.0 (LTS)** – ASP.NET Core Web API
@@ -121,7 +130,8 @@ Kein `InternalsVisibleTo` – das erzwingt, dass Tests ausschließlich über die
 
 ---
 
-## 2. Domain Modeling: "Make Illegal States Unrepresentable"
+<a id="ARC-domain-modeling"></a>
+## Domain Modeling: "Make Illegal States Unrepresentable"
 
 Gilt für C# und TypeScript gleichermaßen.
 
@@ -131,16 +141,17 @@ Für jedes Domänen-Konzept existiert ein eigener Typ, der seine Invarianten sel
 - **Dependency Rule:** Factory Functions nehmen Domain-Typen oder Primitives – niemals DTOs, API-Response-Typen oder DB-Entities. Mapping findet im Endpoint-Layer statt.
 - **Cross-Entity-Constraints** (Uniqueness etc.) können nicht im Typ ausgedrückt werden → expliziter Check im Endpoint-Layer.
 - **Result-Typen als Bausteine:** `OneOf<A, B>` (C#) / `Result<T, E>` (TypeScript) sind Bausteine, kein Ersatz für eigene Domain-Typen. Je mehr Semantik ein Konzept trägt, desto eher verdient es einen eigenen Typ.
-- **Domänentyp ≠ Constraint-Typ:** Ein **Constraint-Typ** ist ein Prädikat über einer Repräsentation (feldagnostisch, wiederverwendbar); ein **Domänentyp** ist eine Rolle in der Fachsprache und *benutzt* Constraint-Typen als Baumaterial. Nur der Domänentyp erfüllt „ein eigener Typ je Domänen-Konzept" oben – ein Constraint-Typ in einer Signatur leckt ein Implementierungsdetail. Fünf Regeln dazu (Domänentyp = Schnittstelle, Constraint-Typ = Implementierung; Rolle ≠ Typ; Verwechslungsschutz ist Nebenprodukt; Abwesenheit ist keine Einschränkung; Regeln in den Typ, Meldungen an die Grenze) kanonisch in `docs/guidelines/coding-guideline-csharp.md` §2. Dort sind sie für C# ausformuliert; die TypeScript-Seite ist noch nicht darauf nachgezogen (siehe `docs/open-questions.md`).
+- **Domänentyp ≠ Constraint-Typ:** Ein **Constraint-Typ** ist ein Prädikat über einer Repräsentation (feldagnostisch, wiederverwendbar); ein **Domänentyp** ist eine Rolle in der Fachsprache und *benutzt* Constraint-Typen als Baumaterial. Nur der Domänentyp erfüllt „ein eigener Typ je Domänen-Konzept" oben – ein Constraint-Typ in einer Signatur leckt ein Implementierungsdetail. Fünf Regeln dazu (Domänentyp = Schnittstelle, Constraint-Typ = Implementierung; Rolle ≠ Typ; Verwechslungsschutz ist Nebenprodukt; Abwesenheit ist keine Einschränkung; Regeln in den Typ, Meldungen an die Grenze) kanonisch in `docs/guidelines/coding-guideline-csharp.md` [die Regeln dazu](../guidelines/coding-guideline-csharp.md#CGC-domaenentyp-regeln). Dort sind sie für C# ausformuliert; die TypeScript-Seite ist noch nicht darauf nachgezogen (siehe `docs/open-questions.md`).
 - **Immutability:** Objekte sind nach Konstruktion unveränderlich (C#: `init`-Properties; TypeScript: `readonly`, Spreading statt Mutation).
 
 Implementierungsdetails & Code-Beispiele:
-- C#: `docs/guidelines/coding-guideline-csharp.md` §2 (Primitive Obsession, Domänentyp/Constraint-Typ) und §5 (Domain-Typen, kanonisches Beispiel)
-- TypeScript: `docs/guidelines/coding-guideline-typescript.md` (Sektionen 2–4)
+- C#: [Primitive Obsession](../guidelines/coding-guideline-csharp.md#CGC-primitive-obsession) (Domänentyp/Constraint-Typ) und [Domain-Typen](../guidelines/coding-guideline-csharp.md#CGC-domain-typen) (Domain-Typen, kanonisches Beispiel)
+- TypeScript: [Branded Types](../guidelines/coding-guideline-typescript.md#CGT-branded-types) und [Railway-Oriented Programming](../guidelines/coding-guideline-typescript.md#CGT-rop)
 
 ---
 
-## 3. Endpoint-Pattern
+<a id="ARC-endpoint-pattern"></a>
+## Endpoint-Pattern
 
 Jede Endpoint-Gruppe ist eine separate Datei in `Server/Endpoints/`:
 
@@ -168,7 +179,8 @@ app.MapRecipesEndpoints();
 
 ---
 
-## 4. Projekt-Struktur
+<a id="ARC-projekt-struktur"></a>
+## Projekt-Struktur
 
 ```
 Infrastructure/                   EF Core – public (eigenes Projekt)
@@ -193,7 +205,8 @@ Shared-Typen (`NonEmptyTrimmedString`, `NonEmptyList<T>`, etc.) liegen in `Serve
 
 ---
 
-## 4b. SKELETON-Phase: Scope-Constraints
+<a id="ARC-skeleton-constraints"></a>
+## SKELETON-Phase: Scope-Constraints
 
 Diese Constraints gelten nur für die **SKELETON-Phase**. Sie rahmen was implementiert wird und verhindern Over-Engineering vor dem MVP.
 
@@ -205,6 +218,7 @@ Diese Constraints gelten nur für die **SKELETON-Phase**. Sie rahmen was impleme
 | **Shopping-List-Generierung: Delete+Recreate** | Beim `POST /api/shopping-list/generate` werden alle bestehenden Items gelöscht und neu berechnet. Kein Diff/Delta, kein Tracking welche Zutat aus welchem Rezept. AlwaysInStock-Filter inaktiv. |
 | **Alle Listen alphabetisch nach Name sortiert** | `GET /api/ingredients` und `GET /api/recipes` geben ihre Einträge alphabetisch nach Name/Titel zurück. |
 
+<a id="ARC-db-inkonsistenz"></a>
 ### DB-Inkonsistenz: Listen vs. Einzel-Endpoints
 
 Verhalten wenn `Create()` einen DB-Datensatz nicht rekonstruieren kann (z.B. durch manuelle DB-Eingriffe oder fehlgeschlagene Migrationen):
@@ -214,14 +228,16 @@ Verhalten wenn `Create()` einen DB-Datensatz nicht rekonstruieren kann (z.B. dur
 
 ---
 
-## 5. TDD-Prozess (verbindlich)
+<a id="ARC-tdd"></a>
+## TDD-Prozess (verbindlich)
 
 > Vollständige Beschreibung: **`docs/process/tdd-process.md`**
 
 TDD gilt für **jeden Produktionscode** (Features, Bugfixes, Refactorings) – nicht nur für Tests. Jede Änderung durchläuft Red → Green → Refactor. Tests nach der Implementierung schreiben ist **kein TDD**.
 
 
-## 6. Logging
+<a id="ARC-logging"></a>
+## Logging
 
 ```csharp
 // Serilog – konfiguriert in Program.cs
@@ -235,14 +251,16 @@ Keine sensitiven Daten loggen (Passwörter, etc.).
 
 ---
 
-## 7. API Error Handling
+<a id="ARC-api-errors"></a>
+## API Error Handling
 
 - Backend: **ASP.NET Core Problem Details (RFC 7807)** für alle Fehler
 - Frontend: Einheitliche Fehlermeldungen via **MUI Snackbar**
 
 ---
 
-## 8. Authentifizierung
+<a id="ARC-auth"></a>
+## Authentifizierung
 
 - **SKELETON:** Keine Auth (Hardcoded User oder ohne)
 - **MVP:** ASP.NET Core Identity + JWT
@@ -251,7 +269,8 @@ Keine sensitiven Daten loggen (Passwörter, etc.).
 
 ---
 
-## 9. Git-Workflow
+<a id="ARC-git-workflow"></a>
+## Git-Workflow
 
 ```
 main        Produktionscode
@@ -263,7 +282,8 @@ feature/us-301-intelligent-article-capture   Feature-Branches
 
 ---
 
-## 10. Bilder & Dateispeicherung
+<a id="ARC-bilder"></a>
+## Bilder & Dateispeicherung
 
 - Rezept-Quell-Bilder: `Server/wwwroot/uploads/recipe-sources/{recipeId}/original.jpg`
 - **Nicht** in der Datenbank speichern

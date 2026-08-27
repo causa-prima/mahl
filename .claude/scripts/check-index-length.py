@@ -2,7 +2,7 @@
 """Prüft die Kurzfassungs-Länge der Einträge in docs/history/sessions/index.md.
 
 Hintergrund: Die Index-Einträge waren über die Sessions hinweg immer länger
-geworden (Verbosity-Ratchet, OBS-S085-9). Regel (siehe closing-session SKILL Schritt 6):
+geworden (Verbosity-Ratchet, OBS-S085-9). Regel (siehe closing-session SKILL, Index-Zeile):
 die Kurzfassung (letzte Tabellenspalte) ist ein Satz – *was* sich geändert hat,
 kein „warum". Soft-Ziel ~150, harter Cap 250 Zeichen.
 
@@ -62,7 +62,7 @@ def main() -> None:
     _, laenge, session = newest
     if laenge > HARD_CAP:
         print(f"VERLETZUNG: neuester Eintrag (Session {session}) {laenge} > {HARD_CAP} Zeichen.")
-        print("Regel: ein Satz – was sich aenderte, kein Warum. Details: closing-session SKILL Schritt 6.")
+        print("Regel: ein Satz – was sich aenderte, kein Warum. Details: closing-session SKILL, Index-Zeile.")
         sys.exit(1)
 
     print(f"OK – neuester Eintrag (Session {session}) {laenge} Zeichen ≤ {HARD_CAP} (Soft-Ziel {SOFT_TARGET}).")

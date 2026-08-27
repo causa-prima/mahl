@@ -42,7 +42,8 @@ def test_string_property_not_hinted_by_nonblocking():
     assert check_nonblocking(inp) == []
 
 
-# --- Drei-Ebenen-Regel: Entity vs. Constraint-/Domänentyp (§2) ---------------
+# --- Drei-Ebenen-Regel: Entity vs. Constraint-/Domänentyp --------------------
+# docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession
 # Beide Ebenen liegen in Server/Domain/, haben aber gegensätzliche Regeln. Unterschieden
 # wird an der `Value`-Property: Wer den Primitive kapselt, darf ihn annehmen.
 

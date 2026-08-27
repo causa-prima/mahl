@@ -210,3 +210,33 @@ def test_results_of_other_tools_are_not_counted_as_reads():
 def test_project_log_dir_encodes_the_repo_path(tmp_path):
     from pathlib import Path
     assert sl.project_log_dir(Path("/home/kieritz/repos/mahl")).name == "-home-kieritz-repos-mahl"
+
+
+# --- session_datum -----------------------------------------------------------
+# Ohne Datum je Session lässt sich eine Messung nicht in „vor" und „nach einer Maßnahme"
+# trennen – und eine Wirksamkeitsprüfung, die beides zusammenwirft, kann Erfolg und
+# Misserfolg nicht unterscheiden. Genau daran scheiterte die für S120 geplante Re-Messung
+# zu OBS-S109-1: eine einzige Implementierungs-Session nach der Maßnahme gegen 24 im
+# Aggregat ist unsichtbar.
+def _log(tmp_path, *records) -> "object":
+    pfad = tmp_path / "sitzung.jsonl"
+    pfad.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
+    return pfad
+
+
+def test_datum_kommt_aus_dem_ersten_zeitstempel(tmp_path):
+    pfad = _log(tmp_path, {"type": "meta"},
+                {"timestamp": "2026-07-29T06:49:32.172Z"},
+                {"timestamp": "2026-07-30T10:00:00.000Z"})
+    assert sl.session_datum(pfad) == "2026-07-29"
+
+
+def test_datum_ist_none_ohne_zeitstempel(tmp_path):
+    """Gegenprobe: Ein geratenes Datum wäre schlimmer als keines – es filterte still falsch."""
+    assert sl.session_datum(_log(tmp_path, {"type": "meta"})) is None
+
+
+def test_datum_uebersteht_kaputte_zeilen(tmp_path):
+    pfad = tmp_path / "kaputt.jsonl"
+    pfad.write_text('{kein json\n{"timestamp": "2026-08-01T00:00:00Z"}\n', encoding="utf-8")
+    assert sl.session_datum(pfad) == "2026-08-01"

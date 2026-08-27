@@ -2,7 +2,7 @@
 
 ## WSL-native Toolchain
 
-.NET und Node laufen **nativ in WSL** (Repo auf ext4). Details: `docs/process/dev-workflow.md` (Sektion "WSL-native Toolchain").
+.NET und Node laufen **nativ in WSL** (Repo auf ext4). Details: `docs/process/dev-workflow.md` (Sektion "[WSL-native Toolchain](docs/process/dev-workflow.md#DEV-wsl-toolchain)").
 
 ---
 
@@ -12,13 +12,13 @@
 |---------|------|
 | Session starten / Status prüfen | `docs/AGENT_MEMORY.md` |
 | Szenario implementieren | Skill `implementing-scenario` verwenden (ein Szenario pro Durchlauf, Double-Loop TDD) |
-| Backend-Endpoint schreiben | `docs/reference/architecture.md` (inkl. Sektion 0c Hexagonal Architecture) → `docs/reference/skeleton-spec.md` (API-Sektion) |
+| Backend-Endpoint schreiben | `docs/reference/architecture.md` (inkl. [Hexagonal Architecture](docs/reference/architecture.md#ARC-hexagonal)) → `docs/reference/skeleton-spec.md` ([API-Sektion](docs/reference/skeleton-spec.md#SKE-api-routen)) |
 | E2E Testing / BDD/Gherkin / Outside-In ATDD | `docs/process/e2e-testing.md` |
 | C#-Code schreiben (Backend, Tests) | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-csharp.md` (enthält Verweise auf ROP/SumTypes/Stryker-Ergänzungen) |
 | TypeScript/React-Code schreiben | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-typescript.md` |
 | Frontend-UX / Interaction Design | `docs/guidelines/coding-guideline-ux.md` |
 | Allgemeine Coding-Prinzipien (KISS, Naming, Komplexität) | `docs/guidelines/coding-guideline-general.md` |
-| Datenbank-Schema ändern | `docs/process/dev-workflow.md` → `docs/reference/skeleton-spec.md` (DB-Sektion) |
+| Datenbank-Schema ändern | [Datenbank-Workflow](docs/process/dev-workflow.md#DEV-datenbank-workflow) (Drop+Recreate vs. Migrations) → [Projekt-Struktur](docs/reference/architecture.md#ARC-projekt-struktur) (wo DbTypes liegen) |
 | Domain-Logik / Fachbegriff | `docs/reference/glossary.md` → `docs/reference/architecture.md` |
 | Code schreiben / TDD / Mutation Testing | `docs/process/tdd-process.md` (Red→Green→Refactor gilt immer) + `docs/process/dev-workflow.md` |
 | Build / Run / Migration | `docs/process/dev-workflow.md` |
@@ -30,15 +30,16 @@
 | Learnings dokumentieren | `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/process.md`) |
 | Tracker-Eintrag lesen/schreiben (OBS, LL, TD, OQ, ADR) | `python3 .claude/scripts/tracker.py` zeigt, welches Werkzeug welchen Tracker pflegt und welche Befehle es kennt – dann `obs.py` / `lessons.py` / `td.py` / `oq.py` / `decisions.py`, statt Read/Edit auf der ganzen Datei |
 | Wohin geht das Read-/Token-Budget? | `python3 .claude/scripts/read-breakdown.py` (nach Session-Art), `tool-usage.py` |
+| Abschnitt referenzieren / Anker prüfen | `python3 .claude/scripts/anchors.py list\|check\|refs <ANKER>`; Nummern statt Namen findet `ordinale.py` |
 | Was steht schon in einer Testdatei? | `python3 .claude/scripts/test-inventory.py <datei>` – Testnamen mit Zeilenbereich |
 | Verhaltensprinzipien (immer gültig) | `docs/kaizen/principles.md` |
 | Maßnahmen-Tracking | `docs/kaizen/countermeasures.md` |
 | Retro durchführen | Skill `kaizen` verwenden |
 | Technische Schuld tracken | `docs/tech-debt.md` |
 | Offene Fragen / geparkte Diskussionen | `docs/open-questions.md` |
-| Wohin gehört dieser Eintrag – ADR, TD, OQ oder OBS/CM/LL? | Sektion "Ablage: in welchen Tracker gehört dieser Eintrag?" (unten in dieser Datei) |
+| Wohin gehört dieser Eintrag – ADR, TD, OQ oder OBS/CM/LL? | Sektion "[Ablage: in welchen Tracker gehört dieser Eintrag?](#CLA-ablage)" (unten in dieser Datei) |
 | Langsame Befehle dokumentieren | `docs/process/slow-commands.md` |
-| Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "Befehlsauswahl & Timeouts") |
+| Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "[Befehlsauswahl & Timeouts](docs/process/dev-workflow.md#DEV-befehlsauswahl)") |
 | Warum wurde X so entschieden? | `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`) |
 | Was passierte in Session X? | `docs/history/sessions/index.md` → ggf. spezifische Session-Datei |
 | Neuen Agenten beauftragen | `.claude/agents/` (bestehende Definitionen als Vorlage) + Skill `review-code` |
@@ -47,12 +48,13 @@
 
 ---
 
+<a id="CLA-ablage"></a>
 ## Ablage: in welchen Tracker gehört dieser Eintrag?
 
-**Einstieg für alle sechs Tracker.** Schnitt 1 unten entscheidet Produkt vs. Prozess und gilt für
-jeden Eintrag; Schnitt 2 und 3 führen die **produkt**-seitigen aus (ADR/TD/OQ). Fällt Schnitt 1 auf
-Prozess, geht es in `docs/kaizen/process.md`, Sektion „Wann gehört etwas wohin?" weiter (OBS/CM/LL) –
-hier nicht wiederholt. Die Datei-Header aller sechs tragen je die Aufnahmebedingung ihrer Datei und
+**Einstieg für alle Tracker.** Der erste Schnitt unten entscheidet Produkt vs. Prozess und gilt für
+jeden Eintrag; die beiden folgenden führen die **produkt**-seitigen aus (ADR/TD/OQ). Fällt er auf
+Prozess, geht es in [„Wann gehört etwas wohin?"](docs/kaizen/process.md#KPR-wohin) weiter (OBS/CM/LL) –
+hier nicht wiederholt. Die Datei-Header aller Tracker tragen je die Aufnahmebedingung ihrer Datei und
 verweisen hierher für die Abgrenzung untereinander.
 
 Drei Trennschnitte, jeder für sich eindeutig:
@@ -63,16 +65,16 @@ Drei Trennschnitte, jeder für sich eindeutig:
 | **entschieden vs. offen** | ADR/TD ↔ OQ |
 | **terminal vs. terminierend** | ADR ↔ TD |
 
-**Schnitt 1 – Produkt vs. Prozess.** Produkt ist der Code samt Build-/Test-Kette
+**Schnitt „Produkt vs. Prozess".** Produkt ist der Code samt Build-/Test-Kette
 (`stryker-config.json`, `playwright.config.ts`, `Directory.Build.props`) → ADR/TD/OQ.
 Prozess ist, wie gearbeitet wird (`.claude/**`, `docs/process/`, `docs/kaizen/`) →
-OBS/CM/LL; deren Taxonomie steht vollständig in `docs/kaizen/process.md`
-(Sektion "Wann gehört etwas wohin?") und wird hier nicht wiederholt.
+OBS/CM/LL; deren Taxonomie steht vollständig in
+[„Wann gehört etwas wohin?"](docs/kaizen/process.md#KPR-wohin) und wird hier nicht wiederholt.
 
-**Schnitt 2 – entschieden vs. offen.** Steht die Antwort noch aus und ist sie mit dem User
-zu klären → `docs/open-questions.md`. Alles Entschiedene fällt unter Schnitt 3.
+**Schnitt „entschieden vs. offen".** Steht die Antwort noch aus und ist sie mit dem User
+zu klären → `docs/open-questions.md`. Alles Entschiedene fällt unter den nächsten Schnitt.
 
-**Schnitt 3 – terminal vs. terminierend.** Operativer Test:
+**Schnitt „terminal vs. terminierend".** Operativer Test:
 
 > *"Ist die Sache erledigt – bleibt dann etwas zu erklären übrig, das ohne diesen Eintrag
 > unverständlich wäre?"*
@@ -94,14 +96,14 @@ ADRs (immutable, nur `Superseded`). Hier gilt: Eine ADR, die je **gegolten** hat
 existiert. Eine ADR, die **nie** angewendet wurde, erklärt nichts und wird gelöscht (Präzedenz
 S108: ADR-S000-3). Im Zweifel behalten. Kein `Rejected`-Archiv.
 
-Herleitung und verworfene Alternativen: `docs/history/sessions/session_118.md`, Abschnitt E1.
+Herleitung und verworfene Alternativen: `docs/history/sessions/session_118.md`, Abschnitt „Ablage-Taxonomie ADR / TD / OQ".
 
 ---
 
 ## Globale Skills: Vorrang lokaler Regeln
 
 Globale Skills (z.B. `tdd`) gelten als Baseline. Lokale Skills und Docs ergänzen sie und gewinnen bei Konflikten – insbesondere:
-- TDD-Prozess: Skill `write-code` **ergänzt** den globalen `tdd`-Skill um Guideline-Pflichten, PFLICHT-OUTPUT und Selbst-Review; TDD läuft als Schritt 2 von `write-code`. Bei Konflikten gelten `write-code` und `docs/process/tdd-process.md`.
+- TDD-Prozess: Skill `write-code` **ergänzt** den globalen `tdd`-Skill um Guideline-Pflichten, PFLICHT-OUTPUT und Selbst-Review; TDD läuft als Schritt [Implementieren via TDD](.claude/skills/write-code/SKILL.md#WRC-tdd) von `write-code`. Bei Konflikten gelten `write-code` und `docs/process/tdd-process.md`.
 
 ---
 

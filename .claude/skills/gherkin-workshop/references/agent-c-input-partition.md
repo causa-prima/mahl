@@ -3,11 +3,11 @@
 ```
 Du führst eine Input-Partition-Analyse für folgende User Story durch: [US-ID + Text]
 
-Eingabefelder der US (mit Typen und Constraints): [aus Schritt 0]
-Constraints: [aus Schritt 0/1]
+Eingabefelder der US (mit Typen und Constraints): [aus dem Kontext-Laden]
+Constraints: [aus Kontext-Laden / Regelentdeckung]
 Bestehende Szenarien: [falls vorhanden, sonst „keine"]
-Glossar-Entitäten: [aus Schritt 0]
-UX-Kontext: [aus Schritt 0.E – welche UX-Prinzipien gelten, mit Relevanzbewertung]
+Glossar-Entitäten: [aus dem Kontext-Laden]
+UX-Kontext: [aus dem Block „UX-Kontext" – welche UX-Prinzipien gelten, mit Relevanzbewertung]
 
 Arbeite für JEDES Eingabefeld durch:
 1. FELDTYP: (String / Zahl / Enum / Referenz / Collection)
@@ -33,7 +33,7 @@ Ausgabe – pro Eingabefeld eine Partitionstabelle, dann eine Szenario-Tabelle:
 |---|---|---|---|---|
 | error | ... | ... | ... | ... |
 
-Fehlermeldungsformat (Guideline 4, wenn UX-Kontext Prinzip 4 als "Relevant" markiert):
+Fehlermeldungsformat („Fehlermeldungen als Hilfe", wenn der UX-Kontext sie als "Relevant" markiert):
 Then-Spalte bei Fehlerfällen muss konkreten Fehlermeldungstext enthalten.
 Format: „sehe ich die Fehlermeldung ‚[Was ist falsch].'" oder „‚[Was ist falsch] ([Constraint]).'"
 Platzierung nahe am betroffenen Eingabefeld – kein generisches „Fehler aufgetreten".

@@ -3,18 +3,22 @@
 Aufruf:
   python .claude/scripts/retro_report.py [--current <pfad>] [--archive <dir>] [--cm <pfad>] [--verbose]
 
+Die Abschnitte tragen Namen statt Nummern: Im Standard-Modus liefen sonst „1, 2, 6, 9" durch,
+und die Lücken lesen sich wie fehlende Teile. Zudem standen die Nummern doppelt – hier und in
+den `section()`-Aufrufen –, von Hand synchron zu halten.
+
 Standard-Output (Agenten-Modus, retro-relevant):
-  1. Aktuelle Periode – Aggregationstabelle
-  2. Sonstiges-Einträge + unbekannte Kontext-Tags (Tag-Pflege)
-  6. Pattern-Kandidaten (aktuelle Periode + letzte 3 Archiv-Sessions)
-  9. Eskalierte Maßnahmen
+  Aktuelle Periode – Aggregationstabelle
+  Sonstiges-Einträge + unbekannte Kontext-Tags (Tag-Pflege)
+  Pattern-Kandidaten (aktuelle Periode + letzte drei Archiv-Sessions)
+  Eskalierte Maßnahmen
 
 Nur mit --verbose (visuell / für Menschen):
-  3. Zeitreihen – Gesamt-Chart (logarithmische Zeitachse, blau)
-  4. Kategorie-Stack – farbiger gestapelter Chart (gleiche Zeitachse)
-  5. Heatmap (Session × Kontext)
-  7. Semantisches Clustering (sklearn optional, alle offenen Einträge)
-  8. Trendanalyse per Kategorie
+  Zeitreihen – Gesamt-Chart (logarithmische Zeitachse, blau)
+  Kategorie-Stack – farbiger gestapelter Chart (gleiche Zeitachse)
+  Heatmap (Session × Kontext)
+  Semantisches Clustering (sklearn optional, alle offenen Einträge)
+  Trendanalyse per Kategorie
 """
 
 import argparse
@@ -424,7 +428,7 @@ def section(title: str) -> str:
 
 def render_aggregation(sessions: list[SessionData]) -> str:
     findings = [f for s in sessions for f in s.findings]
-    lines = [section("1. Aktuelle Periode")]
+    lines = [section("Aktuelle Periode")]
     if not findings:
         lines.append("  (keine strukturierten Findings)")
         return "\n".join(lines)
@@ -468,7 +472,7 @@ def unbekannte_tags(all_sessions: list[SessionData],
 def render_sonstiges(sessions: list[SessionData], all_sessions: list[SessionData],
                      cms: list[Countermeasure]) -> str:
     hits = [f for s in sessions for f in s.findings if f.kontext == "Sonstiges"]
-    lines = [section("2. Sonstiges-Einträge (Tag-Pflege)")]
+    lines = [section("Sonstiges-Einträge (Tag-Pflege)")]
     if not hits:
         lines.append("  Keine Einträge mit Kontext 'Sonstiges'.")
     else:
@@ -492,7 +496,7 @@ def render_sonstiges(sessions: list[SessionData], all_sessions: list[SessionData
 
 
 def render_zeitreihen(all_sessions: list[SessionData]) -> str:
-    lines = [section("3. Zeitreihen – Gesamt")]
+    lines = [section("Zeitreihen – Gesamt")]
     if len(all_sessions) < 2:
         lines.append(f"  Zu wenig Sessions ({len(all_sessions)}). Minimum: 2.")
         return "\n".join(lines)
@@ -502,7 +506,7 @@ def render_zeitreihen(all_sessions: list[SessionData]) -> str:
 
 
 def render_stack(all_sessions: list[SessionData]) -> str:
-    lines = [section("4. Kategorie-Stack")]
+    lines = [section("Kategorie-Stack")]
     if len(all_sessions) < 2:
         lines.append(f"  Zu wenig Sessions ({len(all_sessions)}). Minimum: 2.")
         return "\n".join(lines)
@@ -512,7 +516,7 @@ def render_stack(all_sessions: list[SessionData]) -> str:
 
 
 def render_heatmap(all_sessions: list[SessionData]) -> str:
-    lines = [section("5. Heatmap: Session × Kontext")]
+    lines = [section("Heatmap: Session × Kontext")]
     if len(all_sessions) < 2:
         lines.append(f"  Zu wenig Sessions ({len(all_sessions)}). Minimum: 2.")
         return "\n".join(lines)
@@ -539,7 +543,7 @@ def render_pattern(current_sessions: list[SessionData], archive_periods: list[li
     tail_sessions = [s for period in archive_periods[-PATTERN_WINDOW:] for s in period]
     window = tail_sessions + current_sessions
 
-    lines = [section("6. Pattern-Kandidaten")]
+    lines = [section("Pattern-Kandidaten")]
     n_periods = min(PATTERN_WINDOW, len(archive_periods))
     lines.append(f"  Fenster: aktuelle Periode + letzte {n_periods} Archiv-Perioden ({len(window)} Sessions gesamt)\n")
 
@@ -587,7 +591,7 @@ def render_pattern(current_sessions: list[SessionData], archive_periods: list[li
 
 def render_clustering(all_sessions: list[SessionData], cms: list[Countermeasure]) -> str:
     open_findings = [f for s in all_sessions for f in s.findings if not is_bewährt(f, cms)]
-    lines = [section("7. Semantisches Clustering (Was/Warum)")]
+    lines = [section("Semantisches Clustering (Was/Warum)")]
 
     if len(open_findings) < MIN_CLUSTER:
         lines.append(f"  Zu wenig offene Einträge ({len(open_findings)} / {MIN_CLUSTER} Minimum).")
@@ -624,7 +628,7 @@ def render_clustering(all_sessions: list[SessionData], cms: list[Countermeasure]
 
 def render_trend(all_sessions: list[SessionData]) -> str:
     LABEL_W = 20
-    lines = [section("8. Trendanalyse per Kategorie")]
+    lines = [section("Trendanalyse per Kategorie")]
     if len(all_sessions) < 2:
         lines.append(f"  Zu wenig Sessions ({len(all_sessions)}). Minimum: 2.")
         return "\n".join(lines)
@@ -701,7 +705,7 @@ def archive_start_sessions(archive_dir: str) -> list[int]:
 
 
 def render_escalated(cms: list[Countermeasure], archive_dir: str) -> str:
-    lines = [section("9. Eskalierte Maßnahmen (≥ 2 Retros OFFEN)")]
+    lines = [section("Eskalierte Maßnahmen (≥ 2 Retros OFFEN)")]
     archive_starts = archive_start_sessions(archive_dir)
 
     offen = [cm for cm in cms if cm.status == 'OFFEN']

@@ -43,6 +43,8 @@ CHECKS = [
     "check-adr-capture",
     "check-oq-capture",
     "check-dangling-refs",
+    "check-anchors",
+    "check-ordinale",
 ]
 
 

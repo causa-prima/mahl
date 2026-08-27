@@ -7,7 +7,7 @@ Ein Fälligkeits-Feld hat die Form
 
 Der **Kopf** vor dem Gedankenstrich ist maschinenlesbar, der Rest bleibt Prosa und trägt
 weiter die Nuance („(c) und (d) je mit ihrem Gherkin-Szenario"). Vorher war das ganze Feld
-Prosa; `Fällig:`-Regel 3 („so konkret wie möglich, ggf. mit Fallback") war damit eine
+Prosa; die `Fällig:`-Regel („so konkret wie möglich, ggf. mit Fallback") war damit eine
 Ermessensfrage, die niemand prüfen konnte.
 
 Anker-Vokabular:

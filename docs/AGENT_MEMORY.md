@@ -36,7 +36,7 @@ Alle übrigen Punkte (OBS, ADR, Story, offene Fragen) stehen weiterhin voll ausg
      verletzte damit die Regel „Kurzzusammenfassung ja, Kopie nein" (OBS-S116-2).
   4. **Done** – woran man erkennt, dass der Punkt erledigt ist.
 
-Ein Punkt mit `Fällig: jetzt` beansprucht die „Nächste Aufgabe" der Session (Rang 3, hinter
+Ein Punkt mit `Fällig: jetzt` beansprucht die „Nächste Aufgabe" der Session (hinter
 Retro und vollem OBS-Drain). Gezeigt wird dann der erste `jetzt`-Punkt in Dokumentreihenfolge
 im Volltext, alle übrigen nur als Titel + Fälligkeit – die Reihenfolge hier ist also die
 Auswahl. TD-Einträge mit
@@ -45,10 +45,8 @@ Auswahl. TD-Einträge mit
 
 ## Nächste Prioritäten
 
-- **Abschnitts-Anker einführen und Verweise prüfbar machen** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/obs.py get OBS-S112-7` (gekoppelt: OBS-S114-2) · Done: Verweise in lebenden Dokumenten zeigen auf Anker, der Prüfer läuft grün und meldet Brüche beim Editieren.
-  Eigene Session (User-Entscheid S115: vollständig migrieren, zu groß für einen Drain-Block).
 
-- **Querschnitts-Testfundament aufsetzen (ADR-S112-5, Schritte 2+3)** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/decisions.py get ADR-S112-5` · Done: Ein Page-Object-Interface existiert, die Suite läuft parametrisiert gegen die Zutaten-Seite, alle bisherigen Tests sind grün.
+- **Querschnitts-Testfundament aufsetzen (ADR-S112-5: Page-Object-Interface definieren, bestehende Tests überführen)** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/decisions.py get ADR-S112-5` · Done: Ein Page-Object-Interface existiert, die Suite läuft parametrisiert gegen die Zutaten-Seite, alle bisherigen Tests sind grün.
   Berührt nur Testcode. Jetzt, weil die Umformung teurer wird, sobald neue Seitenarbeit dazwischenliegt.
 
 - TD-S089-1 · Done: `collect_coverage` ist reaktiviert und `dotnet-test.py` meldet 100% Branch-Coverage grün.

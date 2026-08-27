@@ -39,7 +39,7 @@ PRÜFPUNKTE:
    - Ist die Navigation zum neuen Feature logisch eingehängt?
    - Gibt es unnötige Schritte oder Klicks für häufige Aktionen?
 
-5. Formular-/Dialog-Baseline (nur bei Formularen/Dialogen – UX-Guideline Prinzip 8)
+5. Formular-/Dialog-Baseline (nur bei Formularen/Dialogen – [UX-Guideline](../../docs/guidelines/coding-guideline-ux.md#CGU-formular-baseline))
    - Pflichtfelder als solche markiert (`required` → Asterisk + `aria-required`)? Jedes Feld mit „leer schlägt fehl"-Verhalten muss markiert sein.
    - Liegt der Fokus beim Öffnen auf dem visuell ersten Feld? Felder nicht per CSS umsortiert (DOM-Reihenfolge == visuelle Reihenfolge)?
    - Springt der Fokus nach Validierungsfehler aufs erste fehlerhafte Feld?

@@ -34,6 +34,8 @@ def test_registry_covers_every_registered_check():
         "check-adr-capture",
         "check-oq-capture",
         "check-dangling-refs",
+        "check-anchors",
+        "check-ordinale",
     }
 
 

@@ -10,17 +10,18 @@ kritische-regeln:
   - Kein From() in Domain-Typen – DB-Rekonstruktion via ToDomain() → OneOf<Domain, Error<string>> im Mapping-Layer; Endpoints nutzen Results.Problem() statt throw bei Inkonsistenz
 -->
 
+<a id="CGC-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| 1. Immutability & Typen | Typen-Tabelle (class/record/struct), keine public Setter, ImmutableList | Beim Erstellen neuer Klassen oder Typen |
-| 2. Primitive Obsession | Drei-Ebenen-Regel (Constraint-Typ / Domänentyp / Entity) und ihre fünf Regeln, Konvertierungsoperatoren | Beim Modellieren von Fachkonzepten |
-| 3. Illegal States Unrepresentable | Private Ctors, Factory-Methoden, Default-Ctor bei struct absichern | Beim Erstellen von Domain-Typen |
-| 4. Pure Functions & Extension Methods | Extension Methods für Geschäftslogik, OneOf als Rückgabe | Beim Kapseln von Logik ohne Seiteneffekte |
-| 5. Domain-Typen (Architektur) | Systemgrenz-Architektur (Write/Read-Pfad), Dependency Rule, Typ-Deklarationen sind `internal`, Typ-Struktur, Datei-Orte, kanonisches Beispiel | Beim Anlegen neuer Entities oder Umstrukturierung des Domain-Layers |
-| 6. Endpoints: ETag-Pflicht | ETag für alle Endpoints: xmin (Single Resource), Content-Hash (Collection), 304/412/428-Muster | Bei jedem neuen Endpoint |
-| 7. Test-Code | Given/When/Then-Struktur (Pflicht), Full-State-Assertions (`BeEquivalentTo`) | Beim Schreiben von Backend-Tests |
+| [Immutability & Typen](#CGC-immutability) | Typen-Tabelle (class/record/struct), keine public Setter, ImmutableList | Beim Erstellen neuer Klassen oder Typen |
+| [Primitive Obsession](#CGC-primitive-obsession) | Drei-Ebenen-Regel (Constraint-Typ / Domänentyp / Entity) und die Regeln dazu, Konvertierungsoperatoren | Beim Modellieren von Fachkonzepten |
+| [Illegal States Unrepresentable](#CGC-illegal-states) | Private Ctors, Factory-Methoden, Default-Ctor bei struct absichern | Beim Erstellen von Domain-Typen |
+| [Pure Functions & Extension Methods](#CGC-pure-functions) | Extension Methods für Geschäftslogik, OneOf als Rückgabe | Beim Kapseln von Logik ohne Seiteneffekte |
+| [Domain-Typen (Architektur)](#CGC-domain-typen) | Systemgrenz-Architektur (Write/Read-Pfad), Dependency Rule, Typ-Deklarationen sind `internal`, Typ-Struktur, Datei-Orte, kanonisches Beispiel | Beim Anlegen neuer Entities oder Umstrukturierung des Domain-Layers |
+| [Endpoints: ETag-Pflicht](#CGC-endpoints-etag) | ETag für alle Endpoints: xmin (Single Resource), Content-Hash (Collection), 304/412/428-Muster | Bei jedem neuen Endpoint |
+| [Test-Code](#CGC-test-code) | Given/When/Then-Struktur (Pflicht), Full-State-Assertions (`BeEquivalentTo`) | Beim Schreiben von Backend-Tests |
 
 **Ergänzende Richtlinien (separate Dateien):**
 
@@ -28,11 +29,12 @@ kritische-regeln:
 |-------|------------|
 | `docs/guidelines/csharp-rop.md` | Beim Schreiben von Endpoints oder Validierungsketten (`.Bind()/.Map()/.MatchAsync()`) |
 | `docs/guidelines/csharp-sumtypes.md` | Beim Modellieren neuer Domain-Typen mit Zustandsvarianten (z.B. `RecipeSource`, `Quantity`) |
-| `docs/guidelines/csharp-stryker.md` | Beim Behandeln von Stryker-Survivors in Phase 3 (REFACTOR) |
+| `docs/guidelines/csharp-stryker.md` | Beim Behandeln von Stryker-Survivors in [REFACTOR](../process/tdd-process.md#TDD-refactor) (REFACTOR) |
 
 > **Voraussetzung:** Lies zuerst `docs/guidelines/coding-guideline-general.md` (KISS, Naming, Komplexität, übergreifende Paradigmen). Diese Datei beschreibt nur die C#-spezifische Umsetzung.
 
-1. Unveränderlichkeit (Immutability) & Typen:
+<a id="CGC-immutability"></a>
+## Unveränderlichkeit (Immutability) & Typen
 
 Verwende den richtigen Typ je nach Rolle:
 
@@ -40,9 +42,9 @@ Verwende den richtigen Typ je nach Rolle:
 |-------|-----|------------|
 | EF-Core-Entity (Datenbanktabelle) | `class` | EF Change Tracking und Proxy-Support erfordern Referenztyp mit mutierbaren Properties |
 | DTO (Request/Response, JSON) | `record` (mit `init;`) | Vollständig kompatibel mit `System.Text.Json`; immutabel nach Deserialisierung |
-| Constraint-Typ, Domänentyp, Domain-Entity (§2) | `readonly record struct` | Wertsemantik, strukturelle Gleichheit, kein Overhead durch Heap-Allokation |
+| Constraint-Typ, Domänentyp, Domain-Entity ([Primitive Obsession](#CGC-primitive-obsession)) | `readonly record struct` | Wertsemantik, strukturelle Gleichheit, kein Overhead durch Heap-Allokation |
 
-> **Zwei Bedeutungen von „Entity":** Zeile 1 meint die **EF-Core-Entity** (Persistenz, `Infrastructure/DatabaseTypes/`). §2 meint die **Domain-Entity** (`Ingredient`, `readonly record struct`, `Server/Domain/`). Verschiedene Ebenen, gleicher Name – im Zweifel den Ordner ansehen.
+> **Zwei Bedeutungen von „Entity":** Die Tabellenzeile **EF-Core-Entity** meint die Persistenz-Seite (`Infrastructure/DatabaseTypes/`). [Primitive Obsession](#CGC-primitive-obsession) meint die **Domain-Entity** (`Ingredient`, `readonly record struct`, `Server/Domain/`). Verschiedene Ebenen, gleicher Name – im Zweifel den Ordner ansehen.
 
 - Eigenschaften dürfen keine öffentlichen Setter haben. Erlaubt: `get; init;` (DTOs/records) oder `get;` mit Konstruktor-Zuweisung (Value Objects).
 - EF-Entities dürfen `private set;` für Change-Tracking nutzen – nirgendwo sonst.
@@ -52,9 +54,10 @@ Verwende den richtigen Typ je nach Rolle:
 - `Infrastructure/DatabaseTypes/**` – EF-Entities als `class` mit `private set;` erlaubt
 - `Infrastructure/Migrations/**` – generierter Code, keine Kontrolle
 - `**/*Options.cs`, `**/*Settings.cs` – ASP.NET Options-Pattern erfordert `class`
-- Reine **E2E-/Test-Support-Endpoints** (nur in der E2E-Umgebung gemappt, z.B. `E2ETestSupport.cs`; ADR-S084-4 Addendum) – dürfen direkt auf `MahlDbContext` zugreifen und sind von den Domain-Typ-/DTO-/Mapping-Pflichten (auch Sektion 5, „Endpoints") ausgenommen; sie tragen keine Domänenlogik. **Nicht** als Vorlage für produktive Endpoints verwenden.
+- Reine **E2E-/Test-Support-Endpoints** (nur in der E2E-Umgebung gemappt, z.B. `E2ETestSupport.cs`; ADR-S084-4 Addendum) – dürfen direkt auf `MahlDbContext` zugreifen und sind von den Domain-Typ-/DTO-/Mapping-Pflichten (auch der [Dependency Rule](#CGC-dependency-rule)) ausgenommen; sie tragen keine Domänenlogik. **Nicht** als Vorlage für produktive Endpoints verwenden.
 
-2. Vermeidung von "Primitive Obsession":
+<a id="CGC-primitive-obsession"></a>
+## Vermeidung von "Primitive Obsession"
 
 - Verwende keine Primitives (string, int, Guid) direkt in den Geschäftsmodellen. Kapsle sie stattdessen in stark typisierte Value Objects (z.B. Username, EmailAddress, ItemId). „Value Object" ist dabei der Oberbegriff; die Drei-Ebenen-Regel unten trennt ihn in **Constraint-Typ** und **Domänentyp**, und nur der Domänentyp steht in Signaturen.
 - Implementiere implizite/explizite Konvertierungsoperatoren (implicit operator, explicit operator) für eine ergonomische Nutzung der Value Objects.
@@ -65,31 +68,37 @@ Verwende den richtigen Typ je nach Rolle:
 | Ebene | Ort | `Create()`-Signatur | Rolle |
 |---|---|---|---|
 | **Constraint-Typ** (`NonEmptyTrimmedString`, `Bounded<…>` …) | `Server/Types/` | Nimmt Primitives (`string`, `decimal`) | Ein **Prädikat über einer Repräsentation** – feldagnostisch, über Fachkonzepte hinweg wiederverwendbar. *Hier ist* die Validierungsmechanik |
-| **Domänentyp** (`IngredientName`, `Unit` …) | `Server/Domain/` | Nimmt Primitives | Eine **Rolle in der Fachsprache** – an *ein* Fachkonzept gebunden, dort aber überall geteilt (Regel 2). Baut sich aus Constraint-Typen und trägt die Feldregeln |
+| **Domänentyp** (`IngredientName`, `Unit` …) | `Server/Domain/` | Nimmt Primitives | Eine **Rolle in der Fachsprache** – an *ein* Fachkonzept gebunden, dort aber überall geteilt ([Rolle ≠ Typ](#CGC-regel-rolle-typ)). Baut sich aus Constraint-Typen und trägt die Feldregeln |
 | **Entity** (`Ingredient`, `Recipe` …) | `Server/Domain/` | Nimmt Domänentypen | Vertraut den Typen; prüft nur Entity-Invarianten (Cross-Field, etc.) |
 
 `string` und andere ungesicherte Primitive gehören **nicht in Entity-`Create()`-Parameter**. Ein roher `string` landet weder als Parameter noch als Property in einer Domain-Entity. Die Validierung liegt beim Aufrufer (Endpoint oder `ToDomain()`). So macht der Compiler ungültige Aufrufe unmöglich, und Entity-`Create()` hat keine gemischte Verantwortung (String-Validierung + Entity-Invarianten).
 
-### Domänentyp und Constraint-Typ – fünf Regeln
+<a id="CGC-domaenentyp-regeln"></a>
+### Domänentyp und Constraint-Typ – die Regeln
 
-**Regel 1 – Der Domänentyp ist die Schnittstelle, der Constraint-Typ die Implementierung.**
+<a id="CGC-regel-schnittstelle"></a>
+**Der Domänentyp ist die Schnittstelle, der Constraint-Typ die Implementierung.**
 Der Domänentyp *benutzt* Constraint-Typen als Baumaterial; **Constraint-Typen stehen nie in Signaturen** – weder in `Create()`-Parametern noch in Properties einer Entity. Wird die zulässige Menge eines Domänentyps später aufzählbar (Enum) oder strukturiert (Sum-Type), verschwindet der Constraint-Typ ersatzlos. Genau das ist der Ertrag: Steht der Constraint-Typ in Signaturen, ist ein Implementierungsdetail geleckt, und der absehbare Wechsel `Unit`: string → Enum wird zur Breaking Change an jeder Signatur statt zur Änderung in einer Datei.
 
-**Regel 2 – Rolle ≠ Typ.**
+<a id="CGC-regel-rolle-typ"></a>
+**Rolle ≠ Typ.**
 `BaseUnit`, Alternativeinheiten, Rezept- und Einkaufslisten-Einheit sind alle `Unit` – ein geteilter Domänentyp, kein Typ je Verwendungsstelle. Der Grund ist nicht Sparsamkeit: Mehrere Typen für dasselbe Konzept verteilen seine Regeln auf mehrere **Änderungsorte**; eine spätere Verschärfung muss an jedem nachgezogen werden, und ein vergessener ist unsichtbar. Die Regel „keine rohen Primitive" (oben) verbietet nur das Primitive – **nicht** einen eigenen Typ je Property fürs selbe Konzept. Das leistet erst diese Regel.
 
 *Ausnahme, eng zu halten:* eine Rolle mit **eigener Invariante** bekommt einen eigenen Typ. Beispiel: `Amount` und `ConversionFactor` – dieselbe Repräsentation (beide über einem `float > 0`-Constraint-Typ), verschiedene Bedeutung. Der Test ist das **Verhalten unter Operationen**, nicht der Name: `Amount × ConversionFactor = Amount` ist sinnvoll, `Amount + ConversionFactor` ist Unsinn. Ein bloßes Synonym (`CustomerName`/`ClientName`) ist ein *Begriff*, kein Konzept, und bekommt keinen Typ.
 
-**Regel 3 – Verwechslungsschutz ist Nebenprodukt, kein Entwurfsziel.**
+<a id="CGC-regel-verwechslungsschutz"></a>
+**Verwechslungsschutz ist Nebenprodukt, kein Entwurfsziel.**
 Nie fragen „brauche ich hier einen Typ gegen Vertauschen?", sondern „ist das ein eigenes Fachkonzept?". Zwei Parameter desselben Konzepts dürfen denselben Typ haben. Sonst beginnt die Rutschbahn zu einem Typ pro Parameter.
 
-**Regel 4 – Abwesenheit ist keine Einschränkung.**
+<a id="CGC-regel-abwesenheit"></a>
+**Abwesenheit ist keine Einschränkung.**
 Bevor ein Wert einen Sonderfall bekommt (`Guid.Empty`, `-1`, `""`), prüfen, ob eigentlich Optionalität gemeint ist. Optionalität gehört out-of-band (Union/`Option`), nie ins Wertband des Domänentyps – ein In-band-Sentinel ist genau der Zustand, den „Make Illegal States Unrepresentable" ausschließen soll.
 
-**Regel 5 – Regeln in den Domänentyp, Meldungen an die Grenze.**
+<a id="CGC-regel-meldungen-an-die-grenze"></a>
+**Regeln in den Domänentyp, Meldungen an die Grenze.**
 Die Feldregeln (Länge, Wertebereich) leben im Typ. Die Zuordnung *Fehlerfall → deutscher Text* bleibt an der API-Grenze, die das Request-Format kennt (ADR-S051-2). Ein Domänentyp gibt einen Fehler**fall** zurück, nie einen Meldungstext.
 
-Der Fehlertyp gehört dabei zum **Konzept**, nicht zum Feld und nicht zur Entität (ADR-S120-1): `IngredientName.Create` liefert `IngredientNameError`, `Unit.Create` liefert `UnitError`. Er trägt keinen Feldnamen – den kennt die Grenze statisch, und ein geteilter Domänentyp (Regel 2) kennt seine Verwendungsstelle ohnehin nicht. Ein geteilter Typ bekommt deshalb **je Verwendungsstelle** eine eigene Zuordnung zum Meldungstext, bleibt aber ein Typ.
+Der Fehlertyp gehört dabei zum **Konzept**, nicht zum Feld und nicht zur Entität (ADR-S120-1): `IngredientName.Create` liefert `IngredientNameError`, `Unit.Create` liefert `UnitError`. Er trägt keinen Feldnamen – den kennt die Grenze statisch, und ein geteilter Domänentyp ([Rolle ≠ Typ](#CGC-regel-rolle-typ)) kennt seine Verwendungsstelle ohnehin nicht. Ein geteilter Typ bekommt deshalb **je Verwendungsstelle** eine eigene Zuordnung zum Meldungstext, bleibt aber ein Typ.
 
 **Parametrisierte Einschränkungen stehen im Typ (ADR-S119-1).** Eine Grenze wie „max. 30 Zeichen" ist kein handgeschriebener Check in `Create()`, sondern der Typ des privaten Feldes – so ist sie nicht vergessbar. Da C# keine const generics kennt, trägt ein Marker-Typ je Grenzwert den Wert:
 
@@ -104,7 +113,7 @@ internal readonly record struct IngredientName
     public IngredientName() => throw new InvalidOperationException("Uninitialized");
     private IngredientName(Bounded<NonEmptyTrimmedString, Max30> value) => _value = value;
 
-    // Regel 5: der Typ liefert die Fehlerfälle SEINES Konzepts, keine Texte und keinen Feldbezug.
+    // Meldungen an die Grenze: der Typ liefert die Fehlerfälle SEINES Konzepts, keine Texte und keinen Feldbezug.
     public static OneOf<IngredientName, IngredientNameError> Create(string input) =>
         Bounded<NonEmptyTrimmedString, Max30>.Create(input)
             .MapError<Bounded<NonEmptyTrimmedString, Max30>, StringViolation, IngredientNameError>(v => v switch
@@ -119,13 +128,14 @@ internal readonly record struct IngredientName
 
 Die Träger (`IStringConstraint<TSelf>`, `IMaxLength`, `NonEmptyTrimmedString`, `Bounded<TInner, TMax>`, Marker je Grenzwert) liegen in `Server/Types/StringConstraints.cs` – bewusst eine Datei, weil sie nur gemeinsam les- und änderbar sind (dafür ein `MA0048`-Block in `.editorconfig`). Warum Trimmen und Nicht-Leer in **einem** Träger stecken statt in zwei komponierbaren, und wann die Aufspaltung fällig wird: ADR-S119-1, Abschnitt „Warum `NonEmptyTrimmedString`".
 
-Ein geteilter Domänentyp wie `Unit` (Regel 2) baut sich genauso, nur mit `Max20` und `UnitError` – der Fehlertyp gehört zum Konzept, nicht zur Entität, und trägt deshalb über alle Entitäten (ADR-S120-1).
+Ein geteilter Domänentyp wie `Unit` ([Rolle ≠ Typ](#CGC-regel-rolle-typ)) baut sich genauso, nur mit `Max20` und `UnitError` – der Fehlertyp gehört zum Konzept, nicht zur Entität, und trägt deshalb über alle Entitäten (ADR-S120-1).
 
-> **Sollform, nicht Bauauftrag.** Wie die Beispiele hier zu lesen sind – insbesondere, dass eine 1:1-Umsetzung ohne treibendes Szenario gegen vorrangige Regeln verstößt – steht in `coding-guideline-general.md`, Sektion „Wie Code-Beispiele in Guidelines zu lesen sind". Neuer Code folgt der Sollform; bestehender wird bei Berührung nachgezogen.
+> **Sollform, nicht Bauauftrag.** Wie die Beispiele hier zu lesen sind – insbesondere, dass eine 1:1-Umsetzung ohne treibendes Szenario gegen vorrangige Regeln verstößt – steht in `coding-guideline-general.md`, Sektion „[Wie Code-Beispiele in Guidelines zu lesen sind](coding-guideline-general.md#CGG-code-beispiele)". Neuer Code folgt der Sollform; bestehender wird bei Berührung nachgezogen.
 
 **Geltungsbereich:** Die Regeln enden an der DTO-/DbType-Grenze. `mahl.Infrastructure` ist `public`, `mahl.Server` `internal` – ein Domänentyp kann dort gar nicht auftauchen (`docs/reference/architecture.md`). `Name` und `BaseUnit` bleiben im DTO und im DbType deshalb `string`.
 
-3. "Make Illegal States Unrepresentable" (Sichere Instanziierung):
+<a id="CGC-illegal-states"></a>
+## "Make Illegal States Unrepresentable" (Sichere Instanziierung)
 
 - Konstruktoren für Domänen-Objekte müssen private sein.
 - Objekte dürfen nur über statische Factory-Methoden (z.B. Create(...), New(...)) instanziiert werden.
@@ -152,12 +162,15 @@ public Guid Id => _id == default ? throw new InvalidOperationException("Uninitia
 
 Jede Suppression zusätzlich in `docs/history/adr.md` begründen (einmalig pro Typ-Kategorie genügt).
 
-4. Reine Funktionen (Pure Functions) & Extension Methods:
+<a id="CGC-pure-functions"></a>
+## Reine Funktionen (Pure Functions) & Extension Methods
 
 - Geschäftslogik, die den Zustand eines Objekts "verändert", wird oft als statische Klasse mit Extension Methods implementiert, die den alten Zustand aufnimmt und ein OneOf<NeuerZustand, Error<string>> zurückgibt.
 
+<a id="CGC-code-beispiel"></a>
 ## Code-Beispiel als Referenz-Stil:
 
+<a id="CGC-constraint-typ-beispiel"></a>
 ### Constraint-Typ (nimmt Primitives – hier findet die Validierung statt)
 
 ```csharp
@@ -168,9 +181,9 @@ internal readonly record struct TrimmedNonEmpty
 
     private TrimmedNonEmpty(string value) => _value = value;
 
-    // Constraint-Typen nehmen rohe Primitives – sie SIND die Validierungsebene (§2, Ebene 1).
+    // Constraint-Typen nehmen rohe Primitives – sie SIND die Validierungsebene (Drei-Ebenen-Regel).
     // Sie liefern einen Verstoß, keinen Meldungstext: der Typ ist feldagnostisch und kennt
-    // weder Feldnamen noch Request-Format (Regel 5, ADR-S051-2).
+    // weder Feldnamen noch Request-Format (Meldungen an die Grenze, ADR-S051-2).
     public static OneOf<TrimmedNonEmpty, StringViolation> Create(string input)
     {
         var trimmed = input?.Trim();
@@ -182,14 +195,17 @@ internal readonly record struct TrimmedNonEmpty
 }
 ```
 
+<a id="CGC-entity-beispiel"></a>
 ### Domain Entity (nimmt Domänentypen – vertraut den Typen, prüft nur Entity-Invarianten)
 
-Das kanonische Entity-Beispiel steht weiter unten (Sektion „Kanonisches Beispiel") – ausschließlich Domänentypen als Parameter, kein rohes `Guid`/`string`.
+Das kanonische Entity-Beispiel steht weiter unten (Sektion „[Kanonisches Beispiel](#CGC-kanonisches-beispiel)") – ausschließlich Domänentypen als Parameter, kein rohes `Guid`/`string`.
 
 Halte dich bei allem von dir erstellem oder gereviewtem Code strikt an dieses Paradigma. Prüfe: Hält Code mutable state (set), exceptions für Business Logic und nackte Primitive (wie string title) aus Entitäts-Konstruktoren heraus? Das ist der Maßstab.
 
-5. Domain-Typen (Pflicht für alle Entities mit Create-Vorgängen):
+<a id="CGC-domain-typen"></a>
+## Domain-Typen (Pflicht für alle Entities mit Create-Vorgängen)
 
+<a id="CGC-internal-pflicht"></a>
 ### `internal`-Pflicht für Typ-Deklarationen
 
 Alle Typ-Deklarationen (`class`, `record`, `struct`, `interface`, `enum`) in `Server/` sind **`internal`** – kein `public` ohne explizite Begründung. Das betrifft die Typdeklaration selbst, nicht Member-Sichtbarkeit – Member bleiben `private`/`protected` wo nötig.
@@ -208,8 +224,9 @@ public static class IngredientsEndpoints { ... }
 
 **Ausnahme:** `Infrastructure/`-Typen (`MahlDbContext`, `*DbType`) sind `public` – das ist das einzige öffentliche Projekt.
 
-**Begründung:** Erzwingt, dass Tests ausschließlich über HTTP-Ports exercisen (Black-Box-Testing, Hexagonal Architecture). Ohne `InternalsVisibleTo` kann Testcode keine Domain-Typen direkt instantiieren. Vollständige Begründung: `docs/reference/architecture.md` Sektion 0c.
+**Begründung:** Erzwingt, dass Tests ausschließlich über HTTP-Ports exercisen (Black-Box-Testing, Hexagonal Architecture). Ohne `InternalsVisibleTo` kann Testcode keine Domain-Typen direkt instantiieren. Vollständige Begründung: `docs/reference/architecture.md` [Hexagonal Architecture](../reference/architecture.md#ARC-hexagonal).
 
+<a id="CGC-systemgrenze"></a>
 ### Systemgrenz-Architektur
 
 - **Write-Pfad**: `CreateDto` → `ToDomain(dto)` im Mapping-Layer (baut die Domänentypen, **sammelt alle** Feldfehler – ADR-S090-1) → DbType (Persistenz-Mapping). Das DTO bleibt im Mapping-Layer; `Domain.Create(...)` sieht es nie (Dependency Rule unten)
@@ -217,11 +234,13 @@ public static class IngredientsEndpoints { ... }
 - Die Domäne vertraut weder Request-Daten noch DB-Daten – `Create()` ist die einzige Einstiegsmethode
 - **Layer-Isolation:** DB-Inkonsistenz (fehlerhafte Daten in der Datenbank) darf kein unbehandeltes `throw` auslösen. `Results.Problem(detail, statusCode: 500)` gibt strukturiertes `application/problem+json` zurück – testbar per ContentType und Body-Assertion. Unbehandelte Exceptions geben HTML/plain-text zurück und sind nicht testbar.
 
+<a id="CGC-program-main"></a>
 ### Provider-/Assembly-spezifische Aufrufe nicht inline in `Program.Main`
 
 - Provider-/Assembly-spezifische Aufrufe (EF-Relational `MigrateAsync()`, Npgsql o.ä.), die nur unter einer bestimmten Umgebung laufen (z.B. hinter `if (env.IsE2E)`), **nicht inline** in `Program.<Main>$` setzen, sondern in eine **eigene Methode** auslagern.
 - Grund: JIT ist per-Methode lazy, löst aber **innerhalb** einer Methode beim Kompilieren alle referenzierten Assemblies auf – ein *nicht genommener* `if`-Branch schützt nicht. Ein Test-Host mit anderem Provider (`WebApplicationFactory` + InMemory) scheitert sonst schon beim JIT von `Main` mit `FileNotFoundException` auf der Relational-Assembly, obwohl der Zweig nie ausgeführt wird. Der Body der ausgelagerten Methode JITtet erst beim tatsächlichen Aufruf.
 
+<a id="CGC-string-analyzer"></a>
 ### Kulturbezogene String-Analyzer brechen unter `TreatWarningsAsErrors` den Build
 
 Naive String-Operationen lösen kulturbezogene Analyzer aus – und weil Warnungen hier Fehler sind, ist das kein Hinweis, sondern ein Build-Abbruch. Vor dem Schreiben unterscheiden, welcher der beiden Fälle vorliegt; blindes Probieren kostet sonst einen Trial-and-Error-Zyklus pro Stelle (in S105 zweimal getroffen):
@@ -229,6 +248,7 @@ Naive String-Operationen lösen kulturbezogene Analyzer aus – und weil Warnung
 - **Der Analyzer hat recht** – die Operation läuft wirklich zur Laufzeit in .NET: `IndexOf(char)`, `==`, `Contains` in gewöhnlichem Code → **CA1307/MA0006**. Richtige Antwort ist die Korrektur, nicht die Suppression: `Split`, `StringComparison.Ordinal`, `string.Equals(a, b, StringComparison.Ordinal)`.
 - **Der Analyzer irrt** – der Ausdruck wird gar nicht in .NET ausgeführt, sondern übersetzt: `.ToLower()` **in einem EF-Core-LINQ-Prädikat** → **CA1304/CA1311/CA1862/MA0011**. Die Analyzer nehmen `CurrentCulture` zur Laufzeit an, obwohl EF daraus SQL `LOWER()` macht. Hier ist eine Suppression richtig: `#pragma warning disable/restore` **an der Zeile**, mit Begründung – nie ein `disable` ohne `restore` am Dateianfang (das sieht lokal aus, wirkt aber bis Dateiende).
 
+<a id="CGC-dependency-rule"></a>
 ### Dependency Rule
 
 ```
@@ -243,6 +263,7 @@ Domain-Typ    DbType    DTO
 - Mapping-Code (DbType ↔ Domain, Domain → DTO) lebt in **`file static class`-Extension Methods** in der jeweiligen Endpoint-Datei (z.B. `IngredientsEndpoints.cs`). Nicht zwischen Endpoints geteilt – `file`-Sichtbarkeit erzwingt das und verhindert stilles Drift.
 - **Kein `From()`**: DB-Rekonstruktion via `ToDomain()` → `OneOf<Domain, Error<string>>` im Mapping-Layer. Endpoints behandeln Fehler mit `Results.Problem(detail, statusCode: 500)` – kein `throw` im Endpoint-Body.
 
+<a id="CGC-typ-struktur"></a>
 ### Typ-Struktur
 
 - `readonly record struct` – Compiler-generierte Equality, parameterlosen Konstruktor public lassen und mit `throw new InvalidOperationException("Uninitialized")` absichern
@@ -250,24 +271,27 @@ Domain-Typ    DbType    DTO
 - `Create(...)` → `OneOf<DomainType, Error<string>>` für User-Input und für Validierung beim Lesen aus der DB
 - Keine `ToDto()`/`ToDbType()`-Methoden am Domain-Typ selbst
 
+<a id="CGC-ort"></a>
 ### Ort
 
-- `Server/Domain/` für **Domain-Entities** (Rezept, Zutat, …) **und Domänentypen** (`IngredientName`, `Unit`) – beide Ebenen der Drei-Ebenen-Regel aus §2 liegen hier
+- `Server/Domain/` für **Domain-Entities** (Rezept, Zutat, …) **und Domänentypen** (`IngredientName`, `Unit`) – beide Ebenen der Drei-Ebenen-Regel aus [Primitive Obsession](#CGC-primitive-obsession) liegen hier
 - `Server/Types/` ausschließlich für **Constraint-Typen** (z.B. `NonEmptyTrimmedString`, `Bounded<TInner, TMax>`) und geteilte Bausteine (`SumType`, `NonEmptyList<T>`)
 
+<a id="CGC-kanonisches-beispiel"></a>
 ### Kanonisches Beispiel
 
 ```csharp
 // Server/Domain/Ingredient.cs
 internal readonly record struct Ingredient
 {
-    // Ausschließlich Domänentypen – kein rohes Guid/string (§2, Drei-Ebenen-Regel).
+    // Ausschließlich Domänentypen – kein rohes Guid/string (Drei-Ebenen-Regel).
     private readonly IngredientId _id;
     private readonly IngredientName _name;
     private readonly Unit _baseUnit;
 
     // Alle drei werfen selbst transitiv beim Zugriff – kein Guard in der Entity nötig.
-    // Der default(T)-Guard sitzt im jeweiligen Domänentyp, nicht hier (§3).
+    // Der default(T)-Guard sitzt im jeweiligen Domänentyp, nicht hier
+// (Make Illegal States Unrepresentable).
     public IngredientId Id => _id;
     public IngredientName Name => _name;
     public Unit BaseUnit => _baseUnit;
@@ -324,7 +348,7 @@ file static class IngredientMappings
     // Die Id vergibt allein der anlegende Endpoint (ADR-S030-1); ein Pfad, der denselben Body nur
     // validiert (Restore – die Zeile steht über den Routenparameter fest), braucht gar keine.
     // Damit gibt es keinen Ingredient ohne brauchbare Id, und der Compiler verhindert, dass ein
-    // solcher an eine Grenze gerät, die eine Identität voraussetzt (Regel 4).
+    // solcher an eine Grenze gerät, die eine Identität voraussetzt (Abwesenheit ist keine Einschränkung).
     internal static OneOf<IngredientValues, IReadOnlyList<FieldError>> ToValues(this IngredientValuesDto dto) =>
         Collect(
             IngredientName.Create(dto.Name).MapError(DescribeName),
@@ -340,8 +364,9 @@ file static class IngredientMappings
         _ => SumType.Unreachable<FieldError>(),
     };
 
-    // Zur Grenze hin wieder Primitives – Domänentypen enden hier (Geltungsbereich, §2).
-    // Die Zuordnung Fehlerfall → deutscher Text liegt ebenfalls hier, nicht im Typ (Regel 5).
+    // Zur Grenze hin wieder Primitives – Domänentypen enden hier
+// (Geltungsbereich der Drei-Ebenen-Regel).
+    // Die Zuordnung Fehlerfall → deutscher Text liegt ebenfalls hier, nicht im Typ (Meldungen an die Grenze).
     public static IngredientDto ToDto(this Ingredient domain, bool alwaysInStock) =>
         new(domain.Id.Value, domain.Name.Value, domain.BaseUnit.Value, alwaysInStock);
 }
@@ -359,7 +384,8 @@ group.MapGet("/{id:int}", async (int id, MahlDbContext db) =>
 });
 ```
 
-## 6. Endpoints – ETag-Pflicht
+<a id="CGC-endpoints-etag"></a>
+## Endpoints – ETag-Pflicht
 
 Alle Endpoints implementieren ETag-Support.
 Entscheidung + Begründung: `docs/history/adr.md` → Sektion "HTTP-Caching & Optimistic Concurrency".
@@ -379,8 +405,10 @@ Entscheidung + Begründung: `docs/history/adr.md` → Sektion "HTTP-Caching & Op
 
 `UseXminAsConcurrencyToken()` in `OnModelCreating` konfigurieren, bevor der erste GET-Endpoint für eine Entity gebaut wird.
 
-## 7. Test-Code – Struktur und Assertions
+<a id="CGC-test-code"></a>
+## Test-Code – Struktur und Assertions
 
+<a id="CGC-given-when-then"></a>
 ### Given/When/Then-Struktur in Tests (Pflicht)
 
 Jeder neue Test muss durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Die Kommentare helfen beim Review, jede Assertion dem passenden Akzeptanzkriterium des Gherkin-Szenarios zuzuordnen.
@@ -404,6 +432,7 @@ public async Task GetIngredients_ReturnsList()
 }
 ```
 
+<a id="CGC-full-state-assertions"></a>
 ### Full-State-Assertions
 
 Bei `BeEquivalentTo`-Aufrufen müssen alle verglichenen Properties durch ein Akzeptanzkriterium des Szenarios gedeckt sein.

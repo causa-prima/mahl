@@ -19,36 +19,39 @@ gleichzeitig zu halten. Zielfunktion daher: **Homogenität maximieren** – die 
 ergibt sich von selbst.
 
 **Bewusste Abwägung:** Homogenität geht vor Durchsatz. Wo der Algorithmus ein einzelnes
-Szenario isoliert, bleibt es ein eigener Lauf (siehe Hinweis „Singletons").
+Szenario isoliert, bleibt es ein eigener Lauf (siehe [Hinweis „Singletons"](#CLU-singletons)).
 
+<a id="CLU-algorithmus"></a>
 ## Algorithmus
 
-Eingabe: alle Szenarien der Story. Ein resultierender Cluster = ein Lauf. Die vier Schritte in
-Reihenfolge anwenden:
+Eingabe: alle Szenarien der Story. Ein resultierender Cluster = ein Lauf. Die Schritte in
+Reihenfolge anwenden. Sie zerfallen in zwei Gruppen: die **Split-Schritte** zerteilen die
+Szenario-Menge (Capability, Ergebnisklasse, Validierung, Schicht), die **Ordnungs-Schritte**
+ordnen und flaggen das fertige Ergebnis (Zustands-Abhängigkeiten, Erstmaligkeiten).
 
-1. **Nach Capability gruppieren** (aus dem `When` / der Hauptaktion): Lesen/Liste, Anlegen,
+1. <a id="CLU-capability"></a>**Nach Capability gruppieren** (aus dem `When` / der Hauptaktion): Lesen/Liste, Anlegen,
    Ändern, Löschen – plus story-spezifische Operationen (z.B. Reaktivierung). Jede Capability
    ist zunächst ein eigener Cluster.
 
-2. **Mutations-Capabilities** (Anlegen/Ändern/Löschen) nach **Ergebnisklasse** trennen:
+2. <a id="CLU-ergebnisklasse"></a>**Mutations-Capabilities** (Anlegen/Ändern/Löschen) nach **Ergebnisklasse** trennen:
    - **Validierung** – das `Then` behauptet einen *abgelehnten oder grenzwertigen* Input
      (Fehlermeldung **und** Zustand unverändert).
    - **Success/Verhalten** – das `Then` behauptet eine *erfolgreiche* Mutation oder reines
      Dialog-/UI-Verhalten.
 
-3. **Validierung** weiter splitten – zuerst nach **Form**, dann nach **Feld**:
+3. <a id="CLU-validierung-split"></a>**Validierung** weiter splitten – zuerst nach **Form**, dann nach **Feld**:
    - *stateless* (kein Seed, reine Input-Prüfung) vs. *state-driven* (Seed nötig,
      Eindeutigkeit/Konflikt) – unterschiedliches Setup, unterschiedliche Invariante.
    - innerhalb *stateless* nach **Eingabefeld** (Name, Einheit, …).
    - Der **valide Grenzwert** einer Feldregel („genau N akzeptiert") gehört in die Familie
      dieses Feldes – als Boundary-Paar mit dem Reject-Fall, nicht zu Success.
 
-4. **Success/Verhalten** nach **Schicht** splitten:
+4. <a id="CLU-schicht-split"></a>**Success/Verhalten** nach **Schicht** splitten:
    - *frontend-only* – kein HTTP-Call / keine Persistenz-Assertion (Dialog öffnen/schließen/
      zurücksetzen, Fokus, Pflichtfeld-Markierung, Pending-Disabled).
    - *full-stack* – behauptet persistierten Zustand / Liste nach realer Mutation.
 
-5. **Zustands-Abhängigkeiten auflösen** – kein weiterer Split, nur Reihenfolge und Zuordnung:
+5. <a id="CLU-zustands-abhaengigkeiten"></a>**Zustands-Abhängigkeiten auflösen** – kein weiterer Split, nur Reihenfolge und Zuordnung:
    Notiere je Cluster, welche Lebenszyklus-Zustände seine `Given` **voraussetzen** (Reader) und
    welche seine `Then` **herstellen** (Writer). Prüffrage je Cluster: *Lässt sich sein `Given` mit
    dem, was bis zu diesem Lauf gebaut ist, über die Oberfläche herstellen?* Lautet die Antwort
@@ -64,7 +67,7 @@ Reihenfolge anwenden:
    Ohne diesen Schritt entsteht ein Lauf, dessen E2E-Arrangement keinen Weg über die Oberfläche
    hat – er erzwingt dann einen Test-only-Endpoint oder das Vorziehen eines späteren Laufs.
 
-6. **Erstmaligkeiten flaggen** – vor der Implementierung, nicht während:
+6. <a id="CLU-erstmaligkeiten"></a>**Erstmaligkeiten flaggen** – vor der Implementierung, nicht während:
    Prüfe je Lauf in der festgelegten Reihenfolge: *Was tut dieser Lauf, das noch kein Lauf zuvor
    getan hat?* Führt er den ersten Vertreter einer Klasse ein (erster mutierender
    Single-Resource-Endpoint, erste zweite Seite, erste Liste mit Pagination …), zieht das eine
@@ -75,24 +78,26 @@ Reihenfolge anwenden:
    Betrieb. Bewusst als offene Frage formuliert statt als feste Klassenliste – eine solche Liste
    wäre nie vollständig.
 
+<a id="CLU-hinweise"></a>
 ## Hinweise
 
-- **Nach Schritt 4 nicht weiter splitten.** Nicht nach einzelner Assertion-Form zerschneiden – das
-  erzeugt Mikro-Cluster ohne Mehrwert. (Schritte 5–6 splitten nicht, sie ordnen und flaggen.)
-- **Singletons bleiben eigene Läufe.** Ergibt der Algorithmus einen Cluster mit nur einem
+- **Nach dem [Schicht-Split](#CLU-schicht-split) nicht weiter splitten.** Nicht nach einzelner Assertion-Form zerschneiden – das
+  erzeugt Mikro-Cluster ohne Mehrwert. (Die Ordnungs-Schritte – [Zustands-Abhängigkeiten](#CLU-zustands-abhaengigkeiten) und [Erstmaligkeiten](#CLU-erstmaligkeiten) – splitten nicht, sie ordnen und flaggen.)
+- <a id="CLU-singletons"></a>**Singletons bleiben eigene Läufe.** Ergibt der Algorithmus einen Cluster mit nur einem
   Szenario, ihn *nicht* in einen unähnlichen Cluster zwingen, nur um einen Lauf zu sparen –
   das schleppte genau die Heterogenität ein, die wir vermeiden. Ein Singleton ist gewollt,
   kein Versehen. (Tritt natürlich auf, wenn die Story von einer Form nur ein Exemplar hat.)
 - **Kein Größen-Deckel.** Ein homogener Cluster mit vielen Fällen ist *ein* parametrisierter
   Batch und braucht keinen Split. Fühlt sich ein Cluster „zu groß" an, wurde eine der Achsen
-  aus 1–4 übersprungen – diese anwenden, statt willkürlich zu trennen.
+  der Split-Schritte übersprungen – diese anwenden, statt willkürlich zu trennen.
 - **Reihenfolge der Läufe:** zuerst der Full-stack-Success-Cluster der zentralen Mutation
   (er baut den Endpoint), darauf dessen Validierungs-Cluster; übrige Capabilities danach. Die
   Reihenfolge ist im Übrigen weich – hart sind zwei Bedingungen: Validierung setzt auf dem
-  Endpoint des Success-Laufs auf, und die Zustands-Bedingung aus Schritt 5 (Writer vor Reader).
-- Der einzige Urteilspunkt in 1–4 ist Schritt 1 (welche Aktion = welche Capability). Den Rest
-  bestimmt die Form; Schritte 5–6 kommen danach auf das fertige Clustering.
+  Endpoint des Success-Laufs auf, und die Bedingung aus [Zustands-Abhängigkeiten auflösen](#CLU-zustands-abhaengigkeiten) (Writer vor Reader).
+- Der einzige Urteilspunkt unter den Split-Schritten ist die [Capability-Gruppierung](#CLU-capability) (welche Aktion = welche Capability). Den Rest
+  bestimmt die Form; die Ordnungs-Schritte kommen danach auf das fertige Clustering.
 
+<a id="CLU-output"></a>
 ## Output: Lauf-Kommentar-Tags
 
 Jedes Szenario erhält einen **Kommentar-Tag** direkt oberhalb seiner `@US-NNN-…`-Tag-Zeile
@@ -109,7 +114,7 @@ Format: `# @run-<N> · <Cluster-Label> · <Schicht>[ · Singleton]`
 - **Frontend-only** / **Full-Stack** – die Schicht des Laufs: *Frontend-only* braucht keinen
   Backend-Subagenten (reines UI-/Dialog-Verhalten), *Full-Stack* berührt Frontend und Backend.
 - **Singleton** – ein Lauf mit nur einem Szenario; wird ergänzt, damit klar ist, dass der
-  einzelne Eintrag Absicht ist (siehe Hinweise).
+  einzelne Eintrag Absicht ist (siehe [Hinweise](#CLU-hinweise)).
 - Bewusst ein **Kommentar**, kein echter Gherkin-`@tag`: der Bauplan soll die Spec nicht
   verunreinigen und keine Test-Runner-Tags belegen.
 - Greppbar via `# @run-`. `<N>` = Lauf-Nummer = Implementierungs-Reihenfolge.

@@ -10,26 +10,28 @@ kritische-regeln:
   - Stryker --mutate: Pfad ist projektrelativ (ohne Server/-Präfix für Backend, ohne Client/-Präfix für Frontend); mehrere Ziele als Kommaliste, keine Brace-Globs; ein Muster ohne Treffer bricht ab
 -->
 
+<a id="DEV-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Befehlsauswahl & Timeouts | Auto-deny/allow-once-Mechanismus, Timeout-Richtwerte für alle relevanten Kommandos | Vor jedem lang laufenden Befehl |
-| Tool-Call-Failure-Analyse | Root Cause → korrektes Muster ableiten → dokumentieren → wiederholen | Bei fehlgeschlagenen Befehlen |
-| WSL-native Toolchain | .NET + Node nativ; lokale Tool-Manifest; Test/Stryker via Wrapper | Beim Aufrufen von dotnet/npm |
-| Datenbank starten | Docker Compose, Connection String | Beim Starten der lokalen Umgebung |
-| Backend | Build, Run, Seed-Daten | Beim Starten / Bauen des Backends |
-| Frontend | npm install, dev-Server, Produktions-Build, Vite-Proxy | Beim Starten / Bauen des Frontends |
-| Tests | Alle Tests / einzelnes Projekt / einzelner Test / Frontend-Tests | Beim Ausführen von Tests |
-| Datenbank-Workflow | Drop+Recreate (Entwicklung) vs. Migrations (ab V1), Seed-Daten | Bei Schema-Änderungen |
-| Mutation Testing | Stryker gezielt (eine Datei) und vollständig, --mutate-Pfad-Konvention | Nach jeder Phase oder gezielt nach Änderungen |
-| Hook-Entwicklung | Exit-Code-Semantik, $CLAUDE_PROJECT_DIR in settings.json | Beim Schreiben oder Debuggen von Hooks |
-| Hook-Tests | pytest-Aufruf, Subshell-Pflicht, Edit-vs-Write-Delta-Verhalten | Nach Änderungen an Hook-Dateien |
+| [Befehlsauswahl & Timeouts](#DEV-befehlsauswahl) | Auto-deny/allow-once-Mechanismus, Timeout-Richtwerte für alle relevanten Kommandos | Vor jedem lang laufenden Befehl |
+| [Tool-Call-Failure-Analyse](#DEV-failure-analyse) | Root Cause → korrektes Muster ableiten → dokumentieren → wiederholen | Bei fehlgeschlagenen Befehlen |
+| [WSL-native Toolchain](#DEV-wsl-toolchain) | .NET + Node nativ; lokale Tool-Manifest; Test/Stryker via Wrapper | Beim Aufrufen von dotnet/npm |
+| [Datenbank starten](#DEV-datenbank-starten) | Docker Compose, Connection String | Beim Starten der lokalen Umgebung |
+| [Backend](#DEV-backend) | Build, Run, Seed-Daten | Beim Starten / Bauen des Backends |
+| [Frontend](#DEV-frontend) | npm install, dev-Server, Produktions-Build, Vite-Proxy | Beim Starten / Bauen des Frontends |
+| [Tests](#DEV-tests) | Alle Tests / einzelnes Projekt / einzelner Test / Frontend-Tests | Beim Ausführen von Tests |
+| [Datenbank-Workflow](#DEV-datenbank-workflow) | Drop+Recreate (Entwicklung) vs. Migrations (ab V1), Seed-Daten | Bei Schema-Änderungen |
+| [Mutation Testing](#DEV-mutation-testing) | Stryker gezielt (eine Datei) und vollständig, --mutate-Pfad-Konvention | Nach jeder Phase oder gezielt nach Änderungen |
+| [Hook-Entwicklung](#DEV-hook-entwicklung) | Exit-Code-Semantik, $CLAUDE_PROJECT_DIR in settings.json | Beim Schreiben oder Debuggen von Hooks |
+| [Hook-Tests](#DEV-hook-tests) | pytest-Aufruf, Subshell-Pflicht, Edit-vs-Write-Delta-Verhalten | Nach Änderungen an Hook-Dateien |
 
 > **Wann lesen:** Bei Build/Run-Problemen, Datenbankänderungen, Test-Ausführung, Mutation Testing.
 
 ---
 
+<a id="DEV-befehlsauswahl"></a>
 ## Befehlsauswahl & Timeouts (für Agenten)
 
 **Befehlsauswahl:** Der Bash-Permission-Hook (`check-bash-permission.py`) entscheidet automatisch:
@@ -73,6 +75,7 @@ Wenn ein Prozess den Timeout überschreitet:
 
 ---
 
+<a id="DEV-failure-analyse"></a>
 ## Tool-Call-Failure-Analyse (Pflicht)
 
 Schlägt ein Tool-Call fehl:
@@ -85,6 +88,7 @@ Parameter einfach weglassen oder "blind" variieren ist kein Debugging.
 
 ---
 
+<a id="DEV-wsl-toolchain"></a>
 ## WSL-native Toolchain
 
 .NET (SDK via `dotnet-install.sh` nach `~/.dotnet`) und Node (via `fnm`, Version in `Client/.nvmrc`)
@@ -127,6 +131,7 @@ dotnet run --project Server          # Dev-Server (Port via Server/Properties/la
 
 ---
 
+<a id="DEV-projekt-struktur"></a>
 ## Projekt-Struktur (Infrastructure-Referenz)
 
 Das `Infrastructure`-Projekt ist eine separate Assembly:
@@ -134,10 +139,11 @@ Das `Infrastructure`-Projekt ist eine separate Assembly:
 - **`Server/`** – vollständig `internal` (referenziert `Infrastructure`)
 - **`Server.Tests/`** – referenziert `Infrastructure` direkt (für `MahlDbContext` in Tests)
 
-Beim Hinzufügen einer neuen Projektreferenz: `Infrastructure` → `Server` und `Infrastructure` → `Server.Tests`, aber **nicht** `Server` → `Server.Tests`. Vollständige Begründung: `docs/reference/architecture.md` Sektion 0c.
+Beim Hinzufügen einer neuen Projektreferenz: `Infrastructure` → `Server` und `Infrastructure` → `Server.Tests`, aber **nicht** `Server` → `Server.Tests`. Vollständige Begründung: `docs/reference/architecture.md` [Hexagonal Architecture](../reference/architecture.md#ARC-hexagonal).
 
 ---
 
+<a id="DEV-datenbank-starten"></a>
 ## Datenbank starten (Docker)
 
 ```bash
@@ -151,6 +157,7 @@ Host=localhost;Port=5432;Database=mahl;Username=mahl_user;Password=mahl_dev_pass
 
 ---
 
+<a id="DEV-backend"></a>
 ## Backend
 
 ```bash
@@ -167,6 +174,7 @@ dotnet run --project Server -- --seed-data
 
 ---
 
+<a id="DEV-frontend"></a>
 ## Frontend
 
 Node wird von `fnm` verwaltet (Version in `Client/.nvmrc`); npm/npx laufen nativ. npm-Befehle **mit `--prefix Client` aus dem Repo-Root** ausführen, nicht per `cd Client` – ein Verzeichniswechsel überlebt den Befehl, und die folgenden Wrapper-Aufrufe scheitern dann an ihrem repo-root-relativen Pfad (`.claude/scripts/…`). Der Hook blockt `cd … && npm …` deshalb:
@@ -195,6 +203,7 @@ npm --prefix Client audit fix
 
 **Vite-Proxy:** Entwicklung proxied `/api/*` auf `http://localhost:5059` (Backend).
 
+<a id="DEV-dependency-updates"></a>
 ### Nach Dependency-Updates: Pflicht-Verifikation
 
 Updates – auch reine In-Range-Bumps via `npm update` – können Regressionen einführen (z.B. brach ein MUI-Minor-Bump den Vitest-Lauf über einen nicht unterstützten ESM-Directory-Import). Nach jedem `npm install`/`npm update` daher die volle Kette prüfen:
@@ -217,6 +226,7 @@ python3 .claude/scripts/playwright-test.py   # E2E-Kette nach dem Bump verifizie
 
 ---
 
+<a id="DEV-tests"></a>
 ## Tests
 
 ```bash
@@ -241,8 +251,10 @@ python3 .claude/scripts/playwright-test.py --verbose
 
 ---
 
+<a id="DEV-datenbank-workflow"></a>
 ## Datenbank-Workflow
 
+<a id="DEV-drop-recreate"></a>
 ### Während Entwicklung (vor Production-Release): Drop + Recreate
 
 **KEINE Migrations-Hölle** – bei Schema-Änderungen einfach neu aufbauen:
@@ -278,6 +290,7 @@ dotnet run --project Server -- --seed-data
 
 **Seed-Daten:** `Server/Data/SeedDataExtensions.cs` – implementiert als C# Extension Method `app.SeedDatabase()`.
 
+<a id="DEV-migrations"></a>
 ### Ab Production-Release (V1/V2): Normale Migrations
 
 ```bash
@@ -290,6 +303,7 @@ dotnet ef database update --project Infrastructure --startup-project Server
 
 ---
 
+<a id="DEV-mutation-testing"></a>
 ## Mutation Testing (Stryker.NET)
 
 **Konfiguration:** `stryker-config.json` im Repository-Root (für Server-Projekt).
@@ -372,10 +386,12 @@ python3 .claude/scripts/stryker-frontend.py --verbose
 
 ---
 
+<a id="DEV-hook-entwicklung"></a>
 ## Hook-Entwicklung
 
 **Aktive Hooks:** Pre/PostToolUse-Hooks in `.claude/settings.json` prüfen Bash-Berechtigungen und Code-Qualitätsregeln automatisch. Bei unerwartetem Block → Hook-Feedback in der Fehlermeldung lesen (exit 2 + stderr). Hooks-Verzeichnis: `.claude/hooks/`.
 
+<a id="DEV-exit-codes"></a>
 ### Exit-Code-Semantik
 
 | Exit-Code | Bedeutung | Claude sieht Meldung? |
@@ -389,6 +405,7 @@ python3 .claude/scripts/stryker-frontend.py --verbose
 
 → Immer `exit 2` + stderr verwenden, wenn Claude die Meldung sehen und darauf reagieren soll.
 
+<a id="DEV-project-dir"></a>
 ### `$CLAUDE_PROJECT_DIR` in settings.json
 
 Hook-Commands müssen **`$CLAUDE_PROJECT_DIR`** statt `$PWD` verwenden:
@@ -408,10 +425,12 @@ cd .claude/hooks && python3 -m pytest tests/ -q
 (cd .claude/hooks && python3 -m pytest tests/ -q)
 ```
 
+<a id="DEV-hooks-dynamisch"></a>
 ### Hooks werden dynamisch geladen
 
 Änderungen an `settings.json` werden **sofort** wirksam – kein Neustart von Claude Code nötig. Claude Code liest die Hook-Konfiguration bei jeder Hook-Invocation neu.
 
+<a id="DEV-hook-tests"></a>
 ## Tests: Code-Quality-Hooks
 
 Nach Änderungen an Hook-Dateien automatisierte Tests ausführen:

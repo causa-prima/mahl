@@ -39,6 +39,7 @@ from _session_logs import (  # noqa: E402
     project_log_dir,
     read_events,
     relative_path,
+    session_datum,
     session_logs,
     session_type,
     skills_in,
@@ -96,8 +97,16 @@ def scan_context(records: list[dict], sinks: list[Totals]) -> None:
             sink.add(path, size, path in touched, is_reread, targeted)
 
 
-def collect(log_dir: Path) -> tuple[Totals, dict[str, Totals], dict[str, int], list[tuple[str, str]]]:
-    """Misst alle Sessions. Liefert Gesamt, je Art, Sessions je Art und die Art-Zuordnung."""
+def collect(log_dir: Path, since: str | None = None
+            ) -> tuple[Totals, dict[str, Totals], dict[str, int], list[tuple[str, str]]]:
+    """Misst alle Sessions. Liefert Gesamt, je Art, Sessions je Art und die Art-Zuordnung.
+
+    `since` (`YYYY-MM-DD`, inklusiv) beschränkt auf Sessions ab diesem Tag. Ohne diese
+    Trennung lässt sich die Wirkung einer Maßnahme nicht messen: Der Aggregatwert über alle
+    Sessions verdünnt jede Änderung, bis sie unsichtbar ist. Genau daran scheiterte die für
+    S120 geplante Re-Messung zu OBS-S109-1 – seit der Maßnahme in S114 lief nur eine einzige
+    Implementierungs-Session, gegen 24 im Gesamtwert.
+    """
     mapping = load_mapping()
     gesamt = Totals()
     je_art: dict[str, Totals] = defaultdict(Totals)
@@ -105,6 +114,13 @@ def collect(log_dir: Path) -> tuple[Totals, dict[str, Totals], dict[str, int], l
     zuordnung: list[tuple[str, str]] = []
 
     for session_id, main_log, sub_logs in session_logs(log_dir):
+        if since:
+            tag = session_datum(main_log)
+            # ISO-Datum: lexikographischer Vergleich ist chronologisch. Eine Session ohne
+            # Zeitstempel fällt heraus – sie einzurechnen hieße, sie ins gewählte Fenster zu
+            # raten, und das Fenster ist der ganze Zweck des Filters.
+            if tag is None or tag < since:
+                continue
         haupt = load_records(main_log)
         sub_records = [load_records(p) for p in sub_logs]
 
@@ -200,6 +216,8 @@ def main() -> None:
     parser.add_argument("--type", metavar="ART", help="nur eine Session-Art auswerten")
     parser.add_argument("--sessions", action="store_true", help="erkannte Art je Session zeigen")
     parser.add_argument("--json", action="store_true", help="maschinenlesbar")
+    parser.add_argument("--since", metavar="YYYY-MM-DD",
+                        help="nur Sessions ab diesem Tag – trennt vor/nach einer Maßnahme")
     args = parser.parse_args()
 
     log_dir = project_log_dir()
@@ -207,7 +225,10 @@ def main() -> None:
         print(f"Keine Session-Logs unter {log_dir}", file=sys.stderr)
         sys.exit(1)
 
-    gesamt, je_art, sessions, zuordnung = collect(log_dir)
+    gesamt, je_art, sessions, zuordnung = collect(log_dir, since=args.since)
+    if args.since and not sum(sessions.values()):
+        print(f"Keine Sessions ab {args.since} – der Vergleich trägt nichts.", file=sys.stderr)
+        sys.exit(1)
 
     if args.type:
         if args.type not in je_art:

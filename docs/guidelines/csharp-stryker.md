@@ -1,12 +1,13 @@
 # Stryker-Inline-Suppressions – C# Referenz
 
 <!--
-wann-lesen: Beim Behandeln von Stryker-Survivors in Phase 3 (REFACTOR).
+wann-lesen: Beim Behandeln von Stryker-Survivors in [REFACTOR](../process/tdd-process.md#TDD-refactor) (REFACTOR).
 Hinweis: Die Pflicht-Suppressionen für Defensive Guards (parameterless ctor, default(T))
-stehen bereits in docs/guidelines/coding-guideline-csharp.md Sektion 3 mit Beispielen.
+stehen bereits in docs/guidelines/coding-guideline-csharp.md [Illegal States Unrepresentable](coding-guideline-csharp.md#CGC-illegal-states) mit Beispielen.
 -->
 
-## 8. Stryker-Inline-Suppressions (für äquivalente Mutanten)
+<a id="STK-suppressions"></a>
+## Stryker-Inline-Suppressions (für äquivalente Mutanten)
 
 Äquivalente Mutanten (beobachtbar kein Unterschied, z. B. unerreichbarer Code durch private Ctor) werden mit einem Inline-Kommentar auf der Zeile **vor** dem Mutanten unterdrückt:
 

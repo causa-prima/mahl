@@ -3,49 +3,54 @@
 <!--
 wann-lesen: Nach jedem Feature und vor einem Phasen-Abschluss (Definition of Done), bei Fragen zu Performance/Security/Accessibility
 kritische-regeln:
-  - Alle 4 Gates der Definition of Done sind Pflicht – kein Gate darf übersprungen werden
-  - Mutation Testing 100% ist Teil von Gate 1 (Suppressions für strukturell unerreichbaren Code erlaubt)
-  - Gate 4 (Learnings & Dokumentation) ist kein optionaler Nachklapp – er ist Pflicht
+  - Alle Gates der Definition of Done sind Pflicht – kein Gate darf übersprungen werden
+  - Mutation Testing 100% ist Teil des [Implementierungs-Gates](#NFR-gate-implementierung) (Suppressions für strukturell unerreichbaren Code erlaubt)
+  - Das Gate [Learnings & Dokumentation](#NFR-gate-learnings) ist kein optionaler Nachklapp – es ist Pflicht
 -->
 
+<a id="NFR-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Definition of Done | 4 Gates: Implementierung → Autor-Review → Review-Agenten → Learnings/Doku; Periodisches Review | Nach jedem Feature und bei Phasen-Abschluss |
-| Performance | Metrik-Tabelle: Seitenwechsel, Button-Feedback, API-Latenzen, Lighthouse | Bei Performance-Fragen oder -Optimierungen |
-| Accessibility | Best Practices: semantisches HTML, Touch-Targets, Kontraste | Bei Frontend-Implementierungen |
-| Browser & Device Compatibility | Unterstützte Browser, Viewport-Prioritäten | Bei Frontend-Implementierungen |
-| Security | HTTPS, Hashing, SQL-Injection, XSS, CSRF | Bei Auth/Security-relevantem Code |
-| Reliability | ACID, Offline-Queue, Fehlermeldungen | Bei Fehlerbehandlung oder Offline-Features |
-| Observability | Logging von Fehlern, Ausgabeziel, Abgrenzung zu sensiblen Daten | Bevor Code etwas loggt oder sich auf ein Log beruft |
-| Code-Qualität | Nullable Reference Types, Cyclomatic Complexity, Duplicate Code | Als Hintergrund zu Review-Findings |
+| [Definition of Done](#NFR-dod) | 4 Gates: Implementierung → Autor-Review → Review-Agenten → Learnings/Doku; Periodisches Review | Nach jedem Feature und bei Phasen-Abschluss |
+| [Performance](#NFR-performance) | Metrik-Tabelle: Seitenwechsel, Button-Feedback, API-Latenzen, Lighthouse | Bei Performance-Fragen oder -Optimierungen |
+| [Accessibility](#NFR-accessibility) | Best Practices: semantisches HTML, Touch-Targets, Kontraste | Bei Frontend-Implementierungen |
+| [Browser & Device Compatibility](#NFR-browser-compat) | Unterstützte Browser, Viewport-Prioritäten | Bei Frontend-Implementierungen |
+| [Security](#NFR-security) | HTTPS, Hashing, SQL-Injection, XSS, CSRF | Bei Auth/Security-relevantem Code |
+| [Reliability](#NFR-reliability) | ACID, Offline-Queue, Fehlermeldungen | Bei Fehlerbehandlung oder Offline-Features |
+| [Observability](#NFR-observability) | Logging von Fehlern, Ausgabeziel, Abgrenzung zu sensiblen Daten | Bevor Code etwas loggt oder sich auf ein Log beruft |
+| [Code-Qualität](#NFR-code-qualitaet) | Nullable Reference Types, Cyclomatic Complexity, Duplicate Code | Als Hintergrund zu Review-Findings |
 
 > **Wann lesen:** Als Checkliste vor einem PR / Phasen-Abschluss, oder bei Fragen zu Performance/Security/Accessibility.
 
 ---
 
+<a id="NFR-dod"></a>
 ## Definition of Done
 
 Ein Feature gilt als "Done" wenn **alle** Punkte abgehakt sind. Kein Punkt darf übersprungen werden.
 
-### Gate 1: Implementierung
+<a id="NFR-gate-implementierung"></a>
+### Gate: Implementierung
 
-- [ ] **TDD Phase 1 (RED):** Test geschrieben und Fehlschlag bestätigt (*"schlägt fehl mit: ..."*)
-- [ ] **TDD Phase 2 (GREEN):** Minimale Implementierung, Tests grün bestätigt
-- [ ] **TDD Phase 3 (REFACTOR):** Refactoring-Checkliste durchgegangen, Ergebnis dokumentiert
+- [ ] **TDD [RED](tdd-process.md#TDD-red):** Test geschrieben und Fehlschlag bestätigt (*"schlägt fehl mit: ..."*)
+- [ ] **TDD [GREEN](tdd-process.md#TDD-green):** Minimale Implementierung, Tests grün bestätigt
+- [ ] **TDD [REFACTOR](tdd-process.md#TDD-refactor):** Refactoring-Checkliste durchgegangen, Ergebnis dokumentiert
 - [ ] Unit Tests grün, Integration Tests grün (falls API-Endpoint)
 - [ ] Mutation Testing durchgeführt (Ziel: 100%; Suppressions für strukturell unerreichbaren Code mit Begründung erlaubt)
 - [ ] API in Swagger dokumentiert (falls Endpoint)
 - [ ] Frontend-UI implementiert (falls relevant)
 - [ ] Manueller Smoke-Test
 
-### Gate 2: Autor-Review (vor Review-Agent)
+<a id="NFR-gate-autor-review"></a>
+### Gate: Autor-Review (vor Review-Agent)
 
 - [ ] Autor-Checkliste aus `docs/process/review-checklist.md` (Teil A) vollständig durchgegangen
 - [ ] Alle ❌-Findings sofort gefixt
 
-### Gate 3: Review-Agenten (PFLICHT, kein Überspringen)
+<a id="NFR-gate-review-agenten"></a>
+### Gate: Review-Agenten (PFLICHT, kein Überspringen)
 
 Immer laufen: `code-quality-auditor`, `functional-correctness-auditor`, `test-quality-auditor`.
 Nur bei Frontend: `ux-ui-auditor`. Nur bei Auth/Sicherheit: `security-auditor`.
@@ -56,7 +61,8 @@ Begründung angeben, wenn ein Agent ausgelassen wird.
 - [ ] Wiederholung bis kein Agent mehr ❌-Findings hat
 - [ ] ⚠️-Findings: gefixt ODER als technische Schuld in `docs/tech-debt.md` eingetragen
 
-### Gate 4: Learnings & Dokumentation (PFLICHT)
+<a id="NFR-gate-learnings"></a>
+### Gate: Learnings & Dokumentation (PFLICHT)
 
 - [ ] Eintrag in `docs/kaizen/lessons_learned.md` erstellt ("keine Learnings" nur mit Begründung akzeptabel)
 - [ ] **Dokumentations-Änderungsvorschläge:** Für jede Kern-Dokument-Datei explizit geprüft: Anpassung nötig? Falls ja: Änderung dem User **vorschlagen** und auf Bestätigung warten – nicht eigenständig anpassen.
@@ -64,6 +70,7 @@ Begründung angeben, wenn ein Agent ausgelassen wird.
 - [ ] Commit mit aussagekräftiger Message (`US-XXX: ...`)
 - [ ] Migrations erstellt (falls DB-Änderungen)
 
+<a id="NFR-periodisches-review"></a>
 ### Periodisches Review (Phasen-Abschluss)
 
 Am Ende jeder Phase (SKELETON, MVP, V1, ...) zusätzlich:
@@ -71,6 +78,7 @@ Am Ende jeder Phase (SKELETON, MVP, V1, ...) zusätzlich:
 - [ ] **Großes Code-Review:** Alle Review-Agenten auf das gesamte neue Code-Delta der Phase laufen lassen (nicht nur geänderte Dateien)
 - [ ] **Dokumentations-Konsistenz:** Alle Kern-Dokumente auf Veralterung prüfen (Specs, Glossar, Architecture)
 
+<a id="NFR-non-functional"></a>
 ### Non-Functional (gilt immer)
 
 - [ ] Performance: UI-Interaktionen < 100ms (Optimistic UI)
@@ -80,6 +88,7 @@ Am Ende jeder Phase (SKELETON, MVP, V1, ...) zusätzlich:
 
 ---
 
+<a id="NFR-performance"></a>
 ## Performance
 
 | Metrik | Ziel |
@@ -96,6 +105,7 @@ Am Ende jeder Phase (SKELETON, MVP, V1, ...) zusätzlich:
 
 ---
 
+<a id="NFR-accessibility"></a>
 ## Accessibility
 
 Kein WCAG-Compliance-Ziel – aber Best Practices als Nebeneffekt guten Designs:
@@ -106,6 +116,7 @@ Kein WCAG-Compliance-Ziel – aber Best Practices als Nebeneffekt guten Designs:
 
 ---
 
+<a id="NFR-browser-compat"></a>
 ## Browser & Device Compatibility
 
 **Unterstützte Browser:** Chrome/Edge (letzte 2), Firefox (letzte 2), Safari iOS (letzte 2). Kein IE11.
@@ -118,6 +129,7 @@ Kein WCAG-Compliance-Ziel – aber Best Practices als Nebeneffekt guten Designs:
 
 ---
 
+<a id="NFR-security"></a>
 ## Security
 
 - HTTPS erzwungen (Produktion); localhost ohne HTTPS OK (Development)
@@ -135,6 +147,7 @@ Kein WCAG-Compliance-Ziel – aber Best Practices als Nebeneffekt guten Designs:
 
 ---
 
+<a id="NFR-reliability"></a>
 ## Reliability
 
 - ACID-Transaktionen für DB-Operationen
@@ -144,6 +157,7 @@ Kein WCAG-Compliance-Ziel – aber Best Practices als Nebeneffekt guten Designs:
 
 ---
 
+<a id="NFR-observability"></a>
 ## Observability
 
 - **Unbehandelte Exceptions werden serverseitig mit vollständigem Stack-Trace geloggt** (ADR-S112-1).
@@ -161,6 +175,7 @@ Nachvollziehbarkeit über einen einzelnen Request hinaus braucht.
 
 ---
 
+<a id="NFR-code-qualitaet"></a>
 ## Code-Qualität
 
 - **Nullable Reference Types** – aktiviert global, Warnings als Errors

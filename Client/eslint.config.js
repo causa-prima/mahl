@@ -53,21 +53,21 @@ export default defineConfig([
 
       // --- functional/recommended Overrides ---
 
-      // Category 1 – technischer React-Zwang: Hooks und Rendering sind inherent side-effectful.
+      // Technischer React-Zwang: Hooks und Rendering sind inherent side-effectful.
       // useEffect, dispatch, createRoot().render() etc. sind Expression Statements by design.
       'functional/no-expression-statements': 'off',
 
-      // Category 1 – Event-Handler in React geben void zurück. Das ist kein Smell,
+      // Technischer React-Zwang: Event-Handler geben void zurück. Das ist kein Smell,
       // sondern der React-Vertrag für onClick/onChange etc.
       'functional/no-return-void': 'off',
 
-      // Category 1 – React-Komponenten-Props mischen inhärent Daten (boolean, string)
+      // Technischer React-Zwang: Komponenten-Props mischen inhärent Daten (boolean, string)
       // und Callbacks (() => void). Das ist der React-Vertrag für Props-Typen.
       // functional/no-mixed-types wäre hier strukturell nicht befolgbar ohne die
       // Component-API aufzusplitten, was gegen KISS verstößt.
       'functional/no-mixed-types': 'off',
 
-      // Category 1 – Parameterlose Komponenten und Hooks sind valide React-Patterns.
+      // Technischer React-Zwang: Parameterlose Komponenten und Hooks sind valide Patterns.
       // `const Spinner = () => <div />` soll erlaubt sein.
       'functional/functional-parameters': 'off',
 
@@ -105,11 +105,11 @@ export default defineConfig([
         'error',
         {
           selector: "MemberExpression[property.name='isOk']",
-          message: "isOk() nicht verwenden. Stattdessen .match(ok => ..., err => ...) (neverthrow) nutzen. Siehe CODING_GUIDELINE_TYPESCRIPT.md Abschnitt 4.",
+          message: "isOk() nicht verwenden. Stattdessen .match(ok => ..., err => ...) (neverthrow) nutzen. Siehe docs/guidelines/coding-guideline-typescript.md#CGT-rop.",
         },
         {
           selector: "MemberExpression[property.name='isErr']",
-          message: "isErr() nicht verwenden. Stattdessen .match(ok => ..., err => ...) (neverthrow) nutzen. Siehe CODING_GUIDELINE_TYPESCRIPT.md Abschnitt 4.",
+          message: "isErr() nicht verwenden. Stattdessen .match(ok => ..., err => ...) (neverthrow) nutzen. Siehe docs/guidelines/coding-guideline-typescript.md#CGT-rop.",
         },
         {
           selector: "MemberExpression[property.name='_unsafeUnwrap']",
@@ -152,7 +152,7 @@ export default defineConfig([
             {
               name: '@tanstack/react-query',
               importNames: ['useQuery', 'useMutation'],
-              message: "useQuery/useMutation nicht direkt verwenden. Stattdessen useResultQuery/useResultMutation aus src/hooks/ nutzen. Siehe CODING_GUIDELINE_TYPESCRIPT.md Abschnitt 4b.",
+              message: "useQuery/useMutation nicht direkt verwenden. Stattdessen useResultQuery/useResultMutation aus src/hooks/ nutzen. Siehe docs/guidelines/coding-guideline-typescript.md#CGT-react-query.",
             },
           ],
         },

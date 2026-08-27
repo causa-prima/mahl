@@ -5,7 +5,7 @@ namespace mahl.Server.Middleware;
 // ADR-S058-3: Single-Resource-ETag-Format – xmin (Postgres-Zeilenversion) hex-kodiert, quoted.
 // Format() erzeugt den ETag (POST-Response), TryParse() liest ihn aus einem If-Match-Header zurück
 // in den xmin-Wert (DELETE/PUT/PATCH). Beide Seiten teilen sich das Format – daher hier zentral,
-// nicht als Endpoint-Mapping (docs/guidelines/coding-guideline-csharp.md Sektion 5: die
+// nicht als Endpoint-Mapping (docs/guidelines/coding-guideline-csharp.md#CGC-dependency-rule: die
 // file-static-Regel gilt für Domain/DbType/DTO-Mapping, nicht für dieses HTTP-Format-Utility, das
 // über mehrere Endpoints hinweg gebraucht wird).
 internal static class XminETag

@@ -36,7 +36,7 @@ type CreateIngredientDialogProps = {
   readonly onSubmit: () => void
 }
 
-// UX-Guideline Prinzip 8 ("Fokus aufs erste fehlerhafte Feld", TD-S094-1): nach einem
+// UX-Guideline „Formular-/Dialog-Baseline" ("Fokus aufs erste fehlerhafte Feld", TD-S094-1): nach einem
 // Validierungsfehler springt der Fokus auf das erste fehlerhafte Feld in DOM-Reihenfolge
 // (Name vor Einheit). Kein Transition-Race wie beim Autofokus (ADR-S100-1): der Dialog ist
 // beim Fehler bereits offen/sichtbar, `.focus()` greift deterministisch. Als eigene Funktion
@@ -63,7 +63,7 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
   const unitInputRef = useRef<HTMLInputElement>(null)
   useFocusFirstInvalidField(nameInputRef, unitInputRef, nameError, unitError)
 
-  // UX-Guideline Prinzip 3 ("Sperren während Pending"): MUI ruft `onClose` für BEIDE
+  // UX-Guideline „Sichtbares Feedback" ("Sperren während Pending"): MUI ruft `onClose` für BEIDE
   // Schließ-Pfade (Escape UND Backdrop-Klick) auf – während `isPending` beide sperren,
   // ohne den Erfolgspfad zu berühren (der ruft `closeDialog` direkt über `onSuccess`).
   const handleClose = () => {
@@ -76,7 +76,7 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
       open={open}
       onClose={handleClose}
       aria-labelledby="create-ingredient-title"
-      // Framework-geliefert (Prinzip 8, "Enter sendet ab"): echtes <form> via
+      // Framework-geliefert (Formular-/Dialog-Baseline,"Enter sendet ab"): echtes <form> via
       // Dialog-Paper-Slot statt onClick. `formNoValidate` am Speichern-Button, weil
       // die Validierung server-only ist (ADR-S090-1) – sonst blockiert der native
       // `required`-Check die @US-904-error-Szenarien (leerer Name/leere Einheit) stumm.
@@ -90,7 +90,7 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
             onSubmit()
           },
         },
-        // Framework-geliefert (Prinzip 8, "Autofokus beim Öffnen"): `autoFocus` auf dem
+        // Framework-geliefert (Formular-/Dialog-Baseline,"Autofokus beim Öffnen"): `autoFocus` auf dem
         // TextField reicht NICHT – der Dialog öffnet mit einer Fade-Transition, die das
         // Paper anfangs auf `visibility: hidden` setzt; ein `.focus()`-Aufruf auf ein zu
         // dem Zeitpunkt unsichtbares Element wird von echten Browsern (nicht von
@@ -134,7 +134,7 @@ type IngredientListProps = {
   readonly onDelete: (ingredient: Readonly<Ingredient>) => void
 }
 
-// UX-Prinzip 1: die destruktive Aktion steht am Zeilenende (secondaryAction). Das aria-label
+// UX-Prinzip „Least Surprise": die destruktive Aktion steht am Zeilenende (secondaryAction). Das aria-label
 // nennt die Zutat, damit die Aktion auch ohne visuellen Kontext eindeutig ist ("Mehl löschen").
 // run-9: nur die Zeile, deren DELETE gerade läuft, ist deaktiviert (deletingId) – kein globales
 // Sperren der übrigen Zeilen (Scope-Grenze run-9).
@@ -214,14 +214,14 @@ type UndoToastProps = {
   readonly onDismiss: () => void
 }
 
-// UX-Guideline Prinzip 5 ("Destructive Actions schützen"): Soft-Delete + Undo-Toast ersetzt
+// UX-Guideline „Destructive Actions schützen" ("Destructive Actions schützen"): Soft-Delete + Undo-Toast ersetzt
 // den Bestätigungsdialog. Nicht-blockierende Snackbar; autoHideDuration großzügig, damit
 // "Rückgängig" klickbar bleibt.
 function UndoToast({ deleted, onUndo, onDismiss }: Readonly<UndoToastProps>) {
   // clickaway (Klick irgendwo auf der Seite) darf den Toast NICHT schließen: sonst wäre die
   // bewusst großzügige autoHideDuration wertlos, sobald der Nutzer nach dem Löschen woanders
   // hinklickt – der Undo-Weg für eine destruktive Aktion muss die volle Dauer erreichbar
-  // bleiben (UX-Guideline Prinzip 5). timeout/escapeKeyDown sind bewusste Schließen-Gesten
+  // bleiben (UX-Guideline „Destructive Actions schützen"). timeout/escapeKeyDown sind bewusste Schließen-Gesten
   // und schließen weiterhin regulär.
   const handleClose = (_event: unknown, reason: SnackbarCloseReason) => {
     if (reason === 'clickaway') return

@@ -326,3 +326,57 @@ def test_extracts_a_section_up_to_the_next_heading():
 
 def test_missing_section_yields_empty_string():
     assert agenda._abschnitt("# T\n", "## Fehlt") == ""
+
+
+# --- Anker-Prüfung am Session-Start ------------------------------------------
+# Der PreToolUse-Hook sieht nur Edit/Write. Verschwindet eine ganze Datei (rm, mv, ein Merge,
+# eine Änderung von Hand), sterben ihre Anker lautlos und die Verweise darauf werden tot,
+# ohne dass irgendetwas anschlägt. Dieses Modul ist das Auffangnetz dafür.
+def test_anker_modul_schweigt_wenn_alles_aufloesbar(monkeypatch):
+    monkeypatch.setattr(agenda.anchors, "lies_bestand", lambda _root=None: {})
+    assert agenda.modul_anker_defekt().stub == ""
+
+
+def test_anker_modul_meldet_toten_verweis(monkeypatch):
+    monkeypatch.setattr(agenda.anchors, "lies_bestand", lambda _root=None: {
+        "a.md": "Siehe [CGT-weg](b.md#CGT-weg).\n"})
+    block = agenda.modul_anker_defekt()
+    assert "CGT-weg" in block.inhalt and block.stub
+
+
+def test_anker_modul_faellt_nie_still_aus(monkeypatch):
+    """Ein Prüfer, der stumm ausfällt, meldet für immer „alles gut" – und sein Ausfall löst
+    per Definition nichts aus (CM-S116-1). Deshalb wird der Fehler selbst zur Meldung."""
+    def kracht(_root=None):
+        raise OSError("Bestand nicht lesbar")
+    monkeypatch.setattr(agenda.anchors, "lies_bestand", kracht)
+    assert "Bestand nicht lesbar" in agenda.modul_anker_defekt().stub
+
+
+# --- Gliederungsnummern am Session-Start -------------------------------------
+# Dieselbe Lücke wie oben, andere Klasse: `check-ordinale.py` sieht nur Edit/Write. Kommt eine
+# Datei per Merge oder `mv` herein, bringt sie ihre Nummern ungeprüft mit.
+def test_ordinal_modul_schweigt_bei_sauberem_bestand(monkeypatch):
+    monkeypatch.setattr(agenda.ordinale, "bestand", lambda _root=None: [])
+    assert agenda.modul_ordinale().stub == ""
+
+
+def test_ordinal_modul_meldet_fundstelle(monkeypatch):
+    monkeypatch.setattr(agenda.ordinale, "bestand",
+                        lambda _root=None: [("docs/a.md", 5, "## 5. Findings", "Überschrift")])
+    block = agenda.modul_ordinale()
+    assert "docs/a.md" in block.inhalt and block.stub
+
+
+def test_ordinal_modul_faellt_nie_still_aus(monkeypatch):
+    """Gleiche Begründung wie beim Anker-Modul: CM-S116-1."""
+    def kracht(_root=None):
+        raise OSError("Bestand nicht lesbar")
+    monkeypatch.setattr(agenda.ordinale, "bestand", kracht)
+    assert "Bestand nicht lesbar" in agenda.modul_ordinale().stub
+
+
+def test_anker_modul_beansprucht_den_aufgaben_slot_nicht():
+    """Ein defekter Verweis ist ein Befund, kein Arbeitsauftrag für die Session."""
+    arten = {name: art for name, art, _f in agenda.MODULE}
+    assert arten["anker-defekt"] == agenda.STUB

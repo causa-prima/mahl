@@ -5,8 +5,9 @@ description: Vollständige Qualitätsprüfung der Projektdokumentation: Guidelin
 
 # Dokumentations-Review
 
-Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentations- und Konfigurationsdateien des Projekts. **Phase 1: Nur analysieren, keine Änderungen vornehmen.**
+Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentations- und Konfigurationsdateien des Projekts. **Bis zur Freigabe nur analysieren, keine Änderungen vornehmen.**
 
+<a id="RVD-grenzwerte"></a>
 ## Bekannte Grenzwerte (fest, kein Re-Recherchieren nötig)
 
 | Datei/Typ | Grenzwert | Art |
@@ -16,6 +17,7 @@ Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentati
 | Diskrete Instruktionen | ~150–200 gesamt; ~50 davon verbraucht Claude Code selbst | Forschungsbasiert |
 | CLAUDE.md Dateigröße | < 40 KB | Soft (claudelint warnt ab hier) |
 
+<a id="RVD-scope"></a>
 ## Scope
 
 **Projekt-Level** (Arbeitsverzeichnis):
@@ -32,22 +34,25 @@ Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentati
 - `~/.claude/skills/`
 - `~/.claude/settings.json`
 
-## Schritt 1: Dateigrößen prüfen
+<a id="RVD-dateigroessen"></a>
+## Dateigrößen prüfen
 
-Messe die Zeilenzahl und Dateigröße der kritischen Dateien mit `wc -l` und `wc -c`. Vergleiche mit den Grenzwerten aus der Tabelle oben. Halte die Ergebnisse fest – sie fließen in Section 0 des Outputs ein.
+Messe die Zeilenzahl und Dateigröße der kritischen Dateien mit `wc -l` und `wc -c`. Vergleiche mit den Grenzwerten aus der [Tabelle oben](#RVD-grenzwerte). Halte die Ergebnisse fest – sie fließen in den Block „Dateigrößen-Check" des Outputs ein.
 
-## Schritt 2: Vier parallele Sub-Agenten starten
+<a id="RVD-sub-agenten-starten"></a>
+## Vier parallele Sub-Agenten starten
 
 **Wichtig: Sub-Agenten nach Analyse-Dimension aufteilen, nicht nach Dateibereich.** Jeder Agent liest alle relevanten Dateien, fokussiert aber auf eine andere Fragestellung. Nur so können Widersprüche *zwischen* Dokumenten erkannt werden.
 
 ---
 
-### Validierungsstandard (gilt für alle vier Agenten, nicht verhandelbar)
+<a id="RVD-validierungsstandard"></a>
+### Validierungsstandard (gilt für alle Agenten, nicht verhandelbar)
 
 **Vor jedem Finding: Verifikationspflicht.**
 Lies die relevante Stelle in der Zieldatei und zitiere sie – entweder als Beweis dass etwas fehlt ("Datei X hat keine Erwähnung von Y") oder als Widerlegung deines eigenen Verdachts ("Datei X Z.42 sagt bereits Y → kein Finding"). Verweise in der Zieldatei auf andere Dateien MÜSSEN verfolgt werden, bevor ein "fehlt"-Finding formuliert wird. Ein Finding ohne geprüfte Zielstelle ist ungültig.
 
-**Ein Finding ist nur valide wenn ALLE drei Punkte zutreffen:**
+**Ein Finding ist nur valide wenn ALLE Punkte zutreffen:**
 1. Die Information existiert NICHT in der Zieldatei und NICHT in den Dateien auf die sie verweist
 2. Das Fehlen führt zu einem konkreten, beschreibbaren Fehlverhalten: "Agent X würde in Situation Y Code/Entscheidung Z produzieren, die falsch ist"
 3. Es handelt sich nicht um allgemeines Sprachfeature-Wissen (C#-Keywords, Zugriffsmodifikatoren) oder allgemeines Claude-Code-Systemwissen (Skill vs. Agent, user-invocable etc.)
@@ -58,9 +63,9 @@ Lies die relevante Stelle in der Zieldatei und zitiere sie – entweder als Bewe
 
 ---
 
-**Sub-Agenten-Prompts:** Füge den Validierungsstandard oben als ersten Abschnitt in den Prompt jedes Sub-Agenten ein, bevor du die agenten-spezifischen Anweisungen übergibst. Nur so ist gewährleistet, dass der Standard tatsächlich im Kontext der Sub-Agenten landet.
+**Sub-Agenten-Prompts:** Füge den [Validierungsstandard oben](#RVD-validierungsstandard) als ersten Abschnitt in den Prompt jedes Sub-Agenten ein, bevor du die agenten-spezifischen Anweisungen übergibst. Nur so ist gewährleistet, dass der Standard tatsächlich im Kontext der Sub-Agenten landet.
 
-**Ausgabeformat für Agenten 1–3:** Jeder Agent gibt seine Findings im folgenden Format zurück. Dieses Format ebenfalls in den Prompt einfügen:
+**Ausgabeformat für alle Agenten außer „Globale Konflikte":** Jeder Agent gibt seine Findings im folgenden Format zurück. Dieses Format ebenfalls in den Prompt einfügen:
 
 ```
 ## FINDING: [prägnanter Titel]
@@ -76,11 +81,12 @@ Ein Finding pro Block. Mehrere Findings durch `---` trennen. Keine Prosa außerh
 
 Falls ein Agent keine Findings zurückgibt (leere Antwort): In der Aggregation explizit als "(Agent X: keine Findings)" vermerken.
 
-Starte alle vier Agenten gleichzeitig:
+Starte alle Agenten gleichzeitig:
 
 ---
 
-### Agent 1 – Progressive Disclosure & Minimalität
+<a id="RVD-agent-progressive-disclosure"></a>
+### Progressive Disclosure & Minimalität
 
 **Frage:** Werden Agenten mit mehr Kontext belastet als für ihre jeweilige Aufgabe nötig?
 
@@ -98,7 +104,8 @@ Bewerte auch: Werden Skills/Agenten klar genug beschrieben, sodass der Hauptagen
 
 ---
 
-### Agent 2 – Konsistenz & Vollständigkeit
+<a id="RVD-agent-konsistenz"></a>
+### Konsistenz & Vollständigkeit
 
 **Frage:** Widersprechen sich Dokumente? Fehlen Informationen, die Agenten für ihre Aufgabe brauchen?
 
@@ -112,7 +119,8 @@ Lies alle Projekt- und globalen Docs. Suche nach:
 
 ---
 
-### Agent 3 – Verständlichkeit
+<a id="RVD-agent-verstaendlichkeit"></a>
+### Verständlichkeit
 
 **Frage:** Sind die Anweisungen klar genug, dass ein Agent (oder Mensch) sie ohne Rückfragen befolgen kann?
 
@@ -126,7 +134,8 @@ Lies alle Projekt- und globalen Docs. Suche nach:
 
 ---
 
-### Agent 4 – Globale Konflikte (~/.claude vs. Projekt)
+<a id="RVD-agent-globale-konflikte"></a>
+### Globale Konflikte (~/.claude vs. Projekt)
 
 **Frage:** Widersprechen globale User-Settings dem Projekt, und was ist die richtige Lösung?
 
@@ -143,15 +152,17 @@ Prüfe auch: Sind globale Skills mit Projekt-Skills kompatibel? Gibt es Doppelab
 
 ---
 
-## Schritt 3: Ergebnisse aggregieren und ausgeben
+<a id="RVD-ergebnisse-aggregieren"></a>
+## Ergebnisse aggregieren und ausgeben
 
-Warte bis alle vier Agenten abgeschlossen haben.
+Warte bis alle Agenten abgeschlossen haben.
 
+<a id="RVD-pre-filter"></a>
 ### Pre-Filter (vor der Aggregation)
 
-Gehe jedes gemeldete Finding durch und prüfe es gegen den Validierungsstandard aus Schritt 2:
+Gehe jedes gemeldete Finding durch und prüfe es gegen den [Validierungsstandard](#RVD-validierungsstandard):
 
-1. **Zitat vorhanden?** Hat der Agent die betreffende Stelle wirklich gelesen und zitiert? Falls nicht: Finding verwerfen. (Für Agent-4-Einträge: beide Felder `Global-Zitat` und `Projekt-Zitat` müssen vorhanden sein.)
+1. **Zitat vorhanden?** Hat der Agent die betreffende Stelle wirklich gelesen und zitiert? Falls nicht: Finding verwerfen. (Für Einträge aus „Globale Konflikte": beide Felder `Global-Zitat` und `Projekt-Zitat` müssen vorhanden sein.)
 2. **Alle Verweise verfolgt?** Falls das Finding lautet "X fehlt in Datei A": Wurden auch alle Dateien geprüft, auf die Datei A verweist? Falls nicht: jetzt prüfen. Findet sich X dort → Finding verwerfen.
 3. **Konkretes Fehlverhalten?** Falls das Finding nur "könnte missverstanden werden" ohne Szenario beschreibt → Finding verwerfen.
 4. **Richtige Abstraktionsebene?** Falls das Finding Duplikation meldet: sind es wirklich identische Regeln auf derselben Ebene? Falls nein → Finding verwerfen.
@@ -160,11 +171,12 @@ Verworfene Findings werden nicht ausgegeben. Es ist kein Fehler, wenn nach dem P
 
 Dedupliziere die verbleibenden Findings, die von mehreren Agenten identisch erkannt wurden. Wenn zwei Agenten dasselbe Problem aus verschiedenen Winkeln sehen, fasse es zu einem Finding zusammen.
 
-Falls nach Pre-Filter und Deduplizierung keine Findings verbleiben: dem User mitteilen ("Keine validen Findings gefunden – Dokumentation ist konsistent und vollständig.") und Phase 2 überspringen.
+Falls nach Pre-Filter und Deduplizierung keine Findings verbleiben: dem User mitteilen ("Keine validen Findings gefunden – Dokumentation ist konsistent und vollständig.") und [Findings abarbeiten](#RVD-findings-abarbeiten) überspringen.
 
+<a id="RVD-findings-speichern"></a>
 ### Findings speichern
 
-Schreibe die vollständigen Findings in `<scratchpad>/doc-review.md` – das Session-Scratchpad liegt außerhalb des Repos und verschwindet mit der Session, es bleibt also nichts liegen. Diese Datei wird in Phase 2 zum Nachschlagen verwendet.
+Schreibe die vollständigen Findings in `<scratchpad>/doc-review.md` – das Session-Scratchpad liegt außerhalb des Repos und verschwindet mit der Session, es bleibt also nichts liegen. Diese Datei wird in [Findings abarbeiten](#RVD-findings-abarbeiten) zum Nachschlagen verwendet.
 
 Format der gespeicherten Datei:
 ```
@@ -191,6 +203,7 @@ Format der gespeicherten Datei:
 - Option B: ...
 ```
 
+<a id="RVD-user-ausgabe"></a>
 ### Dem User ausgeben
 
 Zeige dem User **nur**:
@@ -225,7 +238,8 @@ Vollständige Analyse: `<scratchpad>/doc-review.md`
 
 ---
 
-## Phase 2: Findings abarbeiten
+<a id="RVD-findings-abarbeiten"></a>
+## Findings abarbeiten
 
 Nach der Ausgabe der CEO-Übersicht:
 

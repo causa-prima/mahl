@@ -428,9 +428,9 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leerer Name)', () => 
 
     // Then: ich sehe die Fehlermeldung "Name darf nicht leer sein."
     expect(await screen.findByText('Name darf nicht leer sein.')).toBeInTheDocument()
-    // Then: das Name-Feld ist als ungültig markiert (a11y-Fehlerzustand, UX-Guideline §4)
+    // Then: das Name-Feld ist als ungültig markiert (a11y-Fehlerzustand, docs/guidelines/coding-guideline-ux.md#CGU-fehlermeldungen)
     expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'true')
-    // Then: das Name-Feld hat den Fokus (UX-Guideline Prinzip 8 "Fokus aufs erste
+    // Then: das Name-Feld hat den Fokus (UX-Guideline „Formular-/Dialog-Baseline" "Fokus aufs erste
     //   fehlerhafte Feld", TD-S094-1 – nicht durch einen eigenen Gherkin-Step getrieben,
     //   sondern durch die Guideline-Baseline; "erstes Feld fehlerhaft" -> Name-Feld).
     //   waitFor, weil der Fokus asynchron via useEffect nach dem Render-Commit gesetzt wird.
@@ -510,7 +510,7 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
 
     // Then: ich sehe die Fehlermeldung "Einheit darf nicht leer sein."
     expect(await screen.findByText('Einheit darf nicht leer sein.')).toBeInTheDocument()
-    // Then: das Einheit-Feld ist als ungültig markiert (a11y-Fehlerzustand, UX-Guideline §4)
+    // Then: das Einheit-Feld ist als ungültig markiert (a11y-Fehlerzustand, docs/guidelines/coding-guideline-ux.md#CGU-fehlermeldungen)
     expect(screen.getByLabelText(/^Einheit/)).toHaveAttribute('aria-invalid', 'true')
   })
 
@@ -527,7 +527,7 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
     //   Einheit) — killt den Mutanten "es wird immer dasselbe Feld markiert" und treibt
     //   den name-absent-Zweig (FieldErrors ohne name-Key).
     expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
-    // Then: das Einheit-Feld hat den Fokus (UX-Guideline Prinzip 8 "Fokus aufs erste
+    // Then: das Einheit-Feld hat den Fokus (UX-Guideline „Formular-/Dialog-Baseline" "Fokus aufs erste
     //   fehlerhafte Feld"; "nur späteres Feld fehlerhaft" -> Einheit-Feld, nicht Name).
     //   waitFor, weil der Fokus asynchron via useEffect nach dem Render-Commit gesetzt wird.
     await waitFor(() => { expect(screen.getByLabelText(/^Einheit/)).toHaveFocus() })
@@ -687,13 +687,13 @@ describe('IngredientsPage – Zutat löschen', () => {
 })
 
 // run-8-Nachtrag „Löschen·Success": Verlässlichkeit des Undo-Wegs – der Toast ist die EINZIGE
-// Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5 Stufe 1), solange die
+// Wiederherstellungsmöglichkeit im UI (UX-Guideline „Destructive Actions schützen", Soft-Delete), solange die
 // Reaktivierung beim Neuanlegen (run-11) fehlt. Drei @US-904-edge-case-Szenarien aus
 // features/ingredients.feature.
 describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
   // Szenario: Undo-Toast bleibt bei einem Klick daneben erhalten
   it('US904_EdgeCase_UndoToast_ClickBesideToast_ToastRemainsVisible', async () => {
-    // UX-Guideline Prinzip 5 ("Destructive Actions schützen"): der Undo-Weg für eine
+    // UX-Guideline „Destructive Actions schützen" ("Destructive Actions schützen"): der Undo-Weg für eine
     //   destruktive Aktion muss die volle autoHideDuration erreichbar bleiben. Ein Klick
     //   irgendwo auf der Seite (clickaway) ist keine bewusste Abbruch-Entscheidung und darf
     //   den Toast NICHT schließen – sonst wäre die großzügige autoHideDuration wertlos.
@@ -718,7 +718,7 @@ describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
 
     // When: ich Escape drücke. Geht über den Wortlaut des Szenarios (nur "Klick daneben")
     //   hinaus, ist aber KEIN eigenes Szenario: Escape-Dismiss ist MUI-Standardverhalten
-    //   (UX-Guideline coding-guideline-ux.md Prinzip 8, Tabelle "Framework-geliefert – KEIN
+    //   (docs/guidelines/coding-guideline-ux.md#CGU-formular-baseline, Tabelle "Framework-geliefert – KEIN
     //   Szenario, per Review erzwungen") – hier zusätzlich mitgeprüft, um zu belegen, dass der
     //   onClose-Pfad (setDeleted(null)) neben dem clickaway-Guard weiterhin regulär funktioniert.
     fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
@@ -979,7 +979,7 @@ describe('IngredientsPage – Zutat reaktivieren', () => {
     expect(await within(list).findByText('Mehl')).toBeInTheDocument()
   })
 
-  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein treibendes Gherkin-Szenario):
+  // Protokolltest nach ADR-S106-3, Protokoll-/Infrastruktur-Mechanik (kein US-Tag, kein treibendes Gherkin-Szenario):
   // strukturell erzwungen durch den gemeinsamen Restore-Codepfad. Tragende Entscheidung
   // ADR-S111-1 – der Restore-Body ist ab run-11 Pflichtbestandteil des Contracts, auch für den
   // Undo-Fall (fachlich ein No-op: unveränderte Werte). Ohne diesen Test bliebe die Verdrahtung
@@ -1022,7 +1022,7 @@ describe('IngredientsPage – Zutat reaktivieren', () => {
     )
   }
 
-  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein eigenes Gherkin-Szenario):
+  // Protokolltest nach ADR-S106-3, Protokoll-/Infrastruktur-Mechanik (kein US-Tag, kein eigenes Gherkin-Szenario):
   // tragende Entscheidung ADR-S111-1 – der transparente Reaktivierungs-Umweg (409 soft-deleted ->
   // Restore) macht eine zuvor gelöschte Zeile wieder aktiv, ohne dass der Nutzer den Undo-Weg
   // benutzt. Der noch sichtbare Undo-Toast der vorangegangenen Löschung muss dabei verworfen
@@ -1110,7 +1110,7 @@ describe('IngredientsPage – Reaktivierungs-Konflikt', () => {
     expect(within(list).queryByText('Bund')).not.toBeInTheDocument()
   })
 
-  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein treibendes Gherkin-Szenario):
+  // Protokolltest nach ADR-S106-3, Protokoll-/Infrastruktur-Mechanik (kein US-Tag, kein treibendes Gherkin-Szenario):
   // tragende Entscheidung ADR-S111-3 ("Auto-Hide 10000 ms, bewusst länger als der Undo-Toast") –
   // ohne einen funktionierenden Dismiss-Callback bliebe die Konflikt-Snackbar nach Ablauf der
   // Anzeigezeit dauerhaft sichtbar, weil MUI selbst nichts unmountet. Geprüft wird ausschließlich,
@@ -1137,7 +1137,7 @@ describe('IngredientsPage – Reaktivierungs-Konflikt', () => {
     })
   })
 
-  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein eigenes Gherkin-Szenario):
+  // Protokolltest nach ADR-S106-3, Protokoll-/Infrastruktur-Mechanik (kein US-Tag, kein eigenes Gherkin-Szenario):
   // tragende Entscheidung ADR-S051-1/-2 ("jede nutzersichtbare Wiedergabe einer Eingabe ist
   // getrimmt") angewandt auf den Reaktivierungs-Konflikt-Hinweis (ADR-S111-3). Ohne Trimmen
   // stünde die Eingabe mit sichtbaren Leerzeichen im Hinweis, obwohl jede andere nutzersichtbare
@@ -1192,7 +1192,7 @@ describe('IngredientsPage – Reaktivierungs-Konflikt', () => {
     )
   }
 
-  // Protokolltest nach ADR-S106-3 Kategorie 1 (kein US-Tag, kein eigenes Gherkin-Szenario):
+  // Protokolltest nach ADR-S106-3, Protokoll-/Infrastruktur-Mechanik (kein US-Tag, kein eigenes Gherkin-Szenario):
   // pinnt den null-Zweig von toConflictNotice – ohne ihn bliebe ein Refactoring zu
   // `if (kind === 'ReactivationConflict') setConflictNotice(...)` unentdeckt, und ein veralteter
   // Konflikt-Hinweis stünde fälschlich weiter, obwohl danach ein normales Anlegen gelingt.

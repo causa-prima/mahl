@@ -6,7 +6,7 @@ import type { Result, ResultAsync } from 'neverthrow'
 // kein throwOnError. `error`/`isPending`/`reset` decken genau das ab, was die bisher
 // umgesetzten US-904-Szenarien beobachten (Erfolg, Feld-Fehler, Pending, Reset beim
 // Schließen); die volle Union bleibt für @US-904-error/resilience aufgeschoben.
-// Kanonische Form: ADR-S056-1 und coding-guideline-typescript.md §4b.
+// Kanonische Form: ADR-S056-1 und docs/guidelines/coding-guideline-typescript.md#CGT-react-query
 // Stand der Abweichung samt bekannter Konsequenzen: TD-S101-1.
 // run-11: `onSuccess` reicht den Erfolgswert durch (statt ihn zu verschlucken) – kein neuer
 // Zustand, keine neue Union, nur der bereits vorhandene Ok-Wert wird sichtbar. Getrieben vom

@@ -514,6 +514,10 @@ def test_write_access_scripts() -> int:
         # Auch als Teil einer Verkettung darf der Text nicht ungesehen durchgehen.
         ('git status && python3 .claude/scripts/obs.py add --titel "X"',
          "obs.py add in Compound → ask"),
+        # `--help` IM Eintragstext ist kein Hilfeaufruf – die Ausnahme darf nicht am
+        # Vorkommen der Zeichenfolge hängen, sondern nur an einem echten Argument.
+        ('python3 .claude/scripts/obs.py add --titel "Warum --help nervt" --beobachtung "Y"',
+         "--help im Text bleibt ask"),
     ]
     for command, description in ask_cases:
         if not assert_decision(command, "ask", description):
@@ -528,6 +532,11 @@ def test_write_access_scripts() -> int:
         ('python3 .claude/scripts/obs-drain.py', "obs-drain.py bleibt allow"),
         # Kein Fehlalarm auf gleichnamige, aber andere Scripte.
         ('python3 .claude/scripts/next_run.py --open', "next_run.py bleibt allow"),
+        # `--help` schreibt nichts, es druckt die Doku (S124, User-Meldung). Eine Freigabe
+        # dafür ist reine Reibung – und wer für Doku klicken muss, liest die Doku seltener.
+        ('python3 .claude/scripts/obs.py add --help', "obs.py add --help bleibt allow"),
+        ('python3 .claude/scripts/td.py set -h', "td.py set -h bleibt allow"),
+        ('python3 .claude/scripts/lessons.py add --help', "lessons.py add --help bleibt allow"),
     ]
     for command, description in allow_cases:
         if not assert_decision(command, "allow", description):

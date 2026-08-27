@@ -5,7 +5,8 @@ wann-lesen: Beim Modellieren neuer Domain-Typen mit Zustandsvarianten (z.B. Reci
 Voraussetzung: docs/guidelines/coding-guideline-csharp.md (Core-Regeln) bereits gelesen.
 -->
 
-## 5. Sum Types / Discriminated Unions
+<a id="SUM-sum-types"></a>
+## Sum Types / Discriminated Unions
 
 Modelliere verschiedene Zustände immer als distinkte Typen (ADTs), niemals als Flag-Kombinationen. Dies gilt für alle Arten von Zustandsunterscheidungen:
 
@@ -61,7 +62,7 @@ public abstract record RecipeSource
 
 **Variante B – `file`-scoped Subtypen + `private protected` Konstruktor:**
 
-Wenn alle Operationen inklusive Transitionen als Extension Methods geführt werden sollen (Guideline 6), können Subtypen als top-level `file`-Records in derselben Datei definiert werden. Der Basiskonstruktor muss dann `private protected` sein – `private` würde den Aufruf durch top-level-Records verhindern.
+Wenn alle Operationen inklusive Transitionen als Extension Methods geführt werden sollen ([Reine Funktionen & Extension Methods](coding-guideline-csharp.md#CGC-pure-functions)), können Subtypen als top-level `file`-Records in derselben Datei definiert werden. Der Basiskonstruktor muss dann `private protected` sein – `private` würde den Aufruf durch top-level-Records verhindern.
 
 ```csharp
 // Server/Domain/ShoppingList.cs
@@ -106,6 +107,7 @@ public static class ShoppingListExtensions
 
 Wenn ein Typ mehr als einen konzeptuell unterschiedlichen Zustand repräsentieren kann, ist ein Sum Type die richtige Modellierung.
 
+<a id="SUM-consumer-pattern"></a>
 ### Consumer-Pattern: Sum Type im Endpoint
 
 Consumer (Endpoints, Mapping-Layer) greifen ausschließlich über `.Match()` zu – niemals per `is`/`switch` auf private Subtypen:

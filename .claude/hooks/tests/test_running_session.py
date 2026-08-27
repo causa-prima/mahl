@@ -1,8 +1,8 @@
 """Tests für obs_parse.running_session – welche Session läuft gerade?
 
 Der Fall, der die naive Rechnung „höchste Session-Datei + 1" bricht: `closing-session` legt
-`session_NNN.md` mitten in der Session an (Schritt 4) und schreibt danach noch Learnings
-(Schritt 5). Ab Schritt 4 lieferte „+1" die Nummer der FOLGE-Session, neue Einträge bekämen
+`session_NNN.md` mitten in der Session an und schreibt danach noch Learnings.
+Ab dem Anlegen der Session-Datei lieferte „+1" die Nummer der FOLGE-Session, neue Einträge bekämen
 also eine falsche ID. Unterscheidungsmerkmal ist der Commit-Zustand der Datei.
 """
 import os

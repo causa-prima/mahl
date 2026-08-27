@@ -9,15 +9,16 @@ kritische-regeln:
   - Kein toter Code (auskommentiert, ungenutzte Importe)
 -->
 
+<a id="CGG-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Code-Beispiele lesen | Beispiele zeigen Regeln, nicht den Bestand und keinen Bauauftrag | Bevor du ein Beispiel aus einer Guideline übernimmst |
-| KISS | Einfachste Lösung wählen, keine vorzeitigen Abstraktionen | Immer – vor jedem Feature |
-| Naming | Glossar-Begriffe, selbsterklärende Namen, Kommentare = Warum | Immer – beim Benennen von Typen/Methoden |
-| Komplexität & Refactoring | Max. ~20 Zeilen/Methode, max. 3 Verschachtelungsebenen, kein toter Code | Bei Umstrukturierung oder wachsenden Methoden |
-| Übergreifende Paradigmen | Tabelle: Immutability, Value Objects, ROP, Pure Functions – C# vs. TypeScript | Als Orientierung vor dem Lesen der sprachspezifischen Guideline |
+| [Code-Beispiele lesen](#CGG-code-beispiele) | Beispiele zeigen Regeln, nicht den Bestand und keinen Bauauftrag | Bevor du ein Beispiel aus einer Guideline übernimmst |
+| [KISS](#CGG-kiss) | Einfachste Lösung wählen, keine vorzeitigen Abstraktionen | Immer – vor jedem Feature |
+| [Naming](#CGG-naming) | Glossar-Begriffe, selbsterklärende Namen, Kommentare = Warum | Immer – beim Benennen von Typen/Methoden |
+| [Komplexität & Refactoring](#CGG-komplexitaet) | Max. ~20 Zeilen/Methode, max. 3 Verschachtelungsebenen, kein toter Code | Bei Umstrukturierung oder wachsenden Methoden |
+| [Übergreifende Paradigmen](#CGG-paradigmen) | Tabelle: Immutability, Value Objects, ROP, Pure Functions – C# vs. TypeScript | Als Orientierung vor dem Lesen der sprachspezifischen Guideline |
 ---
 
 Diese Grundprinzipien gelten für **alle** Sprachen im Projekt (C# und TypeScript/React).
@@ -25,6 +26,7 @@ Sprachspezifische Umsetzungen: `docs/guidelines/coding-guideline-csharp.md` · `
 
 ---
 
+<a id="CGG-code-beispiele"></a>
 ## Wie Code-Beispiele in Guidelines zu lesen sind
 
 Ein Code-Beispiel in einer Guideline zeigt eine **Regel** – nicht den Bestand und nicht einen
@@ -53,6 +55,7 @@ Kurz: Regeltext schlägt Beispiel, Bestand schlägt Annahme, Szenario schlägt Z
 
 ---
 
+<a id="CGG-kiss"></a>
 ## KISS – Keep It Simple
 
 Wähle immer die einfachste Lösung, die den Anforderungen genügt.
@@ -65,6 +68,7 @@ Wähle immer die einfachste Lösung, die den Anforderungen genügt.
 
 ---
 
+<a id="CGG-naming"></a>
 ## Naming
 
 - Verwende ausschließlich Begriffe aus `docs/reference/glossary.md` für Domänenkonzepte.
@@ -73,6 +77,7 @@ Wähle immer die einfachste Lösung, die den Anforderungen genügt.
 
 ---
 
+<a id="CGG-komplexitaet"></a>
 ## Komplexität & Refactoring
 
 - Eine Methode / Funktion hat maximal ~20 Zeilen. Größer → Refactoring-Kandidat.
@@ -85,12 +90,14 @@ Diese Zahlen sind Design-Ziele; der Linter erzwingt nur loosere Backstops (Lint 
 
 ---
 
+<a id="CGG-abhaengigkeiten"></a>
 ## Abhängigkeiten
 
 Externe Pakete (npm, NuGet) nur hinzufügen wenn sie in `docs/reference/dependencies.md` gelistet sind. Vor jeder Erweiterung der Allowlist: User konsultieren (5-Punkte-Begründung laut `docs/reference/dependencies.md`). Hooks erzwingen diese Regel automatisch.
 
 ---
 
+<a id="CGG-paradigmen"></a>
 ## Übergreifende Paradigmen
 
 Diese Prinzipien gelten für den gesamten Produktionscode. Die sprachspezifischen Guidelines beschreiben die konkrete Umsetzung:

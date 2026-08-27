@@ -3,13 +3,14 @@ name: review-code
 description: >
   Code-Review nach einer Implementierung: Selbstcheck via docs/process/review-checklist.md,
   dann spezialisierte Review-Agenten spawnen und Findings als strukturierte Liste
-  zurückgeben. Wird von implementing-scenario Schritt 5 direkt ausgeführt (kein
+  zurückgeben. Wird vom Review-Loop in implementing-scenario direkt ausgeführt (kein
   Subagent-Wrapper). Kann auch standalone auf beliebigem Code angewendet werden.
 user-invocable: true
 ---
 
 # Skill: review-code
 
+<a id="RVC-eingabe"></a>
 ## Eingabe
 
 - Scope + Szenario-Tag (oder freier Scope bei standalone-Aufruf)
@@ -22,9 +23,11 @@ Geänderte Dateien → `git diff` (staged + unstaged) als Standard verwenden.
 
 ---
 
+<a id="RVC-ablauf"></a>
 ## Ablauf
 
-### 1. Selbstcheck (docs/process/review-checklist.md)
+<a id="RVC-selbstcheck"></a>
+### Selbstcheck (docs/process/review-checklist.md)
 
 Gehe `docs/process/review-checklist.md` systematisch Punkt für Punkt durch:
 - Architecture Layer (internal-Typen, kein InternalsVisibleTo, Ports-only-Tests)
@@ -37,18 +40,20 @@ Gehe `docs/process/review-checklist.md` systematisch Punkt für Punkt durch:
 Für jedes Finding: Schweregrad ❌/⚠️/✅ + Guideline-Referenz (Datei + Sektion) notieren.
 Findings werden gesammelt – nicht sofort selbst behoben.
 
-### 2. Suppression-Report bewerten
+<a id="RVC-suppression-report"></a>
+### Suppression-Report bewerten
 
 Jeden Eintrag im übergebenen Stryker-Suppression-Report einzeln prüfen. Referenz:
-`docs/process/tdd-process.md` Sektion „Stryker-Survivor behandeln".
+`docs/process/tdd-process.md` [Sektion „Stryker-Survivor behandeln"](../../../docs/process/tdd-process.md#TDD-stryker-survivor).
 
 Für jeden Eintrag: Beweist die Begründung echte Äquivalenz oder Nichttestbarkeit –
-oder klingt sie nur plausibel? (`docs/kaizen/principles.md`: semantische Korrektheit
-prüfen, nicht blind übernehmen.) Schwache oder fehlende Begründung → ❌ Finding.
+oder klingt sie nur plausibel? ([Review-Prozess](../../../docs/kaizen/principles.md#KPI-review-prozess):
+semantische Korrektheit prüfen, nicht blind übernehmen.) Schwache oder fehlende Begründung → ❌ Finding.
 
 Kein Suppression-Report übergeben oder leer → Schritt überspringen.
 
-### 3. Review-Agenten spawnen
+<a id="RVC-agenten-spawnen"></a>
+### Review-Agenten spawnen
 
 ⚠️ **Context-Freiheit:** Jeden Agenten ohne Iterations-Vorwissen spawnen – weder frühere
 Findings noch als false positive bekannte Punkte im Prompt. Filtering geschieht im
@@ -64,7 +69,7 @@ Scope bestimmt welche Agenten nötig sind:
 | + API-Grenze, User-Input oder Auth berührt | + `security-auditor` |
 | + Frontend-Komponenten geändert | + `ux-ui-auditor` |
 | Nur Tests geändert (kein Produktionscode) | `test-quality-auditor` |
-| Nur Suppressionen hinzugefügt | Schritt 2 deckt das ab – kein Agent-Spawn nötig |
+| Nur Suppressionen hinzugefügt | [Suppression-Report bewerten](#RVC-suppression-report) deckt das ab – kein Agent-Spawn nötig |
 | Nur Dokumentation / Kommentare geändert | `code-quality-auditor` |
 
 Jeden Agenten via Agent-Tool mit `subagent_type: "<name>"` spawnen (z.B. `subagent_type: "code-quality-auditor"`) – die Namen entsprechen der Tabelle (es sind registrierte Agenten in `.claude/agents/`, read-only).
@@ -88,7 +93,7 @@ Agent-Prompts enthalten (je Agent):
   2. Den Auditor ausdrücklich beauftragen, in `docs/history/adr.md` **per Grep selbst nachzusehen** –
      eine zweite Meinung, die nur die Auswahl des Orchestrators kennt, ist keine.
 
-  Punkt 2 ist nicht optional: Fehlt eine ADR, die ein Finding entkräftet, meldet der Auditor ein
+  Die ADR-Mitgabe ist nicht optional: Fehlt eine ADR, die ein Finding entkräftet, meldet der Auditor ein
   False Positive, das erst beim Zusammenführen auffliegt. Real passiert: ADR-S106-3 (Querschnitts-/
   Infra-Tests tragen bewusst keinen US-Tag) stand nicht im Prompt, und ein Auditor meldete daraufhin
   zwölf legitime Tests als Namensformat-Verstoß.
@@ -101,7 +106,8 @@ Agent-Prompts enthalten (je Agent):
   `review-code` ausnahmsweise standalone ohne Team – kein `SendMessage` verfügbar –, ist der
   Rückgabewert des Agenten der Kanal.)
 
-### 4. Findings zusammenführen
+<a id="RVC-findings-zusammenfuehren"></a>
+### Findings zusammenführen
 
 Alle Findings aus Selbstcheck + Suppression-Bewertung + Agenten zusammenführen. Für jedes Finding prüfen:
 ist die Begründung semantisch korrekt – „Es ist implementierbar" ≠ „Es ist das richtige

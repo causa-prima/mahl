@@ -87,16 +87,16 @@ def render_table(findings: list[dict]) -> str:
 
     lines = []
 
-    # Zeile 1: Impact-Zusammenfassung
+    # Impact-Zusammenfassung
     impact_order = ["KRITISCH", "HOCH", "MITTEL", "GERING"]
     parts = [f"{s}: {by_impact[s]}" for s in impact_order if by_impact[s]]
     lines.append("  Impact:    " + "  |  ".join(parts))
 
-    # Zeile 2: Kategorie-Zusammenfassung
+    # Kategorie-Zusammenfassung
     kat_parts = sorted(by_kategorie.items(), key=lambda x: -x[1])
     lines.append("  Kategorie: " + "  |  ".join(f"{k}: {v}" for k, v in kat_parts))
 
-    # Zeile 3: Kontext-Zusammenfassung
+    # Kontext-Zusammenfassung
     ctx_parts = sorted(by_kontext.items(), key=lambda x: -x[1])
     lines.append("  Kontext:   " + "  |  ".join(f"{k}: {v}" for k, v in ctx_parts))
 

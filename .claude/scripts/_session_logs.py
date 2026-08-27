@@ -31,7 +31,7 @@ MAPPING_FILE = REPO_ROOT / ".claude" / "session-types.json"
 SKILL_TO_TYPE = {
     "implementing-scenario": "implementierung",
     "write-code": "implementierung",
-    "review-code": "implementierung",  # läuft als Schritt 5 innerhalb von implementing-scenario
+    "review-code": "implementierung",  # läuft als Review-Loop innerhalb von implementing-scenario
     # Szenario-Entwurf ist eigene Arbeit mit eigenem Leseprofil (Stories, Feature-Dateien –
     # kein Testcode) und gehört deshalb nicht zu „implementierung".
     "gherkin-workshop": "workshop",
@@ -278,6 +278,33 @@ def read_events(records: list[dict]) -> list[tuple[str, int, bool]]:
         and block.get("type") == "tool_result"
         and (entry := id_to_read.get(block.get("tool_use_id"))) is not None
     ]
+
+
+def session_datum(main_log: Path) -> str | None:
+    """Tag der Session (`YYYY-MM-DD`) aus dem ersten Zeitstempel im Log, sonst None.
+
+    Braucht es, um eine Messung in „vor" und „nach einer Maßnahme" zu trennen. Ohne das
+    kann eine Wirksamkeitsprüfung Erfolg und Misserfolg nicht unterscheiden: Die für S120
+    geplante Re-Messung zu OBS-S109-1 lief ins Leere, weil eine einzige Implementierungs-
+    Session nach der Maßnahme gegen 24 im Aggregat unsichtbar bleibt.
+
+    Bewusst der Zeitstempel und nicht die Datei-mtime: Die mtime beschreibt den letzten
+    Schreibzugriff, nicht den Zeitpunkt der Arbeit, und ein Kopiervorgang setzt sie neu.
+    Fehlt der Zeitstempel, wird None geliefert statt geraten – ein falsches Datum filterte
+    still das Falsche heraus.
+    """
+    try:
+        with open(main_log, encoding="utf-8", errors="replace") as handle:
+            for zeile in handle:
+                try:
+                    stempel = json.loads(zeile).get("timestamp")
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+                if isinstance(stempel, str) and len(stempel) >= 10:
+                    return stempel[:10]
+    except OSError:
+        return None
+    return None
 
 
 def session_logs(log_dir: Path) -> list[tuple[str, Path, list[Path]]]:

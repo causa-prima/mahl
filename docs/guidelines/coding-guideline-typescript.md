@@ -10,25 +10,28 @@ kritische-regeln:
   - Ausschließlich unknown + Type Guard oder konkreten Typ verwenden (kein any)
 -->
 
+<a id="CGT-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Verbotene Muster | Verbotene Muster auf einen Blick (Tabelle) | Als schnelle Referenz ohne vollständiges Lesen |
-| 1. Immutability | readonly, as const, kein direktes Mutieren, Spreading statt push/assign | Beim Erstellen von State oder Datenstrukturen |
-| 2. Branded Types | Branded Type Pattern, nominale Brand-Vergabe an der API-Grenze (keine Regelprüfung) | Beim Modellieren von IDs oder Domain-Konzepten |
-| 3. Discriminated Unions | RequestState-Pattern, exhaustive switch, keine Boolean-Flags | Beim Modellieren von Lade-/Fehler-/Erfolgszuständen |
-| 4. Railway-Oriented Programming | neverthrow ok/err/Result/ResultAsync, .andThen()/.match() | Beim Schreiben von Validierungs- oder API-Verkettungen |
-| 4b. React Query | useResultMutation/useResultQuery, MutationState, QueryCache-Setup | Bei jedem Datenzugriff aus einer Komponente |
-| 4c. Validierung | Backend setzt Domänenregeln durch; Ausnahme für offline-schreibfähige Bereiche | Bevor eine Eingabe oder Zustandsänderung geprüft wird |
-| 5. Pure Functions & Separation | src/domain/ für Logik, src/services/ für API, Komponenten nur UI | Beim Anlegen neuer Dateien oder Funktionen |
-| 6. Test-Code | Was gilt, was ist gelockert (_unsafeUnwrap, as, try/catch in Tests OK) | Beim Schreiben von Frontend-Tests |
+| [Verbotene Muster](#CGT-verbotene-muster) | Verbotene Muster auf einen Blick (Tabelle) | Als schnelle Referenz ohne vollständiges Lesen |
+| [Immutability](#CGT-immutability) | readonly, as const, kein direktes Mutieren, Spreading statt push/assign | Beim Erstellen von State oder Datenstrukturen |
+| [Branded Types](#CGT-branded-types) | Branded Type Pattern, nominale Brand-Vergabe an der API-Grenze (keine Regelprüfung) | Beim Modellieren von IDs oder Domain-Konzepten |
+| [Discriminated Unions](#CGT-discriminated-unions) | RequestState-Pattern, exhaustive switch, keine Boolean-Flags | Beim Modellieren von Lade-/Fehler-/Erfolgszuständen |
+| [Railway-Oriented Programming](#CGT-rop) | neverthrow ok/err/Result/ResultAsync, .andThen()/.match() | Beim Schreiben von Validierungs- oder API-Verkettungen |
+| [React Query](#CGT-react-query) | useResultMutation/useResultQuery, MutationState, QueryCache-Setup | Bei jedem Datenzugriff aus einer Komponente |
+| [Validierung](#CGT-validierung) | Backend setzt Domänenregeln durch; Ausnahme für offline-schreibfähige Bereiche | Bevor eine Eingabe oder Zustandsänderung geprüft wird |
+| [Pure Functions & Separation](#CGT-pure-functions) | src/domain/ für Logik, src/services/ für API, Komponenten nur UI | Beim Anlegen neuer Dateien oder Funktionen |
+| [Test-Architektur](#CGT-test-architektur) | Teststrategie und HTTP-Mocking (MSW), DOM-Matcher | Bevor du entscheidest, auf welcher Ebene ein Verhalten getestet wird |
+| [Test-Code](#CGT-test-code) | Was gilt, was ist gelockert (_unsafeUnwrap, as, try/catch in Tests OK) | Beim Schreiben von Frontend-Tests |
 
 > **Voraussetzung:** Lies zuerst `docs/guidelines/coding-guideline-general.md` (KISS, Naming, Komplexität, übergreifende Paradigmen). Diese Datei beschreibt nur die TypeScript/React-spezifische Umsetzung.
 > **UX/Interaction Design:** Bei jeder React-Komponente zusätzlich `docs/guidelines/coding-guideline-ux.md` lesen (Feedback, Fehlermeldungen, Terminologie, leere Zustände, destructive Actions).
 >
 > **🧪 PILOT (seit 2026-06-20 · OBS-S085-4): TS-Language-Server-Tool.** Für Symbol-Navigation und v.a. **Referenz-/Refactor-Impact-Suche** das **LSP-Tool** (ToolSearch `select:LSP`) dem `grep` vorziehen — semantisch präziser (ignoriert Kommentare/Strings). **Kritisch bleiben:** erster `findReferences` nach frischer Session kann **kalt/unvollständig** sein → bei wenig Treffern wiederholen oder gegen `grep` prüfen. **Notable Vorfälle → Pilot-Lauf-Log in OBS-S085-4** (FAILs immer; HELPs bei klarem Counterfactual). Abschluss-Kriterien & Bewertung: OBS-S085-4. *(Temporär — wird bei Pilot-Abschluss zu permanenter Regel verdichtet oder entfernt.)* <!-- ref-ok: temporärer Pilot-Verweis, wird bei Pilot-Abschluss mit-entfernt -->
 
+<a id="CGT-verbotene-muster"></a>
 ## Verbotene Muster (Kurzreferenz)
 
 | Verboten | Stattdessen |
@@ -46,7 +49,8 @@ kritische-regeln:
 
 ---
 
-## 1. Immutability
+<a id="CGT-immutability"></a>
+## Immutability
 
 - Objekte und Arrays immer als `readonly` / `as const` definieren.
 - State-Updates immer als neue Objekte/Arrays zurückgeben (React erzwingt das ohnehin).
@@ -64,7 +68,8 @@ const updatedList = [...list, newItem];
 
 ---
 
-## 2. Branded Types – kein "Primitive Obsession"
+<a id="CGT-branded-types"></a>
+## Branded Types – kein "Primitive Obsession"
 
 Alle `string`/`number`/`uuid`-Werte in Domänen-Modellen als Branded Types kapseln:
 
@@ -77,9 +82,9 @@ type IngredientName = string & { readonly __brand: 'IngredientName' };
 const asRecipeId = (value: string): RecipeId => value as RecipeId;
 ```
 
-**Der Brand ist nominal, die Factory validiert nicht (ADR-S112-4).** Sie vergibt den Brand und prüft keine Regeln – wo Regeln durchgesetzt werden, regelt der Validierungs-Abschnitt, nicht dieser hier. Zweck des Brands ist allein Typ-Unterscheidbarkeit: Er verhindert, dass gleichartige Strings in einer Signatur vertauscht werden (`restoreIngredient(id, name, baseUnit)`).
+**Der Brand ist nominal, die Factory validiert nicht (ADR-S112-4).** Sie vergibt den Brand und prüft keine Regeln – wo Regeln durchgesetzt werden, regelt der [Validierungs-Abschnitt](#CGT-validierung), nicht dieser hier. Zweck des Brands ist allein Typ-Unterscheidbarkeit: Er verhindert, dass gleichartige Strings in einer Signatur vertauscht werden (`restoreIngredient(id, name, baseUnit)`).
 
-**Fehlertyp:** Prüft eine Factory ausnahmsweise doch Regeln (siehe Validierungs-Abschnitt), gibt sie immer `Result<T, ValidationError>` zurück – **kein `Result<T, string>`**.
+**Fehlertyp:** Prüft eine Factory ausnahmsweise doch Regeln (siehe [Validierungs-Abschnitt](#CGT-validierung)), gibt sie immer `Result<T, ValidationError>` zurück – **kein `Result<T, string>`**.
 `ValidationError` ist in `src/types/validationError.ts` definiert:
 
 ```typescript
@@ -93,7 +98,8 @@ export type ValidationError = { readonly message: string }
 
 ---
 
-## 3. "Make Illegal States Unrepresentable" – Discriminated Unions
+<a id="CGT-discriminated-unions"></a>
+## "Make Illegal States Unrepresentable" – Discriminated Unions
 
 TypeScript ist hier stärker als C#. Nutze Discriminated Unions um unmögliche Zustände im Typsystem auszuschließen:
 
@@ -126,7 +132,8 @@ function render(state: RequestState<Recipe>) {
 
 ---
 
-## 4. Railway-Oriented Programming – `neverthrow`
+<a id="CGT-rop"></a>
+## Railway-Oriented Programming – `neverthrow`
 
 Verwende die Bibliothek **`neverthrow`** für Fehlerbehandlung ohne Exceptions. Kein `try/catch` für Domänen- oder Validierungsfehler.
 
@@ -157,7 +164,8 @@ const result = makeIngredientName(rawInput)
 
 ---
 
-## 4b. React Query – useResultMutation / useResultQuery
+<a id="CGT-react-query"></a>
+## React Query – useResultMutation / useResultQuery
 
 React Query ausschließlich über zwei generische Wrapper nutzen (einmalig definiert in `src/hooks/`):
 
@@ -172,6 +180,7 @@ export type MutationState<T, E> =
   | { status: 'error'; error: E }
 ```
 
+<a id="CGT-wrapper-mutation"></a>
 ### Wrapper: Mutation (POST/PUT/DELETE)
 
 ```typescript
@@ -207,6 +216,7 @@ export function useResultMutation<TData, TError, TVariables>(
 
 **Warum kein `throw` für Domain-Fehler:** Ein `Err(domainError)` ist ein erwarteter Wert, keine Ausnahme. React Query bekommt ihn als normales resolved-Ergebnis; der Wrapper liest `mutation.data.isErr()` und baut daraus den `error`-State. Nur Netzwerkfehler/5xx werfen tatsächlich und landen im globalen Handler.
 
+<a id="CGT-wrapper-query"></a>
 ### Wrapper: Query (GET)
 
 ```typescript
@@ -237,6 +247,7 @@ export function useResultQuery<TData, TError>(
 }
 ```
 
+<a id="CGT-match-helpers"></a>
 ### match()-Helpers
 
 ```typescript
@@ -267,6 +278,7 @@ export function matchKind<T extends { kind: string }, R>(
 export const useSaveIngredient = () => useResultMutation(saveIngredient);
 ```
 
+<a id="CGT-komponenten-beispiel"></a>
 ### Komponente: vollständiges Beispiel
 
 ```tsx
@@ -289,6 +301,7 @@ function CreateIngredientForm() {
 
 **Erfolg als Render-Zustand vs. Seiteneffekt:** Der `success`-Zweig von `matchState` ist für **Render**-Erfolg (eine Erfolgsmeldung/-ansicht zeigen). Erfolg, der ein **Seiteneffekt** ist (Dialog schließen, Query invalidieren, navigieren), läuft über den **`onSuccess`-Callback** von `useResultMutation` – nicht über `matchState`, das sonst einen `useEffect` zum Auslösen des Effekts bräuchte. Beides koexistiert: `onSuccess` für den Effekt, `matchState`/`matchKind` für das, was gerendert wird (inkl. `error`-Zweig). Der `onSuccess`-Callback feuert ausschließlich im `Ok`-Pfad (der `Err`-Wert reist durch React Querys Success-Pfad und wird als beobachtbarer Fehlerzustand zurückgegeben).
 
+<a id="CGT-querycache-setup"></a>
 ### QueryCache-Setup (App-Root, einmalig)
 
 ```typescript
@@ -301,12 +314,14 @@ const queryClient = new QueryClient({
 
 ---
 
-## 4c. Validierung – wo Regeln durchgesetzt werden
+<a id="CGT-validierung"></a>
+## Validierung – wo Regeln durchgesetzt werden
 
 **Das Backend setzt Domänenregeln durch.** Das Frontend baut keine zweite Durchsetzung daneben: Es schickt die Zustandsänderung, wertet die Antwort aus und zeigt die Fehler feldbezogen an. Gemeint sind **Domänenregeln** (Pflichtfeld, Längen, Eindeutigkeit) – nicht die semantische Auszeichnung von Feldern: `required` an einem Eingabefeld gehört zur Barrierefreiheit und bleibt. Im bestehenden Code sichtbar an `formNoValidate` am Absende-Button (`IngredientsPage.tsx`), damit der Browser-Check die Server-Meldungen nicht verdeckt.
 
 **Warum:** Eine Regel an zwei Stellen driftet. E2E schützt davor nur begrenzt – lockert das Backend eine Grenze (Max-Länge 30 → 40), während das Frontend weiter auf 30 prüft, erreicht der Request den Server nie; auffallen würde das nur einem Szenario, das genau das Band 31–40 ausübt.
 
+<a id="CGT-offline-validierung"></a>
 ### Ausnahme: offline-schreibfähige Bereiche
 
 Wo Zustandsänderungen entgegengenommen werden, **ohne dass das Backend erreichbar sein muss**, gibt es keinen Server, der ablehnen könnte. Eine erst beim Sync abgelehnte Änderung trifft den Nutzer Stunden später, wenn er sie nicht mehr korrigieren kann. Dort validiert das Frontend selbst.
@@ -326,7 +341,8 @@ Zwei Problemklassen, die **nicht** vermischt werden dürfen:
 
 ---
 
-## 5. Pure Functions & Separation of Concerns
+<a id="CGT-pure-functions"></a>
+## Pure Functions & Separation of Concerns
 
 - **API-Calls** gehören in dedizierte Service-Dateien (`src/services/`), nicht in Komponenten.
 - **Domänen-Logik** (Validierung, Transformationen) gehört in `src/domain/`, nicht in Komponenten.
@@ -354,8 +370,10 @@ function RecipeForm({ onSubmit }: Props) {
 
 ---
 
-## 6. Test-Architektur – Teststrategie und HTTP-Mocking
+<a id="CGT-test-architektur"></a>
+## Test-Architektur – Teststrategie und HTTP-Mocking
 
+<a id="CGT-testbare-oberflaeche"></a>
 ### Testbare Oberfläche: Komponenten, nicht Service-Funktionen
 
 Die testbare Oberfläche im Frontend ist die **gerenderte Komponente** – analog zum Backend, das nur über HTTP-Endpoints getestet wird. Service-Funktionen (`fetchIngredients`, etc.) sind Implementierungsdetails und werden durch die Komponente abgedeckt, **nicht direkt getestet**.
@@ -369,6 +387,7 @@ Konsequenz: Kein separater `*.test.ts` für Service-Dateien. Wenn Stryker NoCove
 
 **Ausnahme – nicht-UI-beobachtbare Transport-/Protokoll-Mechanik (ADR-S041-5-Addendum, ADR-S084-3):** Verhält sich eine Service-Schicht auf der gerenderten Komponente **nachweislich identisch** (z.B. HTTP-Conditional-Requests: 200 und 304 erzeugen denselben gerenderten Output), ist sie über die Komponente nicht killbar. Dann wird sie auf der obersten beobachtbaren Schicht getestet – der Service-Client-/HTTP-Boundary via MSW (gesendete Header, 304-Verarbeitung). Ein separater Service-`*.test.ts` ist hier korrekt, sofern er weiterhin nur den HTTP-Kontrakt prüft (kein `vi.mock`). Beispiel: `conditionalGet.test.ts`.
 
+<a id="CGT-msw"></a>
 ### HTTP-Mocking: ausschließlich MSW
 
 **Einzige erlaubte Mocking-Strategie für HTTP-Calls: MSW (`msw/node`).**
@@ -386,10 +405,12 @@ vi.stubGlobal('fetch', vi.fn().mockResolvedValue(...))
 
 **Setup:** `src/mocks/server.ts` + `src/test/setup.ts` (MSW-Server wird global für alle Tests gestartet, mit `onUnhandledRequest: 'error'`).
 
+<a id="CGT-vi-mock"></a>
 ### vi.mock – wann erlaubt?
 
 `vi.mock` ist für HTTP-kommunizierende Module verboten. Für reine Utility-Funktionen (kein HTTP, keine Side Effects) ist es unnötig – pure Functions können direkt aufgerufen werden.
 
+<a id="CGT-dom-matcher"></a>
 ### DOM-Matcher & Nutzerinteraktion
 
 - **jest-dom-Matcher statt Casts:** `expect(el).toHaveValue('')`, `.toBeInTheDocument()`, `.toBeDisabled()` etc. – nicht `(el as HTMLInputElement).value`. Liefert bei Fehlschlag das Element samt Ist-Wert statt eines nackten Primitiv-Diffs. Registriert global via `import '@testing-library/jest-dom/vitest'` in `src/test/setup.ts`; die Typen hängen an `tsconfig.app.json` → `types` (nötig, weil `src/test` aus dem TS-Programm excluded ist und die Augmentation sonst nicht greift).
@@ -403,7 +424,8 @@ vi.stubGlobal('fetch', vi.fn().mockResolvedValue(...))
 
 ---
 
-## 7. Test-Code – Pragmatische Regeln
+<a id="CGT-test-code"></a>
+## Test-Code – Pragmatische Regeln
 
 Diese Richtlinie gilt für Test-Code mit den folgenden Abschwächungen:
 
@@ -423,6 +445,7 @@ const validName = makeIngredientName('Tomaten')._unsafeUnwrap();
 // _unsafeUnwrap() ist in Tests OK, weil der Wert bekannt gültig ist
 ```
 
+<a id="CGT-given-when-then"></a>
 ### Given/When/Then-Struktur in Tests (Pflicht)
 
 Jeder neue Test muss durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Die Kommentare helfen beim Review, jede Assertion dem passenden Akzeptanzkriterium des Gherkin-Szenarios zuzuordnen.
@@ -442,6 +465,7 @@ it('zeigt Zutaten-Liste an', async () => {
 });
 ```
 
+<a id="CGT-full-state-assertions"></a>
 ### Full-State-Assertions
 
 Bei `toEqual`- und `toMatchObject`-Aufrufen müssen alle verglichenen Properties durch ein Akzeptanzkriterium des Szenarios gedeckt sein.
@@ -461,6 +485,7 @@ expect(result).toMatchObject({ name: 'Tomaten' });
 expect(result).toMatchObject({ name: 'Tomaten' });
 ```
 
+<a id="CGT-stryker-survivor-default"></a>
 ### Stryker-Survivor: `= []` Default-Wert in useQuery
 
 Ein `?? []`-Default (z.B. `data ?? []`) erzeugt einen Stryker-Survivor, weil MSW in Tests immer Daten liefert und der Default nie aktiv ist. Dieser Survivor darf mit einem erklärenden Kommentar supprimiert werden:
@@ -474,6 +499,7 @@ Ein `?? []`-Default (z.B. `data ?? []`) erzeugt einen Stryker-Survivor, weil MSW
 const items = data ?? [];
 ```
 
+<a id="CGT-stryker-survivor-classname"></a>
 ### Stryker-Survivor: CSS-className-Strings
 
 String-Literale in `className`-Props erzeugen Stryker-StringLiteral-Mutanten, die kein Test killt, weil Tests nicht auf CSS-Klassen assertieren. Diese dürfen supprimiert werden:

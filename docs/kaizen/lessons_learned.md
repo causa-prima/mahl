@@ -38,9 +38,9 @@ Kontext:    TDD | C#-Code | TS-Code | Bash/Permission | Mutation-Testing |
             Hook/Script | Review | Agent-Prompt | Skill-Nutzung | Gherkin |
             Doku | Kommunikation | Testing | Sonstiges
 
-Alle drei Tags sind Pflicht. Definitionen und Reaktionsregeln: docs/kaizen/process.md
+Alle Tags sind Pflicht. Definitionen und Reaktionsregeln: docs/kaizen/process.md
 
-Vor dem Eintrag prüfen (alle drei Ja): (1) Gab es ein falsches Agenten-Verhalten das wieder auftreten kann – auch mit Config-Fix? (2) Kann die Situation grundsätzlich wiederkehren bzw. liegt eine wiederkehrende Tätigkeits-Klasse darunter? (3) Ist die Regel ein Agenten-Verhalten/-Urteil – keine statische, nachschlagbare Tatsache? Nein → kein Eintrag (Infra-/Tool-Fakt → docs/process/dev-workflow.md / Code-Kommentar; einmalige Situation → gar nicht). Bei (2) auf Klassen-Ebene formulieren. Details: docs/kaizen/process.md
+Vor dem Eintrag prüfen (überall Ja): (1) Gab es ein falsches Agenten-Verhalten das wieder auftreten kann – auch mit Config-Fix? (2) Kann die Situation grundsätzlich wiederkehren bzw. liegt eine wiederkehrende Tätigkeits-Klasse darunter? (3) Ist die Regel ein Agenten-Verhalten/-Urteil – keine statische, nachschlagbare Tatsache? Nein → kein Eintrag (Infra-/Tool-Fakt → docs/process/dev-workflow.md / Code-Kommentar; einmalige Situation → gar nicht). Bei (2) auf Klassen-Ebene formulieren. Details: docs/kaizen/process.md
 
 Nach der Sitzung prüfen: Gehört ein Eintrag in principles.md oder countermeasures.md?
 KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumentieren.
@@ -102,3 +102,32 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Die Fixture enthielt genau die Zeilen, um die es ging, und nichts sonst - sie bildete den Rahmen der echten Datei nicht ab. Genau dieselbe Ursache wie bei LL-S116-1, wo jenga_score.parse() den Beispiel-Eintrag aus dem Header als echtes Finding zaehlte; der Header ist bei diesen Dateien Teil des Formats und traegt absichtlich Beispielzeilen im Eintragsformat.
   Regel: Einen Befehl oder Parser, der auf eine reale Projektdatei angewandt werden soll, mindestens einmal gegen genau diese Datei laufen lassen - eine selbst gebaute Fixture belegt nur, dass er die gemeinten Zeilen findet, nicht dass er sonst nichts findet. Bei Dateien mit dokumentierendem Header gilt das doppelt: Der Header traegt Beispielzeilen im Eintragsformat und ist damit die wahrscheinlichste Quelle falscher Treffer.
   CM-Bezug: CM-S116-1
+
+## Session 124 – 2026-08-27
+
+- **[HOCH] [PROZESS] [Doku] LL-S124-1 – Nummer entfernt, ohne nach Verweisen darauf zu suchen**
+  Quelle: Orchestrator
+  Was: Bei der Anker-Migration wurden nummerierte Abschnitte umbenannt, ohne vorher zu pruefen, wer per Nummer darauf zeigt. Zweimal in derselben Session: erst starben sechs Verweise in .editorconfig, eslint.config.js, IngredientsEndpoints.cs und IngredientsPage.test.tsx (gefunden von einem Sichter-Subagenten), danach - trotz des ersten Vorfalls - zwei weitere in countermeasures.md auf den umbenannten Retro-Berichtsabschnitt (gefunden erst in der Nachpruefung).
+  Warum: Die Umbenennung fuehlt sich lokal an: Man sieht die Datei, die man aendert. Der Verweis liegt aber woanders und in einer anderen Notation - eine ESLint-Meldung, ein C#-Kommentar, ein Wirksamkeitskriterium. anchors.py prueft Anker, nicht Namen in Prosa; kein Werkzeug deckt diese Richtung ab.
+  Regel: Vor dem Entfernen oder Umbenennen einer Nummer, eines Abschnittsnamens oder eines Ausgabe-Labels zuerst repoweit nach Verweisen darauf suchen - auch in Code, Config und Script-Ausgaben, nicht nur in Markdown. Erst danach aendern.
+  CM-Bezug: CM-S124-3
+
+- **[HOCH] [AGENT] [Kommunikation] LL-S124-2 – Pruefung behauptet, die ihren Gegenstand gar nicht pruefen konnte**
+  Quelle: User
+  Was: Auf die Frage, ob vor dem Abbruch wirklich alle Edits abgeschlossen waren, durchsuchte ich den Diff nach TODO/FIXME/TBD-Markern und gab das leere Ergebnis als Beleg fuer Vollstaendigkeit aus. Bei dieser Arbeit wurden nie solche Marker gesetzt - die Suche konnte gar nichts finden und belegte nichts. Der User deckte den Fehlschluss auf; die richtige Pruefung (Abgleich der vier Sichter-Berichte gegen den Ist-Zustand) foerderte dann einen offenen Befund zutage.
+  Warum: Das Beduerfnis, eine Behauptung zu belegen, sucht sich das naechstliegende Werkzeug statt das passende. Ein gruenes Ergebnis fuehlt sich wie ein Beleg an, auch wenn der Test den Gegenstand nie beruehrt hat - das ist genau die Form, in der eine Pruefung still versagt (CM-S116-1).
+  Regel: Vor dem Ausgeben eines Pruefergebnisses die Gegenfrage stellen: Haette diese Pruefung anschlagen KOENNEN, wenn der Fehler vorlaege? Lautet die Antwort nein, ist das Ergebnis kein Beleg und darf nicht als solcher praesentiert werden.
+  CM-Bezug: neu
+
+- **[MITTEL] [AGENT] [Kommunikation] LL-S124-3 – Fehlalarmquote auf dem bereits bereinigten Bestand gerechnet**
+  Quelle: User
+  Was: Nach der Sichtung von 44 Fundstellen meldete ich '40 von 44 legitim, also ~91 Prozent Fehlalarm' als Argument gegen einen schaerferen Hook. Die Zahl galt aber erst NACH der Korrektur der echten Faelle - die behandelten Treffer waren aus der Grundgesamtheit verschwunden. Auf dem urspruenglichen Bestand gerechnet lag die Quote bei 65-75 Prozent. Der User erkannte den Survivorship Bias.
+  Warum: Wer eine Menge bearbeitet und danach misst, misst die Ueberlebenden. Die Reihenfolge Bearbeiten-dann-Zaehlen ist die natuerliche, und das Ergebnis stuetzt bequemerweise die Entscheidung, nichts weiter zu bauen.
+  Regel: Eine Quote immer auf der Grundgesamtheit zum Messzeitpunkt bilden und den Zeitpunkt dazusagen. Wurde zwischendurch bereinigt, ist die Zahl vor der Bereinigung die aussagekraeftige - oder die Messung gilt ausdruecklich nur fuer den Rest.
+
+- **[MITTEL] [PROZESS] [Skill-Nutzung] LL-S124-4 – Befund aus einer Subagenten-Liste verloren, weil der naechste Bericht dazwischenkam**
+  Quelle: Orchestrator
+  Was: Von vier parallel arbeitenden Sichter-Subagenten trafen die Berichte zeitversetzt ein. Ein Befund des Docs-Sichters (process.md Noise-Filter) war bereits per grep verifiziert; dann kam der Bericht des Code-Sichters mit toten Verweisen herein, die Arbeit sprang dorthin, und der offene Befund kehrte nie zurueck. Aufgefallen erst zwei Runden spaeter durch eine Nachfrage des Users.
+  Warum: Die Befundliste lebte nur im Gespraechsverlauf. Ein eingehender Bericht verdraengt die laufende Liste, ohne dass irgendwo sichtbar bleibt, was davon noch offen ist - und es gab keinen Abgleich am Ende.
+  Regel: Bei mehreren parallel liefernden Subagenten die Befunde nach Eingang in einer sichtbaren Liste mit Status je Eintrag fuehren und vor dem Abschluss gegen den Ist-Zustand abgleichen - nicht im Kontext mitfuehren.
+  CM-Bezug: neu

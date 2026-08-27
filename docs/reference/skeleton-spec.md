@@ -5,12 +5,13 @@ wann-lesen: Überblick über SKELETON-Scope (welche User Stories) und das Walkin
 kritische-regeln:
   - Kein produktiver Code – nur Referenz
   - Entscheidungen → docs/history/adr.md
-  - Architektur-Constraints → docs/reference/architecture.md (Abschnitt 4b)
+  - Architektur-Constraints → [SKELETON-Phase: Scope-Constraints](architecture.md#ARC-skeleton-constraints)
   - Verhaltenserwartungen → Gherkin-Szenarien in features/
 -->
 
 ---
 
+<a id="SKE-ziel"></a>
 ## Ziel
 
 Minimaler technischer Durchstich (End-to-End), der alle Schichten verbindet:
@@ -18,6 +19,7 @@ Minimaler technischer Durchstich (End-to-End), der alle Schichten verbindet:
 
 ---
 
+<a id="SKE-user-stories"></a>
 ## User Stories im SKELETON
 
 | Story | Beschreibung |
@@ -32,6 +34,7 @@ Minimaler technischer Durchstich (End-to-End), der alle Schichten verbindet:
 
 ---
 
+<a id="SKE-api-routen"></a>
 ## API-Routen (Übersicht)
 
 | Gruppe | Methoden |
@@ -45,6 +48,7 @@ Alle nicht-offensichtlichen Verhaltensdetails (Status-Codes, 409-Varianten, Sort
 
 ---
 
+<a id="SKE-akzeptanzkriterium"></a>
 ## Akzeptanzkriterium (Walking Skeleton)
 
 1. Zutat anlegen (z.B. "Tomaten, Stück")

@@ -13,20 +13,21 @@ kritische-regeln:
   - Branch-Coverage-Ziel: 100% (Coverlet / V8) – Unterschreitung = Build-Fehler
 -->
 
+<a id="TDD-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Outside-In ATDD | Three-Loop TDD: äußer (Gherkin/E2E), mittler (Integration), inner (Unit je Schicht); Regeln | Vor dem Start jeder User Story |
-| Phase 1 – RED | Test-Batch schreiben, kollektiven Fehlschlag bestätigen, Business-Entscheidungen dokumentieren | Vor jeder neuen Implementierung |
-| Phase 2 – GREEN | Kleinstmögliche Implementierung, Gold-Plating-Check, alle Tests grün | Während der Implementierung |
-| Phase 3 – REFACTOR | Checkliste: Minimalität, Duplikate, Lesbarkeit, Guideline-Compliance | Nach jedem GREEN |
-| Test-Setup | Unit Tests / Integration Tests / Test-Utilities, Test-Namen-Format | Beim Einrichten neuer Test-Projekte |
-| Test-Data-Builder | Builder-Methoden in EndpointsTestsBase, Schutz vor Schemaänderungen | Beim Anlegen neuer Entities |
-| Parametrisierte Tests | TestCase / TestCaseSource, TDD-Kompatibilität, wann NICHT parametrisieren | Beim Testen gleichartiger Eingaben |
-| Full State Assertion | BeEquivalentTo-Pflicht, Excluding-Regeln, API-Response vs. DB-State | Bei allen mutierenden Operationen (POST/PUT/DELETE) |
-| Mutation Testing | Stryker-Konfiguration, Ziel 100%, Ausnahmen, Stryker-Kategorien für Defensive Guards | Am Ende jeder Phase und während Entwicklung |
-| Branch Coverage | Coverlet (C#) / V8 (TS), Ziel 100%, Suppressionen | Nach jedem vollständigen Test-Lauf |
+| [Outside-In ATDD](#TDD-outside-in) | Three-Loop TDD: äußer (Gherkin/E2E), mittler (Integration), inner (Unit je Schicht); Regeln | Vor dem Start jeder User Story |
+| [RED](#TDD-red) | Test-Batch schreiben, kollektiven Fehlschlag bestätigen, Business-Entscheidungen dokumentieren | Vor jeder neuen Implementierung |
+| [GREEN](#TDD-green) | Kleinstmögliche Implementierung, Gold-Plating-Check, alle Tests grün | Während der Implementierung |
+| [REFACTOR](#TDD-refactor) | Checkliste: Minimalität, Duplikate, Lesbarkeit, Guideline-Compliance | Nach jedem GREEN |
+| [Test-Setup](#TDD-test-setup) | Unit Tests / Integration Tests / Test-Utilities, Test-Namen-Format | Beim Einrichten neuer Test-Projekte |
+| [Test-Data-Builder](#TDD-test-data-builder) | Builder-Methoden in EndpointsTestsBase, Schutz vor Schemaänderungen | Beim Anlegen neuer Entities |
+| [Parametrisierte Tests](#TDD-parametrisierte-tests) | TestCase / TestCaseSource, TDD-Kompatibilität, wann NICHT parametrisieren | Beim Testen gleichartiger Eingaben |
+| [Full State Assertion](#TDD-full-state-assertion) | BeEquivalentTo-Pflicht, Excluding-Regeln, API-Response vs. DB-State | Bei allen mutierenden Operationen (POST/PUT/DELETE) |
+| [Mutation Testing](#TDD-mutation-testing) | Stryker-Konfiguration, Ziel 100%, Ausnahmen, Stryker-Kategorien für Defensive Guards | Am Ende jeder Phase und während Entwicklung |
+| [Branch Coverage](#TDD-branch-coverage) | Coverlet (C#) / V8 (TS), Ziel 100%, Suppressionen | Nach jedem vollständigen Test-Lauf |
 
 ---
 
@@ -41,6 +42,7 @@ Schreibe alle Tests einer Verhaltenseinheit (das Szenario auf der jeweiligen Sch
 - **Test-zuerst:** erst Tests (rot), dann Code. Nach dem Code geschriebene Tests bestätigen nur, was der Code zufällig tut.
 - **Spec-Mapping:** jede Assertion und jedes signifikante Given/When mappt auf ein Gherkin-Kriterium. Das ist die *eine* Garantie, die der Batch verliert und die Stryker NICHT liefert (Stryker beweist Nicht-Vakuosität, nicht ob der *richtige* Sachverhalt getestet wird) – sie wird im Review erzwungen.
 
+<a id="TDD-outside-in"></a>
 ## Outside-In ATDD / Double-Loop TDD
 
 Beim Implementieren einer User Story gilt immer diese Reihenfolge:
@@ -92,7 +94,8 @@ Langsame Stryker-Läufe durch eine wachsende Integration-Test-Suite sind ein akz
 
 ---
 
-## Phase 1 – RED (Test-Batch schreiben)
+<a id="TDD-red"></a>
+## RED – Test-Batch schreiben
 
 **Vor-Bedingung (Before RED):**
 - Existiert ein Gherkin-Szenario mit `@US-NNN`-Tag in `features/`?
@@ -105,14 +108,15 @@ Langsame Stryker-Läufe durch eine wachsende Integration-Test-Suite sind ein akz
    - Mappt jede Assertion + jedes signifikante Given/When auf ein Gherkin-Kriterium? Falls nicht → Gold-Plating, nicht schreiben.
 3. Führe den Batch aus und bestätige den **kollektiven** Fehlschlag.
 4. **PFLICHT-OUTPUT:** Bestätige explizit: *"Test-Batch [Testnamen] schlägt fehl mit: [je Test die Fehlermeldung]"*
-5. Erst dann weiter zu Phase 2
+5. Erst dann weiter zu [GREEN](#TDD-green)
 
 Ist ein Test des Batches auf Anhieb grün, ist das ein **nachgelagertes Symptom**: Entweder beschreibt er kein neues Verhalten, oder bereits geschriebener Code (Gold-Plating) macht ihn grün.
 - **PFLICHT-OUTPUT:** *"Test [TestName] ist sofort grün. Ursache: [Gold-Plating / Test testet nichts Neues]"*
 - Bei Gold-Plating: Den vorzeitig geschriebenen Code **rückgängig machen**, den Test als RED bestätigen, dann minimal implementieren.
 - Bei sinnlosem Test: Test löschen oder anpassen, sodass er echtes neues Verhalten beschreibt.
 
-## Phase 2 – GREEN (Minimale Implementierung)
+<a id="TDD-green"></a>
+## GREEN – Minimale Implementierung
 
 Implementiere, bis der **gesamte Test-Batch** grün ist – nicht mehr.
 
@@ -138,14 +142,15 @@ hardcodierte Rückgabe, durch echte Logik ersetzt zu werden. So entsteht nur Cod
 Wenn ja: tue es – kein Test fordert mehr.
 
 1. Schreibe die **kleinstmögliche** Implementierung, die den **Test-Batch** grün macht
-2. **PFLICHT-CHECK vor dem Speichern:** Gehe jede neue Zeile durch und frage: *"Erzwingt ein Test des Batches diese Zeile?"* Wenn nein → Zeile löschen (oder auf hardcoded Wert reduzieren). Stryker beweist das in Phase 3 mechanisch nach.
+2. **PFLICHT-CHECK vor dem Speichern:** Gehe jede neue Zeile durch und frage: *"Erzwingt ein Test des Batches diese Zeile?"* Wenn nein → Zeile löschen (oder auf hardcoded Wert reduzieren). Stryker beweist das in [REFACTOR](#TDD-refactor) mechanisch nach.
 3. Führe **alle** Tests aus (sicherstellt, dass nichts kaputt gegangen ist)
 4. **PFLICHT-OUTPUT:** Bestätige explizit: *"Alle [N] Tests grün"*
-5. Erst dann weiter zu Phase 3
+5. Erst dann weiter zu [REFACTOR](#TDD-refactor)
 
 Jede Zeile, die kein Test erzwingt, ist Gold-Plating – auch wenn sie "offensichtlich sinnvoll" wirkt.
 
-## Phase 3 – REFACTOR (Qualität herstellen)
+<a id="TDD-refactor"></a>
+## REFACTOR – Qualität herstellen
 
 Führe diese Checkliste explizit durch und dokumentiere das Ergebnis:
 
@@ -155,7 +160,7 @@ Führe diese Checkliste explizit durch und dokumentiere das Ergebnis:
 > Der REFACTOR-Schritt gilt daher **immer für beides**: Produktionscode UND Tests.
 
 - [ ] **Minimalität (zuerst prüfen!):** Gibt es Code, der durch keinen bisher existierenden Test erzwungen wird? → Löschen. Frage: *"Welcher Test würde fehlschlagen, wenn ich diese Zeile entferne?"* Kein Test → Zeile löschen.
-- [ ] **Stryker + Branch Coverage (Pflicht, Teil der Minimalitätsprüfung):** Stryker und Branch-Coverage-Lauf für die betroffene Schicht ausführen. Ziel: **100 % Mutation Score + 100 % Branch Coverage**. Survivor-Behandlung, Suppressionen, Befehle: Sektion "Mutation Testing" + "Branch Coverage" in dieser Datei.
+- [ ] **Stryker + Branch Coverage (Pflicht, Teil der Minimalitätsprüfung):** Stryker und Branch-Coverage-Lauf für die betroffene Schicht ausführen. Ziel: **100 % Mutation Score + 100 % Branch Coverage**. Survivor-Behandlung, Suppressionen, Befehle: Sektion "[Mutation Testing](#TDD-mutation-testing)" + "[Branch Coverage](#TDD-branch-coverage)" in dieser Datei.
 
   **PFLICHT-OUTPUT:** *"Stryker: [Score] | Branch Coverage: [Score] | Suppression-Report: [Neue Suppressionen mit Datei:Zeile und Begründung]"* oder *"Kein Survivor, keine Suppression"*. Beide Scores werden vom Orchestrator geprüft.
 
@@ -185,10 +190,12 @@ Führe die Tests nochmals aus und bestätige grün.
 
 **Wichtig:** Wenn du merkst, dass du Tests erst nach der Implementierung schreibst, halte an, dokumentiere das als Learning in `docs/kaizen/lessons_learned.md`, und schreibe für den Rest der Story Tests zuerst.
 
+<a id="TDD-test-ausfuehrung"></a>
 ## Test-Ausführung
 
-Ausführungsbefehle (`dotnet-test.py`, `dotnet-stryker.py`, Timeouts): `docs/process/dev-workflow.md` – Sektion "Tests & Mutation Testing".
+Ausführungsbefehle (`dotnet-test.py`, `dotnet-stryker.py`, Timeouts): `docs/process/dev-workflow.md` – Sektionen "[Tests](dev-workflow.md#DEV-tests)" und "[Mutation Testing](dev-workflow.md#DEV-mutation-testing)".
 
+<a id="TDD-test-setup"></a>
 ## Test-Setup
 
 - **Alle Tests:** `Server.Tests/` – Domain Logic + API Endpoints (xunit.v3 + AwesomeAssertions + Microsoft.AspNetCore.Mvc.Testing + EF InMemory; MTP-Runner via `UseMicrosoftTestingPlatformRunner`)
@@ -211,6 +218,7 @@ Beispiele: `US201_HappyPath_Create_ValidData_Returns201`, `US201_Error_Create_Em
 
 Wird dasselbe Verhalten von mehreren Szenarien exercised: Primär-Szenario taggen (das Szenario, das diesen Test im inneren Loop erzwungen hat). Kein Mehrfach-Tagging.
 
+<a id="TDD-test-data-builder"></a>
 ## Test-Data-Builder
 
 Alle DB-Entities werden über Builder-Methoden in `EndpointsTestsBase` angelegt. Das schützt vor
@@ -229,6 +237,7 @@ SeedIngredients([AnIngredient("Salz"), AnIngredient("Pfeffer", deletedAt: DateTi
 
 Für jede neue Entity-Art eine entsprechende Builder-Methode ergänzen.
 
+<a id="TDD-parametrisierte-tests"></a>
 ## Parametrisierte Tests
 
 **Vor jedem neuen Test prüfen: eigener Test oder weiterer `[TestCase]`?**
@@ -262,6 +271,7 @@ Test-Batch und werden gemeinsam rot bestätigt – kein getrennter RED-Zyklus pr
 **Nicht parametrisieren** wenn die Setup-Logik zwischen Fällen unterschiedlich ist oder der
 ExpectedState dynamisch vom InitialState abhängt – dort eigene Testmethoden.
 
+<a id="TDD-full-state-assertion"></a>
 ## Pflicht: Full State Assertion bei mutierenden Operationen
 
 Endpoint-Tests, die Daten **anlegen, ändern oder löschen**, prüfen nach dem HTTP-Call den **vollständigen** DB-Zustand ("Full State Assertion") – nicht nur ob ein bestimmtes Item vorhanden ist. Nur so werden unerwartete Seiteneffekte (Extra-Rows, veränderte bestehende Einträge) sicher erkannt.
@@ -328,6 +338,7 @@ GetAllIngredients().Should().BeEquivalentTo(stateBeforeAction); // exakt unverä
 
 Diese Regel gilt für POST (anlegen), PUT/PATCH (ändern), DELETE (löschen/soft-delete).
 
+<a id="TDD-mutation-testing"></a>
 ## Mutation Testing (Stryker.NET / Stryker-JS)
 
 - **Ziel:** 100% Mutation Score
@@ -345,6 +356,7 @@ zutreffenden Fällen**, der die gewählte Reihenfolge behauptet. Stryker-Grün �
 genügt hier nicht — ein Fall, in dem ein grünes Ergebnis nur belegt, dass der Aufbau lief.
 (Gefunden in S105 im Review als FC-F1; der konkrete Fall ist mit einem Mehrfeld-Assert geschlossen.)
 
+<a id="TDD-stryker-survivor"></a>
 ### Stryker-Survivor behandeln
 
 **Ein Survivor bedeutet: Es fehlt eine Test-Assertion für echtes Verhalten.**
@@ -361,7 +373,7 @@ Die richtige Frage bei einem Survivor ist nie „Wie töte ich diesen Mutanten?"
 1. **Spec-Check:** Ist das Verhalten explizit durch die Spezifikation gefordert?
    - **Nein** → Code löschen (Gold-Plating). Alle Tests GREEN bestätigen. Stryker auf die Datei ausführen → Survivor darf nicht mehr erscheinen.
    - **Unsicher** → Nachfragen.
-   - **Ja** → weiter zu 2.
+   - **Ja** → weiter mit dem nächsten Schritt.
 2. **Überlebenden Code löschen.** Nur so ist RED im nächsten Schritt garantiert – Code, der bereits existiert, macht einen neuen Test sofort grün und verhindert den korrekten TDD-Zyklus.
 3. **Test schreiben → RED bestätigen.**
 4. **Code neu schreiben → GREEN bestätigen.**
@@ -381,6 +393,7 @@ Syntax und vollständige Kategorienliste: `docs/guidelines/csharp-stryker.md`.
 
 Stryker-Bezüge (Zeilennummern, Mutantentypen) gehören **nicht** in Test-Namen oder Kommentare.
 
+<a id="TDD-branch-coverage"></a>
 ## Branch Coverage
 
 - **C# Backend:** Coverlet (collector) mit `coverlet.runsettings` – automatisch bei vollem Test-Lauf (`dotnet-test.py` ohne `--filter`). Threshold: 100% Branch + Line.

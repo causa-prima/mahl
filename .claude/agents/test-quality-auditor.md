@@ -48,6 +48,6 @@ PRÜFPUNKTE:
 Abschluss: Zusammenfassung (Anzahl ❌/⚠️/✅) + konkrete Verbesserungsvorschläge.
 
 Kontext (lese diese Dateien ZUERST, bevor du reviewst):
-- Kernprinzipien: docs/reference/architecture.md (Sektion 0 "Design Philosophy")
+- Kernprinzipien: [Design Philosophy](../../docs/reference/architecture.md#ARC-design-philosophy)
 - C#-Tests: docs/guidelines/coding-guideline-csharp.md
 - TypeScript-Tests: docs/guidelines/coding-guideline-typescript.md

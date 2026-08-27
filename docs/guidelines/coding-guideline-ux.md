@@ -7,26 +7,28 @@ Visuelle Konsistenz (Spacing, Hierarchie, Farbe) wird in einer eigenen Guideline
 sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müssen.
 -->
 
+<a id="CGU-inhalt"></a>
 ## Inhalt
 
 | Prinzip | Wann relevant |
 |---|---|
-| 1. Principle of Least Surprise | Bei jedem Button, Link, Formular, Navigation |
-| 2. Don't Make Me Think | Bei Labels, Aktionsbeschriftungen, Strukturentscheidungen |
-| 3. Sichtbares Feedback | Bei jeder Aktion, die etwas verändert |
-| 4. Fehlermeldungen als Hilfe | Bei jeder Validierung oder Fehlerbehandlung |
-| 5. Destructive Actions schützen | Bei Löschen, Archivieren, Überschreiben |
-| 6. Konsistente Terminologie | Bei allen sichtbaren Texten (Labels, Buttons, Meldungen) |
-| 7. Leerer Zustand erklärt sich | Bei jeder Liste, Tabelle oder Ansicht, die leer sein kann |
-| 8. Formular-/Dialog-Baseline | Bei jedem Formular oder Dialog (Pflichtfeld-Markierung, Fokus-Führung, Tastatur) |
-| 9. Erreichbarkeit / Navigation | Sobald mehr als eine Seite/Route existiert |
+| [Principle of Least Surprise](#CGU-least-surprise) | Bei jedem Button, Link, Formular, Navigation |
+| [Don't Make Me Think](#CGU-dont-make-me-think) | Bei Labels, Aktionsbeschriftungen, Strukturentscheidungen |
+| [Sichtbares Feedback](#CGU-feedback) | Bei jeder Aktion, die etwas verändert |
+| [Fehlermeldungen als Hilfe](#CGU-fehlermeldungen) | Bei jeder Validierung oder Fehlerbehandlung |
+| [Destructive Actions schützen](#CGU-destructive-actions) | Bei Löschen, Archivieren, Überschreiben |
+| [Konsistente Terminologie](#CGU-terminologie) | Bei allen sichtbaren Texten (Labels, Buttons, Meldungen) |
+| [Leerer Zustand erklärt sich](#CGU-leerer-zustand) | Bei jeder Liste, Tabelle oder Ansicht, die leer sein kann |
+| [Formular-/Dialog-Baseline](#CGU-formular-baseline) | Bei jedem Formular oder Dialog (Pflichtfeld-Markierung, Fokus-Führung, Tastatur) |
+| [Erreichbarkeit / Navigation](#CGU-navigation) | Sobald mehr als eine Seite/Route existiert |
 
 > **Voraussetzung:** Diese Guideline gilt für alle React-Komponenten.
 > `docs/guidelines/coding-guideline-typescript.md` beschreibt die technische Umsetzung.
 
 ---
 
-## 1. Principle of Least Surprise
+<a id="CGU-least-surprise"></a>
+## Principle of Least Surprise
 
 **Warum:** Nutzer bauen mentale Modelle auf. Jede Überraschung erzeugt Unsicherheit und Vertrauensverlust.
 
@@ -41,7 +43,8 @@ sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müsse
 
 ---
 
-## 2. Don't Make Me Think
+<a id="CGU-dont-make-me-think"></a>
+## Don't Make Me Think
 
 **Warum:** Jede Erklärung, die die UI selbst liefern müsste, kostet den Nutzer kognitive Energie.
 
@@ -56,7 +59,8 @@ sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müsse
 
 ---
 
-## 3. Sichtbares Feedback
+<a id="CGU-feedback"></a>
+## Sichtbares Feedback
 
 **Warum:** Ohne Feedback wissen Nutzer nicht, ob ihre Aktion ankam.
 
@@ -76,7 +80,8 @@ sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müsse
 
 ---
 
-## 4. Fehlermeldungen als Hilfe
+<a id="CGU-fehlermeldungen"></a>
+## Fehlermeldungen als Hilfe
 
 **Warum:** Eine Fehlermeldung, die nicht erklärt was falsch ist und wie man es beheben kann, ist keine Hilfe.
 
@@ -95,19 +100,20 @@ Format: "[Was ist falsch]." oder "[Was ist falsch] ([Constraint])."
 
 ---
 
-## 5. Destructive Actions schützen
+<a id="CGU-destructive-actions"></a>
+## Destructive Actions schützen
 
 **Warum:** Irreversible Aktionen erzeugen Angst. Rückgängig-machen schafft Vertrauen.
 
 **Entscheidungsregel (gestuft):**
 
-| Stufe | Situation | Verhalten |
+| Vorrang | Situation | Verhalten |
 |---|---|---|
-| 1 | Soft-Delete machbar | Soft-Delete + Wiederherstellungsmöglichkeit im UI. Undo-Toast zusätzlich, wenn kein offensichtlicher Restore-Weg im normalen UI existiert. |
-| 2 | Soft-Delete zu komplex | Bestätigungsdialog ("Wirklich löschen?"). Kein Undo. |
-| 3 | Irreversibel + schwerwiegend | Explizite Bestätigung (z.B. Name eintippen). Nur für außergewöhnliche Fälle — aktuell in Mahl nicht vorgesehen. |
+| **erste Wahl** | Soft-Delete machbar | Soft-Delete + Wiederherstellungsmöglichkeit im UI. Undo-Toast zusätzlich, wenn kein offensichtlicher Restore-Weg im normalen UI existiert. |
+| **Rückfall** | Soft-Delete zu komplex | Bestätigungsdialog ("Wirklich löschen?"). Kein Undo. |
+| **Sonderfall** | Irreversibel + schwerwiegend | Explizite Bestätigung (z.B. Name eintippen). Nur für außergewöhnliche Fälle — aktuell in Mahl nicht vorgesehen. |
 
-Stufe 1 hat immer Vorrang vor Stufe 2.
+Soft-Delete hat immer Vorrang vor dem Bestätigungsdialog.
 
 ✅ Zutat löschen → wird als gelöscht markiert → im UI wiederherstellbar → kein Datenverlust.
 ❌ Zutat löschen → sofort unwiederbringlich weg → Nutzer muss neu anlegen.
@@ -126,7 +132,8 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 
 ---
 
-## 6. Konsistente Terminologie
+<a id="CGU-terminologie"></a>
+## Konsistente Terminologie
 
 **Warum:** Synonyme erzeugen Unsicherheit. Nutzer fragen sich: "Ist das dasselbe?"
 
@@ -139,7 +146,8 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 
 ---
 
-## 7. Leerer Zustand erklärt sich
+<a id="CGU-leerer-zustand"></a>
+## Leerer Zustand erklärt sich
 
 **Warum:** Eine leere Liste ohne Kontext lässt Nutzer im Unklaren — ist das ein Fehler oder gewollt?
 
@@ -155,7 +163,8 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 
 ---
 
-## 8. Formular-/Dialog-Baseline
+<a id="CGU-formular-baseline"></a>
+## Formular-/Dialog-Baseline
 
 **Warum:** Jedes Formular braucht dieselben Grund-Mechaniken (Pflichtfeld-Erkennbarkeit, Fokus-Führung, Tastatur-Bedienung). Werden sie pro Formular neu — oder gar nicht — entschieden, driften sie auseinander, und Tastatur-/Screenreader-Nutzer verlieren die Orientierung. Diese Baseline gilt für **jedes** Formular und jeden Dialog.
 
@@ -163,6 +172,7 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 - **Ja → kein Szenario.** Per dieser Guideline + Review erzwingen (beim Schreiben *und* beim Reviewen). Ein Szenario würde nur das Framework testen.
 - **Nein (eigene Logik) → Szenario/Assert** wie unten.
 
+<a id="CGU-custom-mechanismen"></a>
 ### Custom — mit Szenario abgesichert
 
 | Mechanismus | Verhalten | Träger |
@@ -171,6 +181,7 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 | **Autofokus beim Öffnen** | Beim Öffnen liegt der Fokus auf dem **visuell ersten** Eingabefeld. | Eigenes Happy-Path-Szenario, **E2E** (visuell oberstes Input hat Fokus). Invariant: Formularfelder **nicht per CSS umsortieren** (DOM-Reihenfolge == visuelle Reihenfolge) — sonst fokussiert `autoFocus` ein nicht-erstes Feld, besonders im responsiven/Mobile-Layout. |
 | **Fokus aufs erste fehlerhafte Feld** | Nach Validierungsfehler springt der Fokus auf das **erste fehlerhafte** Feld (ein Fehler → dieses; mehrere → das erste). | Asserts an die bestehenden Error-Szenarien — mind. ein Fall „erstes Feld fehlerhaft" **und** ein Fall „nur späteres Feld fehlerhaft", damit „erstes" gepinnt ist. Custom, weil die Validierung server-only ist (ADR-S090-1) → kein nativer Client-Fokus. |
 
+<a id="CGU-framework-mechanismen"></a>
 ### Framework-geliefert — KEIN Szenario, per Review erzwungen
 
 | Mechanismus | Verhalten | Geliefert von / zu erzwingen |
@@ -185,13 +196,14 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 
 ---
 
-## 9. Erreichbarkeit / Navigation
+<a id="CGU-navigation"></a>
+## Erreichbarkeit / Navigation
 
 **Warum:** Eine Seite, die nur per direkter URL erreichbar ist, findet niemand — Deep-Links sind kein Ersatz für eine sichtbare Navigation. Ohne strukturelle Regel wird das erst bemerkt, wenn schon mehrere Seiten ohne Verbindung zueinander existieren.
 
 **Entscheidungsregel:** Sobald eine zweite Seite/Route eingeführt wird, bekommt **jede** erreichbare Seite einen Eintrag in der In-App-Navigation (z.B. AppBar/Sidebar) — strukturell, für jede neue Route, unabhängig davon, ob die einzelne Story das erwähnt. Bei genau einer Seite (aktueller Stand) ist diese Regel nicht anwendbar.
 
-**Abgrenzung zu Gherkin-Szenarien:** Diese Guideline erzwingt nur die *strukturelle* Regel ("jede Route hat einen Nav-Eintrag", per Review). Das *konkrete* Verhalten ("von A nach B navigieren") ist ein Gherkin-Szenario — es gehört in `features/navigation.feature` (Tag `@CROSS-navigation`), nicht in das Feature-File der einzelnen Entität, damit bestehende Feature-Dateien beim Hinzufügen einer neuen Seite nicht nachträglich angepasst werden müssen. Details: ADR-S103-1; Aufnahme in den Szenario-Pool via `gherkin-workshop`-Checkliste (Schritt 1).
+**Abgrenzung zu Gherkin-Szenarien:** Diese Guideline erzwingt nur die *strukturelle* Regel ("jede Route hat einen Nav-Eintrag", per Review). Das *konkrete* Verhalten ("von A nach B navigieren") ist ein Gherkin-Szenario — es gehört in `features/navigation.feature` (Tag `@CROSS-navigation`), nicht in das Feature-File der einzelnen Entität, damit bestehende Feature-Dateien beim Hinzufügen einer neuen Seite nicht nachträglich angepasst werden müssen. Details: ADR-S103-1; Aufnahme in den Szenario-Pool via [`gherkin-workshop`-UI-Verhaltens-Checkliste](../../.claude/skills/gherkin-workshop/SKILL.md#GHW-ui-verhaltens-checkliste).
 
 ✅ Neue Seite „Rezepte" → Eintrag in der AppBar-Navigation + Szenario „Von der Zutatenliste zu den Rezepten navigieren" in `features/navigation.feature`.
 ❌ Neue Seite nur per manuell eingegebener URL erreichbar; Navigations-Szenario im `ingredients.feature` versteckt, weil es „gerade dort naheliegend war".

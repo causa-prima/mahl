@@ -268,24 +268,24 @@
                 why: "Alle 31 Szenarien der User Story US-904, noch ungeteilt. Ziel: in möglichst homogene Cluster aufteilen — je Cluster = ein implementing-scenario-Lauf."
             },
             {
-                title: "Schritt 1 — nach Capability",
+                title: "Nach Capability",
                 crit: "Domänen-Operation aus dem »When«",
                 why: "Jede Operation wird ein eigener Strang: Liste, Anlegen, Löschen, Reaktivierung. Reaktivierung steht eigenständig, weil »Restore eines Soft-Deletes« eine andere Operation ist als »Anlegen«."
             },
             {
-                title: "Schritt 2 — Mutations-Capabilities nach Ergebnisklasse",
+                title: "Mutations-Capabilities nach Ergebnisklasse",
                 crit: "Validierung (abgelehnter Input) vs. Success/Verhalten",
                 why: "Anlegen und Löschen spalten sich in erfolgreiche/Verhaltens-Pfade und abgelehnte Eingaben bzw. Konflikte. Liste (reine Lesepfade) und Reaktivierung bleiben unverändert."
             },
             {
-                title: "Schritt 3 — Validierung nach Form & Feld",
+                title: "Validierung nach Form &amp; Feld",
                 crit: "stateless (kein Seed) vs. state-driven (Seed nötig); stateless weiter nach Eingabefeld",
                 why: "Stateless-Input-Regeln (leer/Whitespace/Länge) haben anderes Setup als Eindeutigkeit (braucht eine geseedete Zutat, prüft Konflikt). Stateless wird nach Feld getrennt (Name/Einheit); der Mehrfeld-Fall ist eigen. Valide Grenzwerte (»genau 30/20«) bleiben beim jeweiligen Feld — Boundary-Paar mit dem Reject-Fall."
             },
             {
-                title: "Schritt 4 — Success/Verhalten nach Schicht",
+                title: "Success/Verhalten nach Schicht",
                 crit: "frontend-only vs. full-stack",
-                why: "Reines Dialog-/Pending-Verhalten braucht keinen Backend-Subagenten (frontend-only); persistierende Pfade sind full-stack. Sichtbar bei Löschen: »Löschen + Undo« (full-stack) trennt sich vom »Button-Pending« (frontend-only). Ergebnis: 11 Cluster = 11 Läufe."
+                why: "Letzter Split-Schritt — die beiden Ordnungs-Schritte des Algorithmus (Zustands-Abhängigkeiten, Erstmaligkeiten) zerteilen nichts mehr und sind hier deshalb nicht dargestellt. Reines Dialog-/Pending-Verhalten braucht keinen Backend-Subagenten (frontend-only); persistierende Pfade sind full-stack. Sichtbar bei Löschen: »Löschen + Undo« (full-stack) trennt sich vom »Button-Pending« (frontend-only). Ergebnis: 11 Cluster = 11 Läufe."
             }
         ];
 

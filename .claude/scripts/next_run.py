@@ -6,7 +6,7 @@ Löst den Platzhalter `{{NEXT_RUN}}` zum nächsten offenen Implementierungs-Lauf
 Story auf. Ein Lauf ist ein oder mehrere Szenarien mit demselben `# @run-N`-Kommentar-Tag
 (Algorithmus + Format: `.claude/skills/gherkin-workshop/references/scenario-clustering.md`).
 Szenarien ohne Run-Tag bilden ihren eigenen Einzel-Lauf – rückwärtskompatibel zu Storys, die
-noch nicht per gherkin-workshop-Schritt 6 geclustert wurden. Mapping Feature-Datei ↔ E2E-Test
+noch nicht per gherkin-workshop-Szenario-Clustering geclustert wurden. Mapping Feature-Datei ↔ E2E-Test
 über `// Szenario: <Titel>`-Kommentare in den Playwright-Specs (ADR-S041-7, Bidirektionale
 Traceability).
 
@@ -311,7 +311,7 @@ def _cmd_list(only_open: bool, story: str | None = None) -> int:
     """Listet offene bzw. erledigte Läufe je Feature-Datei – ohne die Datei öffnen zu müssen.
 
     Mit `story` auf die Feature-Datei(en) dieser Story eingegrenzt (z.B. für den Sibling-Läufe-
-    Überblick in `implementing-scenario` Schritt 0 – andere Storys/NFR-Features sind dort nur
+    Überblick im Architektur-Check von `implementing-scenario` – andere Storys/NFR-Features sind dort nur
     Rauschen und unnötige Tokenkosten)."""
     implemented = _gather_implemented()
     label = "offene" if only_open else "erledigte"

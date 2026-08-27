@@ -58,7 +58,8 @@ export function useCreateIngredientWithReactivation(onSuccess: () => void): Crea
   // Szenario). Bis dahin trägt ApiError den Unexpected-kind und die Komponente liest
   // FieldErrors geguarded direkt; matchKind wird im resilience-Szenario adoptiert, wenn
   // die Komponenten-Fehler-Union auf Domain-Fehler-only kollabiert. Tracking: docs/tech-debt.md.
-  // ADR-S090-1: feld-keyed 422-Fehler -> Meldung am betroffenen Feld (UX-Guideline §4: nah
+  // ADR-S090-1: feld-keyed 422-Fehler -> Meldung am betroffenen Feld
+  // (docs/guidelines/coding-guideline-ux.md#CGU-fehlermeldungen: nah
   // am betroffenen Element). Nur der FieldErrors-kind trägt feldbezogene Meldungen. Der Key
   // (name / baseUnit) ist die Request-JSON-Property; ein FieldErrors kann einen Key
   // weglassen (z.B. nur baseUnit beim 'leere Einheit'-Szenario), daher liefert der Lookup

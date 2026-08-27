@@ -88,7 +88,8 @@ def gruende(eintrag: dict, ktx: td_anchors.Kontext, cur: int | None) -> list[str
         return [f"`Fällig:` nicht auswertbar: {fehler[0]}"]
 
     treffer = td_anchors.faellig_gruende(eintrag["id"], roh, ktx)
-    # Siehe Modul-Docstring, Abweichung 1: `jetzt` hat bei OQ keinen zweiten Kanal.
+    # Siehe Modul-Docstring, Abweichung „`jetzt` erzeugt hier einen Grund": `jetzt` hat bei
+    # OQ keinen zweiten Kanal.
     if any(a.art == td_anchors.JETZT for a in anker):
         treffer.append("als `jetzt` terminiert")
     return treffer

@@ -7,9 +7,11 @@ description: Generate multiple radically different interface designs for a modul
 
 Based on "Design It Twice" from "A Philosophy of Software Design": your first idea is unlikely to be the best. Generate multiple radically different designs, then compare.
 
+<a id="DSI-workflow"></a>
 ## Workflow
 
-### 1. Gather Requirements
+<a id="DSI-gather-requirements"></a>
+### Gather Requirements
 
 Before designing, understand:
 
@@ -21,7 +23,8 @@ Before designing, understand:
 
 Ask: "What does this module need to do? Who will use it?"
 
-### 2. Generate Designs (Parallel Sub-Agents)
+<a id="DSI-generate-designs"></a>
+### Generate Designs (Parallel Sub-Agents)
 
 Spawn 3+ sub-agents simultaneously using the Agent tool. Each must produce a **radically different** approach.
 
@@ -33,10 +36,10 @@ Design an interface for: [module description]
 Requirements: [gathered requirements]
 
 Constraints for this design: [assign a different constraint to each agent]
-- Agent 1: "Minimize method count - aim for 1-3 methods max"
-- Agent 2: "Maximize flexibility - support many use cases"
-- Agent 3: "Optimize for the most common case"
-- Agent 4: "Take inspiration from [specific paradigm/library]"
+- Narrow: "Minimize method count - aim for 1-3 methods max"
+- Flexible: "Maximize flexibility - support many use cases"
+- Common-case: "Optimize for the most common case"
+- Borrowed: "Take inspiration from [specific paradigm/library]"
 
 Output format:
 1. Interface signature (types/methods)
@@ -45,7 +48,8 @@ Output format:
 4. Trade-offs of this approach
 ```
 
-### 3. Present Designs
+<a id="DSI-present-designs"></a>
+### Present Designs
 
 Show each design with:
 
@@ -55,7 +59,8 @@ Show each design with:
 
 Present designs sequentially so user can absorb each approach before comparison.
 
-### 4. Compare Designs
+<a id="DSI-compare-designs"></a>
+### Compare Designs
 
 After showing all designs, compare them on:
 
@@ -67,13 +72,15 @@ After showing all designs, compare them on:
 
 Discuss trade-offs in prose, not tables. Highlight where designs diverge most.
 
-### 5. Synthesize
+<a id="DSI-synthesize"></a>
+### Synthesize
 
 Often the best design combines insights from multiple options. Ask:
 
 - "Which design best fits your primary use case?"
 - "Any elements from other designs worth incorporating?"
 
+<a id="DSI-evaluation-criteria"></a>
 ## Evaluation Criteria
 
 From "A Philosophy of Software Design":
@@ -86,6 +93,7 @@ From "A Philosophy of Software Design":
 
 **Depth**: Small interface hiding significant complexity = deep module (good). Large interface with thin implementation = shallow module (avoid).
 
+<a id="DSI-anti-patterns"></a>
 ## Anti-Patterns
 
 - Don't let sub-agents produce similar designs - enforce radical difference

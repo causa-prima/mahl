@@ -2,14 +2,15 @@ using mahl.Server.Types;
 
 namespace mahl.Server.Domain;
 
-// Domänentyp (coding-guideline-csharp.md §2 Ebene 2): die Identität einer Zutat. Er kapselt den
-// Constraint-Typ Uuid7, damit dieser nicht in Signaturen steht (Regel 1) und eine IngredientId nicht
+// Domänentyp (docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession):
+// die Identität einer Zutat. Er kapselt den
+// Constraint-Typ Uuid7, damit dieser nicht in Signaturen steht (Domänentyp = Schnittstelle) und eine IngredientId nicht
 // gegen eine künftige RecipeId austauschbar ist.
 //
 // Nur der anlegende Schreibpfad erzeugt eine Identität (ADR-S030-1: serverseitig vergeben). Wo keine
 // existiert – der Restore-Pfad validiert einen Body, identifiziert die Zeile aber über den
 // Routenparameter –, wird auch keine gebraucht: dort läuft die validierte Nutzlast ohne Id, statt
-// eine Abwesenheit im Typ darzustellen (§2 Regel 4 – Abwesenheit gehört out-of-band; hier ist
+// eine Abwesenheit im Typ darzustellen (docs/guidelines/coding-guideline-csharp.md#CGC-regel-abwesenheit; hier ist
 // out-of-band schlicht "nicht Teil des Wertes").
 internal readonly record struct IngredientId
 {

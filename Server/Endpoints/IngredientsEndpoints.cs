@@ -11,7 +11,7 @@ using static mahl.Server.OneOfExtensions;
 
 // Die validierte Nutzlast eines Ingredient-Schreibzugriffs – Name und Einheit, keine Identität.
 // Ein Tupel-Alias statt eines eigenen Typs: der Typ hätte keine Invariante zu wahren (die halten
-// IngredientName und Unit), bräuchte aber nach §3 einen Ktor-Guard samt Suppression. Der Alias
+// IngredientName und Unit), bräuchte aber nach docs/guidelines/coding-guideline-csharp.md#CGC-illegal-states einen Ktor-Guard samt Suppression. Der Alias
 // hält die ROP-Typargumente unten lesbar, ohne diesen Preis.
 using IngredientValues = (mahl.Server.Domain.IngredientName Name, mahl.Server.Domain.Unit BaseUnit);
 
@@ -157,7 +157,7 @@ file static class IngredientMappings
 
     // ADR-S051-2 / ADR-S090-1: ein Fehlerfall des Konzepts -> ein (Request-JSON-Property, fester
     // deutscher Text). Die Zuordnung liegt hier an der API-Grenze, die das Request-Format kennt –
-    // der Domänentyp bleibt feldagnostisch (ADR-S120-1, Regel 5). Je Verwendungsstelle eine eigene
+    // der Domänentyp bleibt feldagnostisch (ADR-S120-1; Meldungen an die Grenze). Je Verwendungsstelle eine eigene
     // Zuordnung: die Rezept-Einheit bekommt später ihre eigene, der Typ `Unit` bleibt einer.
     private static FieldError DescribeName(IngredientNameError error) => error switch
     {

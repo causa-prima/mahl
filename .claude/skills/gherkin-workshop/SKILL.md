@@ -21,6 +21,7 @@ Beispiel: `/gherkin-workshop US-904`
 
 ---
 
+<a id="GHW-pflicht-lektuere"></a>
 ## Pflicht-Lektüre
 
 Lies vor dem Start:
@@ -33,14 +34,15 @@ Lies vor dem Start:
 
 ---
 
-## Schritt 0: Kontext laden
+<a id="GHW-kontext-laden"></a>
+## Kontext laden
 
 Gherkin-Szenarien sind die Spec – sie dürfen nachträglich nicht angepasst werden, um die
 Implementierung zu bestätigen. Was hier unvollständig oder ungenau ist, zieht sich durch
 alle folgenden Phasen.
 
 Lies die Pflicht-Dateien. Lade bei konkretem Bedarf nach:
-- `docs/reference/architecture.md` (bei architektonischen Fragen in Schritt 0.A oder Schritt 1)
+- `docs/reference/architecture.md` (bei architektonischen Fragen in [Story-Kern](#GHW-story-kern) oder [Regelentdeckung](#GHW-regelentdeckung))
 - `docs/reference/skeleton-spec.md` / `docs/reference/mvp-spec.md` – nur bei konkretem Bedarf; `adr.md`
   hat Vorrang, weil diese Dateien Entscheidungen und unverifizierte Spec-Details vermischen
 
@@ -50,44 +52,51 @@ alle folgenden Schritte bauen auf diesen Grundlagen auf.
 
 Notiere schriftlich:
 
-**A) Story-Kern:**
+<a id="GHW-story-kern"></a>
+**Story-Kern:**
 - Was ist das Geschäftsziel?
 - Welche Entitäten sind betroffen? (Name aus docs/reference/glossary.md)
 - Welche Zustände kann jede Entität haben? (z.B. Ingredient: Aktiv / Soft-Deleted)
 - Welche Operationen definiert die US? (Create / Read-Einzeln / Read-Liste / Update / Delete / Restore / Filter / Sort / andere)
 - Welche expliziten Validierungsregeln nennt die US oder adr.md?
 
-**B) Bestandsanalyse:**
+<a id="GHW-bestandsanalyse"></a>
+**Bestandsanalyse:**
 Existiert bereits eine Feature-Datei für diese US?
 - **JA:** vollständig lesen und notiere:
   - Vorhandene Szenarien und Tags
   - Offensichtliche Lücken
-- **NEIN:** Notiere „neu anlegen". Schritt 2 startet mit leerem Pool.
+- **NEIN:** Notiere „neu anlegen". [Scenario-Entdeckung](#GHW-scenario-entdeckung) startet mit leerem Pool.
 
-**C) Constraints aus adr.md:**
+<a id="GHW-adr-constraints"></a>
+**Constraints aus adr.md:**
 Welche Entscheidungen betreffen diese US?
 (z.B. „Soft-Delete-Pattern", „IDs sind UUIDs", „Sortierung alphabetisch nach Name")
 
-**D) Eingabefelder (für Schritt 2, Agents B + C):**
+<a id="GHW-eingabefelder"></a>
+**Eingabefelder (für die [Scenario-Entdeckung](#GHW-scenario-entdeckung), Agents B + C):**
 Welche Felder nimmt jede Operation als Eingabe?
 Pro Feld: Name, Typ (String / Zahl / Enum / Referenz), bekannte Constraints (NOT NULL, max. Länge, unique, etc.)
 
-**E) UX-Kontext (für Schritt 2, alle Agents):**
-Prüfe für jede Operation aus A) welche UX-Prinzipien zutreffen – notiere je "Relevant" oder "Nicht relevant" mit einem Satz Begründung:
-- **Prinzip 7 – Leerer Zustand:** Gibt es Listen oder Ansichten, die leer sein können? Bei "Relevant": Leerer Zustand erfordert Erklärungstext ("Noch keine X angelegt.") + nächste Aktion.
-- **Prinzip 3 – Sichtbares Feedback:** Gibt es mutierende Operationen, die auf eine Server-Antwort warten? Bei "Relevant": Lade- und Bestätigungszustand beschreiben.
-- **Prinzip 4 – Fehlermeldungen:** Gibt es Fehlerfälle mit UI-Fehlermeldungen? Bei "Relevant": Format "[Was ist falsch]." oder "[Was ist falsch] ([Constraint])." – Platzierung nahe am betroffenen Element.
-- **Prinzip 1 – Pflichtfeld-Affordance (Least Surprise):** Hat eine Operation ein Formular mit Pflichtfeldern? Bei "Relevant": Pflichtfelder müssen erkennbar markiert sein – eigenes Szenario (→ Formular-/Dialog-Baseline in der UI-Verhaltens-Checkliste, Schritt 1; Details: UX-Guideline Prinzip 8).
+<a id="GHW-ux-kontext"></a>
+**UX-Kontext (für die [Scenario-Entdeckung](#GHW-scenario-entdeckung), alle Agents):**
+Prüfe für jede Operation aus dem [Story-Kern](#GHW-story-kern) welche UX-Prinzipien zutreffen – notiere je "Relevant" oder "Nicht relevant" mit einem Satz Begründung:
+- **[Leerer Zustand](../../../docs/guidelines/coding-guideline-ux.md#CGU-leerer-zustand):** Gibt es Listen oder Ansichten, die leer sein können? Bei "Relevant": Leerer Zustand erfordert Erklärungstext ("Noch keine X angelegt.") + nächste Aktion.
+- **[Sichtbares Feedback](../../../docs/guidelines/coding-guideline-ux.md#CGU-feedback):** Gibt es mutierende Operationen, die auf eine Server-Antwort warten? Bei "Relevant": Lade- und Bestätigungszustand beschreiben.
+- **[Fehlermeldungen als Hilfe](../../../docs/guidelines/coding-guideline-ux.md#CGU-fehlermeldungen):** Gibt es Fehlerfälle mit UI-Fehlermeldungen? Bei "Relevant": Format "[Was ist falsch]." oder "[Was ist falsch] ([Constraint])." – Platzierung nahe am betroffenen Element.
+- **[Pflichtfeld-Affordance](../../../docs/guidelines/coding-guideline-ux.md#CGU-formular-baseline)** (motiviert durch [Least Surprise](../../../docs/guidelines/coding-guideline-ux.md#CGU-least-surprise))**:** Hat eine Operation ein Formular mit Pflichtfeldern? Bei "Relevant": Pflichtfelder müssen erkennbar markiert sein – eigenes Szenario (→ Formular-/Dialog-Baseline in der [UI-Verhaltens-Checkliste](#GHW-ui-verhaltens-checkliste); Details: [UX-Guideline „Formular-/Dialog-Baseline"](../../../docs/guidelines/coding-guideline-ux.md#CGU-formular-baseline)).
 
-Notiere A–E schriftlich – Schritt 2 übergibt sie verbatim an die Agents.
+Notiere alle Blöcke schriftlich – die [Scenario-Entdeckung](#GHW-scenario-entdeckung) übergibt sie verbatim an die Agents.
 
 ---
 
-## Schritt 1: Regelentdeckung (Dialog mit User)
+<a id="GHW-regelentdeckung"></a>
+## Regelentdeckung (Dialog mit User)
 
 Ziel: Domänenwissen erfassen, das nicht aus Dokumenten ableitbar ist – und latente
 Anforderungen aufdecken, die noch nicht in der User Story formuliert wurden.
 
+<a id="GHW-dialog-fuehrung"></a>
 ### Wie der Dialog funktioniert
 
 Mehrere Runden sind ausdrücklich erwünscht. Starte mit **Tracer-Bullet-Fragen**: Das sind
@@ -101,7 +110,7 @@ braucht insgesamt weniger Runden.
 
 Faustregel pro Runde: **maximal 3–5 Fragen**, Tracer Bullets idealerweise zuerst.
 Keine Fragen stellen zu Dingen, die aus den Docs ableitbar sind – das signalisiert dem User,
-dass die Vorbereitung in Schritt 0 übersprungen wurde.
+dass die Vorbereitung in [Kontext laden](#GHW-kontext-laden) übersprungen wurde.
 
 Typische Frage-Kategorien:
 
@@ -113,8 +122,9 @@ Typische Frage-Kategorien:
 | Fehlermeldungen | „Spezifische oder generische Meldung für [Fehlerfall]?" |
 | Latente Regeln | „Gibt es Regeln, die sich nicht aus den Akzeptanzkriterien ergeben, aber wichtig sind?" |
 | Technische Fehler | „Gibt es für diese Operation Fehlerverhalten jenseits der allgemeinen Behandlung (→ adr.md: Querschnittliche Fehlerbehandlung)?" |
-| Draft-Saving & Abbrechen | „Wie komplex sind die Eingaben dieses Formulars? Trivial → kein Draft-Saving, Abbrechen ohne Rückfrage (Standard). Nicht-trivial → (1) Soll es einen 'Als Entwurf speichern'-Button geben? Falls ja: Abbrechen bietet Entwurf-Option an. Falls nein: (a) Abbrechen ohne Rückfrage oder (b) Bestätigungsdialog? (→ UX-Guideline Prinzip 5)" |
+| Draft-Saving & Abbrechen | „Wie komplex sind die Eingaben dieses Formulars? Trivial → kein Draft-Saving, Abbrechen ohne Rückfrage (Standard). Nicht-trivial → (1) Soll es einen 'Als Entwurf speichern'-Button geben? Falls ja: Abbrechen bietet Entwurf-Option an. Falls nein: (a) Abbrechen ohne Rückfrage oder (b) Bestätigungsdialog? (→ [UX-Guideline „Destructive Actions schützen"](../../../docs/guidelines/coding-guideline-ux.md#CGU-destructive-actions))" |
 
+<a id="GHW-grill-me"></a>
 ### grill-me für tiefere Exploration
 
 Aktiviere den `grill-me`-Skill wenn der Dialog keinen neuen Informationsgewinn mehr bringt –
@@ -129,10 +139,10 @@ Kombination zweier Antworten. Prüfe nach jeder neuen Antwort alle bisherigen r�
 Konsistenz.
 
 Der Dialog ist abgeschlossen, wenn:
-- Jede Operation aus Schritt 0.A hat entweder (a) mindestens eine geklärte Validierungsregel
+- Jede Operation aus [Story-Kern](#GHW-story-kern) hat entweder (a) mindestens eine geklärte Validierungsregel
   oder (b) der User hat explizit bestätigt, dass keine gilt – notiere dies als Befund.
   Ohne explizite Bestätigung ist die Abwesenheit einer Antwort kein Abschluss.
-- Alle Zustände aus Schritt 0.A haben definiertes Verhalten bei allen Operationen aus 0.A –
+- Alle Zustände aus [Story-Kern](#GHW-story-kern) haben definiertes Verhalten bei allen dortigen Operationen –
   außer einer Operation wurde durch adr.md oder explizite User-Aussage als „nicht
   applicable" markiert
 - Keine offenen Widersprüche bestehen – prüfe: Widerspricht Antwort X der Antwort Y
@@ -140,13 +150,14 @@ Der Dialog ist abgeschlossen, wenn:
 - Technische Fehler: entweder story-spezifisches Verhalten dokumentiert, oder explizit
   bestätigt dass die allgemeine Behandlung (adr.md: Querschnittliche Fehlerbehandlung)
   gilt – „keine Antwort" ist kein Abschluss
-- Draft-Saving & Abbrechen: für jedes Formular dieser Story explizit entschieden — trivial (→ kein Draft-Saving, Abbrechen ohne Rückfrage) oder nicht-trivial (→ Draft-Saving ja/nein, Abbrechen-Verhalten per UX-Guideline Prinzip 5 geklärt); bei Draft-Saving oder Bestätigungsdialog: Szenarien eingeplant
-- UI-Verhaltens-Checkliste (siehe unten) vollständig abgearbeitet
+- Draft-Saving & Abbrechen: für jedes Formular dieser Story explizit entschieden — trivial (→ kein Draft-Saving, Abbrechen ohne Rückfrage) oder nicht-trivial (→ Draft-Saving ja/nein, Abbrechen-Verhalten per [UX-Guideline „Destructive Actions schützen"](../../../docs/guidelines/coding-guideline-ux.md#CGU-destructive-actions) geklärt); bei Draft-Saving oder Bestätigungsdialog: Szenarien eingeplant
+- [UI-Verhaltens-Checkliste](#GHW-ui-verhaltens-checkliste) (siehe unten) vollständig abgearbeitet
 
-### UI-Verhaltens-Checkliste (Pflichtprüfung vor Abschluss von Schritt 1)
+<a id="GHW-ui-verhaltens-checkliste"></a>
+### UI-Verhaltens-Checkliste (Pflichtprüfung vor Abschluss der Regelentdeckung)
 
 Diese Aspekte werden sonst als Implementierungsdetails entschieden — ohne Gherkin-Deckung.
-Prüfe jeden Punkt für **jede** Operation aus Schritt 0.A – auch für Operationen ohne Formular
+Prüfe jeden Punkt für **jede** Operation aus [Story-Kern](#GHW-story-kern) – auch für Operationen ohne Formular
 und ohne Dialog (Bedienelement in einer Listenzeile, Button in einem Toast). Trifft ein Punkt
 auf eine Operation nicht zu, wird er unten als „Nicht relevant" notiert; das ist der vorgesehene
 Weg – nicht der stille Ausschluss der ganzen Tabelle für diese Operation.
@@ -158,19 +169,20 @@ nicht später als Implementierungsdetail überlassen.
 | **Nach erfolgreicher Aktion** | Schließt sich der Dialog/das Formular nach dem Absenden? Werden Felder zurückgesetzt? Erscheint eine Bestätigung? | Szenario formulieren, das den sichtbaren Zustand nach Erfolg beschreibt |
 | **Abbrechen** | Gibt es einen Abbrechen-Pfad (Button, Escape, Klick außerhalb)? Wohin führt er? Gehen Eingaben verloren? | Szenario formulieren, das die Abbrechen-Navigation und den Endzustand beschreibt |
 | **Feld-Initialisierung** | Welche Werte **und Fehler-/Validierungszustände** zeigen Felder beim Öffnen — beim *ersten* Öffnen (Leer, Defaults, vorausgefüllt?) **und beim erneuten Öffnen nach einem abgebrochenen oder fehlgeschlagenen Versuch** (bleibt eine alte Fehlermeldung/Markierung stehen?) | Szenario je relevantem Öffnungs-Kontext, das den sichtbaren Zustand beschreibt — inkl. „kein Rest-Fehler nach Abbrechen + erneutem Öffnen" |
-| **Async-Zustände & Sperren während Pending** | Welche Bedienelemente lassen sich während einer laufenden mutierenden Aktion auslösen? **Alle** konfliktträchtigen/schließenden Kontrollen (auslösender Button, **Abbrechen, Escape, Backdrop**) müssen gesperrt sein — nicht nur der Auslöser (UX-Guideline Prinzip 3 „Sperren während Pending"). | Szenario je Kontrolle, das die Sperre während der laufenden Aktion beobachtet |
+| **Async-Zustände & Sperren während Pending** | Welche Bedienelemente lassen sich während einer laufenden mutierenden Aktion auslösen? **Alle** konfliktträchtigen/schließenden Kontrollen (auslösender Button, **Abbrechen, Escape, Backdrop**) müssen gesperrt sein — nicht nur der Auslöser ([UX-Guideline „Sichtbares Feedback"](../../../docs/guidelines/coding-guideline-ux.md#CGU-feedback) „Sperren während Pending"). | Szenario je Kontrolle, das die Sperre während der laufenden Aktion beobachtet |
 | **Transientes Feedback (Toast/Snackbar)** | Zeigt die Operation eine Rückmeldung, die von selbst wieder verschwindet? Dann je eigene Prüffrage: Wie lange bleibt sie stehen? Wodurch verschwindet sie außer durch Zeitablauf (Klick daneben, Klick auf eine Aktion darin)? Lässt sie sich manuell schließen (auf Touch Pflicht – dort gibt es kein Hover, das die Zeit anhält)? Was passiert, wenn die Operation ein zweites Mal ausgelöst wird, bevor die erste Rückmeldung weg ist – erbt die zweite die Restlaufzeit der ersten? Trägt die Rückmeldung eine Aktion (z.B. Rückgängig): auf welchen Vorgang wirkt sie, wenn mehrere kurz nacheinander liefen? | Szenario je beobachtbarem Aspekt – Lebensdauer, Schließbarkeit und der Wirkbereich einer Aktion darin sind je eigene Fehlergründe |
 | **Pflichtfeld-Affordance** | Hat das Formular Pflichtfelder? Sind sie als solche markiert (statisch, vor jeder Eingabe sichtbar)? | Eigenes Happy-Path-Szenario „Pflichtfelder sind als solche markiert" (getestet **beim Öffnen**, nicht im Error-Szenario) |
 | **Autofokus beim Öffnen** | Liegt der Fokus beim Öffnen auf dem visuell ersten Feld? | Eigenes Happy-Path-Szenario (E2E: visuell oberstes Input hat Fokus) + Guideline-Invariant „kein CSS-Reorder von Formularfeldern" |
 | **Fokus nach Validierungsfehler** | Springt der Fokus nach Submit-Fehler aufs erste fehlerhafte Feld? | **Asserts an bestehende Error-Szenarien** (kein neues Szenario): ein Fall „erstes Feld fehlerhaft" + ein Fall „nur späteres Feld fehlerhaft" |
-| **Tastatur & Dialog-Fokus** (Enter-Submit, Escape, Fokus-Falle/-Rückkehr) | Liefert das Framework/HTML-native das Verhalten (echtes `<form>`, MUI `Dialog`)? | **Kein Szenario** — per UX-Guideline Prinzip 8 + Review erzwingen |
-| **Erreichbarkeit (Navigation)** | Entsteht durch diese Story eine neue Seite/Route, **und** existiert bereits mindestens eine andere Seite in der Anwendung? | Szenario „Wie kommt der Nutzer zu [Seite]" formulieren. Es ist querschnittlich (siehe Ablage-Regel unten) und gehört daher in `features/navigation.feature`, Tag `@CROSS-navigation`. Ist diese Story die **erste** Seite der Anwendung (keine andere Seite existiert), gibt es noch nichts, wohin navigiert werden könnte: „Nicht relevant" notieren. Strukturelle Vorgabe (Nav-Eintrag je Route): UX-Guideline Prinzip 9. |
+| **Tastatur & Dialog-Fokus** (Enter-Submit, Escape, Fokus-Falle/-Rückkehr) | Liefert das Framework/HTML-native das Verhalten (echtes `<form>`, MUI `Dialog`)? | **Kein Szenario** — per [UX-Guideline „Formular-/Dialog-Baseline"](../../../docs/guidelines/coding-guideline-ux.md#CGU-formular-baseline) + Review erzwingen |
+| **Erreichbarkeit (Navigation)** | Entsteht durch diese Story eine neue Seite/Route, **und** existiert bereits mindestens eine andere Seite in der Anwendung? | Szenario „Wie kommt der Nutzer zu [Seite]" formulieren. Es ist querschnittlich (siehe [Ablage-Regel](#GHW-ablage-regel) unten) und gehört daher in `features/navigation.feature`, Tag `@CROSS-navigation`. Ist diese Story die **erste** Seite der Anwendung (keine andere Seite existiert), gibt es noch nichts, wohin navigiert werden könnte: „Nicht relevant" notieren. Strukturelle Vorgabe (Nav-Eintrag je Route): [UX-Guideline „Erreichbarkeit / Navigation"](../../../docs/guidelines/coding-guideline-ux.md#CGU-navigation). |
 
 **Träger-Regel (welcher Mechanismus bekommt ein Szenario?):**
 Frage pro Mechanismus zuerst: *Liefert das Framework / HTML-native das Verhalten?*
-- **Ja → kein Szenario**, per UX-Guideline Prinzip 8 + Review erzwingen (sonst testet das Szenario nur das Framework).
-- **Nein (eigene Logik) → Szenario/Assert.** Dabei: statische Affordance (Markierung) → **eigenes** Szenario beim Öffnen (one-behavior, eigener Fehlergrund). Nur im Fehlerzustand beobachtbare Mechanik (Fokus aufs erste fehlerhafte Feld) → **Asserts an bestehende Error-Szenarien**, weil „erstes fehlerhaftes Feld" mehrere Input-Partitionen braucht, die die Error-Szenarien schon liefern. Begründung + Details: UX-Guideline Prinzip 8.
+- **Ja → kein Szenario**, per [UX-Guideline „Formular-/Dialog-Baseline"](../../../docs/guidelines/coding-guideline-ux.md#CGU-formular-baseline) + Review erzwingen (sonst testet das Szenario nur das Framework).
+- **Nein (eigene Logik) → Szenario/Assert.** Dabei: statische Affordance (Markierung) → **eigenes** Szenario beim Öffnen (one-behavior, eigener Fehlergrund). Nur im Fehlerzustand beobachtbare Mechanik (Fokus aufs erste fehlerhafte Feld) → **Asserts an bestehende Error-Szenarien**, weil „erstes fehlerhaftes Feld" mehrere Input-Partitionen braucht, die die Error-Szenarien schon liefern. Begründung + Details: [UX-Guideline „Formular-/Dialog-Baseline"](../../../docs/guidelines/coding-guideline-ux.md#CGU-formular-baseline).
 
+<a id="GHW-ablage-regel"></a>
 **Ablage-Regel (gehört das Szenario in die Story-Feature-Datei?):**
 Der Workshop läuft je User Story und legt Szenarien standardmäßig in deren Feature-Datei ab.
 Prüfe jedes Szenario aus dieser Checkliste vorher gegen den **Querschnitts-Test**:
@@ -179,7 +191,7 @@ Prüfe jedes Szenario aus dieser Checkliste vorher gegen den **Querschnitts-Test
 > auf einer zweiten Seite identisch gefordert?
 
 Beide Teile ja → das Verhalten ist querschnittlich und gehört **nicht** in die Story-Feature-Datei,
-sondern in eine `@CROSS-<domain>`-Datei (Tag-Schema: `docs/process/e2e-testing.md`). Sonst
+sondern in eine `@CROSS-<domain>`-Datei (Tag-Schema: [`docs/process/e2e-testing.md`](../../../docs/process/e2e-testing.md#E2E-tag-konventionen)). Sonst
 sammelt sich in der Story-Datei Verhalten, das mit der Story nichts zu tun hat, und muss beim
 Hinzufügen jeder weiteren Seite nachträglich angefasst werden. Typische Treffer: Navigation,
 Sperren während Pending, Undo-/Toast-Verhalten, Fokusführung.
@@ -188,7 +200,7 @@ Nicht hier zu klären ist, wodurch gesichert ist, dass sich die **übrigen** Sei
 verhalten (eine Querschnitts-Datei nutzt eine Seite als Vertreter) – das regelt **ADR-S112-5**
 über geteilte Implementierung, Import-Guard, eine parametrisierte Suite und eine
 Fähigkeits-Deklaration je Seite. Der Umzug **bestehender** Szenarien ist dort ebenfalls verortet
-(Migrationsschritt 5, gebunden an die zweite Seite) – dieser Skill entscheidet nur über
+(Migrationsschritt „Szenarien umziehen + umtaggen + Tests umbenennen", gebunden an die zweite Seite) – dieser Skill entscheidet nur über
 **neu entdeckte** Szenarien.
 
 Notiere das Ergebnis der Checkliste schriftlich — für jeden Aspekt entweder:
@@ -203,41 +215,43 @@ in adr.md dokumentieren, bevor Szenarien geschrieben werden.
 
 ---
 
-## Schritt 2: Parallele Scenario-Entdeckung
+<a id="GHW-scenario-entdeckung"></a>
+## Parallele Scenario-Entdeckung
 
 Starte drei Sub-Agenten **parallel** (in einer einzigen Nachricht mit drei Agent-Aufrufen).
-Befülle die `[Platzhalter]` vor dem Senden mit den konkreten Werten aus Schritt 0/1.
+Befülle die `[Platzhalter]` vor dem Senden mit den konkreten Werten aus [Kontext laden](#GHW-kontext-laden) und [Regelentdeckung](#GHW-regelentdeckung).
 
-Jeder Agent bekommt:
-- Story-Kern inkl. Entitäten + Zustände (Schritt 0.A)
-- Eingabefelder mit Typen und Constraints (Schritt 0.D)
-- User-Antworten aus dem Dialog (Schritt 1) – **verbatim, nicht paraphrasiert**
+Jeder Agent bekommt (jeweils aus dem gleichnamigen Block des [Kontext-Ladens](#GHW-kontext-laden)):
+- [Story-Kern](#GHW-story-kern) inkl. Entitäten + Zustände
+- [Eingabefelder](#GHW-eingabefelder) mit Typen und Constraints
+- User-Antworten aus dem Dialog der [Regelentdeckung](#GHW-regelentdeckung) – **verbatim, nicht paraphrasiert**
   (Paraphrasen können implizite Regeln verlieren, die der User beiläufig formuliert hat)
-- Constraints aus adr.md (Schritt 0.C; nur US-bezogene + allgemeine Architekturregeln)
-- Bestehende Szenarien (Schritt 0.B; „keine" wenn neu)
-- UX-Kontext (Schritt 0.E) – welche UX-Prinzipien gelten, mit Relevanzbewertung
+- [Constraints aus adr.md](#GHW-adr-constraints) – nur US-bezogene + allgemeine Architekturregeln
+- Bestehende Szenarien aus der [Bestandsanalyse](#GHW-bestandsanalyse) („keine" wenn neu)
+- [UX-Kontext](#GHW-ux-kontext) – welche UX-Prinzipien gelten, mit Relevanzbewertung
 
 **Warum parallel?** Jede Technik hat blinde Flecken. Example Mapping findet Business Rules,
 State-Transition findet vergessene Zustandskombinationen, Input-Partition findet
 Feldvalidierungen. Zusammen decken sie systematisch mehr ab als jede Technik allein.
 
 Der Prompt für jeden Agent ist der Inhalt der jeweiligen Referenz-Datei, befüllt mit deinen
-Werten aus Schritt 0/1. Lies jede Datei unmittelbar vor dem Agent-Aufruf und füge den Inhalt
+Werten aus [Kontext laden](#GHW-kontext-laden) und [Regelentdeckung](#GHW-regelentdeckung). Lies jede Datei unmittelbar vor dem Agent-Aufruf und füge den Inhalt
 als Instruktionen in den Prompt ein:
 - **Agent A – Example Mapping** → `references/agent-a-example-mapping.md`
 - **Agent B – State-Transition-Analyse** → `references/agent-b-state-transition.md`
 - **Agent C – Input-Partition-Analyse** → `references/agent-c-input-partition.md`
 
-Starte alle drei Agents parallel (drei unabhängige Agent-Aufrufe in einer Antwort) –
+Starte alle Agents parallel (je ein unabhängiger Agent-Aufruf, alle in einer Antwort) –
 nicht sequentiell. Warum: Sequentielle Starts würden es späteren Agents ermöglichen, die
 Outputs früherer zu sehen und unbewusst zu kopieren, statt eigenständig zu analysieren.
 
-Warte auf alle drei Outputs bevor Schritt 3 beginnt. Wenn ein Agent-Output leer oder
+Warte auf alle Outputs bevor [Synthese](#GHW-synthese) beginnt. Wenn ein Agent-Output leer oder
 offensichtlich inkonsistent mit dem Input ist, wiederhole diesen Agent-Aufruf.
 
 ---
 
-## Schritt 3: Synthese
+<a id="GHW-synthese"></a>
+## Synthese
 
 Führe die Outputs von A, B, C zusammen:
 
@@ -253,7 +267,7 @@ Führe die Outputs von A, B, C zusammen:
    - Komplementäre Fälle (ein Agent: „Zutat existiert", anderer: „Zutat existiert nicht")
      sind **kein** Widerspruch – beide in den Pool aufnehmen
 
-3. **Vollständige Gherkin-Szenarien formulieren** (Formatregeln: `docs/process/e2e-testing.md`):
+3. **Vollständige Gherkin-Szenarien formulieren** (Formatregeln: [`docs/process/e2e-testing.md`](../../../docs/process/e2e-testing.md#E2E-bdd-gherkin)):
    - Background: übernehmen wenn vorhanden und die Given-Steps noch mit docs/reference/glossary.md-Entitäten
      und adr.md-Zustandsmodell übereinstimmen; bei Zweifel verwerfen und neu definieren –
      ein unpassender Background korrumpiert still alle darunterliegenden Szenarien, während
@@ -286,18 +300,19 @@ Führe die Outputs von A, B, C zusammen:
    - Innerhalb error: häufigster Fehler im Produktivbetrieb zuerst
    - Innerhalb edge-case: schwerwiegendste Konsequenz bei fehlendem Test zuerst
 
-Der Entwurf muss vollständig ausformuliert sein, bevor Schritt 4 beginnt –
+Der Entwurf muss vollständig ausformuliert sein, bevor [Review-Loop](#GHW-review-loop) beginnt –
 der Review-Agent kann nur prüfen, was er lesen kann.
 
 ---
 
-## Schritt 4: Review-Loop
+<a id="GHW-review-loop"></a>
+## Review-Loop
 
 Lies `references/agent-review.md` – der Inhalt ist der Prompt für den Review-Agenten.
 Füge ihn zusammen mit diesen Inputs in den Agent-Aufruf ein:
-- Feature-Entwurf aus Schritt 3 (vollständig, verbatim)
-- User Story + Akzeptanzkriterien (verbatim aus Schritt 0, nicht paraphrasiert)
-- Constraints aus adr.md (aus Schritt 0)
+- Feature-Entwurf aus [Synthese](#GHW-synthese) (vollständig, verbatim)
+- User Story + Akzeptanzkriterien (verbatim aus [Kontext laden](#GHW-kontext-laden), nicht paraphrasiert)
+- Constraints aus adr.md (aus [Kontext laden](#GHW-kontext-laden))
 
 **Nach dem Review – Loop (max. 3 Iterationen):**
 
@@ -317,16 +332,17 @@ damit der User den Fortschritt sehen kann.
      Problem, warum nicht gelöst, konkretes Action Item
 4. LOW → Formulierungskorrekturen selbst beheben; inhaltliche LOW-Findings in der
    Freigabe-Nachricht an den User notieren
-5. Keine CRITICAL/HIGH mehr → weiter mit Schritt 5
+5. Keine CRITICAL/HIGH mehr → weiter mit [Feature-File-Freigabe](#GHW-feature-file-freigabe)
 
 **ABBRUCHBEDINGUNG:** Nach Iteration 3 noch CRITICAL/HIGH vorhanden →
 Findings + Kontext dem User präsentieren, fragen wie weiter.
 
 ---
 
-## Schritt 5: Feature-File schreiben & Freigabe
+<a id="GHW-feature-file-freigabe"></a>
+## Feature-File schreiben & Freigabe
 
-**A) Feature-File schreiben:**
+**Feature-File schreiben:**
 Pfad: `features/<entity-plural-english>.feature`
 Konvention: englischer Plural des Domain-Entitätsnamens aus docs/reference/glossary.md
 (z.B. `features/ingredients.feature` für Zutat, `features/recipes.feature` für Rezept).
@@ -334,12 +350,12 @@ Wenn eine US mehrere Entitäten betrifft, benenne die Datei nach der primären E
 (der, die in der US-Überschrift dominant ist); falls unklar: User fragen.
 Datei vollständig ersetzen (oder neu anlegen) mit dem finalen Entwurf.
 
-**B) Entscheidungen dokumentieren:**
+**Entscheidungen dokumentieren:**
 Wurden im Workshop explizite Entscheidungen getroffen (z.B. Fehlermeldungstext,
 Grenzfall-Verhalten), die noch nicht in adr.md stehen?
 Falls ja: Einträge in `docs/history/adr.md` ergänzen.
 
-**C) Freigabe vom User einholen:**
+**Freigabe vom User einholen:**
 Präsentiere:
 1. Zusammenfassung: Anzahl Szenarien je Tag-Kategorie, was ist neu vs. vorher?
 2. Vollständiger Inhalt der Feature-Datei
@@ -357,20 +373,22 @@ oder die Regel aktualisiert werden soll. Business-Logic-Entscheidungen gehören 
 
 ---
 
-## Schritt 6: Szenario-Clustering
+<a id="GHW-szenario-clustering"></a>
+## Szenario-Clustering
 
-Erst möglich, wenn die Szenarien vollständig und freigegeben sind (Schritt 5).
+Erst möglich, wenn die Szenarien vollständig und freigegeben sind ([Feature-File-Freigabe](#GHW-feature-file-freigabe)).
 
 Die freigegebenen Szenarien in Implementierungs-Läufe gruppieren – ein Lauf bündelt die
-Szenarien, die zusammen umgesetzt werden. Folge dem Algorithmus in
+Szenarien, die zusammen umgesetzt werden. Folge dem [Algorithmus](references/scenario-clustering.md#CLU-algorithmus) in
 `references/scenario-clustering.md` und schreibe für jedes Szenario den dort beschriebenen
-Lauf-Kommentar-Tag in die Feature-Datei.
+[Lauf-Kommentar-Tag](references/scenario-clustering.md#CLU-output) in die Feature-Datei.
 
 Dem User das Ergebnis kurz vorlegen (Anzahl Läufe, grobe Gruppierung) und freigeben lassen.
 Kommt später doch ein Szenario hinzu, diesen Schritt für die betroffenen Läufe erneut anwenden.
 
 ---
 
+<a id="GHW-nach-dem-workshop"></a>
 ## Nach dem Workshop
 
 Das Feature-File ist implementierungsbereit und in Läufe gruppiert (`# @run-N`).

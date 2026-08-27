@@ -5,7 +5,8 @@ wann-lesen: Beim Schreiben von Endpoints oder Validierungsketten (.Bind()/.Map()
 Voraussetzung: docs/guidelines/coding-guideline-csharp.md (Core-Regeln) bereits gelesen.
 -->
 
-## 4. Railway-Oriented Programming (Fehlerbehandlung ohne Exceptions)
+<a id="ROP-fehlerbehandlung"></a>
+## Railway-Oriented Programming (Fehlerbehandlung ohne Exceptions)
 
 - Verwende das Paket OneOf (insbesondere `OneOf<Success, Error<string>>` oder `OneOf<T, Error<string>>`), um Erfolgs- und Fehlerfälle explizit im Rückgabetyp zu deklarieren.
 - Verwende `.Match(...)`, `.Switch(...)` und `.Bind(...)` für den Kontrollfluss. Vermeide klassische `if/else`-Blöcke, wo Pattern Matching oder Monaden-Verkettung möglich sind.
@@ -13,6 +14,7 @@ Voraussetzung: docs/guidelines/coding-guideline-csharp.md (Core-Regeln) bereits 
 **`throw` ist eine Ausnahme – keine Regel:**
 `throw` darf ausschließlich für nicht-behebbare technische Ausnahmezustände verwendet werden (z.B. uninitialisierter Value-Object-Zustand im Default-Konstruktor, Datenbankverbindung komplett ausgefallen). Domänen- und Validierungsfehler werden **immer** über `OneOf`/`Error<string>` zurückgegeben. Jedes `throw new` im Produktionscode ist ein Review-Pflichtpunkt und muss explizit kommentiert begründet werden. In Tests ist `throw`/`try/catch` erlaubt.
 
+<a id="ROP-allgemein"></a>
 ### ROP – Allgemein (gilt für den gesamten Produktionscode)
 
 | Kontext | Regel |
@@ -51,6 +53,7 @@ return Results.NotFound();
 | Source-Typ ist ein **Interface** (z.B. `IResult`) | `FromT1(...)` — C# wendet user-defined implicit operators für Interface-Typen grundsätzlich nicht an, weder implizit noch per explicit cast |
 | Seed-Argument für `Aggregate` o.ä. — kein Zieltyp vorhanden | Expliziter Cast: `(OneOf<T0, T1>) value` |
 
+<a id="ROP-oneof-iresult"></a>
 ### OneOf→IResult in Endpoints
 
 Endpoints geben immer `IResult` zurück. `OneOf<T, Error>` ist ein internes Muster, das am Endpoint-Ende zu `IResult` gecastet wird:
@@ -86,6 +89,7 @@ return await Ingredient.Create(id, dto.Name, dto.BaseUnit)
         error  => error);
 ```
 
+<a id="ROP-value-or-throw"></a>
 ### Pre-validiertes Unwrap: `ValueOrThrowUnreachable()` (noch nicht implementiert)
 
 > **Status: Muster, noch kein Code.** `Server/OneOfExtensions.cs` enthält aktuell **nur** `Map`/`Bind`/`MapError`/`BindAsync`/`MatchAsync`. `ValueOrThrowUnreachable()` (und das hier ebenfalls erwähnte `ValueOrThrow(string)`) existieren **nicht** – sie sind das vorgesehene Muster für den ersten Fall, der ein pre-validiertes Unwrap in einer LINQ-Pipeline braucht. Wer den Helper zuerst benötigt: in `OneOfExtensions.cs` anlegen und die Designentscheidung (zentralisierte Stryker-Suppression statt throw-Lambda) per ADR festhalten. Bis dahin gibt es keinen Aufrufer.

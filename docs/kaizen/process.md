@@ -5,6 +5,7 @@ wann-lesen: Beim Schreiben eines lessons_learned-Eintrags (Impact/Kategorie/Kont
             beim Starten einer Retro, beim Bewerten einer Maßnahme.
 -->
 
+<a id="KPR-was-gehoert-rein"></a>
 ## Was gehört in lessons_learned?
 
 Ein Eintrag ist sinnvoll wenn er ein **Agenten-Verhalten** beschreibt das wieder auftreten könnte.
@@ -16,17 +17,18 @@ Ein Eintrag ist sinnvoll wenn er ein **Agenten-Verhalten** beschreibt das wieder
 - Fehler aus einer **einmaligen Situation, die grundsätzlich nicht wiederkehren kann** und unter der **keine wiederkehrende Tätigkeits-Klasse** liegt (z.B. ein Fehler, der nur an eine einmalige Repo-Umstellung gebunden war)
   → Achtung Abstraktionsebene: Liegt unter der einmaligen konkreten Auslösung eine wiederkehrende Klasse (z.B. „programmatische String-Transforms", „Datei-Renames"), ist der Eintrag sinnvoll – aber auf der **Klassen-Ebene** formuliert, nicht auf der Einmal-Situation.
 
-**Test vor jedem Eintrag (alle drei Fragen müssen mit Ja beantwortet werden, sonst kein Eintrag):**
-1. „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?" (Nein → Infra-/Config-Noise)
-2. „Kann die auslösende Situation grundsätzlich wiederkehren – bzw. liegt eine wiederkehrende Tätigkeits-Klasse darunter?" (Nein → einmalige Situation, kein Eintrag)
-3. „Beschreibt die *Regel* ein **Agenten-Verhalten oder -Urteil**, das schiefgehen kann – oder ist sie eine **statische Tatsache**, die man einmal nachschlägt und danach kennt?" (statische Tatsache → Noise, gehört nach `docs/process/dev-workflow.md` oder in einen Code-Kommentar)
+**Test vor jedem Eintrag (alle Fragen müssen mit Ja beantwortet werden, sonst kein Eintrag):**
+1. **Wiederholbarkeit:** „Könnte ein Agent diesen Fehler wieder machen – auch wenn die Konfigurationsänderung schon vorhanden ist?" (Nein → Infra-/Config-Noise)
+2. **Wiederkehrende Situation:** „Kann die auslösende Situation grundsätzlich wiederkehren – bzw. liegt eine wiederkehrende Tätigkeits-Klasse darunter?" (Nein → einmalige Situation, kein Eintrag)
+3. **Verhalten oder Tatsache:** „Beschreibt die *Regel* ein **Agenten-Verhalten oder -Urteil**, das schiefgehen kann – oder ist sie eine **statische Tatsache**, die man einmal nachschlägt und danach kennt?" (statische Tatsache → Noise, gehört nach `docs/process/dev-workflow.md` oder in einen Code-Kommentar)
 
-> Warum Frage 3 nötig ist: Frage 1 allein trennt Tool-Fakten nicht sauber ab – ein Agent „könnte" fast jeden Tool-Fakt wiederholen, weil er Tool-Verhalten nicht auswendig kennt, womit Frage 1 fast nie Nein ergibt. Erst Frage 3 zieht die Linie: wiederkehrendes Verhaltensmuster bleibt, nachschlagbare Tatsache ist Noise.
+> Warum „Verhalten oder Tatsache" nötig ist: Die Wiederholbarkeits-Frage allein trennt Tool-Fakten nicht sauber ab – ein Agent „könnte" fast jeden Tool-Fakt wiederholen, weil er Tool-Verhalten nicht auswendig kennt, womit sie fast nie Nein ergibt. Erst die Verhaltens-Frage zieht die Linie: wiederkehrendes Verhaltensmuster bleibt, nachschlagbare Tatsache ist Noise.
 
-Alle drei Ja → dokumentieren (Frage 2: auf Klassen-Ebene formulieren, nicht auf der einmaligen Auslösung).
+Überall Ja → dokumentieren (dabei auf Klassen-Ebene formulieren, nicht auf der einmaligen Auslösung).
 
 ---
 
+<a id="KPR-zwei-brillen"></a>
 ## Zwei Brillen: lessons_learned vs. observations
 
 Das Kaizen-System hat zwei Tracks, **keine Partition** – dieselbe Sache kann aus zwei Blickwinkeln in beiden Dateien stehen:
@@ -35,7 +37,7 @@ Das Kaizen-System hat zwei Tracks, **keine Partition** – dieselbe Sache kann a
 - `observations.md` = **vorausschauende System-Design-Beobachtungen** (Optimierungen, Reibung, „so wäre es besser"). Speisen Jenga **nicht**.
 
 **Billige Erfassungs-Tests (gelten bei `closing-session`, auch für user-gemeldete Punkte):**
-- LL: „Ist diese Session ein **konkreter schlechter Ausgang** aufgetreten – Rework, Fehler, verschwendeter Aufwand, ein Defekt?" → ja → `lessons_learned.md` (mit Impact). Der Noise-Filter (die 3 Fragen oben) gilt für ALLE Einträge.
+- LL: „Ist diese Session ein **konkreter schlechter Ausgang** aufgetreten – Rework, Fehler, verschwendeter Aufwand, ein Defekt?" → ja → `lessons_learned.md` (mit Impact). Der [Noise-Filter](#KPR-was-gehoert-rein) gilt für ALLE Einträge.
 - Observations: „Eine **vorausschauende** Notiz, wie das System besser wäre?" → `observations.md`.
 - **Beides wahr → beides**, per `Bezug:` verlinkt.
 
@@ -45,12 +47,14 @@ Das Kaizen-System hat zwei Tracks, **keine Partition** – dieselbe Sache kann a
 
 ---
 
+<a id="KPR-observations"></a>
 ## observations.md – Beobachtungs-Backlog
 
 Der proaktive Track für System-Design-Beobachtungen. **Eintrags-Format, ID-Schema, Impact/Häufigkeit-Werte und Erfassungs-Regel stehen kanonisch im Header von `docs/kaizen/observations.md`** (dort werden Einträge geschrieben) – hier nicht duplizieren.
 
 ---
 
+<a id="KPR-gefahr"></a>
 ## Gefahr & Kandidaten-Bewertung
 
 **Gefahr ist eine Eigenschaft eines KANDIDATEN** (der geplanten Änderung), **nicht der Beobachtung/des Findings.** Sie ist daher kein Header-Feld in `observations.md`, sondern wird bei der **Kandidaten-Auswahl** abgewogen. Dieselbe Disziplin gilt beim Wählen einer **CM** für ein LL-Muster.
@@ -61,12 +65,14 @@ Der proaktive Track für System-Design-Beobachtungen. **Eintrags-Format, ID-Sche
 
 ---
 
+<a id="KPR-drain"></a>
 ## Backlog-Abbau: kontinuierlicher Drain (nicht Retro)
 
 Offene OBS (Status `NEU`) werden **kontinuierlich pro Session** abgebaut, **nicht** in der Retro. Grund: OBS-Verarbeitung ist *generatives Design* (Reibung → Kandidaten → lohnt-sich-Entscheidung), die Retro ist *diagnostisch* (Symptom → Muster → Root Cause). Design in den Diagnose-Container zu zwingen, lässt die Retro mit OBS-Themen volllaufen (OBS-S095-1).
 
 **Trigger:** Der SessionStart-Hook schlägt jede Session einen Drain-Satz vor (un-vergessbar – Disziplin allein scheiterte). Orchestrator schlägt vor, User bestätigt/vertagt. Der Zustand ist **sichtbar** („N vorgeschlagen, Backlog bei M, davon K behandlungswürdig"), aber **ohne Strafscore** – OBS speisen Jenga nicht.
 
+<a id="KPR-score"></a>
 ### Score und Behandlungswürdigkeit (S122)
 
 **Score = Impact × Häufigkeit** – Gesamtschaden = Schaden je Vorfall × Zahl der Vorfälle. Die Werte sind nicht frei gewählt (mechanisch in `obs_parse.py`, `IMPACT`/`FREQ`):
@@ -92,6 +98,7 @@ Beim Aufgreifen ist die Zusammengehörigkeit am Volltext zu prüfen und ein nich
 
 *Reichweite:* Cluster entstehen vor allem im Rückstau. Bei gesundem Backlog sind verwandte Einträge selten gleichzeitig offen (der S122-Bestand trug genau einen echten Cluster, aus Einträgen über fünf Sessions hinweg) – das Cluster-Scoring ist daher überwiegend ein Altlast-Werkzeug, das `Zusammen-erledigen:`-Feld dagegen dauerhaft nützlich.
 
+<a id="KPR-lanes-trigger"></a>
 ### Lanes und Trigger
 
 **Wie viele pro Session:** Der Satz zeigt **alle** behandlungswürdigen Einheiten – ungedeckelt. Ein Deckel begrenzte nur den Vorschlag, nicht die Arbeit, und versteckte damit Behandlungswürdiges; für verdauliche Portionen sorgt der Skill, der wenige Einheiten auf einmal vorlegt. Die **Backlog-Größe steuert bewusst nichts**: Sie misst Menge, nicht Wert.
@@ -120,6 +127,7 @@ Beim Aufgreifen ist die Zusammengehörigkeit am Volltext zu prüfen und ein nich
 
 **Aufgelöste Einträge** (Status `UMGESETZT` oder `VERWORFEN`) → nach `docs/kaizen/archive/observations_archive.md` verschieben, damit die Live-`observations.md` scannbar bleibt. Das übernimmt **mechanisch** `python3 .claude/scripts/obs-archive.py` (kein Hand-Cut/Paste); solange es aussteht, listet der Drain-Satz sie als **Hygiene-Reminder**.
 
+<a id="KPR-rolle-retro"></a>
 ### Rolle in der Retro
 
 Die Retro behandelt OBS nicht (das macht der Drain), berührt sie aber an einer Stelle:
@@ -127,6 +135,7 @@ Die Retro behandelt OBS nicht (das macht der Drain), berührt sie aber an einer 
 
 ---
 
+<a id="KPR-session-agenda"></a>
 ## Session-Agenda: was verlangt zum Session-Start eine Entscheidung?
 
 Der SessionStart-Hook ruft `python3 .claude/scripts/session-agenda.py` (Module: `--list`,
@@ -179,7 +188,7 @@ beides: `next-run` beansprucht nur für die aktuelle Story, und `ungeplante-szen
 sichtbar, was geschrieben ist, aber auf keinem Weg vorgelegt wird. Der Status dort ist
 **ungeklärt**, nicht „fällig".
 
-**Warum der Drain nicht an der Backlog-Größe hängt:** s. „Lanes und Trigger" oben.
+**Warum der Drain nicht an der Backlog-Größe hängt:** s. [„Lanes und Trigger"](#KPR-lanes-trigger) oben.
 
 **Keine Extremschwellen** (etwa „sehr volles Backlog schlägt fällige Retro"): nicht
 kalibrierbar – in S116 zeigten Backlog-Rückgang und tiefer Jenga-Stand gleichzeitig auf die
@@ -192,6 +201,7 @@ die Agenda läuft weiter. Ein Totalausfall wäre von „nichts zu tun" ununtersc
 
 ---
 
+<a id="KPR-eintrag-format"></a>
 ## Eintrag-Format (lessons_learned.md)
 
 **Format-Skeleton, Tags-Liste, Beispiel und Erfassungs-Test stehen kanonisch im Header von `docs/kaizen/lessons_learned.md`** (dort, wo Einträge geschrieben werden) – hier nicht duplizieren. Definitionen der Tags: Abschnitte unten. Dieser Abschnitt ergänzt nur die Prozess-Regeln zu IDs/Quelle:
@@ -200,12 +210,13 @@ die Agenda läuft weiter. Ein Totalausfall wäre von „nichts zu tun" ununtersc
 
 **Quelle-Markierung:** Pflicht-Zeile `Quelle: User | Subagent | Orchestrator` – Herkunft des Eintrags (KEINE Session – die steckt in der ID); `Subagent`/`Orchestrator` machen die Feedback-Quelle beobachtbar (z.B. ob Schicht-Implementer-Feedback ankommt). Keine Noise-Filter-Ausnahme: der 3-Fragen-Test gilt auch für user-gemeldete Einträge.
 
-**CM-Bezug bei KRITISCH/HOCH:** Die Maßnahmen-Pflicht aus „Wann gehört etwas wohin?" wird **bei der Erfassung** eingelöst, nicht in der Retro: `lessons.py add --cm-bezug` erzwingt für diese beiden Impacts eine in `countermeasures.md` existierende CM-ID oder `neu`. Die Übertragung dorthin zieht die Retro nach (Skill `kaizen`, Schritt 3). Feldform: Header von `lessons_learned.md`; Hintergrund: CM-S078-2.
+**CM-Bezug bei KRITISCH/HOCH:** Die Maßnahmen-Pflicht aus [„Wann gehört etwas wohin?"](#KPR-wohin) wird **bei der Erfassung** eingelöst, nicht in der Retro: `lessons.py add --cm-bezug` erzwingt für diese beiden Impacts eine in `countermeasures.md` existierende CM-ID oder `neu`. Die Übertragung dorthin zieht die Retro nach (Skill `kaizen`, [CM-Review](../../.claude/skills/kaizen/SKILL.md#KZN-countermeasures-review)). Feldform: Header von `lessons_learned.md`; Hintergrund: CM-S078-2.
 
 **Keine retroaktiven IDs:** Bestands-Einträge bekommen NICHT nachträglich IDs (bewusste Entscheidung).
 
 ---
 
+<a id="KPR-impact-kategorien"></a>
 ## Impact-Kategorien
 
 | Impact | Definition | Sofortreaktion | Maßnahmen-Anspruch |
@@ -222,6 +233,7 @@ die Agenda läuft weiter. Ein Totalausfall wäre von „nichts zu tun" ununtersc
 
 ---
 
+<a id="KPR-bereichs-kategorien"></a>
 ## Bereichs-Kategorien
 
 Entscheidungskriterium: **Wo liegt der Fix?**
@@ -237,6 +249,7 @@ Entscheidungskriterium: **Wo liegt der Fix?**
 
 ---
 
+<a id="KPR-kontext-tags"></a>
 ## Kontext-Tags
 
 Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
@@ -260,7 +273,7 @@ Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
 
 **Diese Tabelle ist die einzige Quelle der erlaubten Tags – auch für die Scripte.**
 `.claude/scripts/kontext_tags.py` liest sie zur Laufzeit; `obs.py`/`lessons.py` weisen einen
-unbekannten Tag beim Anlegen ab, `retro_report.py` meldet ihn im Bestand (Abschnitt 2). Ein
+unbekannten Tag beim Anlegen ab, `retro_report.py` meldet ihn im Bestand (Report-Abschnitt „Tag-Bestand"). Ein
 neuer Tag entsteht daher durch Ergänzen **hier**, ohne Code-Änderung. Erhalten bleiben muss
 dafür nur die Form: Überschrift `## Kontext-Tags`, und jede Tag-Zeile beginnt mit
 `| `-Backtick-Tag-Backtick. Wird der Abschnitt umbenannt oder die Tabelle aufgelöst, scheitern
@@ -273,6 +286,7 @@ die Scripte **laut** (`TabelleFehlt`) – eine stumme Leerliste wäre der gefäh
 
 ---
 
+<a id="KPR-wohin"></a>
 ## Wann gehört etwas wohin?
 
 | Ziel | Kriterium |
@@ -299,6 +313,7 @@ Keine verallgemeinerbare Klasse darunter → **keine CM** (sie wäre sofort obso
 
 ---
 
+<a id="KPR-retro-trigger"></a>
 ## Retro-Trigger: Jenga-Score
 
 Der Jenga-Score misst akkumulierten Problemdruck seit der letzten Retro.
@@ -321,13 +336,16 @@ Nach einer Retro wird `lessons_learned.md` archiviert → Jenga-Score startet ne
 
 ---
 
+<a id="KPR-scripts"></a>
 ## Scripts
 
+<a id="KPR-jenga-script"></a>
 ### jenga_score.py
 Läuft nach jeder Session (im `closing-session`-Skill).
 Input: `docs/kaizen/lessons_learned.md`
 Output: Jenga-Score + Zähltabelle (Impact × Kategorie × Kontext)
 
+<a id="KPR-retro-report-script"></a>
 ### retro_report.py
 Läuft zu Beginn jeder Retro (im `kaizen`-Skill).
 Input: aktuelle `lessons_learned.md` + alle Archiv-Dateien in `docs/kaizen/archive/`
@@ -337,30 +355,33 @@ Details: Kommentar-Header in `.claude/scripts/retro_report.py`.
 
 ---
 
+<a id="KPR-archivierung"></a>
 ## Archivierung (nach Retro)
 
 Die aktuelle `lessons_learned.md` wird nach `docs/kaizen/archive/` verschoben.
-Ablauf: Skill `kaizen`, Schritt 5.
+Ablauf: Skill `kaizen`, [lessons_learned.md archivieren](../../.claude/skills/kaizen/SKILL.md#KZN-archivieren).
 Der Jenga-Score startet automatisch neu – `jenga_score.py` liest immer nur die aktuelle Datei.
 
 ---
 
+<a id="KPR-offene-massnahmen"></a>
 ## Umsetzung offener Maßnahmen
 
-**Regel 1 – Sichtbarkeit:** Die **Countermeasure entsteht immer in der Retro** – sie ist der Tracking-Anker (Impact-Tupel + Status), ohne den `retro_report.py` weder Rückfall noch BEWÄHRT zählen kann. Die Frage ist nur, wo ihre **Umsetzung** wieder vorgelegt wird.
+**Sichtbarkeit:** Die **Countermeasure entsteht immer in der Retro** – sie ist der Tracking-Anker (Impact-Tupel + Status), ohne den `retro_report.py` weder Rückfall noch BEWÄHRT zählen kann. Die Frage ist nur, wo ihre **Umsetzung** wieder vorgelegt wird.
 
-**Default: die Maßnahme in derselben Retro definieren.** Das Abwägen der Kandidaten für ein LL-Muster gehört laut Evaluierungs-Gate (Abschnitt „Gefahr & Kandidaten-Bewertung") ausdrücklich in die **CM-Wahl**, also hierher – nicht in den Drain. Ist sie definiert (konkreter nächster Schritt + überprüfbares Done-Kriterium), bekommt sie einen Punkt unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md`, als **Kurzzusammenfassung mit Verweis** auf `countermeasures.md` – keine Kopie, das Dokument wird bei jedem Session-Start vollständig injiziert.
+**Default: die Maßnahme in derselben Retro definieren.** Das Abwägen der Kandidaten für ein LL-Muster gehört laut Evaluierungs-Gate ([„Gefahr & Kandidaten-Bewertung"](#KPR-gefahr)) ausdrücklich in die **CM-Wahl**, also hierher – nicht in den Drain. Ist sie definiert (konkreter nächster Schritt + überprüfbares Done-Kriterium), bekommt sie einen Punkt unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md`, als **Kurzzusammenfassung mit Verweis** auf `countermeasures.md` – keine Kopie, das Dokument wird bei jedem Session-Start vollständig injiziert.
 
 **Ausnahme, begründungspflichtig:** Steht nicht die Umsetzung aus, sondern die **Antwort selbst** – es gibt mehrere ernsthafte Kandidaten, deren Abwägung eigene Recherche braucht –, bleibt die CM auf OFFEN und die Ausgestaltung geht als Eintrag in `docs/kaizen/observations.md` (mit `Bezug:` auf die CM) in den Drain. Der Grund ist im CM-Eintrag zu notieren; „ist noch nicht definiert" allein zählt nicht, sonst wird die Ausnahme zum bequemen Standardweg. **Preis dieser Route bewusst mitdenken:** Der Drain ist ratenbegrenzt und nach Impact × Häufigkeit priorisiert – ein Eintrag kann dort viele Sessions liegen. Für KRITISCH/HOCH-Findings, die laut „Wann gehört etwas wohin?" *sofort* eine Maßnahme verlangen, ist das in aller Regel zu langsam.
 
 **Nicht** nach `AGENT_MEMORY.md` gehört eine unfertige Maßnahme: Die Datei hat außer der Injektion **keinen** Wiedervorlage-Mechanismus, ein Punkt ohne nächsten Schritt belastet dort nur die Prioritätenliste – das verwechselt Sichtbarkeit mit Wiedervorlage. (Diese Unterscheidung fehlte bis S116; die Regel stammt aus der Zeit vor dem kontinuierlichen Drain und kannte nur einen Ablageort.)
 
-Falls inhaltlich zutreffend zusätzlich als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`). Ablauf: `kaizen`-Skill, Schritt „Änderungen umsetzen".
+Falls inhaltlich zutreffend zusätzlich als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`). Ablauf: `kaizen`-Skill, Schritt [„Änderungen umsetzen"](../../.claude/skills/kaizen/SKILL.md#KZN-aenderungen-umsetzen).
 
-**Regel 2 – Eskalation:** Eine Maßnahme die nach 2 Retros noch OFFEN ist, wird in der nächsten Retro als ESKALIERT präsentiert – im Skill-Schritt „Findings präsentieren & Freigabe einholen", Abschnitt F (gespeist aus dem Abschnitt „Eskalierte Maßnahmen" des `retro_report.py`-Outputs). Der User entscheidet dann: Umsetzung priorisieren oder bewusst verwerfen (Begründung in der Maßnahme notieren).
+**Eskalation:** Eine Maßnahme die nach 2 Retros noch OFFEN ist, wird in der nächsten Retro als ESKALIERT präsentiert – im Skill-Schritt [„Findings präsentieren & Freigabe einholen"](../../.claude/skills/kaizen/SKILL.md#KZN-findings-praesentieren), Abschnitt F (gespeist aus dem Abschnitt „Eskalierte Maßnahmen" des `retro_report.py`-Outputs). Der User entscheidet dann: Umsetzung priorisieren oder bewusst verwerfen (Begründung in der Maßnahme notieren).
 
 ---
 
+<a id="KPR-bewaehrt"></a>
 ## BEWÄHRT-Kriterium für Countermeasures
 
 Eine Maßnahme gilt als BEWÄHRT wenn:
@@ -372,6 +393,7 @@ Nachweis: Session-Dateien in `docs/history/sessions/` lesen und beurteilen, ob d
 
 > **Harte Daten bei nicht-selbstberichteten Verhaltensweisen:** Adressiert die Maßnahme ein Agenten-Verhalten, das der Agent **nicht selbst** als Problem in lessons_learned einträgt (z.B. Bash-Permission-Verstöße, abgelehnte Befehle), ist „keine neuen lessons_learned dazu" **kein** Beleg für BEWÄHRT (der Agent sieht es nicht als Problem). Stattdessen die primäre Datenquelle auswerten (z.B. `.claude/tmp/denied-commands.log`). Fehlt diese, ist **keine verlässliche/belastbare Aussage** möglich – dann den User fragen, ob ihm das Verhalten aufgefallen ist und wie mit dem Punkt weiter verfahren werden soll.
 
+<a id="KPR-obsolet"></a>
 ## Obsolet-Kriterien für Countermeasures
 
 Ein Eintrag ist obsolet wenn:

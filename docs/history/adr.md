@@ -1305,7 +1305,7 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 
 **Begründung:** `docs/process/e2e-testing.md` verlangt US-Tag + ScenarioType als Spec↔Test-Traceability für **szenario-getriebene** Tests. Ein Querschnitts-/Invarianten-Test hat per Definition kein einzelnes treibendes Szenario; ein erzwungener US-Tag wäre eine falsche Traceability-Behauptung. Zentral hier dokumentiert, statt in jedem betroffenen Test einzeln (vermeidet die Kommentar-Wiederholung über die betroffenen Tests und deren Drift).
 
-**Guard (Abgrenzung zu Gold-Plating):** Ein US-Tag-loser Test MUSS per Kommentar als Kategorie 1 oder 2 ausgewiesen sein (welche ADR / welche Invariante). Prüft ein Test hingegen Domänen-/Szenario-Verhalten, ist US-Tag + Gherkin-Szenario Pflicht – fehlt beides, ist es eine Outside-In-Verletzung / Gold-Plating (review-checklist.md „Test-Audit").
+**Guard (Abgrenzung zu Gold-Plating):** Ein US-Tag-loser Test MUSS per Kommentar einer der beiden Kategorien zugeordnet sein – **Protokoll-/Infrastruktur-Mechanik** oder **Stryker-blinde Invariante** – samt Angabe, welche ADR bzw. welche Invariante (S124: beim Namen statt bei der Nummer, damit die Zuordnung eine Umsortierung übersteht). Prüft ein Test hingegen Domänen-/Szenario-Verhalten, ist US-Tag + Gherkin-Szenario Pflicht – fehlt beides, ist es eine Outside-In-Verletzung / Gold-Plating (review-checklist.md „Test-Audit").
 
 **Verworfen:** Die Ausnahme pro betroffenem Test als Kommentar wiederholen – driftet und macht die Grenze „legitime Infra-Ausnahme vs. Gold-Plating" für jeden Review neu verhandelbar.
 

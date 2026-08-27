@@ -22,7 +22,7 @@ Gib für jeden Befund: ✅ OK | ⚠️ Verbesserungswürdig (Vorschlag) | ❌ Mu
 
 PRÜFPUNKTE:
 
-1. "Make Illegal States Unrepresentable" (docs/reference/architecture.md Sektion 2)
+1. "Make Illegal States Unrepresentable" ([Domain Modeling](../../docs/reference/architecture.md#ARC-domain-modeling))
    - Gibt es eingebaute Typen (string, int, decimal, ...) oder Custom Types, wo ein eigener Typ
      die Invarianten besser ausdrücken würde?
    - Gibt es T? für Werte, die semantisch "vorhanden oder unbekannt" bedeuten?
@@ -55,7 +55,7 @@ PRÜFPUNKTE:
 Abschluss: Zusammenfassung (Anzahl ❌/⚠️/✅) + klare Handlungsempfehlung.
 
 Kontext (lese diese Dateien ZUERST, bevor du reviewst):
-- Kernprinzipien: docs/reference/architecture.md (Sektion 0 "Design Philosophy")
+- Kernprinzipien: [Design Philosophy](../../docs/reference/architecture.md#ARC-design-philosophy)
 - C#-Code: docs/guidelines/coding-guideline-csharp.md
 - TypeScript/React-Code: docs/guidelines/coding-guideline-typescript.md
 - Fachbegriffe: docs/reference/glossary.md

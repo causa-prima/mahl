@@ -5,7 +5,8 @@ import type { ResultAsync } from 'neverthrow'
 // (befüllte Liste). Pending kollabiert zu undefined und wird vom Empty-State-Pfad
 // abgedeckt. Volle MutationState-Union (pending/error) aufgeschoben – Erweiterung bei
 // eigenen Lade-/Fehler-Szenarien. Kanonische Form: ADR-S056-1 und
-// coding-guideline-typescript.md §4b; Stand der Abweichung: TD-S101-1.
+// docs/guidelines/coding-guideline-typescript.md#CGT-react-query;
+// Stand der Abweichung: TD-S101-1.
 export function useResultQuery<TData, TError>(
   key: readonly unknown[],
   fn: () => ResultAsync<TData, TError>,

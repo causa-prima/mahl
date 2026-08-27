@@ -2,7 +2,7 @@
 """Fällig gewordene technische Schuld aus `docs/tech-debt.md`.
 
 Der Backstop für **Waisen-TD** (OBS-S099-1): Schuld in Bereichen, zu denen nie ein Lauf kommt.
-`implementing-scenario` Schritt 0 P5 sichtet TD **bereichsgebunden** und schließt den Rest
+Der Architektur-Check in `implementing-scenario` sichtet TD **bereichsgebunden** und schließt den Rest
 ausdrücklich aus („TD ohne Bezug zu den berührten Bereichen bleibt bewusst außen vor"). Genau
 dieses Komplement deckt dieses Modul ab – es prüft nicht, ob ein Lauf hinkommt, sondern ob der
 im `**Fällig:**`-Kopf genannte **Anker eingetreten** ist.
@@ -52,7 +52,7 @@ def faellige(root: Path) -> list[tuple[str, list[str]]]:
 def fuer_szenarien(root: Path, titel: list[str]) -> list[tuple[str, str]]:
     """(TD-ID, Fällig-Wert) für Einträge, die auf eines der gegebenen Szenarien ankern.
 
-    Aufrufstelle: `implementing-scenario` Schritt 6.1 – nach einem erledigten Lauf mit dessen
+    Aufrufstelle: `implementing-scenario`, Offene-Punkte-Triage im Abschluss – nach einem erledigten Lauf mit dessen
     Szenario-Titeln aufgerufen, damit der TD-Abgleich mechanisch statt aus Lese-Disziplin
     passiert.
     """
@@ -72,7 +72,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--szenarien", nargs="+", metavar="TITEL",
                     help="TD-Einträge listen, die auf diese Szenario-Titel ankern "
-                         "(implementing-scenario Schritt 6.1, nach einem erledigten Lauf)")
+                         "(implementing-scenario, Offene-Punkte-Triage im Abschluss)")
     args = ap.parse_args()
     root = repo_root()
 

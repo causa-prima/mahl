@@ -155,7 +155,7 @@ test.describe('US904_HappyPath: Zutaten verwalten', () => {
 
     // Then: Name-Feld und Einheit-Feld sind als Pflichtfeld markiert. Geprüft wird das
     //   USER-SICHTBARE Signal – der Asterisk im Label – als maßgebliche Beobachtung von
-    //   "markiert" (UX-Guideline Prinzip 8). Zusätzlich die native `required`-Property, die
+    //   "markiert" (UX-Guideline „Formular-/Dialog-Baseline"). Zusätzlich die native `required`-Property, die
     //   die semantische/a11y-Zuschreibung absichert (aria-required) und den Mutanten
     //   "required-Prop entfernt" tötet. getByLabel matcht per Substring weiter "Name"/"Einheit".
     const dialog = page.getByRole('dialog')
@@ -436,7 +436,7 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     // Then: Fehlermeldung erscheint
     await expect(page.getByText('Einheit darf nicht leer sein.')).toBeVisible()
     // Then: der Fokus liegt auf dem Einheit-Feld. Es ist das erste (hier einzige) fehlerhafte
-    //   Feld — Name "Salz" ist gültig (UX-Guideline Prinzip 8 "Fokus aufs erste fehlerhafte
+    //   Feld — Name "Salz" ist gültig (UX-Guideline „Formular-/Dialog-Baseline" "Fokus aufs erste fehlerhafte
     //   Feld" / TD-S094-1). Pinnt zugleich den "nur späteres Feld fehlerhaft"-Fall: der Fokus
     //   landet NICHT hart auf dem (visuell ersten) Name-Feld, sondern auf dem fehlerhaften.
     await expect(page.getByLabel('Einheit')).toBeFocused()
@@ -476,7 +476,7 @@ test.describe('US904_Error: Zutaten-Validierung', () => {
     await expect(page.getByText('Name darf nicht leer sein.')).toBeVisible()
     await expect(page.getByText('Einheit darf nicht leer sein.')).toBeVisible()
     // Then: der Fokus liegt auf dem Name-Feld. Beide Felder sind fehlerhaft -> "mehrere ->
-    //   das erste" (UX-Guideline Prinzip 8 / TD-S094-1, Fokus-Priorität in DOM-Reihenfolge
+    //   das erste" (UX-Guideline „Formular-/Dialog-Baseline" / TD-S094-1, Fokus-Priorität in DOM-Reihenfolge
     //   Name vor Einheit). Pinnt den Mehrfeld-Fall, den die Einzelfeld-Fokus-Tests nicht
     //   abdecken: ein Prioritäts-Swap im Fokus-Hook (Einheit vor Name) bliebe sonst
     //   unentdeckt (Stryker kann diesen menschlichen Refactor strukturell nicht fangen).
@@ -723,7 +723,7 @@ test.describe('US904_HappyPath: Zutat löschen', () => {
 })
 
 // @US-904-edge-case: run-8 „Löschen·Success". Verlässlichkeit des Undo-Wegs – der Toast ist die
-// EINZIGE Wiederherstellungsmöglichkeit im UI (UX-Guideline Prinzip 5 Stufe 1), solange die
+// EINZIGE Wiederherstellungsmöglichkeit im UI (UX-Guideline „Destructive Actions schützen", Soft-Delete), solangedie
 // Reaktivierung beim Neuanlegen (run-11) fehlt. Verschwindet er zu früh, ist die Zutat für den
 // Nutzer weg. Die Toast-Anzeigezeit beträgt 6 s (autoHideDuration in IngredientsPage.tsx).
 test.describe('US904_EdgeCase: Undo-Toast-Verlässlichkeit', () => {
@@ -803,7 +803,7 @@ test.describe('US904_EdgeCase: Undo-Toast-Verlässlichkeit', () => {
   })
 })
 
-// @US-904-happy-path: run-9 „Löschen·Pending" (Singleton). UX-Guideline Prinzip 3 ("Sperren
+// @US-904-happy-path: run-9 „Löschen·Pending" (Singleton). UX-Guideline „Sichtbares Feedback" ("Sperren
 // während Pending"), analog zum Speichern-Dialog (run-2): solange der DELETE unterwegs ist, darf
 // die Aktion nicht erneut auslösbar sein. Der Löschen-Button lebt in der Zeile und bleibt während
 // des Pendings sichtbar (die Liste aktualisiert sich erst nach der Server-Antwort) – genau dieses
@@ -842,11 +842,12 @@ test.describe('US904_HappyPath: Löschen·Pending', () => {
 // Name bereits soft-deleted existiert, wird die vorhandene Zeile reaktiviert statt eine zweite
 // anzulegen (ADR-S004-1: POST antwortet 409 mit { code, id }, der Client ruft daraufhin den Restore
 // auf – transparent, ohne Zutun des Nutzers). Der Restore übernimmt dabei Name und Einheit aus dem
-// Anlege-Request (ADR-S051-4/S111-1), weshalb die Szenarien 2 und 3 gezielt abweichende Werte
+// Anlege-Request (ADR-S051-4/S111-1), weshalb die beiden Folge-Tests gezielt abweichende Werte
 // eingeben. Black-box: die Tests klicken nur, die 409-Orchestrierung ist interne Mechanik – ihre
 // Statuscodes prüft Server.Tests. Seed VOR page.goto, damit der initiale GET den Zustand kennt.
 // Namens- und Einheiten-Assertions laufen mit `exact: true`: Playwrights Default-Textmatch ist
-// case-insensitiv und Substring-basiert, womit Szenario 3 („mehl" -> „Mehl") nicht messbar wäre.
+// case-insensitiv und Substring-basiert, womit der Groß-/Kleinschreibungs-Fall („mehl" -> „Mehl")
+// nicht messbar wäre.
 test.describe('US904_EdgeCase: Zutat reaktivieren', () => {
   // Szenario: Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese
   test('US904_EdgeCase_CreateIngredient_SoftDeletedSameName_ReactivatesIngredient', async ({ page, request }) => {

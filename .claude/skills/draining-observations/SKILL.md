@@ -15,11 +15,12 @@ user-invocable: true
 
 Dieser Skill arbeitet einen **Drain-Satz** offener OBS ab – OBS-Verarbeitung ist *generatives Design*, das
 mit einem strukturierten Pfad bias-arm und entscheidungsfreudig bleibt. Der Mechanismus dahinter
-(Wert-/Alters-Lane, Rate, Same-Artefakt-Kolokation, Bias-Modell) lebt kanonisch in `docs/kaizen/process.md`,
-Abschnitt „Backlog-Abbau: kontinuierlicher Drain" – schlag dort nach, sobald eine Lane, die Rate oder ein
+(Wert-/Alters-Lane, Rate, Same-Artefakt-Kolokation, Bias-Modell) lebt kanonisch in
+[„Backlog-Abbau: kontinuierlicher Drain"](../../../docs/kaizen/process.md#KPR-drain) – schlag dort nach, sobald eine Lane, die Rate oder ein
 Marker unklar ist.
 
-## 1. Drain-Satz holen
+<a id="DRN-drain-satz"></a>
+## Drain-Satz holen
 
 Der SessionStart-Hook blendet den Satz bereits ein (als „Nächste Aufgabe" der Session-Agenda, beginnend
 mit „OBS-Drain – Backlog:"). Ist er noch im
@@ -35,10 +36,10 @@ Meldet das Script „Backlog leer", bestätige das kurz und beende – nichts zu
 
 Der Satz liefert **Wert-Lane** + **Alters-Lane**, dazu ggf. **fällige Wiedervorlagen** (geparkte Items, deren
 Termin erreicht ist), **offene Fragen** und einen **Hygiene-Reminder** (aufgelöst, aber noch nicht archiviert).
-Definitionen: `process.md`. Ein **`+Koloc:`-Marker** an
-einer Zeile nennt offene OBS an derselben Datei (Kandidaten für Same-Artefakt-Mitnahme, s. Schritt
-„**Kolokation & Konsolidierung erwägen**"). Eine `Einheit [Σ …]` fasst *verwandte* Einträge zusammen, die
-gemeinsam bearbeitet werden – dazu der Schritt „**Cluster kritisch prüfen**".
+Definitionen: [„Lanes und Trigger"](../../../docs/kaizen/process.md#KPR-lanes-trigger). Ein **`+Koloc:`-Marker** an
+einer Zeile nennt offene OBS an derselben Datei (Kandidaten für Same-Artefakt-Mitnahme, s.
+[Schritt „**Kolokation & Konsolidierung erwägen**"](#DRN-kolokation)). Eine `Einheit [Σ …]` fasst *verwandte* Einträge zusammen, die
+gemeinsam bearbeitet werden – dazu der [Schritt „**Cluster kritisch prüfen**"](#DRN-cluster-pruefen).
 
 **Offene Fragen sind kein Drain-Item.** Erscheint die Sektion „Offene Fragen", leg die Einträge dem **User
 zur Klärung** vor (Volltext: `docs/open-questions.md`) – sie werden nicht wie OBS selbst entschieden, denn
@@ -46,7 +47,8 @@ sie haben Business-/Architektur-Impact. Ergebnis: Frage geklärt → Eintrag ent
 stabilen Ort festhalten (ADR, Guideline, `tech-debt.md`); noch nicht klärbar → `Fällig: S<NNN>` setzen, damit
 sie zum passenden Zeitpunkt statt nach Alter wiederkommt.
 
-## 2. Pro Item: Discovery → Entscheidung
+<a id="DRN-discovery-entscheidung"></a>
+## Pro Item: Discovery → Entscheidung
 
 Jedes Item bekommt in dieser Behandlung eine Entscheidung – **umsetzen, verwerfen oder aufschieben**. Auch
 aufschieben ist eine vollwertige Wahl (mit Grund und Re-Trigger), keine Vertagung der Entscheidung selbst.
@@ -88,7 +90,7 @@ diskutiert wird. Für jedes Item:
    verifizieren, bevor sie eine Empfehlung stützt. Eine auf veralteten Angaben gefällte Verwerfung
    schließt den Punkt *und* hinterlässt die falsche Begründung als Präzedenz im Archiv.
 
-3. **Cluster kritisch prüfen, bevor er gemeinsam bearbeitet wird.** Eine `Einheit [Σ …]` im Drain-Satz
+3. <a id="DRN-cluster-pruefen"></a>**Cluster kritisch prüfen, bevor er gemeinsam bearbeitet wird.** Eine `Einheit [Σ …]` im Drain-Satz
    ist eine **Behauptung der Erfassung**, keine geprüfte Tatsache – gemacht, als der spätere Partner noch
    gar nicht existierte. Volltexte der Mitglieder lesen und je Mitglied fragen: *Wird es beim Bearbeiten
    der anderen wirklich mit erledigt – oder ist es nur dasselbe Themenfeld?* Wer danebensteht, wird
@@ -98,18 +100,19 @@ diskutiert wird. Für jedes Item:
    den vorliegenden zeigen, blendet `obs.py get` als eingehende Kanten mit ein. Der typische Fehltreffer ist die **Vorfrage**, die vor den anderen zu entscheiden wäre –
    eine Reihenfolge-Abhängigkeit macht nichts billiger.
 
-4. **Kolokation & Konsolidierung erwägen** (zwei getrennte Fälle):
+4. <a id="DRN-kolokation"></a>**Kolokation & Konsolidierung erwägen** (zwei getrennte Fälle):
    - **Same-Artefakt-Kolokation** (gemeinsam *lösen*): Berührt ein Kandidat dieselbe Datei wie ein anderes
-     offenes OBS, erwäge die Mitnahme (auch bei verschiedenen Problemen; Begründung: `process.md`). Nur bei
+     offenes OBS, erwäge die Mitnahme (auch bei verschiedenen Problemen; Begründung:
+     [„Lanes und Trigger"](../../../docs/kaizen/process.md#KPR-lanes-trigger)). Nur bei
      **gleicher Datei**, nicht bei bloßer Themen-Nähe. Marker: `+Koloc:`.
    - **Thematisch/parametrische Konsolidierung** (zu *einem* Eintrag zusammenführen): Beschreibt ein Item
      **dasselbe oder eng verwandte Problem** wie ein anderes offenes OBS – auch an anderer Stelle, analog
      parametrisierten Tests – dann den tragenden Eintrag erweitern und den anderen als `VERWORFEN
      (konsolidiert in OBS-…)` schließen, oder via `Bezug:` gemeinsam lösbar halten. Senkt Backlog-Redundanz
      und Drain-Last. (Die teure „ist das dasselbe Problem?"-Beurteilung gehört hierher in den Drain, nicht in
-     die billige Erfassung – `process.md` „Erfassung ist billig, Klassifikation ist teuer".)
+     die billige Erfassung – [„Erfassung ist billig, Klassifikation ist teuer"](../../../docs/kaizen/process.md#KPR-zwei-brillen).)
 
-5. **Gefahr & CM-Gate** (s. `process.md` „Gefahr & Kandidaten-Bewertung" + „Wann gehört etwas wohin?"): Bei
+5. **Gefahr & CM-Gate** (s. [„Gefahr & Kandidaten-Bewertung"](../../../docs/kaizen/process.md#KPR-gefahr) + [„Wann gehört etwas wohin?"](../../../docs/kaizen/process.md#KPR-wohin)): Bei
    höher-Gefahr/nicht-trivialen Items erst absichern/belegen, dann umsetzen – Sorgfalt und Beweisbarkeit
    skalieren mit der Gefahr. Steht eine *stehende, wiederkehrende* Leitplanke dahinter, lege eine CM an; bei
    einer Einmal-Änderung halte sie inline als `Maßnahme:` fest.
@@ -121,7 +124,8 @@ diskutiert wird. Für jedes Item:
    der betroffene Code existiert nicht mehr), darf er normal als `VERWORFEN (Grund)` raus – das schützt der
    Prüfsatz nicht.
 
-## 3. Ausgang festhalten
+<a id="DRN-ausgang-festhalten"></a>
+## Ausgang festhalten
 
 Trag den Ausgang **per Script** ein, statt die Datei zu editieren – das trifft genau die Felder, die
 `obs-drain.py` parst, und erspart den Vor-Edit-Read der gesamten Datei:
@@ -147,7 +151,8 @@ python3 .claude/scripts/obs.py set OBS-SNNN-N --status "UMGESETZT (S<NNN>)" --en
 `python3 .claude/scripts/obs-archive.py` (schneidet sie aus `observations.md` und hängt sie ans
 `archive/observations_archive.md` – kein Hand-Cut/Paste). Vorab prüfbar mit `--dry-run`.
 
-## 4. Abschluss
+<a id="DRN-abschluss"></a>
+## Abschluss
 
 Fass kurz zusammen, was umgesetzt/verworfen/aufgeschoben wurde und wie groß das Backlog jetzt ist
 (`obs-drain.py` zeigt den Stand). Stehen aus den Umsetzungen neue Prioritäten oder TD an, berücksichtige

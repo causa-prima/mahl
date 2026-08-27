@@ -2,9 +2,10 @@ using OneOf;
 
 namespace mahl.Server.Types;
 
-// Constraint-Träger für String-Feldregeln (ADR-S119-1, coding-guideline-csharp.md §2 Ebene 1).
+// Constraint-Träger für String-Feldregeln (ADR-S119-1,
+// docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession).
 // Feldagnostisch: sie melden einen Verstoß, keinen Meldungstext und keinen Feldnamen – die
-// Zuordnung Fehlerfall -> deutscher Text liegt an der API-Grenze (ADR-S051-2, Regel 5).
+// Zuordnung Fehlerfall -> deutscher Text liegt an der API-Grenze (ADR-S051-2; Meldungen an die Grenze).
 // Der Ertrag ist, dass die parametrisierte Grenze Teil des Feldtyps wird
 // (Bounded<NonEmptyTrimmedString, Max30>) statt ein handgeschriebener Check in Create().
 internal enum StringViolation { Empty, TooLong }

@@ -61,7 +61,7 @@ def check(data: dict) -> str | None:
         f"Index-Kurzfassung über dem harten Cap ({HARD_CAP} Zeichen): {lst}.\n"
         "Regel: ein Satz – was sich änderte, kein Warum (das gehört in die Session-Datei); "
         f"auf ADR-/Session-IDs verweisen statt Prosa. Soft-Ziel {SOFT_TARGET}. "
-        "Details: closing-session SKILL Schritt 6."
+        "Details: .claude/skills/closing-session/SKILL.md#CLS-index"
     )
 
 

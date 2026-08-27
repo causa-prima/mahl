@@ -5,7 +5,7 @@ namespace mahl.Server.Domain;
 
 // ADR-S120-1: ein Validierungs-Fehlertyp je Domänentyp. Die Fälle sind die Fehlerfälle des
 // Fachkonzepts "Zutatenname" – nicht die des Constraint-Typs und nicht die eines Feldes. Der Typ
-// trägt weder Feldnamen (den kennt die Grenze statisch) noch Meldungstext (ADR-S051-2, Regel 5).
+// trägt weder Feldnamen (den kennt die Grenze statisch) noch Meldungstext (ADR-S051-2; Meldungen an die Grenze).
 // MA0048: File name must match type name – der Fehlertyp ist per ADR-S120-1 an das Konzept gebunden,
 //         nicht ans Feld und nicht an die Entität: er ist der Fehlerkanal von IngredientName.Create,
 //         außerhalb dieses Typs bedeutungslos und ändert sich ausschließlich mit ihm. Eine eigene
@@ -14,7 +14,8 @@ namespace mahl.Server.Domain;
 internal enum IngredientNameError { Empty, TooLong }
 #pragma warning restore MA0048
 
-// Domänentyp (coding-guideline-csharp.md §2 Ebene 2): der Hauptname einer Zutat
+// Domänentyp (docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession):
+// der Hauptname einer Zutat
 // (docs/reference/glossary.md, "Zutat"). Er baut sich aus Constraint-Typen; die Grenze steht als
 // Marker im Feldtyp, nicht als const in Create() (ADR-S119-1).
 internal readonly record struct IngredientName
@@ -29,8 +30,8 @@ internal readonly record struct IngredientName
 
     private IngredientName(Bounded<NonEmptyTrimmedString, Max30> value) => _value = value;
 
-    // Regel 5: der Typ liefert die Fehlerfälle SEINES Konzepts – der Constraint-Typ und sein
-    // StringViolation bleiben Implementierungsdetail (Regel 1, ADR-S120-1).
+    // Meldungen an die Grenze: der Typ liefert die Fehlerfälle SEINES Konzepts – der Constraint-Typ und sein
+    // StringViolation bleiben Implementierungsdetail (Domänentyp = Schnittstelle, ADR-S120-1).
     public static OneOf<IngredientName, IngredientNameError> Create(string? input) =>
         Bounded<NonEmptyTrimmedString, Max30>.Create(input)
             .MapError<Bounded<NonEmptyTrimmedString, Max30>, StringViolation, IngredientNameError>(v => v switch

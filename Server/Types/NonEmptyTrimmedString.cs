@@ -2,7 +2,8 @@ using OneOf;
 
 namespace mahl.Server.Types;
 
-// Constraint-Typ (coding-guideline-csharp.md §2 Ebene 1): getrimmt und nicht leer.
+// Constraint-Typ (docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession):
+// getrimmt und nicht leer.
 // Trimmen und Nicht-Leer liegen bewusst in EINEM Träger statt in zwei komponierbaren: Ein Träger,
 // der nur normalisiert, müsste im Null-Fall einen Wert liefern ("" aus null), und der ist von ""
 // aus "" nicht unterscheidbar – der Zweig wäre über HTTP nicht mehr beobachtbar. Hier gibt er einen
@@ -24,7 +25,7 @@ internal readonly record struct NonEmptyTrimmedString : IStringConstraint<NonEmp
 
     // ADR-S051-1: trim before validation, store the trimmed value.
     // Der Träger meldet einen Verstoß, keinen Meldungstext: er ist feldagnostisch und kennt weder
-    // Feldnamen noch Request-Format (Regel 5, ADR-S051-2).
+    // Feldnamen noch Request-Format (Meldungen an die Grenze, ADR-S051-2).
     // `string?`: ein fehlendes oder explizit null gesetztes JSON-Property kommt hier als null an
     // (System.Text.Json erzwingt die NRT-Annotationen des DTOs nicht) und ist wie leer zu behandeln.
     public static OneOf<NonEmptyTrimmedString, StringViolation> Create(string? input)

@@ -7,6 +7,7 @@ Kriterium: Verhaltensregel die in jeder Session gilt – zu querschnittlich für
 Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn BEWÄHRT + dauerhaft relevant).
 -->
 
+<a id="KPI-review-prozess"></a>
 ## Review-Prozess
 
 - **Reviewer-Agenten stets ohne Iterations-Vorwissen beauftragen.**
@@ -18,12 +19,13 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   sie nur plausibel? Umsetzbar ≠ inhaltlich korrekt.
 
 - **Findings ohne Zwischen-Nachfrage abarbeiten.**
-  Beim Abarbeiten einer Finding-Liste (z.B. review-code/review-docs, implementing-scenario Schritt 5)
+  Beim Abarbeiten einer Finding-Liste (z.B. review-code/review-docs, implementing-scenario Review-Loop)
   nach jedem umgesetzten Finding kurz bestätigen und **sofort** zum nächsten übergehen – kein
   Pause-und-Fragen (User hat das explizit so gewünscht). **Ausnahme – invalide Findings** (nach
   Verifikation nicht haltbar): kurz erklären, warum der Reviewer darauf gekommen sein könnte und was
   ich evtl. übersehen habe, **dann** beim User nachfragen, bevor weitergearbeitet wird.
 
+<a id="KPI-prozess-disziplin"></a>
 ## Prozess-Disziplin
 
 - **Guidelines aktiv auf den konkreten Fall anwenden.**
@@ -32,8 +34,9 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
 
 - **Deterministische Skill-Schritte mechanisieren.** Beim Schreiben/Ändern eines Skills prüfen, ob
   ein deterministischer Schritt (Session-Nummer bestimmen, Status setzen, archivieren …) statt
-  freihändig besser als Script liefe (Token↓, Varianz↓). Details: `workflow-auditor.md` Dim. 5.
+  freihändig besser als Script liefe (Token↓, Varianz↓). Details: [`workflow-auditor.md`, Ressourceneffizienz](../../.claude/agents/workflow-auditor.md#WFA-ressourceneffizienz).
 
+<a id="KPI-doku-referenzen"></a>
 ## Doku & Referenzen
 
 - **Single Source of Truth: Information am passendsten Ort, sonst referenzieren.**
@@ -44,6 +47,55 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   (grep-barer Marker / Heading-Text / ID – **keine** „Sektion N"-/Zeilen-Position, die stale wird;
   Zeilennummern nur für read-only-Dateien wie Session-Logs). Ändert man eine referenzierte Stelle,
   **prüfen, ob die referenzierenden Stellen mitgepflegt werden müssen.**
+
+- **Abschnitte tragen Anker, Verweise zeigen auf den Anker – nie auf eine Nummer.**
+  Definition per HTML-Anchor über der Überschrift, Verweis als echter Markdown-Link:
+
+      <a id="CGT-result"></a>
+      ## Result-Typen
+      … siehe [CGT-result](../guidelines/coding-guideline-typescript.md#CGT-result) …
+
+  Präfix = Dokument, Rest ein Slug in Kleinbuchstaben. So bleibt der Verweis **klickbar**
+  (GitHub, IDE) und zugleich stabil: Weil der Anker die Identität trägt, dürfen Titel geändert
+  und Abschnitte umsortiert werden, ohne dass etwas bricht – der Zwang zu Einschüben wie
+  „4b/4c" entfällt. GitHubs Auto-Anchors leisten das nicht, sie hängen am Titeltext.
+  Drei Richtungen sind mechanisch abgesichert (`check-anchors.py`): Verweis ohne Ziel, Link
+  auf die falsche Datei, und ein gelöschter Anker, auf den noch verwiesen wird. Bestand und
+  Vollprüfung: `python3 .claude/scripts/anchors.py list|check`. Einzelfall-Escape:
+  `anchor-ok` in der Zeile. Tracker-IDs (TD-/OBS-/ADR-) sind keine Anker.
+
+- **Abschnitte, Regeln und Schritte bekommen Namen, keine Nummern.**
+  Eine selbstvergebene Nummer ist eine *zweite Adresse* neben dem Anker – und nur der Anker
+  wird geprüft. Sie wird bei jeder Umsortierung still falsch; in S124 lagen zwei solche
+  Verweise bereits tot im Bestand („kaizen Schritt 5" für einen Schritt 7, „Script-Output
+  Abschnitt 9" ohne Entsprechung). Der Name leistet zudem mehr: „REFACTOR" sagt, wohin man
+  springt, „Phase 3" nur, wie weit. Gilt für Überschriften (`## Findings präsentieren`),
+  Verweistexte (`[Findings präsentieren](#KZN-…)`) und fette Absatz-Leads (`**Rolle ≠ Typ**`).
+  **Legitim bleibt allein fremdbestimmte Nummerierung** – von einer externen Autorität
+  vergeben (RFC-Abschnitt, Gesetzesparagraph, fremde Spec). *Nicht* legitim ist „steht in
+  einer anderen Datei": Eine ADR-Punktnummer schreiben dieselben Autoren wie eine
+  Abschnittsnummer. Ausgenommen sind Markdown-Ordered-Lists – dort zählt Markdown selbst
+  weiter, solange kein Verweis von außen auf eine Position zeigt. Mechanisch abgesichert
+  (`check-ordinale.py`, Bestand: `python3 .claude/scripts/ordinale.py`); Einzelfall-Escape:
+  `ordinal-ok` in der Zeile.
+
+- **Ein Filter findet nur, woran beim Bauen gedacht wurde – Bestände werden gesichtet, nicht gefiltert.**
+  In S124 versagten vier aufeinander aufbauende Suchnetze am selben Punkt: Jedes kodierte die
+  Wortliste, die gerade im Kopf war („Gate" fehlte, dann „Dimension", dann „Agent", zuletzt
+  „Migrationsschritt"). Jede Runde meldete sauber, und jede folgende Sichtung fand neue Fälle
+  – zuletzt im Prüfwerkzeug selbst. Konsequenz, zweigeteilt: Für den **Neuzugang** ist ein
+  Filter richtig (er läuft bei jedem Edit, Lücken fallen mit der Zeit auf). Für einen
+  **bestehenden Bestand** ist er es nicht – dort trägt nur vollständiges Sichten, notfalls
+  klassenweise: alles aufnehmen, Klassen mit Stichprobenbeleg abziehen, den Rest ansehen.
+  Wer eine Klasse ohne Beleg abzieht, hat wieder gefiltert.
+
+- **Vor dem Ausgeben eines Prüfergebnisses fragen, ob die Prüfung hätte anschlagen können.**
+  Ein grünes Ergebnis fühlt sich wie ein Beleg an, auch wenn der Test seinen Gegenstand nie
+  berührt hat (S124: ein Diff nach `TODO|FIXME` durchsucht, um Vollständigkeit zu belegen –
+  bei Arbeit, die solche Marker nie setzt). Dieselbe Klasse wie ein Checker, der still
+  ausfällt und für immer „alles gut" meldet (CM-S116-1), nur eine Ebene höher: Hier fällt
+  nicht das Werkzeug aus, sondern die Wahl des Werkzeugs. Gegenfrage vor jeder Aussage:
+  *Hätte dieses Ergebnis anders ausgesehen, wenn der Fehler vorläge?*
 
 - **Referenzen laufen von volatil → stabil, nie umgekehrt.**
   Eine stabile Quelle (z.B. ADR) darf **keine** volatile Stelle referenzieren (z.B. `open-questions.md`,
@@ -63,6 +115,7 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Einträge/IDs volatil → an Verweisstellen die nötige Info **inlinen** oder nur auf **stabile** Artefakte (ADR, Guideline)
   verweisen (siehe Prinzip „volatil → stabil" oben; die syntaktischen Guards dafür stehen dort).
 
+<a id="KPI-kommunikation"></a>
 ## Kommunikation & Argumentation
 
 - **"Unterstützt" ≠ "beweist" – Empirie vor Behauptung, Empfehlung und Fertig-Erklärung.**

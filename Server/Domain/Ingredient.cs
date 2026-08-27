@@ -1,6 +1,7 @@
 namespace mahl.Server.Domain;
 
-// Domain-Entity (coding-guideline-csharp.md §2 Ebene 3): sie nimmt ausschließlich Domänentypen und
+// Domain-Entity (docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession):
+// sie nimmt ausschließlich Domänentypen und
 // vertraut ihnen – die Feldregeln liegen im jeweiligen Typ, nicht hier und nicht beim Aufrufer.
 internal readonly record struct Ingredient
 {

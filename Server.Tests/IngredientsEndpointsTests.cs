@@ -619,8 +619,8 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     }
 
     // ADR-S108-1: GET /api/ingredients liefert je Zeile den xmin-ETag im Body (etag-Feld) – die
-    // If-Match-Quelle für ein DELETE einer aus der Liste geladenen Zutat. Kategorie-1-Protokolltest
-    // (ADR-S106-3) ohne treibendes Gherkin-Szenario, daher ohne US-Tag. Der etag-Wert wird gegen den
+    // If-Match-Quelle für ein DELETE einer aus der Liste geladenen Zutat. Protokoll-/
+    // Infrastruktur-Mechanik (ADR-S106-3) ohne treibendes Gherkin-Szenario, daher ohne US-Tag. Der etag-Wert wird gegen den
     // ECHTEN ETag-Header derselben Zeile verglichen (nicht nur "nicht leer") – beide stammen aus
     // demselben xmin und müssen identisch sein.
     [Fact]
@@ -641,7 +641,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
     // ADR-S108-1: POST /api/ingredients (201) teilt sich das IngredientDto mit GET – das etag-Feld des
     // Response-Bodys wird aus demselben xmin gefüllt, das ohnehin schon für den ETag-Response-Header
-    // (ADR-S106-1) gelesen wird. Kategorie-1-Protokolltest (ADR-S106-3), kein US-Tag.
+    // (ADR-S106-1) gelesen wird. Protokoll-/Infrastruktur-Mechanik (ADR-S106-3), kein US-Tag.
     [Fact]
     public async Task CreateIngredient_ValidData_Returns201BodyWithEtagFieldMatchingETagHeader()
     {
@@ -658,9 +658,9 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.Etag.Should().Be(response.Headers.ETag!.Tag);
     }
 
-    // @US-904-happy-path (Szenario 2 "Löschen rückgängig machen via Toast"): pinnt das Backend-
+    // @US-904-happy-path ("Löschen rückgängig machen via Toast"): pinnt das Backend-
     // Verhalten hinter "Then sehe ich 'Mehl' in der Zutaten-Liste mit Einheit 'g'" – Restore setzt
-    // DeletedAt = null. Szenario-getrieben, daher US-Tag (nicht Kategorie-1 nach ADR-S106-3 – das wäre
+    // DeletedAt = null. Szenario-getrieben, daher US-Tag (keine Protokoll-/Infrastruktur-Mechanik nach ADR-S106-3 – das wäre
     // nur reine Protokoll-/Infrastruktur-Mechanik ohne Domänen-Verhalten). ADR-S111-1 (überholt
     // ADR-S108-2): Restore-Body ist ab run-11 Pflicht und Erfolgs-Status 200 statt 204 – der Undo-Aufruf
     // schickt Name/Einheit der gelöschten Zeile unverändert mit (fachlich ein No-op, ein Codepfad).
@@ -689,7 +689,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     }
 
     // ADR-S108-2/ADR-S111-1: eine nie existente id liefert 404 mit demselben Body wie DELETE
-    // (NotFoundProblem, ADR-S051-5/ADR-S054-6). Kategorie-1-Protokolltest (ADR-S106-3), kein US-Tag.
+    // (NotFoundProblem, ADR-S051-5/ADR-S054-6). Protokoll-/Infrastruktur-Mechanik (ADR-S106-3), kein US-Tag.
     // Body ist valide (422 läuft VOR 404, s. Kommentar am Endpoint) – sonst würde dieser Test
     // fälschlich den 422-Pfad statt den 404-Pfad treffen.
     [Fact]
@@ -713,7 +713,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         persisted.Should().BeEmpty();
     }
 
-    // Kategorie-1-Protokolltest (ADR-S106-3): kein treibendes Gherkin-Szenario – der Validierungs-Zweig
+    // Protokoll-/Infrastruktur-Mechanik (ADR-S106-3): kein treibendes Gherkin-Szenario –der Validierungs-Zweig
     // im Restore ist strukturell erzwungen (sonst umginge der Restore die Invariante aus ADR-S051-3,
     // ADR-S111-1). Ein Fall genügt (die Validierungslogik selbst ist über die POST-Tests abgedeckt).
     [Fact]
@@ -740,7 +740,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
             [new IngredientDbType { Id = created.Id, Name = "Kurkuma", BaseUnit = "g" }]);
     }
 
-    // Kategorie-1-Protokolltest (ADR-S106-3): kein treibendes Gherkin-Szenario – Restore ist seit
+    // Protokoll-/Infrastruktur-Mechanik (ADR-S106-3): kein treibendes Gherkin-Szenario –Restore ist seit
     // run-11 ein allgemeiner Schreib-Endpoint auf der eindeutigkeitsbeschränkten Name-Spalte
     // (ADR-S105-2/ADR-S111-2). Ein Request-Name, der mit einer ANDEREN aktiven Zeile kollidiert,
     // verletzt den Index genauso wie beim POST – über die aktuelle UI nicht erreichbar (der Client
@@ -778,9 +778,9 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         persisted.Single(i => i.Id == zucker.Id).DeletedAt.Should().NotBeNull();
     }
 
-    // @US-904-edge-case: "Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese" (Szenario 1,
-    // exakte Schreibweise) + "Reaktivierung übernimmt neuen Namen bei abweichender Schreibweise"
-    // (Szenario 3, case-insensitiver Lookup) – gleiche Setup-/Assert-Struktur, nur die Schreibweise
+    // @US-904-edge-case: "Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese"
+    // (exakte Schreibweise) + "Reaktivierung übernimmt neuen Namen bei abweichender Schreibweise"
+    // (case-insensitiver Lookup) – gleiche Setup-/Assert-Struktur, nur die Schreibweise
     // variiert (docs/process/tdd-process.md "Parametrisierte Tests"). ADR-S004-1/ADR-S111-2: POST
     // unterscheidet den Namenskonflikt gegen eine soft-deleted Zeile (409, strukturiert) von einer
     // aktiven Zeile (422, field-keyed, s. bestehende DuplicateName-Theory).
@@ -814,8 +814,8 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         persisted.Should().BeEquivalentTo([deleted]);
     }
 
-    // @US-904-edge-case: "Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese" (Szenario 1) +
-    // "Reaktivierung übernimmt neue Einheit" (Szenario 2) + "...abweichender Schreibweise" (Szenario 3)
+    // @US-904-edge-case: "Gelöschte Zutat mit gleichem Namen anlegen reaktiviert diese" +
+    // "Reaktivierung übernimmt neue Einheit" + "...abweichender Schreibweise"
     // – dieselbe Invariante (Restore übernimmt Name+Einheit UNBEDINGT aus dem Request, ADR-S051-4/
     // ADR-S111-1), nur Setup/Erwartung variieren -> ein parametrisierter Test.
     [Theory]
@@ -854,7 +854,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     }
 
     // @US-904-edge-case: "Reaktivierung gelingt auch wenn Zutat parallel mit denselben Daten
-    // wiederhergestellt wurde" (Szenario 4) – der Server-seitige Teil: ein Restore auf eine bereits
+    // wiederhergestellt wurde" – der Server-seitige Teil: ein Restore auf eine bereits
     // AKTIVE Zeile mit exakt identischen Werten ist idempotent (200, kein Schreibvorgang), weil es
     // nichts zu schützen gibt (ADR-S111-1). Das E2E erreicht diese Konstellation nur über ein
     // künstliches Zeitfenster (Route-Interception) – hier direkt: aktive Zeile seeden, Restore mit
@@ -882,7 +882,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     }
 
     // @US-904-error: "Reaktivierung meldet Konflikt wenn die Zutat parallel mit anderen Daten
-    // wiederhergestellt wurde" (Szenario 5) – ein Restore auf eine bereits AKTIVE Zeile mit
+    // wiederhergestellt wurde" – ein Restore auf eine bereits AKTIVE Zeile mit
     // ABWEICHENDEN Werten überschreibt nicht fremde Werte, sondern meldet 409 mit dem gespeicherten
     // Stand (ADR-S111-1/ADR-S111-3 – der Anzeigetext selbst ist Frontend-Sache).
     [Fact]
@@ -916,8 +916,8 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     // Kein bisheriger Test pinnt, dass der Restore-200-Body einen FRISCHEN, brauchbaren ETag liefert –
     // der Endpoint liest xmin nach SaveChangesAsync und verlässt sich darauf, dass EF/Npgsql die
     // store-generierte Shadow-Property nachlädt. Hält das nicht mehr, liefert der Restore einen
-    // veralteten ETag und ein Client bekäme beim folgenden DELETE unbemerkt ein 412. Kategorie-1-
-    // Protokolltest (ADR-S106-3): kein treibendes Gherkin-Szenario.
+    // veralteten ETag und ein Client bekäme beim folgenden DELETE unbemerkt ein 412.
+    // Protokoll-/Infrastruktur-Mechanik (ADR-S106-3): kein treibendes Gherkin-Szenario.
     [Fact]
     public async Task RestoreIngredient_SoftDeletedRow_Returns200WithFreshEtagUsableForSubsequentDelete()
     {

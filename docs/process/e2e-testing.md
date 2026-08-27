@@ -9,25 +9,28 @@ kritische-regeln:
   - Spec darf nicht nachträglich angepasst werden, um die Implementierung zu bestätigen
 -->
 
+<a id="E2E-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Outside-In ATDD | Double-Loop TDD, Reihenfolge, Regeln | Vor dem Start jeder User Story |
-| BDD/Gherkin | Feature-Dateien, Given/When/Then, Tags, Namenskonventionen | Beim Schreiben von Feature-Specs |
-| Quality Gate | @US-ID-Tags, CI-Validator, Spec-driven Checklist | Beim Setup von CI oder beim Review |
-| E2E-Treue | Konfigurations-Parität zu Produktion, Mocking-Politik, Test-Support-Endpoints | Bevor ein Fehlerzustand in E2E hergestellt wird |
-| Assertion-Tiefe | Was E2E-Tests prüfen (und was nicht), Full State Assertion | Beim Schreiben von E2E-Test-Steps |
-| Traceability | Bidirektionale Spec↔Test-Verlinkung, Test-Audit | Bei jedem Code-Review |
+| [Outside-In ATDD](#E2E-outside-in) | Double-Loop TDD, Reihenfolge, Regeln | Vor dem Start jeder User Story |
+| [BDD/Gherkin](#E2E-bdd-gherkin) | Feature-Dateien, Given/When/Then, Tags, Namenskonventionen | Beim Schreiben von Feature-Specs |
+| [Quality Gate](#E2E-quality-gate) | @US-ID-Tags, CI-Validator, Spec-driven Checklist | Beim Setup von CI oder beim Review |
+| [E2E-Treue](#E2E-treue) | Konfigurations-Parität zu Produktion, Mocking-Politik, Test-Support-Endpoints | Bevor ein Fehlerzustand in E2E hergestellt wird |
+| [Assertion-Tiefe](#E2E-assertion-tiefe) | Was E2E-Tests prüfen (und was nicht), Full State Assertion | Beim Schreiben von E2E-Test-Steps |
+| [Traceability](#E2E-traceability) | Bidirektionale Spec↔Test-Verlinkung, Test-Audit | Bei jedem Code-Review |
 
 ---
 
+<a id="E2E-outside-in"></a>
 ## Outside-In ATDD
 
-Reihenfolge, Double-Loop-Diagramm und Regeln: → `docs/process/tdd-process.md` (Sektion "Outside-In ATDD / Double-Loop TDD")
+Reihenfolge, Double-Loop-Diagramm und Regeln: → `docs/process/tdd-process.md` (Sektion "[Outside-In ATDD / Double-Loop TDD](tdd-process.md#TDD-outside-in)")
 
 ---
 
+<a id="E2E-bdd-gherkin"></a>
 ## BDD/Gherkin
 
 Feature-Dateien liegen im Verzeichnis `features/` (Projekt-Root-Level).
@@ -54,6 +57,7 @@ Feature: Rezepte verwalten
 
 Die Step-Definitionen (z.B. `When ich ein Rezept … anlege`) werden im Test-Code auf konkrete HTTP-Calls gemappt – die Spec selbst bleibt fachlich lesbar, technische Details (Route, Statuscode) stehen nur im Step-Code.
 
+<a id="E2E-tag-konventionen"></a>
 ### Tag-Konventionen
 
 | Tag | Ebene | Bedeutung |
@@ -73,8 +77,10 @@ NFR-Features haben keine US-ID. Der CI-Validator behandelt `@NFR-*`-Tags als eig
 
 ---
 
+<a id="E2E-quality-gate"></a>
 ## Quality Gate
 
+<a id="E2E-spec-driven-checklist"></a>
 ### Spec-driven Checklist
 
 Der CI-Validator prüft bidirektionale Traceability:
@@ -83,6 +89,7 @@ Der CI-Validator prüft bidirektionale Traceability:
 
 Ein Feature gilt erst als „Done", wenn sein Gherkin-Szenario grün ist.
 
+<a id="E2E-metriken-gates"></a>
 ### Metriken & Gates
 
 - **Branch/Line-Coverage**: 100% projektübergreifend (alle Schichten: Backend + Frontend + Infrastructure)
@@ -91,6 +98,7 @@ Ein Feature gilt erst als „Done", wenn sein Gherkin-Szenario grün ist.
 
 ---
 
+<a id="E2E-treue"></a>
 ## E2E-Treue: Konfiguration & Mocking
 
 **Konfiguration (ADR-S112-2):** Die E2E-Umgebung erbt die Produktions-Konfiguration. Alles Gemeinsame steht in `appsettings.json`; umgebungsspezifische Dateien enthalten **nur** pfad-artige Abweichungen (Connection-String, Log-Ziele). Jede weitere Abweichung braucht eine Begründung mit ADR-Bezug – ein Test prüft die Schlüssel gegen eine Allow-Liste. Umgebungsnamen sind ebenfalls allow-gelistet: Die App bricht beim Start ab, wenn sie unter einem unbekannten `EnvironmentName` läuft, und dieselbe Liste treibt die Umgebungs-Aufzählung in den Fehlerpfad-Tests.
@@ -104,6 +112,7 @@ Ein Feature gilt erst als „Done", wenn sein Gherkin-Szenario grün ist.
 
 ---
 
+<a id="E2E-assertion-tiefe"></a>
 ## Assertion-Tiefe
 
 E2E-Tests prüfen **beobachtbares Verhalten**, nicht Implementierungsdetails:
@@ -119,8 +128,9 @@ E2E-Tests prüfen **beobachtbares Verhalten**, nicht Implementierungsdetails:
 - Nach mutierenden Operationen: gesamten DB-Zustand prüfen (nicht nur einzelne Properties)
 - Nach Fehler: DB-Zustand muss dem Ausgangszustand entsprechen
 
-Vollständige Full-State-Assertion-Regeln: `docs/process/tdd-process.md` Abschnitt "Pflicht: Full State Assertion".
+Vollständige Full-State-Assertion-Regeln: `docs/process/tdd-process.md` Abschnitt "[Pflicht: Full State Assertion](tdd-process.md#TDD-full-state-assertion)".
 
+<a id="E2E-sichtbares-signal"></a>
 ### Sichtbares Signal statt Proxy-Attribut
 
 Fordert ein Szenario ein **user-sichtbares** Signal („markiert", „hervorgehoben", „ausgegraut"),
@@ -131,14 +141,17 @@ erzeugt. Beispiel: „Pflichtfeld ist markiert" → den sichtbaren Asterisk im L
 nicht die Prüfung dessen, was der Nutzer tatsächlich sieht: entkoppelt ein Refactor Attribut und
 Anzeige (z.B. CSS-Klasse statt Framework-Default), fiele eine reine Attribut-Assertion nicht auf.
 
+<a id="E2E-rollen-queries"></a>
 ### Rollen-Queries bei offenem Dialog/Overlay
 
 Ein offener MUI-`Dialog` setzt `aria-hidden` auf den restlichen DOM-Baum. Playwrights rollenbasierte Locators ignorieren versteckte Elemente per Default und finden Hintergrund-Inhalt dann **scheinbar grundlos** nicht. Müssen bei offenem Dialog/Overlay Hintergrund-Elemente über ihre Rolle abgefragt werden (z.B. die Liste hinter einem „Anlegen"-Dialog), `{ includeHidden: true }` setzen: `page.getByRole('listitem', { includeHidden: true })`. (Pendant für Komponententests: `coding-guideline-typescript.md`, `{ hidden: true }`.)
 
 ---
 
+<a id="E2E-traceability"></a>
 ## Traceability
 
+<a id="E2E-bidirektionale-verlinkung"></a>
 ### Bidirektionale Verlinkung
 
 Gherkin ist **dokumentarisch** (keine SpecFlow-Ausführung). Playwright ist der ausführbare äußere Loop.
@@ -161,6 +174,7 @@ Alle drei Ebenen tragen denselben Identifier – das ermöglicht direktes Grep (
 
 > **Ausnahme (ADR-S106-3):** Querschnitts-**Protokoll-/Infra-Tests** (ETag/If-Match-Mechanik, POST-liefert-ETag) und **Stryker-blinde Invarianten-Tests** (Reihenfolge-/Prioritäts-Pins, die kein Mutant fängt) haben per Definition kein treibendes Szenario → **kein US-Tag**. Sie MÜSSEN per Kommentar als solche ausgewiesen sein (welche ADR / welche Invariante). Alles andere ohne Szenario bleibt eine Outside-In-Verletzung.
 
+<a id="E2E-test-audit"></a>
 ### Test-Audit (Teil jedes Reviews)
 
 Bei jedem Code-Review prüfen:
@@ -170,4 +184,4 @@ Bei jedem Code-Review prüfen:
 - Gibt es Backend- oder E2E-Tests ohne darüberliegendes Gherkin-Szenario? → Outside-In-Verletzung
 - Wurden nur Tests angelegt, die das Szenario wirklich fordert? Kein Gold-Plating in Tests (YAGNI gilt auch für Tests)
 
-Test-Audit-Checkliste: `docs/process/review-checklist.md` Abschnitt "Test-Audit".
+Test-Audit-Checkliste: `docs/process/review-checklist.md` Abschnitt "[Test-Audit](review-checklist.md#RCL-test-audit)".

@@ -249,7 +249,8 @@ dotnet_diagnostic.S104.severity = warning
 # MA0004 / CA2007: ConfigureAwait(false) is a no-op in ASP.NET Core – no SynchronizationContext.
 dotnet_diagnostic.MA0004.severity = none
 dotnet_diagnostic.CA2007.severity = none
-# CA1515: Aktiviert – erzwingt internal für alle Typ-Deklarationen in Server/ (ARCHITECTURE.md 0c).
+# CA1515: Aktiviert – erzwingt internal für alle Typ-Deklarationen in Server/
+# (docs/reference/architecture.md#ARC-projekt-visibility).
 #         Kein InternalsVisibleTo geplant; Tests greifen ausschließlich über HTTP-Ports zu.
 dotnet_diagnostic.CA1515.severity = warning
 # CA1062: "Validate non-null parameters" – covered by <Nullable>enable</Nullable>+WarningsAsErrors
@@ -260,7 +261,8 @@ dotnet_diagnostic.CA1062.severity = none
 # --- Domain types: Value Object helpers (Server/Types/) ---
 [Server/Types/*.cs]
 # CA1000: Static factory on generic type – Bounded<TInner, TMax>.Create. Die statische Factory IST
-#         die vorgeschriebene Bauform (§3: privater Ktor + Create), und der CRTP-Baukasten aus
+#         die vorgeschriebene Bauform (docs/guidelines/coding-guideline-csharp.md#CGC-illegal-states:
+#         privater Ktor + Create), und der CRTP-Baukasten aus
 #         ADR-S119-1 ruft sie generisch über TInner.Create(...) auf; ohne statische Member auf dem
 #         generischen Typ gäbe es die Kette nicht.
 dotnet_diagnostic.CA1000.severity = none

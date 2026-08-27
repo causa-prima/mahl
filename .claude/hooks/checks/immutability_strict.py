@@ -47,6 +47,6 @@ def check(inp: HookInput) -> list[str]:
         return [
             "Immutability-Verletzung (blockierend):\n"
             + "\n".join(violations)
-            + "\nSiehe docs/guidelines/coding-guideline-csharp.md (Abschnitt 1)."
+            + "\nSiehe docs/guidelines/coding-guideline-csharp.md#CGC-immutability"
         ]
     return []

@@ -1,22 +1,23 @@
 # Autor-Checkliste (Self-Review)
 
 <!--
-wann-lesen: Nach jedem TDD-REFACTOR-Schritt, vor dem Aufruf der Review-Agenten (Gate 2 der Definition of Done)
+wann-lesen: Nach jedem TDD-REFACTOR-Schritt, vor dem Aufruf der Review-Agenten ([Gate „Autor-Review"](nfr.md#NFR-gate-autor-review) der Definition of Done)
 kritische-regeln:
   - Jeden Punkt explizit durchgehen – nicht überfliegen
   - Findings sofort fixen, bevor Review-Agenten gestartet werden
 -->
 
+<a id="RCL-inhalt"></a>
 ## Inhalt
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| Allgemeine Prinzipien | KISS, Naming nach Glossar | Immer |
-| Architecture Layer | Typ-Deklarationen internal, kein InternalsVisibleTo, Testcode greift nur auf Ports zu | Bei neuen Typen, Projektreferenzen oder Tests |
-| Domain Modeling | Value Types statt Primitives, Factory Methods, keine DTOs in Create(), keine nullable als Zustand | Bei neuen oder geänderten Typen, Endpoints oder Parametern |
-| Komplexität & Refactoring | Methodenlänge, Verschachtelung, Duplikate | Immer |
-| Tests | Verhalten statt Implementierung, Fehlerpfade, Full State Assertion, kein shared mutable State | Bei neuen oder geänderten Tests |
-| Test-Audit | US-Tag im Testnamen, Traceability Spec↔Test, kein Gold-Plating in Tests | Bei jedem neuen Test |
+| [Allgemeine Prinzipien](#RCL-allgemeine-prinzipien) | KISS, Naming nach Glossar | Immer |
+| [Architecture Layer](#RCL-architecture-layer) | Typ-Deklarationen internal, kein InternalsVisibleTo, Testcode greift nur auf Ports zu | Bei neuen Typen, Projektreferenzen oder Tests |
+| [Domain Modeling](#RCL-domain-modeling) | Value Types statt Primitives, Factory Methods, keine DTOs in Create(), keine nullable als Zustand | Bei neuen oder geänderten Typen, Endpoints oder Parametern |
+| [Komplexität & Refactoring](#RCL-komplexitaet) | Methodenlänge, Verschachtelung, Duplikate | Immer |
+| [Tests](#RCL-tests) | Verhalten statt Implementierung, Fehlerpfade, Full State Assertion, kein shared mutable State | Bei neuen oder geänderten Tests |
+| [Test-Audit](#RCL-test-audit) | US-Tag im Testnamen, Traceability Spec↔Test, kein Gold-Plating in Tests | Bei jedem neuen Test |
 
 > **Wann:** Nach jedem TDD-REFACTOR-Schritt, vor dem Aufruf der Review-Agenten.
 > Die Checklisten der Review-Agenten stehen in den Agent-Definitionen unter `.claude/agents/`.
@@ -29,14 +30,16 @@ Gehe jeden Punkt durch. Findings sofort fixen – erst dann Review-Agenten start
 
 Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken bedeutet: "Geprüft, kein Problem gefunden."
 
+<a id="RCL-endpoints"></a>
 ## Endpoints
 
 - [ ] Neuer GET-Endpoint? → `ETag`-Header gesetzt + `If-None-Match` → 304 implementiert?
   → Single Resource: xmin (`UseXminAsConcurrencyToken()`). Collection: SHA-256-Hash der Response-Body.
 - [ ] Neuer PUT/PATCH/DELETE-Endpoint? → `If-Match`-Prüfung implementiert (fehlend → 428, Mismatch → 412)?
-  → Muster: `docs/guidelines/coding-guideline-csharp.md` Abschnitt 6.
+  → Muster: `docs/guidelines/coding-guideline-csharp.md` [Endpoints – ETag-Pflicht](../guidelines/coding-guideline-csharp.md#CGC-endpoints-etag).
 
-## Architecture Layer (aus `docs/reference/architecture.md` Sektion 0c)
+<a id="RCL-architecture-layer"></a>
+## Architecture Layer (aus [Hexagonal Architecture](../reference/architecture.md#ARC-hexagonal))
 
 - [ ] Neue Typ-Deklarationen (`class`/`record`/`struct`/`interface`/`enum`) in `Server/` sind `internal`? Kein `public` ohne explizite Begründung.
   → Ausnahme: `Infrastructure/`-Typen (`MahlDbContext`, `*DbType`) sind `public`.
@@ -44,11 +47,13 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 - [ ] Kein `InternalsVisibleTo` in `.csproj`-Dateien hinzugefügt?
 - [ ] Testcode greift ausschließlich über HTTP-Requests und `MahlDbContext` zu – kein direktes Instantiieren von Domain-Typen?
 
+<a id="RCL-allgemeine-prinzipien"></a>
 ## Allgemeine Prinzipien (aus `docs/guidelines/coding-guideline-general.md`)
 
 - [ ] KISS eingehalten? Keine Abstraktion für hypothetische Zukunft? Keine clever-überkomplexe Lösung?
 - [ ] Naming aus `docs/reference/glossary.md`? Namen selbsterklärend ohne Kommentar?
 
+<a id="RCL-domain-modeling"></a>
 ## Domain Modeling
 
 - [ ] Neue Properties/Parameter verwenden einen eingebauten Typ (`string`, `int`, `decimal`, ...) obwohl es ungültige Werte gibt?
@@ -67,7 +72,7 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
   → Mapping DTO → Primitives gehört in den Endpoint-Layer, nicht in den Domain-Typ.
 
 - [ ] `ToDto()` ist auf einem DbType definiert statt auf dem Domain-Typ?
-  → Read-Pfad: DbType → `ToDomain()` → Domain → `domain.ToDto(...)`. `ToDto()` lebt als file-level Extension Method auf dem Domain-Typ (nicht auf DbType). Siehe `docs/guidelines/coding-guideline-csharp.md` Abschnitt 3.
+  → Read-Pfad: DbType → `ToDomain()` → Domain → `domain.ToDto(...)`. `ToDto()` lebt als file-level Extension Method auf dem Domain-Typ (nicht auf DbType). Siehe `docs/guidelines/coding-guideline-csharp.md` [Systemgrenz-Architektur](../guidelines/coding-guideline-csharp.md#CGC-systemgrenze).
 
 - [ ] `T?` (nullable) als **Property-Typ** eines Domain-Typs verwendet, obwohl null einen semantischen Sonderzustand bedeutet?
   → Ein eigener Typ mit `OneOf<T, Unknown>` intern. `T?` als Domain-Property ist verboten – auch nicht als "pragmatischer Shortcut".
@@ -85,18 +90,21 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
   → Wenn das Verhalten bewusst unterschiedlich ist: durch einen Test explizit dokumentieren und in `adr.md` begründen.
   → Beispiel aus Session 039: `GET /api/recipes` nutzte ursprünglich `ToUri()` (silent null), während `GET /api/recipes/{id}` via `ToDomain()` korrekt 500 zurückgab. Behoben durch `ToSummaryDtoOrError()` + `Sequence()`.
 
+<a id="RCL-minimalitaet"></a>
 ## Minimalität
 
 - [ ] Wurde Mutation Testing auf alle geänderten Dateien ausgeführt und kein Survivor stillschweigend ignoriert?
   → Survivor = entweder Gold-Plating (Code löschen) oder äquivalenter Mutant (begründen + Exclusion).
-  → Befehle: `docs/process/dev-workflow.md` – Sektion "Mutation Testing".
+  → Befehle: `docs/process/dev-workflow.md` – Sektion "[Mutation Testing](dev-workflow.md#DEV-mutation-testing)".
 
+<a id="RCL-komplexitaet"></a>
 ## Komplexität & Refactoring
 
 - [ ] Eine Methode hat mehr als ~20 Zeilen? → Refactoring-Kandidat
 - [ ] Verschachtelung tiefer als 3 Ebenen? → Pattern Matching oder Extraktion erwägen
 - [ ] Gibt es Duplikate oder Copy-Paste-Code, der ein gemeinsames Helper verdienen würde?
 
+<a id="RCL-tests"></a>
 ## Tests
 
 - [ ] Ein Test prüft Implementierungsdetails statt beobachtbares Verhalten (bricht bei harmlosen Refactorings)?
@@ -106,9 +114,10 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 - [ ] Gibt es Unit Tests auf Value Types, Domain-Typen oder Service-Klassen die **keine** HTTP-Integrationstests und keine MSW-Komponenten-Tests sind? → **Kritisch prüfen:** Liegt ein Stryker-Survivor-Report vor, der diesen Test erzwingt (Survivor strukturell nicht via HTTP beobachtbar)? Wenn nein → Gold-Plating (Test und ggf. zugehöriger Code löschen). Wenn ja → Begründung im Survivor-Report vollständig und nachvollziehbar?
 - [ ] Mutierender Endpoint-Test (POST/PUT/PATCH/DELETE): Wird der DB-Zustand nach der Aktion mit **Full State Assertion** (`GetAllXxx()` + `BeEquivalentTo`) geprüft – nicht nur die HTTP-Response? Damit wird sichergestellt, dass genau die erwarteten Änderungen in der DB gelandet sind und keine unerwarteten Seiteneffekte aufgetreten sind (weder fehlende Änderungen noch ungewollte Mutationen anderer Einträge).
   → Auch Fehlerpfade: Zustand nach einem Fehler muss dem Ausgangszustand entsprechen (`BeEquivalentTo(stateBeforeAction)`).
-- [ ] (Frontend) Werden HTTP-Calls in Tests auf falscher Ebene gemockt (`vi.mock` auf Service-Modulen, `vi.stubGlobal('fetch', ...)` o.ä.)? → Ausschließlich MSW verwenden. Service-Funktionen sind Implementierungsdetails – sie werden durch den Komponenten-Test via MSW abgedeckt, nicht direkt getestet. Siehe `docs/guidelines/coding-guideline-typescript.md` Abschnitt 6.
-- [ ] (Frontend) Hängt eine Folge-Interaktion davon ab, dass ein vorheriger UI-Übergang abgeschlossen ist (Dialog/Overlay geschlossen, Element entfernt/aktiviert)? → Wird dieser Übergang **explizit per Assertion** geprüft (z.B. `await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())`)? `fireEvent.click` prüft keine Actionability – ohne die Assertion bliebe ein Regress, der den Übergang unterlässt, unbemerkt. Siehe `docs/guidelines/coding-guideline-typescript.md` Abschnitt 6.
+- [ ] (Frontend) Werden HTTP-Calls in Tests auf falscher Ebene gemockt (`vi.mock` auf Service-Modulen, `vi.stubGlobal('fetch', ...)` o.ä.)? → Ausschließlich MSW verwenden. Service-Funktionen sind Implementierungsdetails – sie werden durch den Komponenten-Test via MSW abgedeckt, nicht direkt getestet. Siehe `docs/guidelines/coding-guideline-typescript.md` [Test-Architektur](../guidelines/coding-guideline-typescript.md#CGT-msw).
+- [ ] (Frontend) Hängt eine Folge-Interaktion davon ab, dass ein vorheriger UI-Übergang abgeschlossen ist (Dialog/Overlay geschlossen, Element entfernt/aktiviert)? → Wird dieser Übergang **explizit per Assertion** geprüft (z.B. `await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())`)? `fireEvent.click` prüft keine Actionability – ohne die Assertion bliebe ein Regress, der den Übergang unterlässt, unbemerkt. Siehe `docs/guidelines/coding-guideline-typescript.md` [Test-Architektur](../guidelines/coding-guideline-typescript.md#CGT-dom-matcher).
 
+<a id="RCL-ui-ux"></a>
 ## UI/UX (aus `docs/guidelines/coding-guideline-ux.md`)
 
 - [ ] Least Surprise: Tut jede Aktion exakt das, was Label, Position und Kontext erwarten lassen?
@@ -118,8 +127,9 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 - [ ] Destructive Actions: Bevorzugt Soft-Delete mit Wiederherstellungsmöglichkeit im UI. Bestätigungsdialog nur wenn Soft-Delete nicht machbar.
 - [ ] Terminologie: Verwendet die UI ausschließlich Begriffe aus `docs/reference/glossary.md`? Keine Synonyme in Labels, Buttons, Fehlermeldungen oder leeren Zuständen.
 - [ ] Leere Zustände: Erklärt jede potenziell leere Liste (1) warum sie leer ist und (2) was der Nutzer tun kann?
-- [ ] Formular-/Dialog-Baseline (Prinzip 8, nur bei Formularen/Dialogen): Pflichtfelder markiert (`required`/`aria-required`, jedes Feld mit Leerwert-Fehler)? Fokus beim Öffnen im visuell ersten Feld (kein CSS-Reorder)? Nach Validierungsfehler Fokus aufs erste fehlerhafte Feld? Enter sendet via echtem `<form>` (kein manueller `keydown→submit`)? Escape/Fokus-Falle/Fokus-Rückkehr durch MUI `Dialog` nicht abgeschaltet?
+- [ ] Formular-/Dialog-Baseline ([UX-Guideline](../guidelines/coding-guideline-ux.md#CGU-formular-baseline), nur bei Formularen/Dialogen): Pflichtfelder markiert (`required`/`aria-required`, jedes Feld mit Leerwert-Fehler)? Fokus beim Öffnen im visuell ersten Feld (kein CSS-Reorder)? Nach Validierungsfehler Fokus aufs erste fehlerhafte Feld? Enter sendet via echtem `<form>` (kein manueller `keydown→submit`)? Escape/Fokus-Falle/Fokus-Rückkehr durch MUI `Dialog` nicht abgeschaltet?
 
+<a id="RCL-test-audit"></a>
 ## Test-Audit (aus `docs/process/e2e-testing.md`)
 
 - [ ] Beginnt jeder neue Backend-Integrations-Testname mit US-Tag und ScenarioType (`USxxx_ScenarioType_MethodName_Szenario_ErwartetesErgebnis`, z.B. `US201_HappyPath_Create_ValidData_Returns201`)?

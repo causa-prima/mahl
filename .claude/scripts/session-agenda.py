@@ -25,7 +25,7 @@ Innerhalb der Agenda:
   zugunsten des Drains gegen die fällige Retro).
 
 Bewusst KEINE Extremschwellen in der Rangfolge (etwa „extrem volles Backlog schlägt Retro"):
-Die vier verfügbaren Messpunkte können sie nicht kalibrieren – bei S116 zeigten beide Signale
+Die verfügbaren Messpunkte können sie nicht kalibrieren – bei S116 zeigten beide Signale
 gleichzeitig auf die Retro, die Erklärungen sind konfundiert. Eine unkalibrierbare Schwelle
 liegt falsch, und falsch liegen kostet dasselbe wie keine Schwelle zu haben (eine Übersteuerung
 durch den User), zusätzlich aber Pflege und Erklärung.
@@ -48,7 +48,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import anchors  # noqa: E402
 import open_questions  # noqa: E402
+import ordinale  # noqa: E402
 import td_anchors  # noqa: E402
 import td_due  # noqa: E402
 from obs_parse import current_session, parse_entries  # noqa: E402
@@ -346,6 +348,63 @@ def modul_td_due() -> Block:
     )
 
 
+def modul_anker_defekt() -> Block:
+    """Abschnitts-Anker, deren Verweise nicht mehr auflösen.
+
+    Auffangnetz für alles, was an der Edit-Kette vorbeigeht: `check-anchors.py` läuft als
+    PreToolUse nur auf Edit/Write. Verschwindet eine ganze Datei – per `rm`, `mv`, durch
+    einen Merge oder von Hand –, sterben ihre Anker lautlos, und die Verweise darauf werden
+    tot, ohne dass irgendetwas anschlägt.
+    """
+    try:
+        bestand = anchors.lies_bestand(ROOT)
+        tot = anchors.tote_verweise(bestand)
+        pfade = anchors.falsche_pfade(bestand)
+        dopp = anchors.doppelte(bestand)
+    except Exception as fehler:  # noqa: BLE001
+        # Nie stumm ausfallen: Ein Prüfer ohne Ausgabe meldet für immer „alles gut", und sein
+        # Ausfall löst per Definition nichts aus (CM-S116-1). Also wird der Fehler die Meldung.
+        return Block(stub=f"⚠️ Anker-Prüfung fiel aus: {fehler}")
+
+    zeilen = [f"  - {d}:{n} → `{z}` hat kein Ziel" for d, n, z in tot[:10]]
+    zeilen += [f"  - {d}:{n} → `{z}` verlinkt {gemeint}, liegt in {echt}"
+               for d, n, z, gemeint, echt in pfade[:10]]
+    zeilen += [f"  - `{a}` ist doppelt vergeben: {', '.join(ds)}" for a, ds in dopp[:10]]
+    if not zeilen:
+        return Block(stub="")
+    anzahl = len(tot) + len(pfade) + len(dopp)
+    return Block(
+        stub=f"Anker-Verweise: {anzahl} defekt",
+        inhalt=("Anker-Verweise defekt – vermutlich wurde eine Datei gelöscht, umbenannt "
+                "oder außerhalb der Edit-Kette geändert:\n" + "\n".join(zeilen)
+                + "\n  Vollbild: python3 .claude/scripts/anchors.py check"),
+    )
+
+
+def modul_ordinale() -> Block:
+    """Selbstvergebene Gliederungsnummern im Bestand.
+
+    Dieselbe Lücke wie beim Anker-Modul, andere Klasse: `check-ordinale.py` läuft als
+    PreToolUse nur auf Edit/Write. Kommt eine Datei per Merge, `mv` oder von Hand herein,
+    bringt sie ihre Nummern ungeprüft mit – und niemand merkt es, weil der Hook sie nie sah.
+    """
+    try:
+        funde = ordinale.bestand(ROOT)
+    except Exception as fehler:  # noqa: BLE001
+        # Nie stumm ausfallen – siehe modul_anker_defekt (CM-S116-1).
+        return Block(stub=f"⚠️ Ordinal-Prüfung fiel aus: {fehler}")
+
+    if not funde:
+        return Block(stub="")
+    zeilen = [f"  - {d}:{n} [{art}] `{z[:90]}`" for d, n, z, art in funde[:10]]
+    return Block(
+        stub=f"Gliederungsnummern: {len(funde)} Fundstelle(n)",
+        inhalt=("Selbstvergebene Gliederungsnummern im Bestand – vermutlich außerhalb der "
+                "Edit-Kette hereingekommen:\n" + "\n".join(zeilen)
+                + "\n  Vollbild: python3 .claude/scripts/ordinale.py"),
+    )
+
+
 # --- Registry ----------------------------------------------------------------
 # Reihenfolge INNERHALB von AUFGABE ist die Rangfolge. Sie steht bewusst an dieser einen
 # sichtbaren Stelle – verstreut über die Module würde sie zur Folklore.
@@ -364,6 +423,10 @@ MODULE: list[tuple[str, str, callable]] = [
     ("open-questions", ZUSTAND, modul_open_questions),
     ("td-due", STUB, modul_td_due),
     ("ungeplante-szenarien", STUB, modul_ungeplante_szenarien),
+    # STUB, nicht AUFGABE: ein defekter Verweis ist ein Befund, kein Arbeitsauftrag für die
+    # Session. Er meldet sich nur, wenn wirklich etwas kaputt ist.
+    ("anker-defekt", STUB, modul_anker_defekt),
+    ("ordinale", STUB, modul_ordinale),
 ]
 
 ABRUF = "python3 .claude/scripts/session-agenda.py --only <name>"
@@ -417,12 +480,12 @@ def rendere(bloecke: dict[str, Block], warnungen: list[str]) -> str:
     aufgabe = waehle_aufgabe(bloecke)
     teile: list[str] = []
 
-    # 1. Rahmen zuerst – über Sessions unverändert, beim Lesen überspringbar.
+    # Rahmen zuerst – über Sessions unverändert, beim Lesen überspringbar.
     for name, art, _ in MODULE:
         if art == RAHMEN and (block := bloecke.get(name)):
             teile += [f"=== {block.stub} ===", block.inhalt, "=" * (len(block.stub) + 8)]
 
-    # 2. Agenda zuletzt – das einzig session-spezifische Stück, direkt vor der ersten
+    # Agenda zuletzt – das einzig session-spezifische Stück, direkt vor der ersten
     #    Nachricht des Users. Zustand, Aufgabe und Einzeiler stehen zusammenhängend.
     teile.append("=== Session-Agenda ===")
     for name, art, _ in MODULE:

@@ -9,7 +9,8 @@ und genau so ist die Regel bisher unterlaufen worden. Ebenso wenig gehören offe
 dieses Feld. Was beobachtet wurde, gehört ins Feld `- Beobachtung:`; die Entscheidung trifft
 der Drain. Ein hier notierter Kandidat ankert den bewusst frischen Drain-Agenten
 (Anchoring-Bias) und untergräbt dessen Debiasing-Zweck. Die Regel steht im Header von
-`observations.md` und in `closing-session` Schritt 2, wurde aber wiederholt verletzt –
+`observations.md` und in `.claude/skills/closing-session/SKILL.md#CLS-doku-bedarf`,
+wurde aber wiederholt verletzt –
 Lese-Disziplin reicht nicht, deshalb dieser syntaktische Guard.
 
 Scope:
