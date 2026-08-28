@@ -720,9 +720,30 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 private readonly Bounded<NonEmptyTrimmedString, Max30> _value;
 ```
 
-Bausteine in `Server/Types/`: `IStringConstraint<TSelf>` (CRTP mit `static abstract Create`), `IMaxLength` als Marker-Interface, die Träger `NonEmptyTrimmedString` und `Bounded<TInner, TMax>` und ein Marker-Typ **je Grenzwert** (`Max30`, `Max20`). Die Träger melden `StringViolation` (`Empty`, `TooLong`); der Domänentyp faltet das in seine Fehlerfälle auf (ADR-S051-2 bleibt unberührt; die Fälle gehören zum Konzept, nicht zum Feld – ADR-S120-1). Ausformulierter Code: `docs/history/sessions/session_119.md`, Abschnitt „Volltext zur Constraint-Parametrisierung", Variante A – dort noch mit der ursprünglich vorgesehenen Träger-Trennung, siehe nächster Absatz.
+Bausteine in `Server/Types/`: `IStringConstraint<TSelf>` (CRTP mit `static abstract Create`), `IMaxLength` als Marker-Interface, die Träger `NonEmptyTrimmedString` und `Bounded<TInner, TMax>` und ein Marker-Typ **je Grenzwert** (`Max30`, `Max20`). Die Träger melden `StringViolation` (`Empty`, `TooLong`); der Domänentyp faltet das in seine Fehlerfälle auf (ADR-S051-2 bleibt unberührt; die Fälle gehören zum Konzept, nicht zum Feld – ADR-S120-1). Der Entwurf sah ursprünglich eine feinere Träger-Trennung vor, siehe nächster Absatz.
 
-**Warum `NonEmptyTrimmedString` statt `NonEmpty<TrimmedString>` (S120):** Ursprünglich waren zwei orthogonale Träger vorgesehen – `TrimmedString` normalisiert, `NonEmpty<TInner>` prädiziert. Beim Umbau zeigte sich, dass diese Trennung einen **nicht killbaren Mutanten** erzeugt: Ein rein normalisierender Träger muss im JSON-`null`-Fall einen *Wert* liefern (`""`), und `""` aus `null` ist von `""` aus `""` nicht unterscheidbar – jeder Mutant, der die Null-Behandlung entfernt, wirkt sich nur bei `{"feld": null}` aus, wofür kein Szenario existiert. Im ungetrennten Träger fällt die Leer-Entscheidung dagegen im selben Schritt und kann einen **Fehler** zurückgeben, dessen Entfernung über HTTP sofort beobachtbar ist. Eine Suppression schied aus: Der Zweig ist erreichbar, das ist eine Testlücke und keine Unerreichbarkeit (ADR-S041-9 greift nicht).
+**Warum `NonEmptyTrimmedString` statt `NonEmpty<TrimmedString>` (S120):** Ursprünglich waren zwei orthogonale Träger vorgesehen – `TrimmedString` normalisiert, `NonEmpty<TInner>` prädiziert. Beim Umbau zeigte sich, dass diese Trennung einen **nicht killbaren Mutanten** erzeugt: Ein rein normalisierender Träger muss im JSON-`null`-Fall einen *Wert* liefern (`""`), und `""` aus `null` ist von `""` aus `""` nicht unterscheidbar – jeder Mutant, der die Null-Behandlung entfernt, wirkt sich nur bei `{"feld": null}` aus, wofür kein Szenario existiert. Im ungetrennten Träger fällt die Leer-Entscheidung dagegen im selben Schritt und kann einen **Fehler** zurückgeben, dessen Entfernung über HTTP sofort beobachtbar ist. Eine Suppression schied aus: Der Zweig ist erreichbar, das ist eine Testlücke und keine Unerreichbarkeit (ADR-S041-9 greift nicht). Die verworfene Trennung als Code – das Feld hieß damals `Bounded<NonEmpty<TrimmedString>, Max30>`:
+
+```csharp
+// ADR-S051-1: trimmen vor der Validierung, getrimmten Wert speichern – normalisiert nur,
+// prädiziert nicht. Genau daher der nicht killbare Mutant: bei {"feld": null} liefert
+// dieser Träger "" und kann keinen Fehler melden.
+internal readonly record struct TrimmedString : IStringConstraint<TrimmedString>
+{
+    public static OneOf<TrimmedString, StringViolation> Create(string input) =>
+        new TrimmedString(input?.Trim() ?? "");
+}
+
+internal readonly record struct NonEmpty<TInner> : IStringConstraint<NonEmpty<TInner>>
+    where TInner : IStringConstraint<TInner>
+{
+    public static OneOf<NonEmpty<TInner>, StringViolation> Create(string input) =>
+        TInner.Create(input).Bind<TInner, NonEmpty<TInner>, StringViolation>(inner =>
+            inner.Value.Length == 0
+                ? (OneOf<NonEmpty<TInner>, StringViolation>) StringViolation.Empty
+                : new NonEmpty<TInner>(inner));
+}
+```
 
 Der Ertrag dieser Entscheidung bleibt davon unberührt – die Grenze steht weiterhin als Typ des privaten Feldes und ist nicht vergessbar. Betroffen ist nur die Träger-**Liste**.
 

@@ -55,7 +55,9 @@ aufschieben ist eine vollwertige Wahl (mit Grund und Re-Trigger), keine Vertagun
 Leg die Items in **sinnvoll gruppierten, kleinen Blöcken** vor (z.B. 2–3 thematisch/nach Datei
 zusammengehörige, dann die nächsten) und nur **wenige auf einmal** – schon wenige Items gleichzeitig
 sind für den User kognitiv anstrengend (Kontext-Switch), erst recht wenn über sie in mehreren Runden
-diskutiert wird. Für jedes Item:
+diskutiert wird. **Kein Item nur per ID vorlegen** – Kurztitel und ein paar erklärende Sätze gehören
+dazu ([`principles.md`, Kommunikation](../../../docs/kaizen/principles.md#KPI-kommunikation)); den
+Volltext hast du, der User hätte ihn zu suchen. Für jedes Item:
 
 0. **Tracker-Check – Prozess oder Produkt?** In einem Satz vorab. Betrifft der Eintrag das **Produkt**
    (Code samt Build-/Test-Kette), endet die Behandlung hier: Er **zieht um** – nach `tech-debt.md`,

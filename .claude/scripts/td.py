@@ -96,14 +96,15 @@ def cmd_set(args) -> int:
     if tde.get(text, args.id) is None:
         print(f"{args.id} existiert nicht.", file=sys.stderr)
         return 1
-    if not any((args.faellig, args.problem, args.behebung)):
+    if not any((args.faellig, args.problem, args.behebung, args.titel)):
         print("Nichts zu ändern – mindestens ein Feld angeben.", file=sys.stderr)
         return 1
 
     neu = tde.set_fields(text, args.id, faellig=args.faellig, problem=args.problem,
-                         behebung=args.behebung)
+                         behebung=args.behebung, titel=args.titel)
     pfad.write_text(neu, encoding="utf-8")
-    geaendert = [n for n, w in (("Fällig", args.faellig), ("Problem", args.problem),
+    geaendert = [n for n, w in (("Titel", args.titel), ("Fällig", args.faellig),
+                                ("Problem", args.problem),
                                 ("Behebung", args.behebung)) if w]
     print(f"✓ {args.id}: {', '.join(geaendert)} aktualisiert.")
 
@@ -173,6 +174,8 @@ def main() -> int:
 
     p_set = sub.add_parser("set", help="Felder eines bestehenden Postens ändern")
     p_set.add_argument("id", metavar="TD-ID")
+    p_set.add_argument("--titel", help="Titel korrigieren – er ist zugleich der Kurztitel, "
+                                       "unter dem der Posten im Gespräch läuft")
     p_set.add_argument("--faellig")
     p_set.add_argument("--problem")
     p_set.add_argument("--behebung")

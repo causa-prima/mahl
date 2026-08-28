@@ -314,6 +314,23 @@ def test_set_replaces_decision_only():
     assert "- Status: NEU" in eintrag
 
 
+def test_set_replaces_the_title():
+    """Der Titel ist der Kurztitel, unter dem der Eintrag im Gespräch läuft – taugt er nicht,
+    wird er korrigiert statt ein zweiter Name danebengestellt."""
+    neu = oe.set_fields(BESTAND, "OBS-S110-1", titel="Sinnhaftigkeit von Session-Dateien")
+    assert "## OBS-S110-1 – Sinnhaftigkeit von Session-Dateien" in neu
+    assert "## OBS-S110-1 – Erster" not in neu
+    assert "- Status: NEU" in oe.get(neu, "OBS-S110-1")
+
+
+def test_set_rejects_an_empty_title():
+    try:
+        oe.set_fields(BESTAND, "OBS-S110-1", titel="   ")
+    except ValueError:
+        return
+    raise AssertionError("leerer Titel wurde akzeptiert")
+
+
 def test_set_keeps_the_bezug_line():
     neu = oe.set_fields(BESTAND, "OBS-S110-2", status="VERWORFEN (Grund)")
     assert "- Bezug: OBS-S110-1" in oe.get(neu, "OBS-S110-2")

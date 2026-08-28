@@ -76,11 +76,8 @@ def test_dangling_ok_line_is_ignored(monkeypatch, tmp_path):
     assert hook.find_references(["TD-S001-1"], tmp_path / "tech-debt.md") == []
 
 
-def test_session_logs_and_archives_are_skipped(monkeypatch, tmp_path):
+def test_archives_are_skipped(monkeypatch, tmp_path):
     monkeypatch.setattr(hook, "_REPO_ROOT", tmp_path)
-    logs = tmp_path / "docs" / "history" / "sessions"
-    logs.mkdir(parents=True)
-    (logs / "session_100.md").write_text("TD-S001-1 erledigt\n", encoding="utf-8")
     archive = tmp_path / "docs" / "kaizen" / "archive"
     archive.mkdir(parents=True)
     (archive / "old.md").write_text("TD-S001-1 war mal\n", encoding="utf-8")

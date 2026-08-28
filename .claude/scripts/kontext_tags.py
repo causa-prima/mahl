@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from obs_parse import repo_root  # noqa: E402
+from repo_kontext import repo_root  # noqa: E402
 
 PROCESS_FILE = "docs/kaizen/process.md"
 _ABSCHNITT = re.compile(r"^## Kontext-Tags\s*$(.*?)^## ", re.M | re.S)

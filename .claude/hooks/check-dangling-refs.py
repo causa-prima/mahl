@@ -54,7 +54,7 @@ _SKIP_DIRS = {
     ".venv", "TestResults", "StrykerOutput", "playwright-report",
 }
 _SKIP_PREFIXES = (
-    "docs/history/sessions/", "docs/kaizen/archive/", ".claude/tmp/",
+    "docs/kaizen/archive/", ".claude/tmp/",
     # Tooling-Tests nennen IDs als Fixture, nicht als Verweis – ohne diese Ausnahme
     # blockieren sie die Löschung erledigter Einträge (OBS-S119-2). Produktionsscripte
     # liegen nicht in tests/ und bleiben geprüft.

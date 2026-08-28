@@ -126,7 +126,14 @@ def add(spec: TrackerSpec, text: str, session: int, kurztitel: str,
     return text.rstrip("\n") + trenner + eintrag, eid
 
 
-def set_fields(spec: TrackerSpec, text: str, eid: str, werte: dict[str, str]) -> str:
+def set_fields(spec: TrackerSpec, text: str, eid: str, werte: dict[str, str],
+               titel: str | None = None) -> str:
+    """Ersetzt Feldwerte und/oder den Titel.
+
+    `titel` ändert die Überschrift, nicht die ID: Der Titel ist zugleich der Kurztitel, unter
+    dem der Eintrag im Gespräch geführt wird. Trägt er den Punkt nicht mehr, wird er korrigiert
+    – ein zweites Namensfeld daneben würde still veralten und dann Falsches behaupten.
+    """
     span = entry_spans(spec, text).get(eid)
     if not span:
         raise ValueError(f"{eid} existiert nicht in {spec.datei}.")
@@ -138,6 +145,12 @@ def set_fields(spec: TrackerSpec, text: str, eid: str, werte: dict[str, str]) ->
 
     block = text[span[0]:span[1]]
     pruefe_wohlgeformt(spec, eid, block)
+    if titel is not None:
+        if not titel.strip():
+            raise ValueError(f"{eid}: leerer Titel.")
+        kopf = re.compile(rf"^## {re.escape(eid)} .*$", re.M)
+        neue_zeile = f"## {eid} — {titel.strip()}"
+        block = kopf.sub(lambda _: neue_zeile, block, count=1)
     for feld, wert in werte.items():
         if wert is None:
             continue

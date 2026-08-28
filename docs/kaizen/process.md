@@ -389,7 +389,7 @@ Eine Maßnahme gilt als BEWÄHRT wenn:
 - Kein Rückfall beobachtet wurde
 - "Aufgetreten" = die Art der Arbeit, bei der das Problem hätte entstehen können, hat stattgefunden
 
-Nachweis: Session-Dateien in `docs/history/sessions/` lesen und beurteilen, ob die relevante Arbeit stattfand.
+Nachweis: Die Commit-Nachrichten der Sessions lesen (`git log --grep='^Session-Ende: '`, bei Bedarf `--stat`) und beurteilen, ob die relevante Arbeit stattfand.
 
 > **Harte Daten bei nicht-selbstberichteten Verhaltensweisen:** Adressiert die Maßnahme ein Agenten-Verhalten, das der Agent **nicht selbst** als Problem in lessons_learned einträgt (z.B. Bash-Permission-Verstöße, abgelehnte Befehle), ist „keine neuen lessons_learned dazu" **kein** Beleg für BEWÄHRT (der Agent sieht es nicht als Problem). Stattdessen die primäre Datenquelle auswerten (z.B. `.claude/tmp/denied-commands.log`). Fehlt diese, ist **keine verlässliche/belastbare Aussage** möglich – dann den User fragen, ob ihm das Verhalten aufgefallen ist und wie mit dem Punkt weiter verfahren werden soll.
 

@@ -48,7 +48,7 @@ Globben statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
   Inhalt, **prüfe aber nicht ihre inhaltliche Qualität in der Tiefe** – das ist Sache von review-docs.
 
 **Bewusst ausnehmen** (außerhalb des Prozesses – kostet nur Kontext):
-- `docs/history/sessions/` und `docs/kaizen/archive/` – historische Logs/Archive.
+- `docs/kaizen/archive/` – historische Archive.
 - `docs/history/adr.md` – bei einer konkreten Prozessfrage gezielt per Grep die Fundstelle
   suchen und nur deren Umgebung lesen, nicht die ganze Datei. (Die Abrufscripte des Projekts
   stehen dir nicht zur Verfügung: Du hast bewusst kein Bash, damit aus dem Audit keine Änderung

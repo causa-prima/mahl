@@ -129,6 +129,15 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
 <a id="KPI-kommunikation"></a>
 ## Kommunikation & Argumentation
 
+- **Eine Tracker-ID nie nackt nennen.**
+  Wer den Volltext hat, ist der Agent – der User müsste ihn heraussuchen. Erstnennung eines
+  Eintrags (OBS/LL/TD/OQ/ADR): ID + Kurztitel + zwei, drei Sätze, die den Punkt verständlich
+  machen und eine qualifizierte Nachfrage erlauben. Jede weitere Nennung: ID + **derselbe**
+  Kurztitel, auch wenn der User selbst nur die ID schreibt – der Name hält im Gespräch fest,
+  wofür die Ziffer steht. Der Kurztitel ist der **Titel** des Eintrags; trägt der den Punkt
+  nicht, Alternativen vorschlagen und die Wahl per `--titel` zurückschreiben, statt einen
+  zweiten Namen danebenzustellen (der veraltete still und behauptete dann Falsches).
+
 - **"Unterstützt" ≠ "beweist" – Empirie vor Behauptung, Empfehlung und Fertig-Erklärung.**
   Vor jeder Aussage oder Handlung, die auf angenommenem Tool-/Prozess-Verhalten beruht – eine
   Behauptung, eine Empfehlung, ein „fertig", oder das Verlassen auf einen dokumentierten

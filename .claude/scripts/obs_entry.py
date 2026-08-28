@@ -20,7 +20,8 @@ import re
 from pathlib import Path
 
 import kontext_tags
-from obs_parse import OBS_FILE, repo_root, running_session
+from obs_parse import OBS_FILE
+from repo_kontext import current_session, repo_root
 
 IMPACT_WERTE = ("KRITISCH", "HOCH", "MITTEL", "GERING")
 HAEUFIGKEIT_WERTE = ("gelegentlich", "häufig", "dauerhaft")
@@ -239,11 +240,16 @@ def add(text: str, session: int, **felder) -> tuple[str, str]:
 
 
 def set_fields(text: str, oid: str, status: str | None = None,
-               entscheidung: str | None = None, zusammen: str | None = None) -> str:
-    """Ersetzt Status, Entscheidung und/oder die `Zusammen-erledigen`-Kanten eines Eintrags.
+               entscheidung: str | None = None, zusammen: str | None = None,
+               titel: str | None = None) -> str:
+    """Ersetzt Titel, Status, Entscheidung und/oder die `Zusammen-erledigen`-Kanten.
 
     `zusammen` wird **eingefügt**, wenn das Feld fehlt – Einträge aus der Zeit vor der
     Pflichtangabe haben es nicht, und der Drain muss Kanten beidseitig korrigieren können.
+
+    `titel` ändert die Überschrift, nicht die ID: Der Titel ist zugleich der Kurztitel, unter
+    dem der Eintrag im Gespräch geführt wird. Trägt er den Punkt nicht mehr, wird er korrigiert
+    – ein zweites Namensfeld daneben würde still veralten und dann Falsches behaupten.
     """
     span = entry_spans(text).get(oid)
     if not span:
@@ -251,6 +257,12 @@ def set_fields(text: str, oid: str, status: str | None = None,
 
     block = text[span[0]:span[1]]
     pruefe_wohlgeformt(oid, block)
+    if titel is not None:
+        if not titel.strip():
+            raise ValueError(f"{oid}: leerer Titel.")
+        kopf = re.compile(rf"^## {re.escape(oid)} .*$", re.M)
+        neue_zeile = f"## {oid} – {titel.strip()}"
+        block = kopf.sub(lambda _: neue_zeile, block, count=1)
     if zusammen is not None:
         _pruefe_ziele(oid, re.findall(r"OBS-S\d{3}-\d+", zusammen), text)
         zeile = f"- {ZUSAMMEN_FELD}: {_pruefe_zusammen(zusammen)}"
@@ -313,8 +325,9 @@ def append_beobachtung(text: str, oid: str, zusatz: str) -> str:
 
 
 def laufende_session(root: Path | None = None) -> int:
-    """Nummer der laufenden Session (Mechanik: `obs_parse.running_session`)."""
-    session = running_session(root or repo_root())
+    """Nummer der laufenden Session (Mechanik: `repo_kontext.current_session`)."""
+    session = current_session(root or repo_root())
     if session is None:
-        raise ValueError("Session-Nummer nicht bestimmbar – docs/history/sessions/ fehlt.")
+        raise ValueError("Session-Nummer nicht bestimmbar – kein Commit 'Session <NNN>: …' "
+                         "in der Historie.")
     return session

@@ -35,7 +35,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 CHECKS = [
     "check-dependency-allowlist",
     "check-code-quality-blocking",
-    "check-index-length",
     "check-e2e-scenario-ref",
     "check-ref-direction",
     "check-obs-capture",

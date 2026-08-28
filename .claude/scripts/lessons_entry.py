@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 
 import kontext_tags
-from obs_parse import repo_root, running_session
+from repo_kontext import current_session, repo_root
 
 LL_FILE = "docs/kaizen/lessons_learned.md"
 CM_FILE = "docs/kaizen/countermeasures.md"
@@ -158,8 +158,9 @@ def add(text: str, session: int, heute: str | None = None, **felder) -> tuple[st
 
 
 def laufende_session(root: Path | None = None) -> int:
-    """Nummer der laufenden Session (Mechanik: `obs_parse.running_session`)."""
-    session = running_session(root or repo_root())
+    """Nummer der laufenden Session (Mechanik: `repo_kontext.current_session`)."""
+    session = current_session(root or repo_root())
     if session is None:
-        raise ValueError("Session-Nummer nicht bestimmbar – docs/history/sessions/ fehlt.")
+        raise ValueError("Session-Nummer nicht bestimmbar – kein Commit 'Session <NNN>: …' "
+                         "in der Historie.")
     return session

@@ -95,20 +95,22 @@ def cmd_list_offen(args) -> int:
 
 
 def cmd_set(args) -> int:
-    if (args.status is None and args.entscheidung is None
+    if (args.status is None and args.entscheidung is None and args.titel is None
             and args.beobachtung_anhaengen is None and args.zusammen_erledigen is None):
-        print("Nichts zu ändern – --status, --entscheidung, --zusammen-erledigen und/oder "
-              "--beobachtung-anhängen angeben.", file=sys.stderr)
+        print("Nichts zu ändern – --titel, --status, --entscheidung, --zusammen-erledigen "
+              "und/oder --beobachtung-anhängen angeben.", file=sys.stderr)
         return 1
     path = obs_path()
     inhalt = path.read_text(encoding="utf-8")
-    if args.status is not None or args.entscheidung is not None or args.zusammen_erledigen is not None:
-        inhalt = set_fields(inhalt, args.id, status=args.status,
+    if (args.status is not None or args.entscheidung is not None
+            or args.zusammen_erledigen is not None or args.titel is not None):
+        inhalt = set_fields(inhalt, args.id, status=args.status, titel=args.titel,
                             entscheidung=args.entscheidung, zusammen=args.zusammen_erledigen)
     if args.beobachtung_anhaengen is not None:
         inhalt = append_beobachtung(inhalt, args.id, args.beobachtung_anhaengen)
     path.write_text(inhalt, encoding="utf-8")
-    geaendert = ", ".join(n for n, v in (("Status", args.status),
+    geaendert = ", ".join(n for n, v in (("Titel", args.titel),
+                                         ("Status", args.status),
                                          ("Entscheidung", args.entscheidung),
                                          ("Zusammen-erledigen", args.zusammen_erledigen),
                                          ("Beobachtung erweitert",
@@ -166,8 +168,10 @@ def main() -> None:
                             help="offene Einträge als Titelliste mit Score (Basis für --zusammen-erledigen)")
     p_list.set_defaults(func=cmd_list_offen)
 
-    p_set = sub.add_parser("set", help="Status/Entscheidung eines Eintrags ändern (Drain)")
+    p_set = sub.add_parser("set", help="Titel/Status/Entscheidung eines Eintrags ändern (Drain)")
     p_set.add_argument("id", metavar="OBS-ID")
+    p_set.add_argument("--titel", help="Titel korrigieren – er ist zugleich der Kurztitel, "
+                                       "unter dem der Eintrag im Gespräch läuft")
     p_set.add_argument("--status", help='z.B. "UMGESETZT (S114)", "VERWORFEN (Grund)", '
                                         '"IN BEOBACHTUNG bis S120"')
     p_set.add_argument("--entscheidung", help="gewählte Lösung + warum statt der Alternativen")

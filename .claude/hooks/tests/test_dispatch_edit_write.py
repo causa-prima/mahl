@@ -26,7 +26,6 @@ def test_registry_covers_every_registered_check():
     assert set(dispatcher.CHECKS) == {
         "check-dependency-allowlist",
         "check-code-quality-blocking",
-        "check-index-length",
         "check-e2e-scenario-ref",
         "check-ref-direction",
         "check-obs-capture",

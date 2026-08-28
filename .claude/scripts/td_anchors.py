@@ -309,7 +309,7 @@ def lade_kontext(root: Path) -> Kontext:
     """Baut den Auflöse-Kontext aus dem Repo. Fehlende Quellen ⇒ leere Teil-Angaben (fail-open:
     ein unvollständiger Kontext darf nie einen Edit blocken, er meldet dann nur weniger)."""
     import next_run  # lokal: zieht beim reinen Parsen keine Feature-Dateien nach
-    from obs_parse import current_session
+    from repo_kontext import current_session
 
     def lies(pfad: Path) -> str:
         return pfad.read_text(encoding="utf-8") if pfad.is_file() else ""

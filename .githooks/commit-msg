@@ -1,0 +1,10 @@
+#!/bin/sh
+# Prüft die Form der Commit-Nachricht, vor allem die Abschluss-Marke `Session-Ende: <NNN>`.
+# Die Logik steht in .claude/scripts/commit_msg.py, damit sie testbar ist; hier bleibt nur der
+# Aufruf. git führt Hooks mit der Repo-Wurzel als Arbeitsverzeichnis aus, daher der relative Pfad.
+#
+# Aktiv nur, wenn core.hooksPath auf dieses Verzeichnis zeigt:
+#   git config core.hooksPath .githooks
+# Die Einstellung liegt in .git/config und ist damit NICHT versioniert – ein frischer Klon
+# braucht sie erneut. Die session-agenda meldet, wenn sie fehlt.
+exec python3 .claude/scripts/commit_msg.py "$1"

@@ -10,8 +10,8 @@ Datei-Scope (default-protected + explizite Ausnahmen, robust gegen neue Dateien)
 - **Geschützt:** alles unter `docs/`, `.claude/skills/`, `.claude/agents/` + Root-`CLAUDE.md`.
 - **Ausgenommen** (selbst volatil oder verwalten das ID-System): die kaizen-Bookkeeping-Dateien
   (`observations`/`countermeasures`/`lessons_learned`/`process`.md), `docs/kaizen/archive/**`,
-  die volatilen Tracker (`tech-debt`/`open-questions`/`AGENT_MEMORY`.md),
-  `docs/history/sessions/**` (read-only Logs) und `.claude/skills/kaizen/**`.
+  die volatilen Tracker (`tech-debt`/`open-questions`/`AGENT_MEMORY`.md)
+  und `.claude/skills/kaizen/**`.
 - **Zeilen-Ausnahme:** eine Zeile mit `ref-ok`-Marker wird ignoriert (bewusste Einzelfälle).
 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt und prüft ihn.
@@ -38,7 +38,7 @@ _EXEMPT_FILES = frozenset({
     "docs/open-questions.md",
     "docs/AGENT_MEMORY.md",
 })
-_EXEMPT_PREFIXES = ("docs/kaizen/archive/", "docs/history/sessions/", ".claude/skills/kaizen/")
+_EXEMPT_PREFIXES = ("docs/kaizen/archive/", ".claude/skills/kaizen/")
 
 # Volatiles ID-Schema: OBS-/OQ-/LL-/TD- gefolgt von S<Session>[-<n>]. ADR- ist bewusst NICHT dabei (stabil).
 _VOLATILE_RE = re.compile(r"\b(?:OBS|OQ|LL|TD)-S\d{2,3}(?:-\d+)?\b")

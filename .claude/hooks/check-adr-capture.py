@@ -116,8 +116,8 @@ def _laufende_session(adr_pfad: str) -> int | None:
         if wurzel is None:
             return None
         sys.path.insert(0, str(wurzel / ".claude" / "scripts"))
-        from obs_parse import running_session  # noqa: PLC0415 – nur im Bedarfsfall
-        return running_session(wurzel)
+        from repo_kontext import current_session  # noqa: PLC0415 – nur im Bedarfsfall
+        return current_session(wurzel)
     except Exception:  # noqa: BLE001 – s. Docstring
         return None
 
@@ -169,11 +169,11 @@ def check(data: dict) -> str | None:
             "❌ ADR-Erfassung (Poka-Yoke): neu erfasste ADR trägt nicht die laufende "
             f"Session-Nummer:\n  - {', '.join(fremde)}\n"
             "  Die ID nennt die Session, in der die Entscheidung fällt – nicht die jüngste "
-            "bestehende Serie. Der Session-Index zeigt die letzte ABGESCHLOSSENE Session; wer "
+            "bestehende Serie. Die Git-Historie zeigt die letzte ABGESCHLOSSENE Session; wer "
             "von dort weiterzählt, liegt um eins daneben (LL-S106-2: zwei Subagenten, "
             "Umnummerierung über ~7 Referenzen).\n"
-            "  Laufende Nummer: `python3 .claude/scripts/session-agenda.py` oder die höchste "
-            "Datei in `docs/history/sessions/` + 1, solange sie noch nicht committet ist.\n"
+            "  Laufende Nummer: `python3 .claude/scripts/session-agenda.py` oder der höchste "
+            "Trailer `Session-Ende: <NNN>` in `git log` + 1.\n"
             "  Bewusster Einzelfall (Nachtrag zu einer alten Serie) → `adr-ok`-Marker in den "
             "Eintrag."
         )

@@ -23,7 +23,7 @@ Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentati
 **Projekt-Level** (Arbeitsverzeichnis):
 - `CLAUDE.md` (Projekt-Root)
 - `docs/AGENT_MEMORY.md`
-- `docs/` – alle Markdown-Dateien, **außer** `docs/history/sessions/` (Session-Logs, keine Richtlinien)
+- `docs/` – alle Markdown-Dateien
 - `docs/history/adr.md`, `docs/kaizen/lessons_learned.md`, `docs/kaizen/principles.md`, `docs/kaizen/countermeasures.md` (explizit einschließen)
 - `.claude/skills/` – alle Skill-Definitionen
 - `.claude/agents/` – alle Agenten-Definitionen (falls vorhanden)

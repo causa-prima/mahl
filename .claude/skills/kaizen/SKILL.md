@@ -118,16 +118,19 @@ grep "^  CM-Bezug:" docs/kaizen/lessons_learned.md | sort | uniq -c
 
 Erst danach der Review der bestehenden Einträge.
 
-Lies `docs/kaizen/countermeasures.md`. Für jeden AKTIV/OFFEN-Eintrag:
+Lies `docs/kaizen/countermeasures.md`. **Kein Eintrag – CM, LL oder OBS – wird dem User nur per ID
+vorgelegt**: Kurztitel und ein paar erklärende Sätze gehören dazu
+([`principles.md`, Kommunikation](../../../docs/kaizen/principles.md#KPI-kommunikation)).
+Für jeden AKTIV/OFFEN-Eintrag:
 
-**Anwendbarkeit prüfen:** Lies zunächst `docs/history/sessions/index.md` und identifiziere anhand der Kurzfassungen welche Sessions ab "Neue Sessions ab: NNN" (laut Script-Output) die relevante Arbeit enthielten. Lies dann die vollständigen Session-Dateien dieser gefilterten Sessions um zu beurteilen ob das Problem aufgetreten ist (Nachweis für BEWÄHRT / Rückfall). Falls eine Session-Datei fehlt: Fehler melden – nicht als "nicht beobachtbar" werten (fehlende Datei = Datenverlust oder Prozessbruch, keine valide Aussage möglich).
+**Anwendbarkeit prüfen:** Die Session-Historie steht in den Commit-Nachrichten. Jede abgeschlossene Session endet mit einem Commit, der den Trailer `Session-Ende: <NNN>` trägt; Zwischen-Commits stehen davor, bis zur vorigen Marke. Verschaffe dir mit `git log --format='%(trailers:key=Session-Ende,valueonly=true)%x09%s'` eine Liste aus Session-Nummer und Betreff und identifiziere daran, welche Sessions ab "Neue Sessions ab: NNN" (laut Script-Output) die relevante Arbeit enthielten. Lies dann deren vollständige Nachricht (`git log --format='%B' <commit>`, bei Bedarf `--stat` für die berührten Dateien), um zu beurteilen ob das Problem aufgetreten ist (Nachweis für BEWÄHRT / Rückfall). Falls zu einer Session gar kein Commit existiert: Fehler melden – nicht als "nicht beobachtbar" werten (fehlender Commit = Datenverlust oder Prozessbruch, keine valide Aussage möglich).
 
-Faustregel je Kontext-Tag (für Filterung via index.md):
+Faustregel je Kontext-Tag (für die Vorfilterung anhand der Betreffzeilen):
 - `TDD` / `C#-Code` / `TS-Code`: beobachtbar wenn neuer Produktions- oder Testcode geschrieben wurde
 - `Agent-Prompt` / `Review`: beobachtbar wenn ein Sub-Agent beauftragt wurde
 - `Skill-Nutzung`: beobachtbar wenn ein Skill aufgerufen wurde
 - `Bash/Permission` / `Mutation-Testing` / `Hook/Script`: beobachtbar wenn Befehle/Permission-Hook, Mutation-Testing oder .claude-Hooks/Scripts berührt wurden
-- Sonstige: Zweifel → Session-Datei trotzdem lesen
+- Sonstige: Zweifel → Commit-Nachricht trotzdem lesen
 
 Falls keine Session die relevante Arbeit enthielt: Maßnahme hat keine neue Evidenz gesammelt – Status unverändert.
 

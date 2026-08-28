@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import td_anchors  # noqa: E402
 import tracker_entry as te  # noqa: E402
-from obs_parse import repo_root, running_session  # noqa: E402
+from repo_kontext import current_session, repo_root  # noqa: E402
 
 OQ_FILE = "docs/open-questions.md"
 
@@ -85,12 +85,13 @@ def add(text: str, session: int, root: Path | None = None, *, titel: str, frage:
 
 
 def set_fields(text: str, oid: str, frage: str | None = None, faellig: str | None = None,
-               hintergrund: str | None = None, root: Path | None = None) -> str:
+               hintergrund: str | None = None, root: Path | None = None,
+               titel: str | None = None) -> str:
     if faellig is not None:
         _pruefe_anker(oid, faellig, root)
     werte = {f: w for f, w in (("Frage", frage), ("Fällig", faellig),
                                ("Hintergrund", hintergrund)) if w is not None}
-    return te.set_fields(SPEC, text, oid, werte)
+    return te.set_fields(SPEC, text, oid, werte, titel=titel)
 
 
 def remove(text: str, oid: str) -> str:
@@ -98,5 +99,5 @@ def remove(text: str, oid: str) -> str:
 
 
 def laufende_session(root: Path | None = None) -> int:
-    """Nummer der laufenden Session (Mechanik: `obs_parse.running_session`)."""
-    return running_session(root or repo_root())
+    """Nummer der laufenden Session (Mechanik: `repo_kontext.current_session`)."""
+    return current_session(root or repo_root())

@@ -104,13 +104,14 @@ def cmd_add(args) -> int:
 def cmd_set(args) -> int:
     path = oq_path()
     text = path.read_text(encoding="utf-8")
-    if not any((args.frage, args.faellig, args.hintergrund)):
+    if not any((args.frage, args.faellig, args.hintergrund, args.titel)):
         print("Nichts zu ändern – mindestens ein Feld angeben.", file=sys.stderr)
         return 1
     neu = set_fields(text, args.id, frage=args.frage, faellig=args.faellig,
-                     hintergrund=args.hintergrund)
+                     hintergrund=args.hintergrund, titel=args.titel)
     path.write_text(neu, encoding="utf-8")
-    geaendert = [n for n, w in (("Frage", args.frage), ("Fällig", args.faellig),
+    geaendert = [n for n, w in (("Titel", args.titel), ("Frage", args.frage),
+                                ("Fällig", args.faellig),
                                 ("Hintergrund", args.hintergrund)) if w]
     print(f"✓ {args.id}: {', '.join(geaendert)} aktualisiert.")
     return 0
@@ -166,6 +167,8 @@ def main() -> int:
 
     p_set = sub.add_parser("set", help="Felder einer bestehenden Frage ändern")
     p_set.add_argument("id", metavar="OQ-ID")
+    p_set.add_argument("--titel", help="Titel korrigieren – er ist zugleich der Kurztitel, "
+                                       "unter dem die Frage im Gespräch läuft")
     p_set.add_argument("--frage")
     p_set.add_argument("--faellig")
     p_set.add_argument("--hintergrund")

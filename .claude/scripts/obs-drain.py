@@ -20,9 +20,10 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from obs_parse import (  # noqa: E402
-    OBS_FILE, WUERDIG_AB, current_session, parse_entries, repo_root, score,
+    OBS_FILE, WUERDIG_AB, parse_entries, score,
     is_parked, is_due_parked, is_resolved,
 )
+from repo_kontext import current_session, repo_root  # noqa: E402
 
 FAR_PARK = 20  # Soft-Cap: Wiedervorlage > ~2 Retro-Perioden voraus (Schnitt ~8, jüngste ~10 Sessions/Periode → großzügig aufgerundet) → Vertipp-/Vanish-Schutz.
 

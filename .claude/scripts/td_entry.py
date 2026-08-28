@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import td_anchors  # noqa: E402
 import tracker_entry as te  # noqa: E402
-from obs_parse import repo_root, running_session  # noqa: E402
+from repo_kontext import current_session, repo_root  # noqa: E402
 
 TD_FILE = "docs/tech-debt.md"
 MEMORY_FILE = "docs/AGENT_MEMORY.md"
@@ -88,12 +88,13 @@ def add(text: str, session: int, root: Path | None = None, *, titel: str, faelli
 
 
 def set_fields(text: str, tid: str, faellig: str | None = None, problem: str | None = None,
-               behebung: str | None = None, root: Path | None = None) -> str:
+               behebung: str | None = None, root: Path | None = None,
+               titel: str | None = None) -> str:
     if faellig is not None:
         _pruefe_anker(tid, faellig, root)
     werte = {f: w for f, w in (("Fällig", faellig), ("Problem", problem),
                                ("Behebung", behebung)) if w is not None}
-    return te.set_fields(SPEC, text, tid, werte)
+    return te.set_fields(SPEC, text, tid, werte, titel=titel)
 
 
 def remove(text: str, tid: str) -> str:
@@ -202,5 +203,5 @@ def memory_entfernen(memory_text: str, tid: str) -> str:
 
 
 def laufende_session(root: Path | None = None) -> int:
-    """Nummer der laufenden Session (Mechanik: `obs_parse.running_session`)."""
-    return running_session(root or repo_root())
+    """Nummer der laufenden Session (Mechanik: `repo_kontext.current_session`)."""
+    return current_session(root or repo_root())

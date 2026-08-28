@@ -53,7 +53,8 @@ import open_questions  # noqa: E402
 import ordinale  # noqa: E402
 import td_anchors  # noqa: E402
 import td_due  # noqa: E402
-from obs_parse import current_session, parse_entries  # noqa: E402
+from obs_parse import parse_entries  # noqa: E402
+from repo_kontext import current_session  # noqa: E402
 
 # obs-drain.py trägt einen Bindestrich (CLI-Name) und ist deshalb nicht direkt importierbar.
 # Der Trigger lebt trotzdem dort, nicht hier: Wer den Drain-Satz berechnet, entscheidet auch,
@@ -410,6 +411,35 @@ def modul_ordinale() -> Block:
     )
 
 
+def modul_commit_hook() -> Block:
+    """Ist der `commit-msg`-Hook überhaupt scharf?
+
+    `core.hooksPath` liegt in `.git/config` und ist nicht versionierbar. Ein frischer Klon
+    committet also ungeprüft – und gerade die Abschluss-Marke, an der jede Tracker-ID hängt,
+    fiele still durch. Die Prüfung kostet einen git-Aufruf und meldet sich nur im Defektfall.
+    """
+    try:
+        ergebnis = subprocess.run(
+            ["git", "config", "--get", "core.hooksPath"],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=10,
+        )
+        pfad = ergebnis.stdout.strip()
+    except (OSError, subprocess.SubprocessError) as fehler:
+        # Nie stumm ausfallen – siehe modul_anker_defekt (CM-S116-1).
+        return Block(stub=f"⚠️ Hook-Prüfung fiel aus: {fehler}")
+
+    if pfad and (ROOT / pfad / "commit-msg").is_file():
+        return Block(stub="")
+    return Block(
+        stub="⚠️ commit-msg-Hook inaktiv",
+        inhalt=("Die Form der Commit-Nachricht wird nicht geprüft – `core.hooksPath` zeigt "
+                f"{'nirgendwohin' if not pfad else f'auf {pfad}, dort fehlt der Hook'}. "
+                "Ohne ihn kann die Abschluss-Marke `Session-Ende: <NNN>` still falsch werden, "
+                "und daran hängt jede Tracker-ID.\n"
+                "  Einrichten: git config core.hooksPath .githooks"),
+    )
+
+
 # --- Registry ----------------------------------------------------------------
 # Reihenfolge INNERHALB von AUFGABE ist die Rangfolge. Sie steht bewusst an dieser einen
 # sichtbaren Stelle – verstreut über die Module würde sie zur Folklore.
@@ -432,6 +462,7 @@ MODULE: list[tuple[str, str, callable]] = [
     # Session. Er meldet sich nur, wenn wirklich etwas kaputt ist.
     ("anker-defekt", STUB, modul_anker_defekt),
     ("ordinale", STUB, modul_ordinale),
+    ("commit-hook", STUB, modul_commit_hook),
 ]
 
 ABRUF = "python3 .claude/scripts/session-agenda.py --only <name>"

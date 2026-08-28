@@ -79,7 +79,7 @@ Eintrag-Format:
 
 **Hintergrund:** Recherchiert in S119. C# 15 führt `union` als nominale Deklaration ein (`public union Pet(Cat, Dog, Bird);`) mit compiler-erzwungener Exhaustivität in `switch`, dazu den `closed`-Modifier für geschlossene Hierarchien. Verfügbar ab .NET 11 Preview 2, GA für November 2026 angekündigt.
 
-**Warum relevant:** `IngredientId` ist als Union `Known`/`Unknown` über `SumType.cs` gebaut (S120, Herleitung in `session_118.md`, Abschnitt „ID-Modellierung"); nativ entfielen die `SumType.Unreachable<T>()`-Arme samt Stryker-Suppression (ADR-S018-2) – genau das Bedenken, das bei der ID-Modellierung diskutiert wurde.
+**Warum relevant:** `IngredientId` ist als Union `Known`/`Unknown` über `SumType.cs` gebaut (in S118 entschieden, in S120 umgesetzt – verworfen wurde die Alternative „zwei Entitätstypen `IngredientValues`/`Ingredient`", weil US-306 Schreiben ohne erreichbares Backend verlangt (ADR-S000-13, ADR-S112-4), die ID aber serverseitig vergeben wird (ADR-S030-1): eine Phase ohne Server-ID ist dokumentiert absehbar); nativ entfielen die `SumType.Unreachable<T>()`-Arme samt Stryker-Suppression (ADR-S018-2) – genau das Bedenken, das bei der ID-Modellierung diskutiert wurde.
 
 **Zwei Haken, die 2026 gegen ein Warten auf .NET 11 sprachen** – sie sind weiterhin die Prüfpunkte, an denen die Umstellung zu messen ist:
 1. Unions sind Structs mit einem `object? Value` – **Value Types boxen bei jeder Zuweisung.** Die Domänentypen des Projekts sind `readonly record struct` ausdrücklich, um Heap-Allokation zu vermeiden (Typen-Tabelle in [Immutability](guidelines/coding-guideline-csharp.md#CGC-immutability)).

@@ -44,9 +44,8 @@ def test_exempts_volatile_trackers():
     assert not hook.is_protected("docs/AGENT_MEMORY.md")
 
 
-def test_exempts_archive_sessions_and_kaizen_skill():
+def test_exempts_archive_and_kaizen_skill():
     assert not hook.is_protected("docs/kaizen/archive/observations_archive.md")
-    assert not hook.is_protected("docs/history/sessions/session_101.md")
     assert not hook.is_protected(".claude/skills/kaizen/references/lessons_learned_template.md")
 
 

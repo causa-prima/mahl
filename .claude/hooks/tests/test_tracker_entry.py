@@ -101,6 +101,20 @@ def test_set_unbekanntes_feld_scheitert():
         te.set_fields(SPEC, BESTAND, "XX-S100-1", {"Gamma": "x"})
 
 
+def test_set_ersetzt_den_titel():
+    """Der Titel ist der Kurztitel, unter dem der Eintrag im Gespräch läuft – taugt er nicht,
+    wird er korrigiert statt ein zweiter Name danebengestellt."""
+    neu = te.set_fields(SPEC, BESTAND, "XX-S100-1", {}, titel="Besserer Name")
+    assert "## XX-S100-1 — Besserer Name" in neu
+    assert "## XX-S100-1 — Erster" not in neu
+    assert te.get(SPEC, neu, "XX-S100-2") == te.get(SPEC, BESTAND, "XX-S100-2")
+
+
+def test_set_leerer_titel_scheitert():
+    with pytest.raises(ValueError):
+        te.set_fields(SPEC, BESTAND, "XX-S100-1", {}, titel="  ")
+
+
 def test_set_wert_bleibt_literal():
     """Regex-Sonderzeichen im Wert dürfen nicht als Ersetzungs-Template wirken."""
     neu = te.set_fields(SPEC, BESTAND, "XX-S100-1", {"Alpha": r"\1 und \s"})

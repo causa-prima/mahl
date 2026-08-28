@@ -1,4 +1,4 @@
-"""Tests für obs_parse.py – Eintrags-Parsing, Scoring, Status-Filter, Session-Zählung."""
+"""Tests für obs_parse.py – Eintrags-Parsing, Scoring, Status-Filter."""
 import os
 import sys
 
@@ -100,28 +100,6 @@ def test_status_filters():
     assert op.is_resolved("UMGESETZT (S091)") and op.is_resolved("VERWORFEN (x)")
     assert not op.is_resolved("NEU")
 
-
-def test_current_session_none_when_no_sessions(tmp_path):
-    # Ohne Sessions-Verzeichnis ist das Alter unbestimmbar -> None (nicht 0-Sentinel).
-    assert op.current_session(tmp_path) is None
-    d = tmp_path / op.SESSIONS_DIR
-    d.mkdir(parents=True)
-    (d / "session_095.md").write_text("x", encoding="utf-8")
-    assert op.current_session(tmp_path) == 96  # max(95) + 1
-
-
-def test_current_session_ignores_nonmatching_filenames(tmp_path):
-    # Dateien ohne parsbare Session-Nummer werden ignoriert (kein Crash); nur valide zählen.
-    d = tmp_path / op.SESSIONS_DIR
-    d.mkdir(parents=True)
-    (d / "session_notes.md").write_text("x", encoding="utf-8")   # keine Nummer -> ignoriert
-    (d / "session_090.md").write_text("x", encoding="utf-8")
-    assert op.current_session(tmp_path) == 91
-    # Nur nicht-parsbare Dateien -> None (Alter unbestimmbar), kein Fehlwert.
-    bad = tmp_path / "br"
-    (bad / op.SESSIONS_DIR).mkdir(parents=True)
-    (bad / op.SESSIONS_DIR / "session_notes.md").write_text("x", encoding="utf-8")
-    assert op.current_session(bad) is None
 
 
 # --- Wiedervorlage (IN BEOBACHTUNG bis S<NNN>): geparkte Items mit Ablaufdatum ----------

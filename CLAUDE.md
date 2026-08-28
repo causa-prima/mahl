@@ -42,7 +42,7 @@
 | Langsame Befehle dokumentieren | `docs/process/slow-commands.md` |
 | Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "[Befehlsauswahl & Timeouts](docs/process/dev-workflow.md#DEV-befehlsauswahl)") |
 | Warum wurde X so entschieden? | `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`) |
-| Was passierte in Session X? | `docs/history/sessions/index.md` → ggf. spezifische Session-Datei |
+| Was passierte in Session X? | `git log --grep='^Session-Ende: X$'` – die Commit-Nachricht **ist** die Session-Historie (Zwischen-Commits stehen davor, bis zur vorigen Marke). Wörtlicher Verlauf: Skill `recall-session` |
 | Neuen Agenten beauftragen | `.claude/agents/` (bestehende Definitionen als Vorlage) + Skill `review-code` |
 | Interface/API designen (Design It Twice) | Skill `design-an-interface` verwenden |
 | Session abschließen | Skill `closing-session` verwenden |
@@ -97,7 +97,12 @@ ADRs (immutable, nur `Superseded`). Hier gilt: Eine ADR, die je **gegolten** hat
 existiert. Eine ADR, die **nie** angewendet wurde, erklärt nichts und wird gelöscht (Präzedenz
 S108: ADR-S000-3). Im Zweifel behalten. Kein `Rejected`-Archiv.
 
-Herleitung und verworfene Alternativen: `docs/history/sessions/session_118.md`, Abschnitt „Ablage-Taxonomie ADR / TD / OQ".
+**Ort der Regel – verworfene Alternativen (S118).** Die Übersicht steht hier, weil `CLAUDE.md` das
+einzige Dokument mit garantiertem Lese-Trigger und ohnehin Routing-Zentrale ist; die
+Aufnahmebedingung je Tracker steht zusätzlich in dessen Datei-Header. Verworfen: die Übersicht in
+`docs/kaizen/process.md` – die dortige Tabelle ist die Kaizen-Taxonomie und dort vollständig, die
+zunächst vermutete Lücke war ein Fehlschluss. Ebenfalls verworfen: eine eigene Datei – sie hätte
+keinen Lese-Trigger.
 
 ---
 

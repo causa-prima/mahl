@@ -81,7 +81,7 @@ def mapped_type(session_id: str, mapping: dict[str, str]) -> str | None:
 RAUSCH_DATEIEN = (
     "docs/kaizen/observations.md",
     "docs/kaizen/lessons_learned.md",
-    "docs/history/sessions/",
+    "docs/history/sessions/",   # bis S125: Session-Datei + Index; bleibt für Alt-Logs stehen
     "docs/AGENT_MEMORY.md",
     "docs/tech-debt.md",
     "docs/open-questions.md",

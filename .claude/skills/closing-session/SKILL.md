@@ -1,9 +1,9 @@
 ---
 name: closing-session
 description: >
-  Session ordentlich abschließen: lessons_learned, Session-Datei anlegen, INDEX aktualisieren,
-  AGENT_MEMORY aktualisieren. Verwende diesen Skill wenn die aktuelle Arbeits-Session
-  beendet werden soll.
+  Session ordentlich abschließen: Doku-Änderungen, lessons_learned, AGENT_MEMORY aktualisieren
+  und die Session-Historie als Abschluss-Commit schreiben. Verwende diesen Skill wenn die
+  aktuelle Arbeits-Session beendet werden soll.
 user-invocable: true
 ---
 
@@ -35,10 +35,10 @@ user-invocable: true
    - **Lief unmittelbar zuvor die [Offene-Punkte-Triage aus `implementing-scenario`](../implementing-scenario/SKILL.md#IMP-abschluss)** (Szenario → direkter Abschluss): Die offenen Punkte wurden dort schon mit dem User surfacet + triagiert. Dann die als „vermerken" entschiedenen LL/OBS **hier** schreiben (gebündelt) und den obigen Prompt nur **ergänzend** stellen (was die Triage nicht abdeckte) – nicht dieselbe Frage voll wiederholen.
 
    - Falls Doku-Vorschläge oder Beobachtungen vorliegen: konkret formulieren und dem User **JETZT** präsentieren. **Warten auf Antwort.**
-   - Falls nichts anzupassen / keine Beobachtung: direkt mit dem [Anlegen der Session-Datei](#CLS-session-datei) weitermachen.
+   - Falls nichts anzupassen / keine Beobachtung: direkt mit dem [Schreiben der Learnings](#CLS-lessons) weitermachen.
 
 3. <a id="CLS-doku-umsetzen"></a>Dokumentations-Änderungen umsetzen (falls User zugestimmt hat):
-   - Dokumente anpassen, dann weiter mit dem [Anlegen der Session-Datei](#CLS-session-datei).
+   - Dokumente anpassen, dann weiter mit dem [Schreiben der Learnings](#CLS-lessons).
    - **Neue Beobachtungen** (aus dem Beobachtungs-Prompt) → **per Script erfassen**, nicht per Edit:
      ```
      python3 .claude/scripts/obs.py list-offen        # erst die offenen Titel ansehen – für --zusammen-erledigen
@@ -60,12 +60,7 @@ user-invocable: true
      KEINE Lösung jetzt umsetzen, wenn sie aufgeschoben/nicht-trivial ist – die Retro evaluiert
      (Evaluierungs-Gate).
 
-4. <a id="CLS-session-datei"></a>`docs/history/sessions/session_NNN.md` – neue Session-Datei anlegen
-   Inhalt = **was in dieser Session passierte** (Historie): Implementiertes, Entscheidungen, Probleme, Review-/Subagent-Beobachtungen.
-   **Scope-Disziplin:** (a) KEIN vorwärtsgerichteter Zustand (offene Punkte / nächster Lauf) – der lebt in `AGENT_MEMORY` „Nächste Prioritäten" (auto-geladen) + ist via `next_run.py` ableitbar; in read-only Historie wäre er sofort stale. (b) Learnings/Beobachtungen nur als knappe ID + Ein-Satz + Verweis auf die kanonische Quelle (`lessons_learned.md`/`observations.md`), kein nacherzählter Inhalt (Drift-Schutz, Single Source of Truth).
-   Wird NACH Doku-Änderungen erstellt (damit finaler Zustand widergespiegelt wird).
-
-5. <a id="CLS-lessons"></a>`docs/kaizen/lessons_learned.md` – Einträge schreiben:
+4. <a id="CLS-lessons"></a>`docs/kaizen/lessons_learned.md` – Einträge schreiben:
 
    **Per Script schreiben**, nicht per Edit – das vergibt die ID, findet den Session-Abschnitt (oder legt ihn an) und erzeugt die parse-kritische Bullet-Form, die `jenga_score.py` und `retro_report.py` lesen:
    ```
@@ -97,13 +92,7 @@ user-invocable: true
 
    "Keine Learnings" nur mit expliziter Begründung akzeptabel.
 
-6. <a id="CLS-index"></a>`docs/history/sessions/index.md` – neue Zeile ergänzen
-   Format: `| <Nr> | <Datum> | <Phase> | <Kurzfassung> |`. **Kurzfassung = ein Satz, *was* sich geändert hat – kein „warum"/Begründung** (das gehört in die Session-Datei); auf ADR-/Session-IDs verweisen statt Prosa. Soft-Ziel ~150, **harter Cap 300 Zeichen** – ein PreToolUse-Hook (`check-index-length.py`) blockiert zu lange neue Einträge automatisch. Für den vollen Report (inkl. grandfatherter Altbestände):
-   ```bash
-   python3 .claude/scripts/check-index-length.py
-   ```
-
-7. <a id="CLS-projekt-status"></a>Projekt-Status aktualisieren:
+5. <a id="CLS-projekt-status"></a>Projekt-Status aktualisieren:
    - **`docs/AGENT_MEMORY.md` schlank halten** – wird bei jedem Session-Start voll injiziert (jede Zeile kostet Token). Leitfrage: „Welche Info braucht JEDER Agent beim Start, um den Projektstatus einzuordnen?" Nur: **Phase**, **Aktuelle Story**, **Nächste Prioritäten**.
      - **Nächsten Lauf nicht von Hand pflegen:** Der Platzhalter `{{NEXT_RUN}}` in der Prioritätenliste wird beim Session-Start automatisch zum nächsten offenen Lauf aufgelöst (`next_run.py`; Mechanik: ADR-S041-7) – stehen lassen.
      - **Lauf außer der Reihe** (Priorität überschreibt die Feature-Reihenfolge, z.B. error vor sortiert): als Anstrich **über** den Platzhalter setzen, nach Umsetzung entfernen.
@@ -113,3 +102,55 @@ user-invocable: true
      ```
      **Phasen-Review ausstehend:** Skill `review-code` über gesamtes Phase-Delta starten.
      ```
+
+6. <a id="CLS-abschluss-commit"></a>Abschluss-Commit – **Pflicht, letzter Schritt**:
+   Der Commit **ist** die Session-Historie. Form:
+   ```
+   <Betreff: was sich geändert hat, höchstens 72 Zeichen>
+
+   <Rumpf: siehe Inhaltsregel>
+
+   Session-Ende: <NNN>
+   Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+   ```
+   **`Session-Ende: <NNN>` ist keine Zierde.** Daraus leitet `repo_kontext.current_session()`
+   die Session-Nummer ab, und daran hängt **jede** Tracker-ID. Nur der Abschluss-Commit trägt
+   sie; Zwischen-Commits nicht – ein Commit gehört zu der Session, deren Marke als nächste
+   folgt.
+
+   Die Marke steht **im letzten Absatz, ohne Leerzeile zu den übrigen Trailern**: Git erkennt
+   nur den letzten Block als Trailer-Block, und davor bliebe sie für
+   `git log --format='%(trailers:key=Session-Ende,valueonly=true)'` unsichtbar – der Abruf
+   lieferte still leer, während die grep-basierte Nummernableitung weiterliefe. Ein
+   `commit-msg`-Hook prüft das mit, dazu Betreff-Länge, Schreibweise, Eindeutigkeit und Nummer
+   der Marke sowie einen nicht-leeren Rumpf.
+
+   **Inhaltsregel.** In den Rumpf gehört, was in dieser Session entstand und **in keiner Datei
+   gelandet ist**. Detailtiefe richtet sich nach der Bedeutung, nicht nach dem Aufwand – genau
+   diese Verwechslung machte die früheren Session-Dateien lang und inhaltsarm. Weil sich erst
+   rückblickend zeigt, was wichtig war, läuft der Filter über das, was sicher **nicht**
+   hineingehört:
+
+   - Inhalt, der einen Ort in der [Ablage-Tabelle](../../../CLAUDE.md#CLA-ablage) hat – ADR, OBS,
+     TD, OQ, Guideline, Docstring. Eine ID im Fließtext ist in Ordnung, wenn der Satz sie
+     braucht; eine Aufzählung erzeugter IDs nie – welche Einträge wann entstanden, sagt die ID
+   - Was der Diff zeigt: Dateilisten, Zeilen- und Testzahlen, Umbenennungen
+   - Erfüllte Voraussetzungen: grüne Tests, saubere Gates, eingehaltene Guidelines
+   - Review-Findings – umgesetzte stehen im Code, falsche sind wertlos (ein *Muster* daraus ist ein OBS)
+   - Vorwärtsgerichteter Zustand → `AGENT_MEMORY` „Nächste Prioritäten"
+   - Ablauf-Nacherzählung („zuerst … dann …") und Bewertungen („sauber gelöst", „deutlich robuster")
+
+   Der Rumpf beginnt immer mit einem **kurzen Absatz Orientierung** – worum ging es, warum war
+   es eine Session wert. Danach, sofern es vorkam:
+
+   - **Sackgassen mit Kosten:** was versucht wurde und woran es scheiterte
+   - **Abweichungen** von den Voraussetzungen oben: roter Test, übersprungenes Gate, bewusst nicht gelaufene Prüfung
+   - **Bewusst Weggelassenes** unterhalb der TD/OQ-Schwelle
+   - **Ein Urteil des Users, das Richtung setzt**, aber weder Regel noch Tracker-Eintrag ist –
+     einschließlich eines abgelehnten Review-Findings, wenn die Ablehnung nicht trivial war
+   - **Ein nicht offensichtlicher Zusammenhang** zwischen den Änderungen dieses Commits
+
+   Trifft nichts davon zu, endet der Rumpf nach dem Orientierungsabsatz. Zwei, drei Sätze sind
+   dann das richtige Ergebnis, kein Mangel.
+
+   Vorher `git status` prüfen: Alles, was zur Session gehört, gehört in diesen Commit.

@@ -128,6 +128,9 @@ Fragen:
 
    Macht die TD-Mitnahme **bewusst und auditierbar** statt zufällig – verhindert beide Fehler: stilles Übergehen *und* ungebremstes Mitnehmen. TD **ohne** Bezug zu den berührten Bereichen bleibt bewusst außen vor (wird erst angefasst, wenn ein Lauf real dorthin kommt).
 
+   Legst du eine dieser Entscheidungen dem User vor, gilt sie **nie nur per ID**: Kurztitel und ein
+   paar erklärende Sätze gehören dazu ([`principles.md`, Kommunikation](../../../docs/kaizen/principles.md#KPI-kommunikation)) – das gilt für ADR- wie für TD-Bezüge.
+
 6. <a id="IMP-modell-eignung"></a>**Modell-Eignung je geplanter Schicht:** Die Komplexitätseinschätzung liegt nach den vorangegangenen Punkten ohnehin vor (YAGNI-Scope, Domain-Typen, ADR-Berührung, TD-Mitnahme). Halte pro erwarteter Schicht fest, welches Modell genügt: **`sonnet` ist der Default** und trägt die normale schichtweise TDD-Arbeit. Im Zweifel beim `sonnet`-Default bleiben. Nur eine Schicht, die klar überdurchschnittlich anspruchsvoll ist (offener Entwurfsraum, mehrschichtig verschränkte Logik), gezielt auf Opus eskalieren (`model`-Parameter beim Spawn). Beim Spawn ([TDD-Zyklus](#IMP-tdd-zyklus)) wird diese Vorab-Einschätzung nur noch bestätigt.
 
 <a id="IMP-tdd-zyklus"></a>

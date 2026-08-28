@@ -14,7 +14,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from obs_parse import OBS_FILE, repo_root, parse_entries, is_resolved  # noqa: E402
+from obs_parse import OBS_FILE, parse_entries, is_resolved  # noqa: E402
+from repo_kontext import repo_root  # noqa: E402
 
 ARCHIVE_FILE = "docs/kaizen/archive/observations_archive.md"
 
