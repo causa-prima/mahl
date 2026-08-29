@@ -100,14 +100,6 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   klassenweise: alles aufnehmen, Klassen mit Stichprobenbeleg abziehen, den Rest ansehen.
   Wer eine Klasse ohne Beleg abzieht, hat wieder gefiltert.
 
-- **Vor dem Ausgeben eines Prüfergebnisses fragen, ob die Prüfung hätte anschlagen können.**
-  Ein grünes Ergebnis fühlt sich wie ein Beleg an, auch wenn der Test seinen Gegenstand nie
-  berührt hat (S124: ein Diff nach `TODO|FIXME` durchsucht, um Vollständigkeit zu belegen –
-  bei Arbeit, die solche Marker nie setzt). Dieselbe Klasse wie ein Checker, der still
-  ausfällt und für immer „alles gut" meldet (CM-S116-1), nur eine Ebene höher: Hier fällt
-  nicht das Werkzeug aus, sondern die Wahl des Werkzeugs. Gegenfrage vor jeder Aussage:
-  *Hätte dieses Ergebnis anders ausgesehen, wenn der Fehler vorläge?*
-
 - **Referenzen laufen von volatil → stabil, nie umgekehrt.**
   Eine stabile Quelle (z.B. ADR) darf **keine** volatile Stelle referenzieren (z.B. `open-questions.md`,
   die bei Lösung gelöscht wird) – sonst dangelt die Referenz, sobald die volatile Stelle verschwindet.
@@ -128,6 +120,15 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
 
 <a id="KPI-kommunikation"></a>
 ## Kommunikation & Argumentation
+
+**Vier der folgenden Regeln sichern dieselbe Kette – von der Frage über die Erhebung zur
+Aussage – an je einer Bruchstelle, und stehen unten in dieser Reihenfolge:** gar nichts erhoben
+(„Unterstützt ≠ beweist"), am untauglichen Aufbau erhoben („Die Gegenprobe"), nur über einen Teil
+des Raums erhoben („Vollständige Zerlegung"), korrekt erhoben und in einer anderen Größe berichtet
+(„Die berichtete Größe ist die gemessene"). Wer einen Fall einordnet, bestimmt **zuerst die
+Bruchstelle** – die vier überschneiden sich inhaltlich stark, und ohne diesen Schritt landet ein
+Fall beliebig bei einer von ihnen. Jede trägt im Tracker eine eigene Maßnahme, deren
+Rückfallzählung nur bei eindeutiger Zuordnung etwas wert ist.
 
 - **Eine Tracker-ID nie nackt nennen.**
   Wer den Volltext hat, ist der Agent – der User müsste ihn heraussuchen. Erstnennung eines
@@ -172,9 +173,36 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   abgesichert ist. Ein Mechanismus, der nichts prüft, fällt lautlos aus: Sein Ausfall löst per
   Definition nichts aus.
 
+- **Vor dem Ausgeben eines Prüfergebnisses fragen, ob die Prüfung hätte anschlagen können.**
+  Dieselbe Bruchstelle wie die Gegenprobe, eine Ebene höher: Dort fällt das Werkzeug aus, hier
+  war schon die **Wahl** des Werkzeugs untauglich. Ein grünes Ergebnis fühlt sich wie ein Beleg
+  an, auch wenn der Test seinen Gegenstand nie berührt hat (S124: ein Diff nach `TODO|FIXME`
+  durchsucht, um Vollständigkeit zu belegen – bei Arbeit, die solche Marker nie setzt).
+  Gegenfrage vor jeder Aussage: *Hätte dieses Ergebnis anders ausgesehen, wenn der Fehler
+  vorläge?*
+
 - **Vollständige Zerlegung vor Schluss/Empfehlung.**
   Bevor ein Schluss, eine Empfehlung oder eine abgeleitete Anforderung steht, den relevanten
   Raum **explizit zerlegen** und jede Dimension prüfen – nicht den auffälligsten Teil für das
   Ganze nehmen. Konkrete Auslöser: Quantoren in Akzeptanzkriterien („alle", „jeder") sind eine
   **eigene** Prüfdimension; bei Kosten-/Trade-off-Vergleichen **alle** Pfade aufzählen
   (z.B. Injektion + Lesen + Schreiben), bevor eine Empfehlung steht.
+
+- **Die berichtete Größe ist die gemessene – sonst ist es keine Messung mehr.**
+  Letzte Bruchstelle der Kette, und die unauffälligste: Erhoben wurde korrekt, berichtet wird
+  eine andere Größe. Der Fehler fällt nicht auf, weil beide Zahlen plausibel klingen und in
+  dieselbe Richtung zeigen. Drei Fragen vor jeder Zahl, die in eine Aussage eingeht:
+  **(1) Zähleinheit** – was genau ist *ein* Treffer, und kann *ein* Ereignis mehrere erzeugen?
+  (S125: 31 Vorkommen der Agenda-Injektion, verteilt auf 11 Session-Logs, wurden als „30
+  Session-Starts" berichtet – Resume, `/clear` und manuelle Aufrufe erzeugen je einen Treffer.
+  Damit fiel das tragende Argument weg.)
+  **(2) Grundgesamtheit und Zeitpunkt** – worauf bezieht sich die Quote, und wurde zwischen
+  Erhebung und Bericht daran etwas verändert? Wer eine Menge erst bearbeitet und dann misst,
+  misst die Überlebenden (S124: Fehlalarmquote auf dem bereits bereinigten Bestand – 91 % statt
+  realer 65–75 %).
+  **(3) Zielgröße** – rechnet der Mechanismus, über den geredet wird, in genau dieser Größe?
+  Eine Ersatzgröße ist erst zulässig, wenn ihr Zusammenhang mit der Zielgröße selbst belegt ist
+  (S126: der Drain rechnet in Score, gemessen wurde Anzahl).
+  Ein Muster trifft zudem Zeichenketten, keine Objekte der gemeinten Art: Zählt es in Dokumenten,
+  die über den gesuchten Gegenstand *schreiben* (Logs, Retros, Archive), sind diese vor dem Zählen
+  auszuschließen – und die Treffer sind anzusehen, nicht nur ihre Anzahl.
