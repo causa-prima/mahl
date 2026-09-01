@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import anchors  # noqa: E402
-from _hook_io import compute_post_content, read_file_text  # noqa: E402
+from _hook_io import edit_zustand  # noqa: E402
 
 _ANCHOR_OK = "anchor-ok"
 _MAX_HITS = 25
@@ -53,16 +53,10 @@ def _ohne_ausnahmen(text: str) -> str:
 
 def check(data: dict) -> str | None:
     """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py."""
-    tool = data.get("tool_name", "")
-    tool_input = data.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
-    if tool not in ("Edit", "Write") or not file_path or not betrifft(file_path):
+    zustand = edit_zustand(data, betrifft)
+    if zustand is None:
         return None
-
-    pre = read_file_text(file_path)
-    post = compute_post_content(tool, tool_input, pre)
-    if post is None:
-        return None
+    file_path, pre, post = zustand
 
     rel = Path(file_path).resolve().relative_to(anchors.REPO_ROOT).as_posix()
     bestand = anchors.lies_bestand()

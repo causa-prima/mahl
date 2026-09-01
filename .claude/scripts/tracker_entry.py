@@ -161,7 +161,9 @@ def set_fields(spec: TrackerSpec, text: str, eid: str, werte: dict[str, str],
         # dem `\s` mit „bad escape" abbräche und `\1` still durch eine Gruppe ersetzt würde.
         # Einträge zitieren regelmäßig Muster und Pfade – der Wert muss literal bleiben.
         neuer_wert = f"**{feld}:** {wert.strip()}"
-        block = muster.sub(lambda _: neuer_wert, block, count=1)
+        # noqa B023: wie in `obs_entry.set_feld` – `sub` ruft das Lambda sofort in derselben
+        # Iteration auf, die Closure überlebt sie nicht. Geprüft in S128.
+        block = muster.sub(lambda _: neuer_wert, block, count=1)  # noqa: B023
 
     pruefe_wohlgeformt(spec, eid, block)
     return text[:span[0]] + block + text[span[1]:]

@@ -37,7 +37,7 @@ def main() -> None:
         emit(verbose=args.verbose, output=output, verdict="✓ jscpd: keine Duplikate")
     else:
         # Die Fundstellen selbst sind die Analyse-Information – Tabelle und Werbung nicht.
-        lines = [l for l in strip_noise(output, _JSCPD_CHROME) if l.strip()]
+        lines = [line for line in strip_noise(output, _JSCPD_CHROME) if line.strip()]
         count = found.group(1) if found else "?"
         emit(verbose=args.verbose, output=output,
              verdict=f"✗ jscpd: {count} Duplikat(e) – Fundstellen oben", details=lines)

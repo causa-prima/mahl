@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _hook_io import compute_post_content, read_file_text  # noqa: E402
+from _hook_io import edit_zustand  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -138,18 +138,12 @@ def check(data: dict) -> str | None:
     Fail-open (Exception → None) liegt beim Dispatcher, damit ein Hook-Fehler
     nie einen Edit blockiert.
     """
-    tool = data.get("tool_name", "")
-    tool_input = data.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
-    if tool not in ("Edit", "Write") or not file_path:
+    zustand = edit_zustand(data, lambda p: watched_pattern(p) is not None)
+    if zustand is None:
         return None
-
+    file_path, pre, post = zustand
     pattern = watched_pattern(file_path)
-    if pattern is None:
-        return None
 
-    pre = read_file_text(file_path)
-    post = compute_post_content(tool, tool_input, pre)
     if post is None:
         return None
 

@@ -1,0 +1,18 @@
+# Werkzeuge für den Prozess-Code unter .claude/** (15.329 Zeilen Python, 1.025 Tests).
+#
+# Warum ein venv und kein `pip install --user`: Das System-Python ist Debian-verwaltet
+# (PEP 668) und weist Installationen ab. Warum überhaupt Werkzeuge: Bis S128 galt für
+# Prozess-Code keine einzige Qualitätsmaßgabe außer den Tests selbst – kein Linter, kein
+# Coverage-Wert, kein Mutations-Backstop, während Produktcode 100 % Branch-Coverage und
+# 100 % Mutation Score erfüllen muss.
+#
+# Anlegen/aktualisieren:
+#     python3 -m venv .venv
+#     .venv/bin/pip install -r requirements-dev.txt
+#
+# Aufgerufen werden die Werkzeuge über die Wrapper in .claude/scripts/, nie direkt.
+
+pytest==8.3.4
+pytest-cov==6.0.0
+ruff==0.9.6
+mutmut==3.2.3

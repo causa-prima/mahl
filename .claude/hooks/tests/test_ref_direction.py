@@ -87,14 +87,7 @@ def test_clean_content_yields_no_refs():
     assert hook.find_volatile_refs("Nur normaler Text ohne IDs.\nZweite Zeile.") == []
 
 
-# --- compute_post_content ----------------------------------------------------
-def test_compute_post_content_write_returns_content():
-    inp = {"file_path": "docs/x.md", "content": "TD-S001-1\n"}
-    assert hook.compute_post_content("Write", "docs/x.md", inp) == "TD-S001-1\n"
-
-
-def test_compute_post_content_edit_applies_replacement(tmp_path):
-    f = tmp_path / "doc.md"
-    f.write_text("alt: sauber\n", encoding="utf-8")
-    inp = {"file_path": str(f), "old_string": "sauber", "new_string": "TD-S001-1"}
-    assert hook.compute_post_content("Edit", str(f), inp) == "alt: TD-S001-1\n"
+# Die compute_post_content-Tests standen bis S128 hier und prüften eine LOKALE Kopie mit
+# eigener Signatur (tool, file_path, tool_input) – die 18-Zeilen-Duplikation, die jscpd als
+# größten Python-Clone meldete. Die Kopie ist entfallen, der Hook nutzt `_hook_io.edit_zustand`;
+# geprüft wird die Simulation jetzt in test_hook_io.py.

@@ -28,6 +28,8 @@ from importlib import import_module
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from checks import guard_log
+
 # Die Reihenfolge bestimmt, in welcher Folge mehrere Blockier-Gründe ausgegeben werden – rein
 # kosmetisch, kein Vertrag: die Checks sind untereinander unabhängig, und `collect_reasons`
 # führt sie alle aus. Deshalb prüft der Registry-Test auf Mengen-, nicht auf Listengleichheit.
@@ -58,6 +60,10 @@ def collect_reasons(data: dict) -> list[str]:
                   file=sys.stderr)
             continue
         if reason:
+            # Wer blockiert hat, wird protokolliert. Ein Guard, der nie feuert, ist entweder
+            # kaputt oder überflüssig – und ohne Protokoll fällt beides nie auf, weil der
+            # Ausfall eines Prüfmechanismus per Definition nichts auslöst. (S128)
+            guard_log.protokolliere(name)
             reasons.append(reason)
     return reasons
 

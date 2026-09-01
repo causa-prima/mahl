@@ -17,7 +17,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from _hook_io import edit_zustand  # noqa: E402
 from next_run import scenario_comment_titles, parse_scenarios  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -66,23 +68,6 @@ def _has_szenario_comment_above(lines: list[str], index: int) -> bool:
             continue
         break  # erste Nicht-Kommentar-/Nicht-Leerzeile → Kommentarblock zu Ende
     return False
-
-
-def compute_post_content(tool: str, file_path: str, tool_input: dict) -> str | None:
-    """Simuliert den Datei-Inhalt nach Anwendung des Edits/Writes."""
-    if tool == "Write":
-        return tool_input.get("content", "")
-    if tool == "Edit":
-        old = tool_input.get("old_string", "")
-        new = tool_input.get("new_string", "")
-        path = Path(file_path)
-        current = path.read_text(encoding="utf-8") if path.exists() else ""
-        if old and old in current:
-            if tool_input.get("replace_all"):
-                return current.replace(old, new)
-            return current.replace(old, new, 1)
-        return current  # old_string nicht gefunden → echter Edit schlägt ohnehin fehl
-    return None
 
 
 def validate(
@@ -161,15 +146,10 @@ def check(data: dict) -> str | None:
     Fail-open (Exception → None) liegt beim Dispatcher, damit ein Hook-Fehler
     nie einen Edit blockiert.
     """
-    tool = data.get("tool_name", "")
-    tool_input = data.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
-    if tool not in ("Edit", "Write"):
+    zustand = edit_zustand(data)
+    if zustand is None:
         return None
-
-    post = compute_post_content(tool, file_path, tool_input)
-    if post is None:
-        return None
+    file_path, _pre, post = zustand
 
     if is_e2e_spec(file_path):
         violations = validate(post, _feature_titles(), _other_spec_titles(file_path))

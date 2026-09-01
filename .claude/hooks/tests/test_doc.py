@@ -99,6 +99,55 @@ def bestand(**dateien):
     return dict(dateien)
 
 
+# --- Eingerückte Code-Blöcke sind kein Markdown ------------------------------
+# S128: `principles.md` zeigt im Prinzip „Abschnitte tragen Anker" ein EINGERÜCKTES Beispiel,
+# wie ein Anker aussieht – darin die Zeile `      ## Result-Typen`. doc.py las sie als echte
+# Überschrift (`_heading` strippte jede Einrückung), meldete in `toc` einen 5.353-Zeichen-
+# Abschnitt, den es nicht gibt, und brach `get KPI-doku-referenzen` dort ab: 1.157 statt 6.325
+# Zeichen, 82 % des Abschnitts fehlten – ohne Fehler, ohne Kürzungshinweis, an syntaktisch
+# unauffälliger Stelle. Nach CommonMark beginnt ab vier Leerzeichen ein Code-Block.
+_EINGERUECKT = """<a id="XX-eins"></a>
+## Eins
+
+Text von Eins.
+
+    <a id="YY-beispiel"></a>
+    ## So sieht eine Überschrift aus
+    … erklärender Beispieltext …
+
+Weiterer Text von Eins.
+
+<a id="XX-zwei"></a>
+## Zwei
+
+Text von Zwei.
+"""
+
+
+def test_eingerueckte_ueberschrift_beendet_den_abschnitt_nicht():
+    """Der Kernfall: Der Abschnitt läuft über das Beispiel hinweg bis zur echten `##`."""
+    text = doc.abschnitt("XX-eins", _EINGERUECKT)
+    assert "Text von Eins." in text
+    assert "Weiterer Text von Eins." in text, "am eingerückten Beispiel abgebrochen"
+    assert "Text von Zwei." not in text, "über die nächste echte ## hinausgelaufen"
+
+
+def test_eingerueckte_ueberschrift_erscheint_nicht_in_der_gliederung():
+    titel = [e["titel"] for e in doc.toc(_EINGERUECKT)]
+    assert "So sieht eine Überschrift aus" not in titel
+    assert "Eins" in titel and "Zwei" in titel
+
+
+def test_bis_zu_drei_leerzeichen_bleiben_eine_ueberschrift():
+    """Gegenprobe zur Vier-Zeichen-Regel: Darunter ist es echtes Markdown und muss zählen.
+
+    Ohne diese Richtung wäre der Fix ein stumpfes „eingerückt = kein Titel" und schnitte
+    leicht eingerückte, gültige Überschriften still aus der Gliederung.
+    """
+    text = '<a id="A-eins"></a>\n## Eins\n\nText.\n\n   ### Drei Leerzeichen\n\nMehr.\n'
+    assert "Drei Leerzeichen" in [e["titel"] for e in doc.toc(text)]
+
+
 # --- Scope: Überschriften-Anker ----------------------------------------------
 def test_ueberschriften_anker_endet_bei_gleichrangiger_ueberschrift():
     """`## Inhalt` endet bei der nächsten `##` – nicht am Dateiende."""

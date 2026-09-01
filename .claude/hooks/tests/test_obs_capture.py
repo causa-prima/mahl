@@ -243,29 +243,5 @@ def test_obs_ok_marker_exempts_the_whole_entry():
     assert hook.find_violations("", post) == []
 
 
-# --- pre/post-Inhalt ---------------------------------------------------------
-def test_pre_content_is_the_file_on_disk(tmp_path):
-    f = tmp_path / "observations.md"
-    f.write_text(_obs("OBS-S100-1", "offen"), encoding="utf-8")
-    assert hook.read_file_text(str(f)) == _obs("OBS-S100-1", "offen")
-
-
-def test_pre_content_of_a_missing_file_is_empty(tmp_path):
-    assert hook.read_file_text(str(tmp_path / "gibtsnicht.md")) == ""
-
-
-def test_write_post_content_is_the_new_file_content():
-    post = _obs("OBS-S100-1", "offen")
-    assert hook.compute_post_content("Write", {"content": post}, "alt") == post
-
-
-def test_edit_post_content_applies_the_replacement():
-    pre = _obs("OBS-S100-1", "offen")
-    inp = {"old_string": "offen", "new_string": "Umgesetzt: Hook gebaut"}
-    assert "- Entscheidung/Maßnahme: Umgesetzt: Hook gebaut" in hook.compute_post_content("Edit", inp, pre)
-
-
-def test_edit_with_unfindable_old_string_leaves_content_unchanged():
-    pre = _obs("OBS-S100-1", "offen")
-    inp = {"old_string": "kommt so nicht vor", "new_string": "egal"}
-    assert hook.compute_post_content("Edit", inp, pre) == pre
+# Die pre/post-Tests standen bis S128 hier und prüften `_hook_io` durch dieses Modul
+# hindurch – sie gehören zum Helfer, nicht zum OBS-Hook, und liegen jetzt in test_hook_io.py.

@@ -124,7 +124,7 @@ def test_retired_prioritaet_field_blocks():
 
 def test_retired_combined_field_blocks_and_counts_as_missing_behebung():
     """Die alte Vorlage: `**Behebung/Trigger:**` statt getrennter Felder."""
-    old = f"## TD-S120-1 — Alt\n**Priorität:** Mittel\n**Problem:** X\n**Behebung/Trigger:** Y\n"
+    old = "## TD-S120-1 — Alt\n**Priorität:** Mittel\n**Problem:** X\n**Behebung/Trigger:** Y\n"
     body = hook.parse_td_entries(old)["TD-S120-1"]
     reasons = hook.check_entry("TD-S120-1", body, "")
     assert any("`**Behebung/Trigger:**`" in r for r in reasons)

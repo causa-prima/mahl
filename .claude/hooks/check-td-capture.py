@@ -44,7 +44,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import td_anchors  # noqa: E402
-from _hook_io import compute_post_content, read_file_text  # noqa: E402
+from _hook_io import edit_zustand, read_file_text  # noqa: E402
 
 TD_FILE = "docs/tech-debt.md"
 MEMORY_FILE = "docs/AGENT_MEMORY.md"
@@ -168,16 +168,10 @@ def check(data: dict) -> str | None:
     Fail-open (Exception → None) liegt beim Dispatcher, damit ein Hook-Fehler
     nie einen Edit blockiert.
     """
-    tool = data.get("tool_name", "")
-    tool_input = data.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
-    if tool not in ("Edit", "Write") or not file_path or not is_td_file(file_path):
+    zustand = edit_zustand(data, is_td_file)
+    if zustand is None:
         return None
-
-    pre = read_file_text(file_path)
-    post = compute_post_content(tool, tool_input, pre)
-    if post is None:
-        return None
+    file_path, pre, post = zustand
 
     violations = find_violations(pre, post, memory_text_for(file_path),
                                  kontext_for(file_path, post))

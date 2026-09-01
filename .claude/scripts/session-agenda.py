@@ -4,14 +4,21 @@
 Einstiegspunkt des SessionStart-Hooks (ersetzt `session-start.sh`; Rangfolge und Begründung
 kanonisch in `docs/kaizen/process.md`, Abschnitt „Session-Agenda").
 
-Die Ausgabe hat zwei Teile, in dieser Reihenfolge:
+Die Ausgabe zerfällt in fünf **Injektionsblöcke** (`INJEKTIONS_BLOECKE`), von denen jeder
+EINZELN als SessionStart-Hook registriert ist – drei aus `principles.md`, die Allow-Liste
+und die Agenda selbst.
 
-1. **Rahmen-Blöcke** (`principles`, Allow-Liste) – stehender Verhaltensrahmen, nie unterdrückt.
-   Ihr Weglassen fiele lautlos aus. Sie stehen ZUERST, weil sie über Sessions unverändert
-   bleiben und beim Lesen übersprungen werden dürfen.
-2. **Session-Agenda** – Zustand, genau eine „Nächste Aufgabe" im Volltext, und die Einzeiler
-   der übrigen Module. Sie steht am SCHLUSS, direkt vor der ersten Nachricht des Users: das
-   einzig session-spezifische Stück gehört an die Stelle, an der es am ehesten wirkt.
+Der Grund ist eine harte Grenze des Runtimes, die er kommentarlos durchsetzt (Einheit,
+Empirie und Quellen an `CAP` unten). Bis S128 lief alles in EINEM Block mit 23.123 units –
+die Agenda stand am Ende und kam damit in KEINER Session an, ohne dass es je auffiel. Weil
+der Cap PRO registriertem Command gilt, löst die Aufteilung das.
+
+Zwei Folgen davon durchziehen den Code:
+
+- **Es gibt keine Reihenfolge mehr.** Hooks eines Events laufen parallel und treffen
+  gemischt ein. Jeder Block nennt sich deshalb selbst; Position bedeutet nichts.
+- **Jeder Block bewacht seine Größe.** `BUDGET` liegt unter `CAP`, damit Wachstum auffällt,
+  solange noch Luft ist – und nicht durch sein Ausbleiben.
 
 Innerhalb der Agenda:
 
@@ -31,9 +38,12 @@ liegt falsch, und falsch liegen kostet dasselbe wie keine Schwelle zu haben (ein
 durch den User), zusätzlich aber Pflege und Erklärung.
 
 Schnittstelle:
-    session-agenda.py              volle Agenda (der Hook)
-    session-agenda.py --only <id>  ein Modul in voller Tiefe (Übersteuern)
-    session-agenda.py --list       Modulnamen
+    session-agenda.py --block <name>  EIN Injektionsblock – so ruft der Hook (fünfmal)
+    session-agenda.py                 alle Blöcke am Stück (Sicht für Menschen; diese
+                                      Ausgabe liegt mit Absicht über dem Cap und wird nie
+                                      als Ganzes injiziert)
+    session-agenda.py --only <id>     ein Modul in voller Tiefe (Übersteuern)
+    session-agenda.py --list          Modulnamen
 
 Ausfallverhalten: Jedes Modul scheitert EINZELN und sichtbar; die Agenda läuft weiter. Ein
 Totalausfall wäre von „nichts zu tun" ununterscheidbar.
@@ -80,6 +90,33 @@ class Block:
     beansprucht: bool = False   # beansprucht den Aufgaben-Slot?
 
 
+# Claude Code verwirft Hook-stdout oberhalb dieser Grenze KOMMENTARLOS: Der Text wandert in
+# eine Datei, injiziert wird eine 2.000er-Vorschau, der Hook bekommt Exit 0 und kein Signal.
+# Empirisch bestimmt in anthropics/claude-code#84021 (10.000 kommt durch, 10.001 spillt);
+# gemessen wird JS `.length`, also UTF-16 code units – NICHT Bytes und NICHT Zeichen.
+# Die Grenze ist undokumentiert, nicht konfigurierbar (#50571, #51537) und gilt PRO
+# registriertem Command – daher die Aufteilung auf mehrere SessionStart-Hooks.
+CAP = 10_000
+# Selbstauflage mit Luft: principles.md wächst mit jeder Retro. Wer erst bei CAP nachschneidet,
+# erfährt vom Überlauf durch sein Ausbleiben. 80 % ist eine nachträglich verschobene Latte –
+# bei 70 % riss der größte Block um 38 units, und die Alternative wäre ein Anker mitten in
+# `KPI-kommunikation` gewesen: eine Gliederung, die dem Cap folgt statt dem Inhalt.
+BUDGET = 8_000
+# So viel injiziert der Runtime im Spill-Fall. Alles, was den Ausfall melden soll, muss
+# hierhin passen, sonst verschwindet die Meldung mit dem Rest.
+VORSCHAU = 2_000
+
+
+def u16(text: str) -> int:
+    """Länge in UTF-16 code units – die Einheit, in der der Cap misst.
+
+    Astrale Zeichen (Emoji) zählen zwei. `len()` unterschätzt sie deshalb, `len(encode())`
+    überschätzt jeden Umlaut. Beides führt zu einem Guard, der etwas anderes misst als die
+    Grenze, gegen die er schützt.
+    """
+    return sum(2 if ord(z) > 0xFFFF else 1 for z in text)
+
+
 def _lies(pfad: Path) -> str:
     return pfad.read_text(encoding="utf-8") if pfad.is_file() else ""
 
@@ -109,8 +146,13 @@ def ohne_kommentare(text: str) -> str:
     return _HTML_KOMMENTAR.sub("", text).strip()
 
 
+PRINCIPLES = ROOT / "docs" / "kaizen" / "principles.md"
+
+_ANKER = re.compile(r'^<a id="([^"]+)"></a>[ \t]*$', re.M)
+
+
 def modul_principles() -> Block:
-    text = _lies(ROOT / "docs" / "kaizen" / "principles.md")
+    text = _lies(PRINCIPLES)
     if not text:
         raise FileNotFoundError("docs/kaizen/principles.md fehlt")
     return Block(stub="principles.md", inhalt=ohne_kommentare(text))
@@ -119,6 +161,60 @@ def modul_principles() -> Block:
 def modul_bash_allowlist() -> Block:
     text = _laufe("python3", str(ROOT / ".claude" / "hooks" / "check-bash-permission.py"), "--list")
     return Block(stub="Bash-Allow-Liste", inhalt=text)
+
+
+# --- principles.md in Injektionsblöcke schneiden ------------------------------
+# Die Datei ist mit 15.199 units allein 152 % des Caps – sie passt in keinen einzelnen
+# Hook und muss geschnitten werden. Geschnitten wird an den ANKERN, nicht an Zeilen oder
+# Positionen: Ein umbenannter Titel oder ein umsortierter Abschnitt bricht den Zuschnitt
+# dann nicht. Das ist dieselbe Zusage, die `KPI-doku-referenzen` für Verweise macht.
+
+def _principles_teile() -> tuple[str, dict[str, str]]:
+    """(Vorspann, Abschnittstext je Anker). Eine Zerlegung für alle Nutzer – zwei
+    Zerlegungen könnten unbemerkt verschieden ausfallen."""
+    text = ohne_kommentare(_lies(PRINCIPLES))
+    if not text:
+        raise FileNotFoundError("docs/kaizen/principles.md fehlt")
+    treffer = list(_ANKER.finditer(text))
+    vorspann = text[:treffer[0].start()].strip() if treffer else text
+    teile: dict[str, str] = {}
+    for i, marke in enumerate(treffer):
+        ende = treffer[i + 1].start() if i + 1 < len(treffer) else len(text)
+        teile[marke.group(1)] = text[marke.start():ende].strip()
+    return vorspann, teile
+
+
+def principles_anker() -> list[str]:
+    """Alle Anker in Dateireihenfolge."""
+    return list(_principles_teile()[1])
+
+
+# Welcher Abschnitt in welchen Block. Der AUFFANGBLOCK nimmt alles Ungenannte auf: Ein NEU
+# angelegter Abschnitt darf nicht zwischen die Blöcke fallen – er verschwände lautlos, also
+# in derselben Weise, gegen die diese ganze Aufteilung gebaut ist.
+PRINCIPLES_VERTEILUNG: dict[str, list[str]] = {
+    "verhalten": ["KPI-review-prozess", "KPI-prozess-disziplin"],
+    "doku": ["KPI-doku-referenzen"],
+    "kommunikation": [],
+}
+AUFFANGBLOCK = "kommunikation"
+
+
+def principles_zuschnitt() -> dict[str, list[str]]:
+    verteilt = {block: list(anker) for block, anker in PRINCIPLES_VERTEILUNG.items()}
+    benannt = {a for anker in verteilt.values() for a in anker}
+    verteilt[AUFFANGBLOCK] += [a for a in principles_anker() if a not in benannt]
+    return verteilt
+
+
+def _principles_block(name: str) -> str:
+    vorspann, teile = _principles_teile()
+    anker = principles_zuschnitt()[name]
+    stuecke = [teile[a] for a in anker if a in teile]
+    # Der Vorspann (Dateititel) hängt am ersten Block – in jedem Block stünde er viermal.
+    if name == next(iter(PRINCIPLES_VERTEILUNG)) and vorspann:
+        stuecke.insert(0, vorspann)
+    return "\n\n".join(stuecke)
 
 
 # --- Zustand (Kopf der Agenda) -----------------------------------------------
@@ -134,6 +230,28 @@ def modul_memory_state() -> Block:
     zeilen = [z for z in text.splitlines()
               if z.startswith(("**Phase:", "**Aktuelle Story:", "**Nächster Lauf:"))]
     return Block(stub="", inhalt="\n".join(zeilen) or "(kein Zustand lesbar)")
+
+
+def modul_repo_state() -> Block:
+    """Arbeitsbaum und letzte Commits.
+
+    Beantwortet „liegt noch etwas offen, wo stehe ich" ohne Tool-Call – der Agent hat das
+    bis S128 in fast jeder Session selbst abgefragt, und zwar als Erstes. Der Arbeitsbaum
+    steht dabei VOR den Commits: Uncommittetes ist das, was eine Entscheidung verlangt,
+    die Historie nur Orientierung. Bewusst ohne Stub (wie `memory-state`) – der Block ist
+    winzig und immer relevant, eine Kurzfassung daneben wäre dieselbe Information zweimal.
+    """
+    status = _laufe("git", "status", "--short")
+    offen = status.splitlines()
+    zeilen = ["**Arbeitsbaum:** " + ("sauber" if not offen
+                                     else f"{len(offen)} Datei(en) uncommitted")]
+    # Gedeckelt: Bei einem großen Umbau ersetzte die Dateiliste sonst die Agenda.
+    zeilen += [f"  {z}" for z in offen[:8]]
+    if len(offen) > 8:
+        zeilen.append(f"  … und {len(offen) - 8} weitere (git status)")
+    zeilen.append("**Letzte Commits:** " + " | ".join(
+        _laufe("git", "log", "--oneline", "-3").splitlines()))
+    return Block(stub="", inhalt="\n".join(zeilen))
 
 
 # --- Aufgaben-Kandidaten (in Rangfolge) --------------------------------------
@@ -447,6 +565,7 @@ MODULE: list[tuple[str, str, callable]] = [
     ("principles", RAHMEN, modul_principles),
     ("bash-allowlist", RAHMEN, modul_bash_allowlist),
     ("memory-state", ZUSTAND, modul_memory_state),
+    ("repo-state", ZUSTAND, modul_repo_state),
     ("retro", AUFGABE, modul_retro),
     ("obs-drain", AUFGABE, modul_obs_drain),
     ("priorities", AUFGABE, modul_priorities),
@@ -513,17 +632,16 @@ def waehle_aufgabe(bloecke: dict[str, Block]) -> str | None:
 
 
 def rendere(bloecke: dict[str, Block], warnungen: list[str]) -> str:
+    """Der Agenda-Block: Zustand, Aufgabe, Einzeiler.
+
+    Die RAHMEN-Module stehen seit S128 NICHT mehr hier – sie sind eigene Injektionsblöcke
+    (siehe INJEKTIONS_BLOECKE). Zusammen ergaben sie 23.123 units und damit das Zweifache
+    des Caps, an dem der Runtime den ganzen Block gegen eine Vorschau tauscht; die Agenda
+    stand am Ende und kam deshalb in keiner Session an.
+    """
     aufgabe = waehle_aufgabe(bloecke)
     teile: list[str] = []
 
-    # Rahmen zuerst – über Sessions unverändert, beim Lesen überspringbar.
-    for name, art, _ in MODULE:
-        if art == RAHMEN and (block := bloecke.get(name)):
-            teile += [f"=== {block.stub} ===", block.inhalt, "=" * (len(block.stub) + 8)]
-
-    # Agenda zuletzt – das einzig session-spezifische Stück, direkt vor der ersten
-    #    Nachricht des Users. Zustand, Aufgabe und Einzeiler stehen zusammenhängend.
-    teile.append("=== Session-Agenda ===")
     for name, art, _ in MODULE:
         if art == ZUSTAND and (block := bloecke.get(name)) and block.inhalt:
             teile += [block.inhalt, ""]
@@ -549,13 +667,101 @@ def rendere(bloecke: dict[str, Block], warnungen: list[str]) -> str:
                   f"Volltext je Eintrag: {ABRUF}  (<name> = das Wort vor dem Doppelpunkt)"] + stubs
 
     teile += warnungen
-    teile.append("======================")
+    # KEINE Abschlussmarke hier: Die setzt `rendere_block` für alle fünf Blöcke einheitlich.
+    # Bis zur Prüfung in S128 tat es beides, und der Agenda-Block endete auf zwei ineinander
+    # liegenden Rahmen.
     return "\n".join(teile)
+
+
+# --- Injektions-Blöcke -------------------------------------------------------
+# EIN Block = EINE SessionStart-Registrierung in settings.json = EIN eigener 10.000er-Cap.
+# Der Cap gilt pro registriertem Command (belegt in #84021: zwei gemeinsam registrierte
+# 5.149er-Proben kamen beide intakt an). Wer hier einen Block ergänzt oder zwei zusammenlegt,
+# muss settings.json mitziehen – sonst fällt der nicht registrierte Block lautlos aus.
+
+def _block_verhalten() -> str:
+    return _principles_block("verhalten")
+
+
+def _block_doku() -> str:
+    return _principles_block("doku")
+
+
+def _block_kommunikation() -> str:
+    return _principles_block("kommunikation")
+
+
+def _block_allowlist() -> str:
+    return modul_bash_allowlist().inhalt
+
+
+def _block_agenda() -> str:
+    return rendere(*sammle())
+
+
+INJEKTIONS_BLOECKE: list[tuple[str, str, callable]] = [
+    ("verhalten", "Verhalten & Disziplin", _block_verhalten),
+    ("doku", "Doku & Referenzen", _block_doku),
+    ("kommunikation", "Kommunikation & Argumentation", _block_kommunikation),
+    ("bash-allowlist", "Bash-Allow-Liste", _block_allowlist),
+    # Zuletzt und bewusst allein: Die Agenda ist der einzige Block, der von Session zu
+    # Session stark schwankt (der Drain-Satz wächst mit dem Backlog). Ein stabiler Block
+    # daneben würde sein Budget an dieses Schwanken koppeln.
+    ("agenda", "Session-Agenda", _block_agenda),
+]
+
+
+def _blockkopf(name: str, titel: str, nummer: int, gesamt: int, inhalt: str) -> list[str]:
+    """Kopf eines Injektionsblocks – muss in die 2.000er-Vorschau passen.
+
+    Er leistet dreierlei, und alles drei nur, weil er die Kürzung überlebt: Er sagt, WER
+    der Block ist (die Ankunftsreihenfolge sagt es nicht), er MELDET den Überlauf (der
+    Runtime tut es nicht), und er nennt den GEZIELTEN Nachladebefehl (die Volldatei zu
+    lesen wäre der Rückfall in das Problem, das die Aufteilung gerade löst).
+    """
+    zeilen = [f"=== Session-Start {nummer}/{gesamt}: {titel} ==="]
+    groesse = u16(inhalt)
+    if groesse > CAP:
+        zeilen.append(
+            f"!!! ÜBERSCHREITET den Injektions-Cap ({groesse} von {CAP} u16): Alles ab rund "
+            f"{VORSCHAU} units fehlt im Kontext, und der Runtime meldet das nicht. "
+            f"Diesen Block neu schneiden.")
+    elif groesse > BUDGET:
+        zeilen.append(
+            f"! Budget knapp ({groesse} von {BUDGET} u16, Cap {CAP}) – neu schneiden, "
+            f"bevor der Block still verschwindet.")
+    zeilen.append(
+        f"(Die {gesamt} Blöcke laufen parallel und treffen in BELIEBIGER Reihenfolge ein – "
+        f"die Nummer ist Identität, keine Position. Fehlt hier Text oder siehst du nur eine "
+        f"„saved to\"-Vorschau: python3 .claude/scripts/session-agenda.py --block {name})")
+    return zeilen
+
+
+def rendere_block(name: str) -> str:
+    namen = [n for n, _t, _f in INJEKTIONS_BLOECKE]
+    if name not in namen:
+        raise KeyError(f"Unbekannter Injektionsblock: {name}. Bekannt: {', '.join(namen)}")
+    nummer = namen.index(name) + 1
+    _name, titel, funktion = INJEKTIONS_BLOECKE[nummer - 1]
+    inhalt = funktion()
+    kopf = _blockkopf(name, titel, nummer, len(namen), inhalt)
+    return "\n".join([*kopf, inhalt, "=" * 30])
+
+
+def rendere_alles() -> str:
+    """Alle Blöcke am Stück – für den manuellen Blick, NICHT für die Injektion.
+
+    Setzt dieselben Blöcke zusammen, die injiziert werden: Zwei Renderpfade könnten
+    auseinanderlaufen, und geprüft würde dann nicht, was ankommt.
+    """
+    return "\n".join(rendere_block(n) for n, _t, _f in INJEKTIONS_BLOECKE)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     gruppe = ap.add_mutually_exclusive_group()
+    gruppe.add_argument("--block", metavar="NAME",
+                        help="einen Injektionsblock ausgeben (so ruft der SessionStart-Hook)")
     gruppe.add_argument("--only", metavar="ID", help="ein Modul in voller Tiefe ausgeben")
     gruppe.add_argument("--list", action="store_true", help="Modulnamen listen")
     args = ap.parse_args()
@@ -563,6 +769,14 @@ def main() -> int:
     if args.list:
         for name, art, _ in MODULE:
             print(f"{name:16} {art}")
+        return 0
+
+    if args.block:
+        try:
+            print(rendere_block(args.block))
+        except KeyError as exc:
+            print(exc.args[0], file=sys.stderr)
+            return 1
         return 0
 
     if args.only:
@@ -579,7 +793,10 @@ def main() -> int:
         print(block.inhalt or f"({args.only}: nichts zu melden)")
         return 0
 
-    print(rendere(*sammle()))
+    # Ohne Argument: alle Blöcke am Stück. Das ist die Sicht für Menschen und für Prüfungen –
+    # sie zeigt, was zusammen ankommt. Injiziert wird trotzdem NIE diese Ausgabe (sie ist mit
+    # Absicht über dem Cap), sondern je Block ein eigener Hook.
+    print(rendere_alles())
     return 0
 
 

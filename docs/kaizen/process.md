@@ -138,16 +138,40 @@ Die Retro behandelt OBS nicht (das macht der Drain), berührt sie aber an einer 
 <a id="KPR-session-agenda"></a>
 ## Session-Agenda: was verlangt zum Session-Start eine Entscheidung?
 
-Der SessionStart-Hook ruft `python3 .claude/scripts/session-agenda.py` (Module: `--list`,
-einzeln abrufen: `--only <name>`). Ziel ist **Fokus**, nicht Tokensparen – ein Session-Start mit
+Registriert sind **fünf** SessionStart-Hooks, je einer pro Injektionsblock:
+`python3 .claude/scripts/session-agenda.py --block <name>` (Blöcke: `verhalten`, `doku`,
+`kommunikation`, `bash-allowlist`, `agenda`; Module innerhalb der Agenda: `--list`, einzeln
+abrufen: `--only <name>`). Ziel ist **Fokus**, nicht Tokensparen – ein Session-Start mit
 mehreren konkurrierenden Aufträgen zeigt in keine Richtung.
 
-Ausgegeben wird erst der **Rahmen** (`principles`, Allow-Liste) – über Sessions unverändert und
-beim Lesen überspringbar –, danach die **Agenda**. Sie steht am Schluss, direkt vor der ersten
-Nachricht des Users: Das einzig session-spezifische Stück gehört an die Stelle, an der es am
-ehesten wirkt. Die Agenda enthält zusammenhängend:
+<a id="KPR-injektions-cap"></a>
+### Warum fünf Hooks und nicht einer
 
-1. **Zustand** – Phase, Story, nächster Lauf. Drei Zeilen, ohne Titel und ohne Kurzfassung.
+Claude Code verwirft Hook-stdout oberhalb von **10.000 UTF-16 code units kommentarlos**: Der
+Text wandert in eine Datei, injiziert wird eine 2.000er-Vorschau, der Hook bekommt Exit 0 und
+kein Signal. Bis S128 lief alles in *einem* Block mit 23.123 units – die Agenda stand am Ende
+und kam damit **in keiner Session an**, 27 Sessions lang unbemerkt. Der Cap gilt **pro
+registriertem Command**, deshalb die Aufteilung. Er ist undokumentiert und nicht konfigurierbar
+(anthropics/claude-code#84021, #51537).
+
+Drei Konsequenzen, die beim Ändern zu beachten sind:
+
+- **Reihenfolge gibt es nicht.** Hooks eines Events laufen parallel und treffen gemischt ein.
+  Jeder Block nennt sich selbst; wer aus der Position schließt, schließt falsch.
+- **Wer einen Block ergänzt, muss `settings.json` mitziehen.** Ein Block ohne Registrierung
+  wird nie injiziert. Der Test `test_settings_registriert_genau_die_definierten_bloecke` hält
+  beide Seiten zusammen.
+- **Der Guard misst in UTF-16 units, nicht in Bytes oder Zeichen.** `BUDGET` (8.000) liegt
+  unter `CAP` (10.000), damit Wachstum auffällt, solange noch Luft ist. Wächst eine
+  Injektionsquelle wie `principles.md`, läuft die Werkzeug-Suite mit und meldet es.
+
+<a id="KPR-agenda-aufbau"></a>
+### Aufbau der Agenda
+
+Die **Agenda** selbst ist einer dieser fünf Blöcke und enthält zusammenhängend:
+
+1. **Zustand** – Phase, Story, nächster Lauf; dazu Arbeitsbaum und die letzten drei Commits.
+   Wenige Zeilen, ohne Titel und ohne Kurzfassung.
 2. **Nächste Aufgabe** – genau *eine*, nach der Rangfolge unten. Ihr Text ist **buchstäblich**
    die Ausgabe von `--only <name>` für dieses Modul; keine zusammenfassende Kopfzeile davor,
    die den Inhalt darunter doppelte. Umgekehrt heißt das: Jeder Modulinhalt muss ohne

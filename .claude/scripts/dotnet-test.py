@@ -228,7 +228,7 @@ def main() -> None:
         print(output)
     else:
         lines = output.splitlines()
-        relevant = [l for l in lines if _RELEVANT.search(l)]
+        relevant = [line for line in lines if _RELEVANT.search(line)]
         if relevant:
             print("\n".join(relevant))
         else:

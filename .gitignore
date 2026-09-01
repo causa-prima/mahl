@@ -309,6 +309,14 @@ paket-files/
 __pycache__/
 *.pyc
 
+# Werkzeug-Umgebung für den Prozess-Code unter .claude/** (ruff, mutmut).
+# Nicht versioniert, weil plattformabhängig – reproduziert wird sie aus
+# requirements-dev.txt, siehe docs/process/dev-workflow.md.
+.venv/
+
+# Messdatei von coverage-run.py – ein Lauf-Artefakt, kein Projektstand.
+.coverage
+
 # Cake - Uncomment if you are using it
 # tools/**
 # !tools/packages.config

@@ -6,9 +6,13 @@ identisch vor. Gefährlich daran war nicht der Umfang, sondern die Ausfallart: W
 Kopie bei einer Semantik-Änderung des Edit-Tools nicht nachgezogen, prüft der Hook
 lautlos einen Dateiinhalt, den es nie geben wird, und winkt durch.
 
-NICHT hier: die Variante aus check-ref-direction.py und check-e2e-scenario-ref.py –
-sie nimmt (tool, file_path, tool_input). Zusammenlegen hieße eine Signatur umbauen.
+Seit S128 liegt hier auch der EINSTIEG (`edit_zustand`): Die vier Zeilen davor – Tool prüfen,
+`file_path` ziehen, Zuständigkeit prüfen – standen neunmal identisch da und machten sieben der
+zwölf Python-Clones aus, die jscpd meldete. Es ist dieselbe Ausfallart wie oben, eine Stufe
+früher: Ändert sich der Dispatcher-Vertrag, muss man neun Stellen finden, und die vergessene
+prüft dann lautlos das Falsche.
 """
+from collections.abc import Callable
 from pathlib import Path
 
 
@@ -33,3 +37,30 @@ def compute_post_content(tool: str, tool_input: dict, pre: str) -> str | None:
             return pre.replace(old, new, count)
         return pre  # old_string nicht gefunden → echter Edit schlägt ohnehin fehl
     return None
+
+
+def edit_zustand(data: dict,
+                 betrifft: Callable[[str], bool] | None = None) -> tuple[str, str, str] | None:
+    """`(file_path, pre, post)` für einen Edit/Write – oder None, wenn nichts zu prüfen ist.
+
+    None in vier Fällen, und der Aufrufer behandelt sie alle gleich: kein Edit/Write, kein
+    Dateipfad, `betrifft` verneint die Zuständigkeit, oder der Nachzustand ist nicht
+    simulierbar. Ein Hook, der hier None bekommt, gibt None zurück – mehr braucht sein
+    Einstieg nicht.
+
+    `betrifft` ist optional, weil vier der neun Hooks ihre Zuständigkeit erst am INHALT
+    entscheiden (etwa `check-anchors`, das jede Datei mit Ankern angeht) und nicht am Pfad.
+    """
+    tool = data.get("tool_name", "")
+    tool_input = data.get("tool_input") or {}
+    file_path = tool_input.get("file_path", "")
+    if tool not in ("Edit", "Write") or not file_path:
+        return None
+    if betrifft is not None and not betrifft(file_path):
+        return None
+
+    pre = read_file_text(file_path)
+    post = compute_post_content(tool, tool_input, pre)
+    if post is None:
+        return None
+    return file_path, pre, post

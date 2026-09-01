@@ -16,6 +16,7 @@
 | E2E Testing / BDD/Gherkin / Outside-In ATDD | `docs/process/e2e-testing.md` |
 | C#-Code schreiben (Backend, Tests) | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-csharp.md` (enthält Verweise auf ROP/SumTypes/Stryker-Ergänzungen) |
 | TypeScript/React-Code schreiben | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-typescript.md` |
+| Python schreiben (Scripts, Hooks, Checks unter `.claude/**`) | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-python.md` (andere Maßgaben als Produktcode – der Grund steht dort) |
 | Frontend-UX / Interaction Design | `docs/guidelines/coding-guideline-ux.md` |
 | Allgemeine Coding-Prinzipien (KISS, Naming, Komplexität) | `docs/guidelines/coding-guideline-general.md` |
 | Datenbank-Schema ändern | [Datenbank-Workflow](docs/process/dev-workflow.md#DEV-datenbank-workflow) (Drop+Recreate vs. Migrations) → [Projekt-Struktur](docs/reference/architecture.md#ARC-projekt-struktur) (wo DbTypes liegen) |
@@ -30,6 +31,8 @@
 | Learnings dokumentieren | `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/process.md`) |
 | Tracker-Eintrag lesen/schreiben (OBS, LL, TD, OQ, ADR) | `python3 .claude/scripts/tracker.py` zeigt, welches Werkzeug welchen Tracker pflegt und welche Befehle es kennt – dann `obs.py` / `lessons.py` / `td.py` / `oq.py` / `decisions.py`, statt Read/Edit auf der ganzen Datei |
 | Wohin geht das Read-/Token-Budget? | `python3 .claude/scripts/read-breakdown.py` (nach Session-Art), `tool-usage.py` |
+| Hat ein Guard/Hook je angeschlagen – oder fällt er lautlos aus? | `python3 .claude/scripts/guard-stats.py` (Teil der Retro) |
+| Wo fehlen Tests im Prozess-Code? | `python3 .claude/scripts/coverage-run.py` (Metrik, kein Gate – Teil der Retro) |
 | Abschnitt einer Doku lesen (statt Volldatei) | `python3 .claude/scripts/doc.py toc <datei>` zeigt die Abschnitte, `doc.py get <ANKER>` holt einen davon |
 | Abschnitt referenzieren / Anker prüfen | `python3 .claude/scripts/anchors.py list\|check\|refs <ANKER>`; Nummern statt Namen findet `ordinale.py` |
 | Was steht schon in einer Testdatei? | `python3 .claude/scripts/test-inventory.py <datei>` – Testnamen mit Zeilenbereich |

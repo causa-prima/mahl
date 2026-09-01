@@ -49,8 +49,11 @@ def parse_entries(text: str):
         m_sess = re.match(r"OBS-S0*(\d+)-(\d+)", oid)
         session, sub = int(m_sess.group(1)), int(m_sess.group(2))
 
+        # noqa B023: `field` fängt `body` aus der Schleife, wird aber ausschließlich innerhalb
+        # derselben Iteration aufgerufen und nirgends gespeichert – der Fallstrick der Regel
+        # (später aufgerufene Closure sieht den letzten Wert) tritt nicht ein. Geprüft in S128.
         def field(name):
-            mm = re.search(rf"^- {name}:\s*(.+)", body, flags=re.M)
+            mm = re.search(rf"^- {name}:\s*(.+)", body, flags=re.M)  # noqa: B023
             return mm.group(1).strip() if mm else ""
 
         status = field("Status")

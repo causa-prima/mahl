@@ -1,22 +1,25 @@
 {
   "minTokens": 70,
-  "format": ["typescript", "tsx", "csharp"],
+  "format": ["typescript", "tsx", "csharp", "python"],
   "path": [
     "Client/src",
     "Server",
-    "Infrastructure"
+    "Infrastructure",
+    ".claude/scripts",
+    ".claude/hooks"
   ],
   "ignore": [
     "**/node_modules/**",
     "**/bin/**",
     "**/obj/**",
     "**/dist/**",
+    "**/__pycache__/**",
     "Client/src/**/*.test.ts",
     "Client/src/**/*.test.tsx",
     "Client/src/**/*.spec.ts",
     "Client/src/**/*.spec.tsx",
     "Client/e2e/**",
-    "Server/Migrations/**"
+    "Infrastructure/Migrations/**"
   ],
   "reporters": ["console"]
 }

@@ -1,0 +1,26 @@
+# Linter für den Prozess-Code unter .claude/** – aufgerufen über
+# `python3 .claude/scripts/ruff-run.py`, nie direkt.
+#
+# Warum eine eigene Datei und kein pyproject.toml: Dieses Repo ist kein Python-Paket, es ist
+# ein C#/TypeScript-Projekt mit Python-Werkzeugen. Ein pyproject.toml im Root behauptete das
+# Gegenteil und zöge Erwartungen an Build und Metadaten nach sich, die niemand einlöst.
+
+target-version = "py312"
+line-length = 100
+exclude = [".venv", "__pycache__", "node_modules"]
+
+[lint]
+# Bewusst schmal. Die Auswahl folgt der Frage „findet die Regel FEHLER oder regelt sie STIL?" –
+# Stil steht in den Coding-Guidelines und wird im Review beurteilt, nicht von einem Linter
+# erzwungen, der dabei Reibung ohne Fehlerreduktion erzeugt.
+#
+#   E4/E7/E9 + F  Pyflakes und die harten pycodestyle-Regeln: ungenutzte Importe, doppelte
+#                 Definitionen, undefinierte Namen, Syntaxfehler.
+#   B             flake8-bugbear: echte Fallstrick-Muster. Bei der Einführung in S128 fand
+#                 allein B023 (function-uses-loop-variable) drei Stellen – eine Closure, die
+#                 eine Schleifenvariable einfängt, sieht am Ende überall denselben Wert.
+#
+# Verworfen, mit Grund: `I` (Import-Sortierung, 40 Treffer) und `UP`/`SIM`/`C4`/`RET` sind
+# Stil bzw. Modernisierung. Sie erzeugen Diff-Rauschen an Dateien, die sonst niemand anfasst,
+# und keine der Fundstellen wäre je ein Fehler geworden.
+select = ["E4", "E7", "E9", "F", "B"]

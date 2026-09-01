@@ -5,10 +5,11 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from checks.common import parse_input
-from checks import constructors, test_patterns, tooling_tests
+from checks import constructors, guard_log, ruff_lint, test_patterns, tooling_tests
 from checks.primitives import check_nonblocking as primitives_nonblocking
 
-CHECKS = [constructors.check, test_patterns.check, primitives_nonblocking, tooling_tests.check]
+CHECKS = [constructors.check, test_patterns.check, primitives_nonblocking,
+          tooling_tests.check, ruff_lint.check]
 
 
 def main() -> None:
@@ -19,9 +20,15 @@ def main() -> None:
     warnings: list[str] = []
     for check_fn in CHECKS:
         try:
-            warnings.extend(check_fn(inp))
+            treffer = check_fn(inp)
         except Exception as e:
             print(f"check-code-quality-nonblocking: Fehler in {check_fn.__module__}: {e}", file=sys.stderr)
+            continue
+        if treffer:
+            # Wer gefeuert hat, wird protokolliert – ein Guard ohne jede Auslösung ist
+            # entweder kaputt oder überflüssig, und ohne Protokoll fiele beides nie auf.
+            guard_log.protokolliere(check_fn.__module__.rsplit(".", 1)[-1])
+        warnings.extend(treffer)
 
     if warnings:
         separator = "\n" + "─" * 60 + "\n"

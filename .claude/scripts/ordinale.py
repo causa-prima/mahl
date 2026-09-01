@@ -51,7 +51,7 @@ _BEZUG = (r"Schritte?|Punkte?|Sektion|Abschnitt|Regel|Phase|Gate|Ebene|Stufe|Kap
           r"Dimension|Check|Runde|Frage|Kategorie|Rang|Achse|Dim")
 
 # --- Überschrift: Ziffer/Buchstabe/römisch als Präfix, oder Bezugswort + Zahl. ---
-_H_PRAEFIX = re.compile(rf"^\s{{0,3}}#{{1,6}}\s+(?:\d+[.:)]|[A-H][.)]|[IVX]{{1,4}}[.)])\s")
+_H_PRAEFIX = re.compile(r"^\s{0,3}#{1,6}\s+(?:\d+[.:)]|[A-H][.)]|[IVX]{1,4}[.)])\s")
 _H_WORT = re.compile(rf"^\s{{0,3}}#{{1,6}}\s+(?:{_BEZUG})\s+\d")
 # Wortlos, weil die Liste oben zweimal versagt hat („Gate", dann „Agent"): <Wort> <Zahl>,
 # gefolgt von einem Trenner. Der Trenner grenzt gegen „## Claude 5 als Modell" ab.

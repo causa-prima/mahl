@@ -102,6 +102,61 @@ Ergebnis intern festhalten für [Findings präsentieren](#KZN-findings-praesenti
 
 ---
 
+<a id="KZN-guard-stats"></a>
+## Guard-Auslösungen sichten
+
+```bash
+python3 .claude/scripts/guard-stats.py
+```
+
+**Warum in der Retro.** Der Ausfall eines Guards löst per Definition nichts aus – die Frage
+„hat er je gefeuert?" ist der einzige Zugang dazu ([Begründung](../../../docs/guidelines/coding-guideline-python.md#CGP-guard-protokoll)).
+Sie gehört hierher, weil die Retro der Ort der **Bestandssichtung** ist und der Abstand
+zwischen zwei Retros genug Auslösungen sammelt.
+
+**Wie der Befund zu lesen ist – drei Fälle, drei verschiedene Schlüsse:**
+
+- **Nie gefeuert, aber der Report meldet dünne Datenlage** → kein Befund. Die Zahl sagt dann
+  etwas über das Alter des Protokolls, nicht über den Guard.
+- **Nie gefeuert bei ausreichender Datenlage** → der Guard ist *entweder* kaputt *oder*
+  überflüssig, und von außen sind beide nicht zu unterscheiden. Also prüfen, nicht annehmen:
+  ihn einmal absichtlich brechen und sehen, ob er anspringt (die Gegenprobe aus
+  [`principles.md`](../../../docs/kaizen/principles.md#KPI-kommunikation)). Springt er an, ist
+  er überflüssig geworden – das ist eine OBS, keine stille Löschung.
+- **Im Protokoll, aber nicht mehr definiert** → ein umbenannter oder entfernter Guard.
+  Aufräumen, damit die Zählung zuordenbar bleibt.
+
+Der Bash-Hook führt sein eigenes Protokoll (`tool-usage.py`) und ist hier **nicht** enthalten.
+
+Ergebnis intern festhalten für [Findings präsentieren](#KZN-findings-praesentieren).
+
+---
+
+<a id="KZN-coverage"></a>
+## Testabdeckung des Prozess-Codes sichten
+
+```bash
+python3 .claude/scripts/coverage-run.py
+```
+
+**Metrik, kein Gate** ([Begründung](../../../docs/guidelines/coding-guideline-python.md#CGP-was-nicht-gilt)).
+Gesucht wird **kein Zielwert**, sondern die Stelle, an der offensichtlich Tests fehlen.
+
+**Beim Lesen zwei Gruppen trennen**, sonst wirkt die Zahl dramatischer als sie ist:
+
+- **Dünne CLI-Fassade über getestetem Kern** – `obs.py`, `td.py`, `tracker.py` und die
+  Wrapper-Scripts stehen bei 0 %, ihre Kernmodule (`obs_entry`, `td_entry`, `tracker_entry`)
+  aber bei 86–99 %. Kein Befund.
+- **Logik und Guards mit Lücken** – das ist der Befund. In S128 etwa `qa-check.py` (36 %),
+  `check-anchors.py` (40 %), `check-code-quality-nonblocking.py` (32 %).
+
+Ein Guard mit Lücken gehört zusammen mit [Guard-Auslösungen](#KZN-guard-stats) gelesen: Wenig
+Abdeckung *und* keine Auslösung ist ein deutlich stärkeres Signal als jedes für sich.
+
+Ergebnis intern festhalten für [Findings präsentieren](#KZN-findings-praesentieren).
+
+---
+
 <a id="KZN-countermeasures-review"></a>
 ## countermeasures.md reviewen
 

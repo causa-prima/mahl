@@ -50,26 +50,9 @@ def test_validate_feature_ok_when_title_lives_in_other_feature():
     assert hook.validate_feature(post, other_feature_titles=frozenset({"Zutat anlegen"}), spec_titles={"Zutat anlegen"}) == []
 
 
-# --- compute_post_content ----------------------------------------------------
-def test_compute_post_content_write_returns_content():
-    inp = {"file_path": "x.spec.ts", "content": "// Szenario: Zutat anlegen\n"}
-    assert hook.compute_post_content("Write", "x.spec.ts", inp) == "// Szenario: Zutat anlegen\n"
-
-
-def test_compute_post_content_edit_applies_replacement(tmp_path):
-    f = tmp_path / "ingredients.spec.ts"
-    f.write_text("test('foo')\n", encoding="utf-8")
-    inp = {"file_path": str(f), "old_string": "test('foo')", "new_string": "// Szenario: Zutat anlegen\ntest('foo')"}
-    out = hook.compute_post_content("Edit", str(f), inp)
-    assert "// Szenario: Zutat anlegen" in out
-    assert "test('foo')" in out
-
-
-def test_compute_post_content_edit_missing_old_string_returns_current(tmp_path):
-    f = tmp_path / "ingredients.spec.ts"
-    f.write_text("test('foo')\n", encoding="utf-8")
-    inp = {"file_path": str(f), "old_string": "NICHT VORHANDEN", "new_string": "x"}
-    assert hook.compute_post_content("Edit", str(f), inp) == "test('foo')\n"
+# Die compute_post_content-Tests standen bis S128 hier und prüften eine LOKALE Kopie mit
+# eigener Signatur – zusammen mit der in check-ref-direction.py war das der größte Python-Clone
+# (18 Zeilen). Beide Kopien sind entfallen, geprüft wird die Simulation in test_hook_io.py.
 
 
 # --- validate ----------------------------------------------------------------

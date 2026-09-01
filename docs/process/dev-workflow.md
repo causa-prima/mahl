@@ -129,6 +129,35 @@ dotnet run --project Server          # Dev-Server (Port via Server/Properties/la
 > **Parallele Builds:** Kein `dotnet watch` gleichzeitig mit `build`/`test`/`stryker` auf
 > demselben Projekt laufen lassen (Race auf `bin`/`obj`). Sonst sind parallele dotnet-Prozesse unkritisch.
 
+<a id="DEV-python-werkzeuge"></a>
+### Python-Werkzeuge für den Prozess-Code (`.venv`)
+
+Die Werkzeuge für den Prozess-Code unter `.claude/**` (ruff, mutmut, pytest) liegen in einem
+venv im Repo-Root. Das Verzeichnis ist nicht versioniert; hergestellt wird es aus
+`requirements-dev.txt`:
+
+```bash
+sudo apt install python3.12-venv          # einmalig, sonst fehlt ensurepip
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+```
+
+**Warum ein venv und kein `pip install --user`:** Das System-Python ist Debian-verwaltet und
+weist Installationen nach PEP 668 ab (`externally-managed-environment`).
+
+**Aufgerufen werden die Werkzeuge über ihre Wrapper**, nie direkt – `.venv/bin/ruff` steht
+nicht auf der Bash-Allow-Liste:
+
+```bash
+python3 .claude/scripts/ruff-run.py            # Linter über .claude/scripts + .claude/hooks
+python3 .claude/scripts/ruff-run.py --fix      # sichere Fixes anwenden (ändert Dateien)
+```
+
+Zusätzlich läuft ruff **automatisch** über jede geänderte Python-Datei des Prozess-Codes
+(PostToolUse, `checks/ruff_lint.py`, nicht-blockierend). Fehlt das venv, sagt der Check das –
+ein Linter, der stumm ausfällt, wäre von „alles sauber" nicht zu unterscheiden.
+Regelauswahl und ihre Begründung: `ruff.toml` im Root.
+
 ---
 
 <a id="DEV-projekt-struktur"></a>

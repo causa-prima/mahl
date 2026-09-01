@@ -1186,6 +1186,8 @@ _PROJECT_TASK_SCRIPTS: list[str] = [
     "Frontend-E2E:        python3 .claude/scripts/playwright-test.py [--filter X] [--verbose]",
     "Frontend-Mutation:   python3 .claude/scripts/stryker-frontend.py [--mutate src/..] [--verbose]",
     "ESLint:              python3 .claude/scripts/eslint-run.py [--verbose]",
+    "Python-Linter:       python3 .claude/scripts/ruff-run.py [--fix] [--verbose]",
+    "Python-Coverage:     python3 .claude/scripts/coverage-run.py [--verbose]  (Metrik, kein Gate)",
     "Duplikate (jscpd):   python3 .claude/scripts/jscpd-run.py [--verbose]",
 ]
 

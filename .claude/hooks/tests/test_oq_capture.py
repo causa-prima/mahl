@@ -12,7 +12,6 @@ from importlib import import_module
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 hook = import_module("check-oq-capture")
-import td_anchors  # noqa: E402
 
 
 def oq(oid: str, faellig: str | None = None, title: str = "Frage?") -> str:

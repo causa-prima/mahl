@@ -6,7 +6,6 @@ decisions.py – CLI-Tool zur Verwaltung von Architecture Decision Records in do
 import argparse
 import re
 import sys
-import os
 from pathlib import Path
 
 

@@ -289,7 +289,11 @@ def set_fields(text: str, oid: str, status: str | None = None,
         # still durch eine Regex-Gruppe ersetzt würde. Entscheidungstexte zitieren
         # regelmäßig Muster und Pfade – der Wert muss literal bleiben.
         neuer_wert = f"- {feld}: {wert}"
-        block = muster.sub(lambda _: neuer_wert, block, count=1)
+        # noqa B023: Das Lambda fängt zwar `neuer_wert` aus der Schleife, wird von `sub` aber
+        # SOFORT in derselben Iteration aufgerufen und überlebt sie nicht – der Fallstrick,
+        # den die Regel meint (gespeicherte Closure sieht später den letzten Wert), liegt hier
+        # nicht vor. Geprüft in S128.
+        block = muster.sub(lambda _: neuer_wert, block, count=1)  # noqa: B023
 
     pruefe_wohlgeformt(oid, block)
     return text[:span[0]] + block + text[span[1]:]

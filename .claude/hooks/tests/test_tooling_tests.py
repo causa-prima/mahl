@@ -32,6 +32,22 @@ def test_ignores_python_outside_watched_dirs():
     assert not tt._is_watched("tools/irgendwas.py")
 
 
+def test_watches_injection_sources_even_though_they_are_not_python():
+    """principles.md fließt in einen Session-Start-Block und muss dessen Budget einhalten.
+
+    Der Cap greift auf den fertigen Block, und wachsen tut der TEXT, nicht das Script.
+    Ohne diesen Auslöser liefe die Datei über die Grenze, ohne dass ein Gate anspringt.
+    """
+    assert tt._is_watched("docs/kaizen/principles.md")
+    assert tt._is_watched("/home/x/repo/docs/kaizen/principles.md")
+
+
+def test_ignores_unrelated_markdown():
+    """Gegenprobe: nicht jedes Markdown zieht die Werkzeug-Suite nach sich."""
+    assert not tt._is_watched("docs/kaizen/lessons_learned.md")
+    assert not tt._is_watched("README.md")
+
+
 # --- Formatierung: kurz, mit Assertion, gedeckelt ----------------------------
 _STDOUT = """\
 /home/x/repo/.claude/hooks/tests/test_qa_check.py:37: assert None == 100.0

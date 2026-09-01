@@ -344,7 +344,7 @@ def check_adr_refs() -> tuple[str, int]:
     r = subprocess.run([sys.executable, str(script), "check"], capture_output=True, text=True)
     if r.returncode == 0:
         return r.stdout.strip() or "OK – keine Stale-Referenzen", 0
-    lines = [l for l in (r.stdout + r.stderr).splitlines() if l.strip()]
+    lines = [line for line in (r.stdout + r.stderr).splitlines() if line.strip()]
     return "\n  ".join(lines) if lines else "FEHLER (kein Output)", r.returncode
 
 
@@ -369,7 +369,7 @@ def check_eslint(layer: str) -> tuple[str, int]:
     r = subprocess.run([sys.executable, str(script)], capture_output=True, text=True)
     if r.returncode == 0:
         return "OK", 0
-    lines = [l for l in (r.stdout + r.stderr).splitlines() if l.strip()]
+    lines = [line for line in (r.stdout + r.stderr).splitlines() if line.strip()]
     return f"FEHLER – {lines[-1] if lines else '(kein Output)'}", r.returncode
 
 
@@ -552,7 +552,7 @@ def main() -> None:
         print("keine verdächtigen Treffer")
 
     if args.layer == "frontend":
-        print(f"\n=== CHECK 4: ESLINT ===")
+        print("\n=== CHECK 4: ESLINT ===")
         print(lint_status)
 
     print("\n=== CHECK 5: TEST-STRUKTUR (Given/When/Then) ===")
@@ -562,7 +562,7 @@ def main() -> None:
     else:
         print("alle neuen Tests strukturiert")
 
-    print(f"\n=== CHECK 6: ADR-REFERENZEN ===")
+    print("\n=== CHECK 6: ADR-REFERENZEN ===")
     print(adr_status)
 
     # ── Hash ─────────────────────────────────────────────────────────────────
@@ -586,7 +586,7 @@ def main() -> None:
             sys.exit(1)
 
         ok = verify_hash(args.verify, **hash_kwargs)
-        print(f"\n=== VERIFY ===")
+        print("\n=== VERIFY ===")
         if not ok:
             print("❌ Hash stimmt NICHT überein – der aktuelle Zustand weicht von dem ab, für den der "
                   "Hash erzeugt wurde (Code/Report seit der Übergabe geändert, falsche Schicht, oder "
@@ -606,7 +606,7 @@ def main() -> None:
         # Score < 100 % ist trotzdem keine gültige Übergabe. Der Audit ist bewusst kein Exit-Gate
         # (Setup-Änderungen sind erlaubt; nur der Orchestrator kann Setup ≠ Assertion entscheiden).
     else:
-        print(f"\n=== VERIFIKATIONS-HASH ===")
+        print("\n=== VERIFIKATIONS-HASH ===")
         if args.skip_stryker:
             print("(übersprungen – --skip-stryker erzeugt KEINEN Übergabe-Hash. Nur Läufe ohne "
                   "--skip-stryker sind zur Übergabe gültig; Verifikation durch den Orchestrator via --verify <hash>.)")

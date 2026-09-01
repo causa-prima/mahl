@@ -1,9 +1,11 @@
 ---
 name: write-code
 description: >
-  Pflicht-Vorbereitung vor dem Schreiben von C# oder TypeScript/React-Code:
+  Pflicht-Vorbereitung vor dem Schreiben von C#, TypeScript/React oder Python:
   Guidelines lesen, TDD-Workflow starten, Selbst-Review. Verwende diesen Skill
-  automatisch bevor du neuen Produktionscode in C# oder TypeScript schreibst.
+  automatisch bevor du neuen Produktionscode in C# oder TypeScript schreibst –
+  und ebenso vor Python unter .claude/** (Scripts, Hooks, Checks), für das
+  eigene Maßgaben gelten.
 user-invocable: false
 ---
 
@@ -13,6 +15,9 @@ user-invocable: false
 ## Wann dieser Skill aktiv wird
 
 Immer wenn du C#- oder TypeScript/React-Code schreibst – egal ob im Rahmen von `/feature` oder ad hoc.
+
+**Auch bei Python unter `.claude/**`** (Scripts, Hooks, Checks). Dort gilt allerdings ein
+eigener, kurzer Pfad: [Prozess-Code](#WRC-prozess-code) statt der Produktcode-Pflichten.
 
 ---
 
@@ -38,6 +43,29 @@ der teurere Fehler.
   - Stryker-Survivors behandeln ([REFACTOR](../../../docs/process/tdd-process.md#TDD-refactor)) → zusätzlich `docs/guidelines/csharp-stryker.md`
 - TypeScript/React (Frontend) → `docs/guidelines/coding-guideline-typescript.md`
   - React-Komponenten (`src/components/`, `src/pages/`) → zusätzlich `docs/guidelines/coding-guideline-ux.md`
+- Python (`.claude/**`) → `docs/guidelines/coding-guideline-python.md`, dann [Prozess-Code](#WRC-prozess-code)
+
+<a id="WRC-prozess-code"></a>
+### Prozess-Code: der kurze Pfad
+
+Für Python unter `.claude/**` gelten **eigene Maßgaben**, nicht die abgeschwächten
+Produktcode-Regeln – der Grund (ein anderes Fehlerprofil) steht in
+`coding-guideline-python.md`. Konkret entfällt hier alles, was den Produktcode-Pfad
+ausmacht: kein PFLICHT-OUTPUT, kein Stryker, keine Coverage-Schwelle, keine
+Szenario-Bindung.
+
+Was stattdessen gilt – drei Dinge:
+
+1. **Tests, und sie laufen von selbst.** Jede Änderung fährt die Werkzeug-Suite; rot bleiben
+   ist keine Option. Red-Green-Refactor gilt unverändert.
+2. **Gegenprobe bei jedem Guard.** Wer einen Hook, ein Gate oder einen Wrapper baut oder
+   ändert, bricht ihn einmal absichtlich und sieht ihn anspringen. Ohne diesen Schritt ist
+   nicht belegt, dass er überhaupt prüft.
+3. **Verdikt statt Rohausgabe.** Werkzeuge laufen über ihre Wrapper in `.claude/scripts`, und
+   eine Meldung nennt den Ausweg, nicht nur den Befund.
+
+Danach direkt zum [Selbst-Review](#WRC-selbst-review) – die Produktcode-Schritte dazwischen
+entfallen.
 
 **PFLICHT-OUTPUT nach dem Lesen** – beantworte aufgabenspezifisch:
 - **YAGNI:** Was implementiere ich explizit NICHT? (Nennung konkreter Nicht-Ziele)

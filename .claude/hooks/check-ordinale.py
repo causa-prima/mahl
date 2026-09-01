@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import anchors  # noqa: E402
 import ordinale  # noqa: E402
-from _hook_io import compute_post_content, read_file_text  # noqa: E402
+from _hook_io import edit_zustand  # noqa: E402
 
 _LOG = Path(__file__).resolve().parent.parent / "tmp" / "mengenangaben.log"
 _MAX_HITS = 10
@@ -45,6 +45,18 @@ def _rel(file_path: str) -> str | None:
         return Path(file_path).resolve().relative_to(anchors.REPO_ROOT).as_posix()
     except ValueError:
         return None
+
+
+def _zustaendig(file_path: str) -> bool:
+    """Geht diese Datei den Hook an? Entschieden am PFAD, vor dem Lesen der Datei.
+
+    Zweite Stufe derselben Regel wie im Bestandsprüfer: Wo die Muster Eingabedatum sind,
+    blockiert der Hook nicht – sonst wäre jeder Edit an den Werkzeug-Tests gesperrt.
+    """
+    rel = _rel(file_path)
+    if rel is None or not anchors.wird_geprueft(rel):
+        return False
+    return "ordinal" not in anchors.ausnahmen_fuer(rel)
 
 
 def _ausschnitt(zeile: str, fund: str, breite: int = 160) -> str:
@@ -77,25 +89,12 @@ def _protokolliere(rel: str, funde: list[tuple[int, str, str]]) -> None:
 
 def check(data: dict) -> str | None:
     """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py."""
-    tool = data.get("tool_name", "")
-    tool_input = data.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
-    if tool not in ("Edit", "Write") or not file_path:
+    zustand = edit_zustand(data, _zustaendig)
+    if zustand is None:
         return None
+    file_path, pre, post = zustand
 
     rel = _rel(file_path)
-    if rel is None or not anchors.wird_geprueft(rel):
-        return None
-    # Zweite Stufe derselben Regel wie im Bestandsprüfer: Wo die Muster Eingabedatum sind,
-    # blockiert der Hook nicht – sonst wäre jeder Edit an den Werkzeug-Tests gesperrt.
-    if "ordinal" in anchors.ausnahmen_fuer(rel):
-        return None
-
-    pre = read_file_text(file_path)
-    post = compute_post_content(tool, tool_input, pre)
-    if post is None:
-        return None
-
     markdown = rel.endswith(".md")
     _protokolliere(rel, ordinale.neue_mengenangaben(pre, post))
 

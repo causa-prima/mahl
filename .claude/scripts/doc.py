@@ -44,7 +44,10 @@ from importlib import import_module
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 anchors = import_module("anchors")
 
-_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
+# Bis zu drei Leerzeichen sind nach CommonMark noch eine Überschrift; ab vier beginnt ein
+# eingerückter Code-Block. Die Grenze steht hier, weil Doku ÜBER Doku-Konventionen genau so
+# ihre Beispiele setzt – `principles.md` zeigt eingerückt, wie ein Anker aussieht.
+_HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.*)$")
 _FENCE = re.compile(r"^\s*```")
 # Dasselbe Muster wie in `anchors.py`, nicht neu geschrieben: Was ein Anker ist, wird an EINER
 # Stelle definiert. Neu formuliert bräche eine spätere Änderung dort dieses Werkzeug lautlos –
@@ -90,8 +93,13 @@ def _ebene(zeile: str) -> int | None:
 
 
 def _heading(zeile: str) -> re.Match | None:
-    """Der Überschriften-Treffer dieser Zeile, um einen vorangestellten Anker bereinigt."""
-    return _HEADING.match(_ANKER_ZEILE.sub("", zeile).lstrip())
+    """Der Überschriften-Treffer dieser Zeile, um einen vorangestellten Anker bereinigt.
+
+    KEIN `lstrip()`: Die Einrückung trägt Bedeutung. Bis S128 wurde sie weggeworfen, damit
+    galt jede eingerückte Beispiel-Überschrift als echte – `_HEADING` toleriert die drei
+    Leerzeichen, die CommonMark erlaubt, und weist ab vier ab.
+    """
+    return _HEADING.match(_ANKER_ZEILE.sub("", zeile))
 
 
 def _anker_positionen(zeilen: list[str]) -> list[tuple[str, int]]:
@@ -496,7 +504,7 @@ def cmd_toc(args) -> int:
         einzug = "  " * max(e["ebene"] - 1, 0)
         anker = e["anker"] or "(kein Anker)"
         print(f"  {einzug}{anker:<32} {e['titel'][:46]:<48} {e['zeichen']:>6} Z.")
-    print(f"\nAbschnitt holen: doc.py get <ANKER>")
+    print("\nAbschnitt holen: doc.py get <ANKER>")
     return 0
 
 

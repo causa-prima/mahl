@@ -1,5 +1,4 @@
 """Tests für checks/constructors.py"""
-import pytest
 from conftest import make_input
 from checks import constructors
 

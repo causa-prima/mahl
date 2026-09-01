@@ -30,6 +30,13 @@ _TESTS_REL = os.path.join(".claude", "hooks", "tests")
 # der Auslöser in S113 lag dort, nicht in den Hooks selbst.
 _WATCHED = (".claude/scripts/", ".claude/hooks/")
 
+# Quellen, deren INHALT in einen Injektionsblock des Session-Starts fließt. Sie sind kein
+# Python, lösen die Suite aber trotzdem aus: Der Budget-Test misst die fertige Blockgröße
+# gegen den 10.000-u16-Cap des Runtimes, und wachsen tut nicht das Script, sondern der Text.
+# Ohne diesen Eintrag wüchse principles.md bis über den Cap und der Block verschwände
+# lautlos – genau der Ausfall, den S128 behoben hat.
+_WATCHED_QUELLEN = ("docs/kaizen/principles.md",)
+
 _MAX_LINES = 10
 _TIMEOUT_S = 120
 
@@ -37,10 +44,12 @@ _SUMMARY = re.compile(r'^\d+ failed')
 
 
 def _is_watched(file_path: str) -> bool:
-    """True für Python-Dateien unterhalb der beobachteten Verzeichnisse."""
-    if not file_path.endswith(".py"):
-        return False
+    """True für Python-Dateien der beobachteten Verzeichnisse und für Injektionsquellen."""
     norm = file_path.replace("\\", "/")
+    if any(norm.endswith(quelle) for quelle in _WATCHED_QUELLEN):
+        return True
+    if not norm.endswith(".py"):
+        return False
     return any(seg in norm for seg in _WATCHED)
 
 

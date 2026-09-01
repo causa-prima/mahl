@@ -46,7 +46,7 @@ def _run_mode(story_tag: str, run_number: int) -> None:
 
     if not matches:
         print(f"❌  Kein Szenario mit run-{run_number} unter Feature-Tag {story_tag} in features/ gefunden.")
-        print(f"   Bitte zuerst /gherkin-workshop (Szenario-Clustering) für diese Story ausführen.")
+        print("   Bitte zuerst /gherkin-workshop (Szenario-Clustering) für diese Story ausführen.")
         sys.exit(1)
 
     run_meta = matches[0][2]["run"]
@@ -77,7 +77,7 @@ def _tag_mode(tag: str, title_filter: str | None) -> None:
             print(f"❌  Kein Szenario mit Tag {tag} und Titel '{title_filter}' in features/ gefunden.")
         else:
             print(f"❌  Kein Szenario mit Tag {tag} in features/ gefunden.")
-        print(f"   Bitte zuerst /gherkin-workshop für die betreffende User Story ausführen.")
+        print("   Bitte zuerst /gherkin-workshop für die betreffende User Story ausführen.")
         sys.exit(1)
 
     print(f"✅  {len(matches)} Szenario(s) mit Tag {tag} gefunden:\n")

@@ -16,7 +16,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py"
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block verhalten"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block doku"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block kommunikation"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block bash-allowlist"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block agenda"
           }
         ]
       }

@@ -28,7 +28,6 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kontext_tags
 from kaizen_constants import IMPACT_WEIGHTS
@@ -168,9 +167,12 @@ def parse_file(path: str) -> list[SessionData]:
                 continue
             if cur_f:
                 m = WAS_RE.match(line)
-                if m: cur_f.was = m.group(1).strip(); continue
+                if m:
+                    cur_f.was = m.group(1).strip()
+                    continue
                 m = WARUM_RE.match(line)
-                if m: cur_f.warum = m.group(1).strip()
+                if m:
+                    cur_f.warum = m.group(1).strip()
     return sessions
 
 
@@ -410,7 +412,11 @@ def linear_regression(xs: list[float], ys: list[float]) -> tuple[float, float]:
     if n < 2:
         return 0.0, ys[0] if ys else 0.0
     sx, sy = sum(xs), sum(ys)
-    sxy = sum(x * y for x, y in zip(xs, ys))
+    # strict=True, weil `n` aus `xs` stammt: Bei ungleich langen Listen summierte `zip` still
+    # über die kürzere, und die Regression rechnete mit einem zu großen n weiter – ein falscher
+    # Trend ohne jedes Anzeichen. Lieber hier laut scheitern als eine Retro auf Zahlen stützen,
+    # die niemand nachrechnet. (S128, gefunden von ruff B905.)
+    sxy = sum(x * y for x, y in zip(xs, ys, strict=True))
     sxx = sum(x * x for x in xs)
     d = n * sxx - sx * sx
     if d == 0:
@@ -479,8 +485,10 @@ def render_sonstiges(sessions: list[SessionData], all_sessions: list[SessionData
         lines.append(f"  {len(hits)} Einträge – fehlende Tags ableiten:\n")
         for f in hits:
             lines.append(f"  [{f.impact}] S{f.session_num}: {f.titel}")
-            if f.was:   lines.append(f"    Was:   {f.was}")
-            if f.warum: lines.append(f"    Warum: {f.warum}")
+            if f.was:
+                lines.append(f"    Was:   {f.was}")
+            if f.warum:
+                lines.append(f"    Warum: {f.warum}")
             lines.append("")
 
     fremd = unbekannte_tags(all_sessions, cms)
@@ -768,7 +776,7 @@ def main() -> int:
     if last_retro_session is not None:
         print(f"  Letzte Retro: nach Session {last_retro_session}  |  Neue Sessions ab: {last_retro_session + 1}")
     else:
-        print(f"  Letzte Retro: keine (erster Lauf)")
+        print("  Letzte Retro: keine (erster Lauf)")
     print(f"{'═'*64}")
 
     print(render_aggregation(current_sessions))

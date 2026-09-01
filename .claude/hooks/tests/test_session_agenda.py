@@ -12,11 +12,18 @@ Vier Zusagen, die der Session-Start hält:
      Ein leerer Session-Start wäre von „nichts zu tun" ununterscheidbar.
 """
 import os
+import json
+import subprocess
 import sys
 from importlib import import_module
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 agenda = import_module("session-agenda")
+
+SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "session-agenda.py"
 
 
 def blocks(**beansprucht: bool) -> dict:
@@ -96,26 +103,34 @@ def test_silent_modules_produce_no_stub_line():
     assert "td-due" not in agenda.rendere(b, [])
 
 
-def test_frame_blocks_are_rendered_even_without_a_task():
+def test_the_task_slot_stays_filled_without_a_claim():
     out = agenda.rendere(blocks(), [])
     assert "Nächste Aufgabe: keine erzwungen" in out
-    assert "principles-inhalt" in out and "bash-allowlist-inhalt" in out
 
 
-def test_frame_blocks_are_never_suppressed():
-    """Sie sind Verhaltensrahmen; ihr Weglassen fiele lautlos aus."""
+def test_the_agenda_no_longer_carries_the_frame():
+    """Seit S128 sind die Rahmen EIGENE Injektionsblöcke, nicht Teil der Agenda.
+
+    Bis dahin rendete `rendere()` principles.md und Allow-Liste mit – zusammen 23.123
+    UTF-16 units, also weit über dem 10.000er-Cap, an dem der Runtime den GESAMTEN
+    Block gegen eine 2.000er-Vorschau tauscht. Die Agenda stand am Ende und kam damit
+    in keiner Session an. Ein Rahmen HIER wäre der Rückfall in genau diesen Zustand.
+    """
     out = agenda.rendere(blocks(retro=True), [])
-    assert "principles-inhalt" in out
+    assert "principles-inhalt" not in out
+    assert "bash-allowlist-inhalt" not in out
+
+
+def test_the_frame_is_never_suppressed_but_lives_in_its_own_blocks():
+    """Die Zusage bleibt – sie wandert nur auf die Block-Ebene."""
+    namen = {name for name, _t, _f in agenda.INJEKTIONS_BLOECKE}
+    assert {"verhalten", "doku", "kommunikation", "bash-allowlist"} <= namen
 
 
 # --- Anordnung ---------------------------------------------------------------
-def test_the_agenda_comes_last_behind_the_unchanging_frame():
-    """Das einzig session-spezifische Stück steht direkt vor der ersten User-Nachricht;
-    der über Sessions unveränderliche Rahmen davor ist überspringbar."""
-    out = agenda.rendere(blocks(retro=True), [])
-    assert out.index("principles-inhalt") < out.index("=== Session-Agenda ===")
-    assert out.index("bash-allowlist-inhalt") < out.index("=== Session-Agenda ===")
-
+# Über BLOCKgrenzen hinweg gibt es keine Anordnung mehr: Hooks eines Events laufen
+# parallel und kommen gemischt an. Was ANORDNUNG heißt, gilt nur noch INNERHALB eines
+# Blocks; die Identität über Blöcke hinweg trägt die Kopfzeile, nicht die Position.
 
 def test_state_task_and_stubs_are_contiguous():
     """Zustand, Aufgabe und Einzeiler gehören zusammen – bis S117 lag der Zustand hinter
@@ -380,3 +395,207 @@ def test_anker_modul_beansprucht_den_aufgaben_slot_nicht():
     """Ein defekter Verweis ist ein Befund, kein Arbeitsauftrag für die Session."""
     arten = {name: art for name, art, _f in agenda.MODULE}
     assert arten["anker-defekt"] == agenda.STUB
+
+
+# --- Repo-Zustand ------------------------------------------------------------
+def _git_antworten(monkeypatch, status: str, log: str = "abc1234 letzter Commit") -> None:
+    monkeypatch.setattr(agenda, "_laufe",
+                        lambda *befehl: status if "status" in befehl else log)
+
+
+def test_ein_sauberer_arbeitsbaum_wird_als_sauber_gemeldet(monkeypatch):
+    _git_antworten(monkeypatch, "")
+    assert "sauber" in agenda.modul_repo_state().inhalt
+
+
+def test_uncommittete_dateien_werden_gezaehlt_und_benannt(monkeypatch):
+    _git_antworten(monkeypatch, " M a.py\n M b.py")
+    inhalt = agenda.modul_repo_state().inhalt
+    assert "2 Datei(en) uncommitted" in inhalt
+    assert "a.py" in inhalt and "b.py" in inhalt
+
+
+def test_eine_lange_dateiliste_wird_gedeckelt(monkeypatch):
+    """Bei einem großen Umbau ersetzte die Liste sonst die Agenda – im selben Block."""
+    _git_antworten(monkeypatch, "\n".join(f" M datei{i}.py" for i in range(20)))
+    inhalt = agenda.modul_repo_state().inhalt
+    assert "20 Datei(en) uncommitted" in inhalt
+    assert "und 12 weitere" in inhalt
+    assert "datei19.py" not in inhalt
+
+
+def test_der_repo_zustand_erzeugt_keine_stub_zeile(monkeypatch):
+    """Wie `memory-state`: klein und immer relevant – eine Kurzfassung daneben wäre
+    dieselbe Information ein zweites Mal."""
+    _git_antworten(monkeypatch, "")
+    assert agenda.modul_repo_state().stub == ""
+
+
+# --- Injektions-Blöcke: der 10.000-u16-Cap -----------------------------------
+# Der Runtime verwirft zu große Hook-Ausgaben kommentarlos; Mechanik, Einheit und Quellen
+# stehen an `CAP` in session-agenda.py. Hier wird geprüft, was daraus folgt.
+
+def test_u16_zaehlt_astrale_zeichen_doppelt():
+    """Die Messgröße ist UTF-16 units – sonst misst der Guard etwas anderes als der Cap.
+
+    Gegenprobe zum naheliegenden Fehler, in Zeichen oder Bytes zu messen: 😀 ist EIN
+    Zeichen und VIER UTF-8-Bytes, zählt für den Cap aber ZWEI.
+    """
+    assert agenda.u16("A") == 1
+    assert agenda.u16("ä") == 1          # 2 Bytes, aber 1 unit
+    assert agenda.u16("😀") == 2         # 1 Zeichen, 4 Bytes, aber 2 units
+
+
+def test_jeder_injektionsblock_bleibt_unter_dem_cap():
+    """Am ECHTEN Bestand, nicht an Fixtures – der Cap greift auf die reale Ausgabe."""
+    for name, _titel, _f in agenda.INJEKTIONS_BLOECKE:
+        groesse = agenda.u16(agenda.rendere_block(name))
+        assert groesse <= agenda.CAP, f"Block {name}: {groesse} u16 > {agenda.CAP}"
+
+
+def test_jeder_injektionsblock_haelt_das_budget_mit_luft():
+    """Unter dem Cap reicht nicht: principles.md wächst mit jeder Retro.
+
+    Reißt ein Block das Budget, ist das eine Aufforderung zum Nachschneiden, solange
+    noch Luft ist – nicht erst, wenn der Block bereits stumm verschwunden ist.
+    """
+    for name, _titel, _f in agenda.INJEKTIONS_BLOECKE:
+        groesse = agenda.u16(agenda.rendere_block(name))
+        assert groesse <= agenda.BUDGET, (
+            f"Block {name}: {groesse} u16 > Budget {agenda.BUDGET} "
+            f"({groesse / agenda.CAP:.0%} des Caps) – neu schneiden")
+
+
+def test_kein_abschnitt_von_principles_faellt_zwischen_die_bloecke():
+    """Vollständigkeit gegen den Zuschnitt: Jeder Anker landet in genau einem Block.
+
+    Der Zuschnitt nennt Anker beim Namen. Ohne diesen Test verschwände ein NEU
+    hinzugefügter Abschnitt lautlos – derselbe stumme Ausfall, den die Aufteilung
+    gerade behebt, eine Ebene tiefer.
+    """
+    verteilt = agenda.principles_zuschnitt()
+    zugeordnet = [a for anker in verteilt.values() for a in anker]
+    assert sorted(zugeordnet) == sorted(agenda.principles_anker())
+    assert len(zugeordnet) == len(set(zugeordnet)), "ein Anker in mehreren Blöcken"
+
+
+def test_ein_neuer_abschnitt_landet_im_auffangblock(monkeypatch):
+    """Gegenprobe: Ein Anker, den der Zuschnitt nicht kennt, darf nicht verschwinden."""
+    monkeypatch.setattr(agenda, "principles_anker",
+                        lambda: ["KPI-review-prozess", "KPI-brandneu"])
+    verteilt = agenda.principles_zuschnitt()
+    assert "KPI-brandneu" in verteilt[agenda.AUFFANGBLOCK]
+
+
+def test_jeder_block_nennt_sich_selbst():
+    """Hooks eines Events laufen PARALLEL – die Ankunftsreihenfolge ist zufällig.
+
+    In #84021 gemessen: vier Teile kamen als 2,1,4,3 an. Wer auf die Position vertraut,
+    setzt falsch zusammen – schlimmer als Truncation, weil nichts zu fehlen scheint.
+    """
+    anzahl = len(agenda.INJEKTIONS_BLOECKE)
+    for i, (name, titel, _f) in enumerate(agenda.INJEKTIONS_BLOECKE, start=1):
+        kopf = agenda.rendere_block(name).splitlines()[0]
+        assert titel in kopf
+        assert f"{i}/{anzahl}" in kopf
+
+
+def test_jeder_block_warnt_vor_der_ankunftsreihenfolge():
+    for name, _titel, _f in agenda.INJEKTIONS_BLOECKE:
+        assert "Reihenfolge" in agenda.rendere_block(name)
+
+
+def test_jeder_block_nennt_seinen_eigenen_abrufbefehl():
+    """Rückfall, falls ein Block DOCH spillt: Die Vorschau umfasst die ersten 2.000
+    units, der Kopf überlebt sie also. Er nennt den GEZIELTEN Abruf – „lies die
+    Datei" führte zur Volldatei zurück und damit zum Problem, das wir gerade lösen.
+    """
+    for name, _titel, _f in agenda.INJEKTIONS_BLOECKE:
+        kopf = agenda.rendere_block(name)[:2000]
+        assert f"--block {name}" in kopf
+
+
+def test_ein_zu_grosser_block_warnt_innerhalb_der_vorschau(monkeypatch):
+    """Die Gegenprobe zum Guard: Wird er ausgelöst, wenn der Fall wirklich eintritt?
+
+    Ohne diesen Test prüft der Guard nur, dass der heutige Bestand passt – und fiele
+    beim einzigen Fall, für den er gebaut ist, selbst lautlos aus.
+    """
+    monkeypatch.setattr(agenda, "modul_bash_allowlist",
+                        lambda: agenda.Block(stub="x", inhalt="A" * 12_000))
+    kopf = agenda.rendere_block("bash-allowlist")[:2000]
+    assert "ÜBERSCHREITET" in kopf
+
+
+def test_unbekannter_blockname_wird_abgewiesen():
+    with pytest.raises(KeyError):
+        agenda.rendere_block("gibt-es-nicht")
+
+
+def test_die_cli_liefert_je_blockname_verschiedene_bloecke():
+    """Geprüft wird der Pfad, den der HOOK nimmt – die CLI, nicht die Funktion.
+
+    Beim Bau war `--block` geparst, aber nie ausgewertet: Jeder der fünf Hooks hätte
+    dieselbe Agenda injiziert, principles.md und Allow-Liste wären ersatzlos
+    verschwunden. Alle 59 Funktionstests waren dabei grün, weil sie `rendere_block()`
+    direkt aufriefen. Ein Test der Funktion ist kein Test der Wirkung.
+    """
+    ausgaben = {}
+    for name, _titel, _f in agenda.INJEKTIONS_BLOECKE:
+        fertig = subprocess.run(
+            [sys.executable, str(SCRIPT), "--block", name],
+            capture_output=True, text=True)
+        assert fertig.returncode == 0, fertig.stderr
+        ausgaben[name] = fertig.stdout
+    assert len(set(ausgaben.values())) == len(ausgaben), "Blöcke liefern denselben Text"
+    for name, text in ausgaben.items():
+        assert f"--block {name}" in text
+
+
+def test_die_cli_weist_einen_unbekannten_block_ab():
+    """Gegenprobe: Ein Tippfehler in settings.json muss laut scheitern, nicht leer
+    durchlaufen – ein leerer Block ist von einem fehlenden nicht zu unterscheiden."""
+    fertig = subprocess.run(
+        [sys.executable, str(SCRIPT), "--block", "gibt-es-nicht"],
+        capture_output=True, text=True)
+    assert fertig.returncode == 1
+    assert not fertig.stdout.strip()
+
+
+def test_jeder_block_endet_auf_genau_einer_abschlussmarke():
+    """S128, beim Prüflauf gefunden: Der Agenda-Block trug zwei ineinander liegende Rahmen,
+    weil `rendere()` und `rendere_block()` beide eine Marke setzten."""
+    for name, _titel, _f in agenda.INJEKTIONS_BLOECKE:
+        zeilen = [z for z in agenda.rendere_block(name).splitlines() if z.strip()]
+        marken = [z for z in zeilen if set(z.strip()) == {"="} and len(z.strip()) > 8]
+        # Eine am Anfang (Kopfzeile zählt nicht, die trägt Text), eine am Schluss.
+        assert marken == [zeilen[-1]], f"Block {name}: {len(marken)} Abschlussmarken"
+
+
+def test_settings_registriert_genau_die_definierten_bloecke():
+    """Die Kopplung, an der die Aufteilung sonst lautlos zerfällt.
+
+    Ein Block ohne Registrierung wird nie injiziert; eine Registrierung ohne Block
+    scheitert bei jedem Session-Start. Beides bliebe unbemerkt – der Session-Start
+    meldet weder das eine noch das andere, und das ist die Ausgangslage von S128.
+    """
+    settings = json.loads(
+        (Path(__file__).resolve().parents[2] / "settings.json").read_text(encoding="utf-8"))
+    befehle = [h["command"]
+               for eintrag in settings["hooks"]["SessionStart"]
+               for h in eintrag["hooks"]]
+    registriert = [b.split("--block", 1)[1].strip() for b in befehle if "--block" in b]
+    definiert = [name for name, _t, _f in agenda.INJEKTIONS_BLOECKE]
+    assert sorted(registriert) == sorted(definiert)
+    assert len(befehle) == len(definiert), "SessionStart-Hook ohne --block registriert"
+
+
+def test_die_bloecke_zusammen_ergeben_die_gesamtausgabe():
+    """Eine Quelle, zwei Sichten: Der Gesamtmodus setzt dieselben Blöcke zusammen.
+
+    Sonst driften Injektion und manueller Aufruf auseinander, und der Bestand, den ein
+    Mensch prüft, wäre nicht der, den der Agent bekommt.
+    """
+    einzeln = "\n".join(agenda.rendere_block(n)
+                        for n, _t, _f in agenda.INJEKTIONS_BLOECKE)
+    assert agenda.rendere_alles() == einzeln

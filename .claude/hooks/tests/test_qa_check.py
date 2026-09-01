@@ -302,7 +302,7 @@ def test_audit_approved_tests_flags_unapproved(tmp_path, monkeypatch):
     findings, lines = qa.audit_approved_tests("frontend", {})
     # // Then wird die nie freigegebene Test-Datei als Auffälligkeit gemeldet
     assert findings == 1
-    assert any("KEINE Freigabe" in l for l in lines)
+    assert any("KEINE Freigabe" in line for line in lines)
 
 
 def test_is_test_file_recognizes_repo_conventions():

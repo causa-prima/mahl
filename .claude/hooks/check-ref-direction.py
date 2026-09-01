@@ -22,6 +22,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _hook_io import edit_zustand  # noqa: E402
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Geschützte Wurzeln (relativer POSIX-Pfad-Präfix) + einzelne geschützte Dateien.
@@ -77,40 +80,16 @@ def find_volatile_refs(content: str) -> list[tuple[int, str]]:
     return hits
 
 
-def compute_post_content(tool: str, file_path: str, tool_input: dict) -> str | None:
-    """Simuliert den Datei-Inhalt nach Anwendung des Edits/Writes."""
-    if tool == "Write":
-        return tool_input.get("content", "")
-    if tool == "Edit":
-        old = tool_input.get("old_string", "")
-        new = tool_input.get("new_string", "")
-        path = Path(file_path)
-        current = path.read_text(encoding="utf-8") if path.exists() else ""
-        if old and old in current:
-            if tool_input.get("replace_all"):
-                return current.replace(old, new)
-            return current.replace(old, new, 1)
-        return current  # old_string nicht gefunden → echter Edit schlägt ohnehin fehl
-    return None
-
-
 def check(data: dict) -> str | None:
     """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py.
 
     Fail-open (Exception → None) liegt beim Dispatcher, damit ein Hook-Fehler
     nie einen Edit blockiert.
     """
-    tool = data.get("tool_name", "")
-    tool_input = data.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
-    if tool not in ("Edit", "Write") or not file_path:
+    zustand = edit_zustand(data, is_protected)
+    if zustand is None:
         return None
-    if not is_protected(file_path):
-        return None
-
-    post = compute_post_content(tool, file_path, tool_input)
-    if post is None:
-        return None
+    _file_path, _pre, post = zustand
 
     refs = find_volatile_refs(post)
     if not refs:
