@@ -34,7 +34,7 @@ Globben statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
   den Skills, die den Entwicklungsfluss tragen (z.B. gherkin-workshop, implementing-scenario,
   review-code, closing-session), aber verschaffe dir Überblick über alle.
 - **Die Agenten** – `.claude/agents/*.md`: die Akteure im Workflow (Implementer + Auditoren).
-- **Die Enforcement-Mechanismen** – `.claude/hooks/` (Glob nach `*.py`/`*.sh`) und
+- **Die Enforcement-Mechanismen** – `prozesscode/hooks/` (Glob nach `*.py`/`*.sh`) und
   `.claude/settings.json` / `settings.local.json`: Welche Gates/Hooks greifen *wirklich*, welche
   nur advisory? Zentral für die Dimensionen „Qualitätssicherung" und „Robustheit & Fehlerresistenz".
 - **Die Prozess-Docs** – in `docs/`: insbesondere `CLAUDE.md` (Navigation), `docs/process/tdd-process.md`,

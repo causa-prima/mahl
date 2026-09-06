@@ -3,7 +3,7 @@
 <!--
 wann-lesen: Bevor eine Entscheidung getroffen wird die bereits getroffene Entscheidungen
             berühren könnte. Vor dem Schreiben von Tags:
-            `python3 .claude/scripts/decisions.py tags` ausführen – listet alle
+            `python3 -m prozesscode.decisions tags` ausführen – listet alle
             verwendeten Kategorien und Tags.
 aufnahmebedingung: Hier steht eine **entschiedene** Sache am Produkt (Code + Build-/Test-Kette),
             von der nach Behebung oder Ablösung ein **terminaler Rest** bleibt – etwas, das ohne
@@ -13,7 +13,7 @@ aufnahmebedingung: Hier steht eine **entschiedene** Sache am Produkt (Code + Bui
             Nein → `docs/tech-debt.md`. Noch nicht entschieden → `docs/open-questions.md`.
             Trägt eine Entscheidung einen Aufschub, gehört der Aufschub-Teil als eigener Eintrag
             nach `docs/tech-debt.md` – eine ADR trägt keinen Aufschub. Bei **neu** erfassten
-            Einträgen mechanisch geprüft: `.claude/hooks/check-adr-capture.py` blockt
+            Einträgen mechanisch geprüft: `prozesscode/hooks/check-adr-capture.py` blockt
             Aufschub-Vokabular (Escape für bewusste Einzelfälle: `adr-ok`-Marker im Eintrag).
             Abgrenzung ADR/TD/OQ kanonisch: `CLAUDE.md`, Sektion „Ablage: in welchen Tracker gehört dieser Eintrag?"
 kritische-regeln:
@@ -22,13 +22,13 @@ kritische-regeln:
   - Neue Tags nur nach Prozess (siehe oben) und Freigabe
 -->
 
-> Archiv aller technischen Entscheidungen. Discovery via `python3 .claude/scripts/decisions.py list`.
+> Archiv aller technischen Entscheidungen. Discovery via `python3 -m prozesscode.decisions list`.
 > Historisch überholte Einträge: `docs/history/decisions-archive.md`
 
 ---
 
-> Gefilterte Suche: `python3 .claude/scripts/decisions.py list --tag resource:ingredients`
-> Cross-cutting ADRs: `python3 .claude/scripts/decisions.py list --tag scope:cross-cutting`
+> Gefilterte Suche: `python3 -m prozesscode.decisions list --tag resource:ingredients`
+> Cross-cutting ADRs: `python3 -m prozesscode.decisions list --tag scope:cross-cutting`
 
 ---
 

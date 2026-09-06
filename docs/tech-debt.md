@@ -27,8 +27,8 @@ Eintrag-Format:
   Freie fettgesetzte Absätze (`**Zusammenhang:**`, `**Reichweite präzisiert:**` …) sind erlaubt,
   die Felder oben sind Pflicht.
 
-Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `.claude/hooks/check-td-capture.py`,
-Grammatik und Auflösung kanonisch in `.claude/scripts/td_anchors.py`):
+Regeln zum Feld `**Fällig:**` (mechanisch geprüft von `prozesscode/hooks/check-td-capture.py`,
+Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
 
   1. Pflicht. Ein Eintrag, der nur sagt, WIE behoben wird, schuldet niemandem einen Zeitpunkt.
 
@@ -305,3 +305,5 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** `POST /api/ingredients/{id}/restore` verlangt weder Custom-Header noch Request-Body und ist damit ein CORS-„Simple Request": Ein Browser sendet ihn cross-origin **ohne** Preflight. CORS verhindert dann nur das Auslesen der Antwort, nicht die serverseitige Ausführung – der Restore liefe also durch. Alle übrigen mutierenden Endpoints sind nur **zufällig** geschützt: `DELETE` durch den verpflichtenden `If-Match`-Header, `POST /api/ingredients` durch `Content-Type: application/json`; beide erzwingen dadurch eine Preflight, die mangels CORS-Policy scheitert. Dass der Restore kein `If-Match` verlangt, ist in ADR-S108-2 bewusst und mit Concurrency-Argumenten entschieden – dass `If-Match` nebenbei auch die Preflight erzwingt, war dabei nicht Teil der Abwägung.
 **Behebung:** Den Schutz zur Entwurfsentscheidung machen, statt ihn der Header-Wahl einzelner Endpoints zu überlassen – explizite CORS-Policy serverseitig.
 **Herkunft:** OBS-S108-5 (S108), in S122 hierher umgezogen.
+
+---

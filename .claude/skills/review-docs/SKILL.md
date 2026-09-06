@@ -43,7 +43,7 @@ Messe die Zeilenzahl und Dateigröße der kritischen Dateien mit `wc -l` und `wc
 ## Abrufeinheiten prüfen
 
 ```
-python3 .claude/scripts/doc.py audit
+python3 -m prozesscode.doc audit
 ```
 
 Seit `doc.py` existiert, ist ein Anker nicht mehr nur eine Verweismarke, sondern die **Einheit, in

@@ -41,8 +41,8 @@ user-invocable: true
    - Dokumente anpassen, dann weiter mit dem [Schreiben der Learnings](#CLS-lessons).
    - **Neue Beobachtungen** (aus dem Beobachtungs-Prompt) → **per Script erfassen**, nicht per Edit:
      ```
-     python3 .claude/scripts/obs.py list-offen        # erst die offenen Titel ansehen – für --zusammen-erledigen
-     python3 .claude/scripts/obs.py add --titel "…" --quelle User --impact MITTEL \
+     python3 -m prozesscode.obs list-offen        # erst die offenen Titel ansehen – für --zusammen-erledigen
+     python3 -m prozesscode.obs add --titel "…" --quelle User --impact MITTEL \
          --haeufigkeit dauerhaft --kategorie PROZESS --kontext Doku --beobachtung "…" \
          --zusammen-erledigen keiner
      ```
@@ -64,10 +64,10 @@ user-invocable: true
 
    **Per Script schreiben**, nicht per Edit – das vergibt die ID, findet den Session-Abschnitt (oder legt ihn an) und erzeugt die parse-kritische Bullet-Form, die `jenga_score.py` und `retro_report.py` lesen:
    ```
-   python3 .claude/scripts/lessons.py add --impact HOCH --kategorie PROZESS --kontext Doku \
+   python3 -m prozesscode.lessons add --impact HOCH --kategorie PROZESS --kontext Doku \
        --titel "…" --quelle User --was "…" --warum "…" --regel "…" --cm-bezug CM-S116-1
    ```
-   Bestehende Einträge nachlesen: `python3 .claude/scripts/lessons.py get LL-SNNN-N`.
+   Bestehende Einträge nachlesen: `python3 -m prozesscode.lessons get LL-SNNN-N`.
 
    **`--cm-bezug` ist für KRITISCH und HOCH Pflicht**, bei MITTEL/GERING optional – gibt es dort
    einen Bezug, gern eintragen; sonst weglassen. Zulässig ist eine in `countermeasures.md`

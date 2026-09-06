@@ -51,3 +51,10 @@ Kontext (lese diese Dateien ZUERST, bevor du reviewst):
 - Kernprinzipien: [Design Philosophy](../../docs/reference/architecture.md#ARC-design-philosophy)
 - C#-Tests: docs/guidelines/coding-guideline-csharp.md
 - TypeScript-Tests: docs/guidelines/coding-guideline-typescript.md
+- Tests für Prozess-Code (`tests/`): docs/guidelines/coding-guideline-python.md
+
+Bei Prozess-Code-Tests entfallen US-Tag, Szenario-Bindung und Traceability – es gibt keine
+Story. Die tragende Frage ist stattdessen: Würde der Test rot, wenn der geprüfte Mechanismus
+das Fragliche nicht mehr prüft? Ein Test, der nur den Aufruf belegt, deckt die ohnehin laute
+Fehlerklasse doppelt und die stumme gar nicht
+([Fehlerprofil](../../docs/guidelines/coding-guideline-python.md#CGP-fehlerprofil)).

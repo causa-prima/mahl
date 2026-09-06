@@ -61,7 +61,7 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   „4b/4c" entfällt. GitHubs Auto-Anchors leisten das nicht, sie hängen am Titeltext.
   Drei Richtungen sind mechanisch abgesichert (`check-anchors.py`): Verweis ohne Ziel, Link
   auf die falsche Datei, und ein gelöschter Anker, auf den noch verwiesen wird. Bestand und
-  Vollprüfung: `python3 .claude/scripts/anchors.py list|check`. Einzelfall-Escape:
+  Vollprüfung: `python3 -m prozesscode.anchors list|check`. Einzelfall-Escape:
   `anchor-ok` in der Zeile. Tracker-IDs (TD-/OBS-/ADR-) sind keine Anker.
 
 - **Ein Anker ist eine Abrufeinheit – was zu ihm gehört, muss aus der Gliederung folgen.**
@@ -71,7 +71,7 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Block. Damit wird die Gliederung **maschinell wirksam** – ein Nachsatz hinter dem Block, der
   inhaltlich dazugehört, fehlt beim Abruf, und zwar unbemerkt. Beim Schreiben gilt deshalb:
   Braucht ein Gedanke mehr als seinen Absatz, bekommt er eine Überschrift, keinen zweiten
-  Absatz. Bestand sichten: `python3 .claude/scripts/doc.py audit` (Teil von `review-docs`).
+  Absatz. Bestand sichten: `python3 -m prozesscode.doc audit` (Teil von `review-docs`).
   Nicht behoben wird das je durch eine großzügigere Abrufregel – eine Heuristik, die schlechte
   Gliederung glattbügelt, verbirgt sie auch vor dem menschlichen Leser.
 
@@ -87,7 +87,7 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   einer anderen Datei": Eine ADR-Punktnummer schreiben dieselben Autoren wie eine
   Abschnittsnummer. Ausgenommen sind Markdown-Ordered-Lists – dort zählt Markdown selbst
   weiter, solange kein Verweis von außen auf eine Position zeigt. Mechanisch abgesichert
-  (`check-ordinale.py`, Bestand: `python3 .claude/scripts/ordinale.py`); Einzelfall-Escape:
+  (`check-ordinale.py`, Bestand: `python3 -m prozesscode.ordinale`); Einzelfall-Escape:
   `ordinal-ok` in der Zeile.
 
 - **Ein Filter findet nur, woran beim Bauen gedacht wurde – Bestände werden gesichtet, nicht gefiltert.**

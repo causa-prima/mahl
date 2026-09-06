@@ -9,9 +9,9 @@
 | Befehl | Zweck | Dauer normal | Dauer max | Notizen / Alternativen |
 |--------|-------|-------------|-----------|------------------------|
 | `dotnet build` | Kompilierung prüfen | – | – | – |
-| `python3 .claude/scripts/dotnet-test.py` | Alle Tests | – | – | **WSL/Windows Cache-Konflikt:** Nach Dateiänderungen via WSL schlägt `dotnet test` (mit Build) wegen MSB3492 fehl. Zuverlässiger Workflow: `dotnet build Server/mahl.Server.csproj` → `dotnet build Server.Tests/mahl.Server.Tests.csproj` → dann Script mit `--no-build` (falls künftig unterstützt) oder Build-Fehler ignorieren. Bei DLL-Sperr-Fehler (Copying file...) kurz warten und nochmal. |
-| `python3 .claude/scripts/dotnet-stryker.py --mutate ...` | Mutation Testing (eine Datei) | – | – | – |
-| `python3 .claude/scripts/dotnet-stryker.py` | Mutation Testing (vollständig) | – | – | – |
+| `python3 -m prozesscode.dotnet-test` | Alle Tests | – | – | **WSL/Windows Cache-Konflikt:** Nach Dateiänderungen via WSL schlägt `dotnet test` (mit Build) wegen MSB3492 fehl. Zuverlässiger Workflow: `dotnet build Server/mahl.Server.csproj` → `dotnet build Server.Tests/mahl.Server.Tests.csproj` → dann Script mit `--no-build` (falls künftig unterstützt) oder Build-Fehler ignorieren. Bei DLL-Sperr-Fehler (Copying file...) kurz warten und nochmal. |
+| `python3 -m prozesscode.dotnet-stryker --mutate ...` | Mutation Testing (eine Datei) | – | – | – |
+| `python3 -m prozesscode.dotnet-stryker` | Mutation Testing (vollständig) | – | – | – |
 | `npm run build` | Frontend-Build | – | – | – |
 | `npm run test` | Frontend-Tests | – | – | – |
 | `docker-compose up -d` | DB starten | – | – | – |

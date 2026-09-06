@@ -1,5 +1,5 @@
-# Linter für den Prozess-Code unter .claude/** – aufgerufen über
-# `python3 .claude/scripts/ruff-run.py`, nie direkt.
+# Linter für den Prozess-Code unter `prozesscode/` und seine Tests unter `tests/` –
+# aufgerufen über `python3 -m prozesscode.ruff-run`, nie direkt.
 #
 # Warum eine eigene Datei und kein pyproject.toml: Dieses Repo ist kein Python-Paket, es ist
 # ein C#/TypeScript-Projekt mit Python-Werkzeugen. Ein pyproject.toml im Root behauptete das

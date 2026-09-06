@@ -167,9 +167,9 @@ Führe diese Checkliste explizit durch und dokumentiere das Ergebnis:
 - [ ] **Linter- und Duplikat-Gate:**
   - TypeScript: `npm run lint` (ESLint inkl. Complexity ≤ 10, Funktionslänge ≤ 20 Zeilen) – muss 0 Errors haben
   - C#: `dotnet build` – SonarAnalyzer (S3776 Cognitive Complexity, S138 Methodenlänge) ist Teil des Builds; kein Fehler erlaubt
-  - Duplikate: `python3 .claude/scripts/jscpd-run.py` (jscpd über TypeScript + C#) – Findings im Suppression-Report dokumentieren; kein hartes Gate, aber jeder Fund muss adressiert oder mit Begründung ignoriert werden
+  - Duplikate: `python3 -m prozesscode.jscpd-run` (jscpd über TypeScript, C# und Python) – gemeldet wird nur der **Zuwachs** gegenüber dem bekannten Bestand; kein hartes Gate, aber jeder neue Fund muss adressiert oder mit Begründung in die Baseline aufgenommen werden (`BEKANNTE_KLONE` im Wrapper, Politik: [CGP-duplikate](../guidelines/coding-guideline-python.md#CGP-duplikate))
 
-  **PFLICHT-OUTPUT:** *"ESLint: [0 Errors / N Errors (Liste)] | dotnet build: [clean / N Fehler (Liste)] | jscpd: [Keine Duplikate / N Duplikate: Datei:Zeile – Adressierung oder Begründung]"*
+  **PFLICHT-OUTPUT:** *"ESLint: [0 Errors / N Errors (Liste)] | dotnet build: [clean / N Fehler (Liste)] | jscpd: [Keine neuen Duplikate / N neue Duplikate: Dateipaar – Adressierung oder Begründung]"*
 
   Fehlt dieser Output im Subagenten-Report → Orchestrator behandelt das als fehlendes Gate (analog zu fehlendem Stryker-Score).
 
@@ -343,7 +343,7 @@ Diese Regel gilt für POST (anlegen), PUT/PATCH (ändern), DELETE (löschen/soft
 
 - **Ziel:** 100% Mutation Score
 - **Ende jeder Phase:** Vollständiger Lauf (PFLICHT)
-- **Während Entwicklung:** Nur geänderte Files: `python3 .claude/scripts/dotnet-stryker.py --mutate Endpoints/IngredientsEndpoints.cs`
+- **Während Entwicklung:** Nur geänderte Files: `python3 -m prozesscode.dotnet-stryker --mutate Endpoints/IngredientsEndpoints.cs`
 - **Konfiguration:** `stryker-config.json` im Root (mit `coverage-analysis: "off"` für WebApplicationFactory)
 - **Ausnahmen** (äquivalente Mutanten, müssen dokumentiert werden): Generated Code (EF Migrations), Framework-Boilerplate (Program.cs)
 

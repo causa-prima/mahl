@@ -28,7 +28,7 @@ Kontext und aktuell, nutze ihn direkt. Berechne ihn neu, sobald er fehlt oder ve
 der Session, oder nachdem schon Items aufgelöst wurden):
 
 ```
-python3 .claude/scripts/obs-drain.py
+python3 -m prozesscode.obs-drain
 ```
 
 Meldet das Script „Backlog leer", bestätige das kurz und beende – nichts zu tun. (Die Backlog-Zahl B zählt nur
@@ -77,7 +77,7 @@ Volltext hast du, der User hätte ihn zu suchen. Für jedes Item:
 
    **Trägt der Eintrag eine `Vorprägung` (Marker `+Vorprägung` im Drain-Satz, Hinweis im `get`), dann in
    dieser Reihenfolge:** erst eigene Kandidaten bilden und **dem User vorlegen**, danach
-   `python3 .claude/scripts/obs.py get OBS-SNNN-N --vorprägung` abrufen und die dortigen Angaben als
+   `python3 -m prozesscode.obs get OBS-SNNN-N --vorprägung` abrufen und die dortigen Angaben als
    *weiteren* Kandidaten behandeln. Das Feld enthält, was schon genannt oder vermutet wurde – genannte
    Lösungen, Ursachenvermutungen, Analogieschlüsse. Zwei Gründe für die Reihenfolge: Vorher gelesen, prägt es
    die Discovery (deshalb ist es beim Standardzugriff verborgen); und der Text ist **agentenformuliert** – er
@@ -133,8 +133,8 @@ Trag den Ausgang **per Script** ein, statt die Datei zu editieren – das trifft
 `obs-drain.py` parst, und erspart den Vor-Edit-Read der gesamten Datei:
 
 ```
-python3 .claude/scripts/obs.py get OBS-SNNN-N          # Eintrag lesen, ohne die Datei zu öffnen
-python3 .claude/scripts/obs.py set OBS-SNNN-N --status "UMGESETZT (S<NNN>)" --entscheidung "…"
+python3 -m prozesscode.obs get OBS-SNNN-N          # Eintrag lesen, ohne die Datei zu öffnen
+python3 -m prozesscode.obs set OBS-SNNN-N --status "UMGESETZT (S<NNN>)" --entscheidung "…"
 ```
 
 - **umsetzen** → Änderung durchführen (je nach Art via TDD/Guidelines/review-code), Status auf
@@ -150,7 +150,7 @@ python3 .claude/scripts/obs.py set OBS-SNNN-N --status "UMGESETZT (S<NNN>)" --en
   der Blocker, Termin = Spätestens-Wiedervorlage, Re-Trigger = dessen Auflösung.
 
 **Aufgelöste Einträge** (UMGESETZT / VERWORFEN) → mechanisch ins Archiv verschieben:
-`python3 .claude/scripts/obs-archive.py` (schneidet sie aus `observations.md` und hängt sie ans
+`python3 -m prozesscode.obs-archive` (schneidet sie aus `observations.md` und hängt sie ans
 `archive/observations_archive.md` – kein Hand-Cut/Paste). Vorab prüfbar mit `--dry-run`.
 
 <a id="DRN-abschluss"></a>

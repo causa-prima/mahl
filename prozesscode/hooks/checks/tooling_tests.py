@@ -1,0 +1,95 @@
+"""
+Tooling-Tests: fährt die eigene Werkzeug-Testsuite, wenn ein Script oder Hook geändert wurde.
+
+Warum als PostToolUse-Check: Die Suite unter `tests/` sichert Hooks und
+Wrapper-Scripts ab – also genau die Mechanismen, die alle anderen Gates durchsetzen –,
+lief aber selbst in keinem Gate. In S113 fiel auf, dass eine geänderte Signatur in
+`prozesscode/qa-check.py` vier Tests brach, ohne dass etwas rot wurde.
+
+Warum nicht PreToolUse: Dort liegt die Änderung noch nicht auf der Platte; der Lauf
+prüfte den alten Stand und wäre wertlos.
+
+Ausgabe folgt der Wrapper-Politik des Projekts: im Erfolgsfall nichts, im Fehlerfall nur
+das Analyse-Relevante (Datei:Zeile + Assertion), gedeckelt auf `_MAX_LINES` Einträge.
+
+Registriert in der `CHECKS`-Liste von `check-code-quality-nonblocking.py` – nicht in
+`settings.json`; ein Wechsel dort wirkt daher ohne Claude-Code-Reload.
+"""
+import os
+import re
+import subprocess
+import sys
+
+from .common import HookInput
+
+_HOOKS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_REPO_ROOT = os.path.dirname(os.path.dirname(_HOOKS_DIR))
+_TESTS_REL = "tests"
+
+# Änderungen hier können die Suite brechen. `prozesscode/` ist ausdrücklich dabei:
+# der Auslöser in S113 lag dort, nicht in den Hooks selbst.
+_WATCHED = ("prozesscode/", "tests/")
+
+# Quellen, deren INHALT in einen Injektionsblock des Session-Starts fließt. Sie sind kein
+# Python, lösen die Suite aber trotzdem aus: Der Budget-Test misst die fertige Blockgröße
+# gegen den 10.000-u16-Cap des Runtimes, und wachsen tut nicht das Script, sondern der Text.
+# Ohne diesen Eintrag wüchse principles.md bis über den Cap und der Block verschwände
+# lautlos – genau der Ausfall, den S128 behoben hat.
+_WATCHED_QUELLEN = ("docs/kaizen/principles.md",)
+
+_MAX_LINES = 10
+_TIMEOUT_S = 120
+
+_SUMMARY = re.compile(r'^\d+ failed')
+
+
+def _is_watched(file_path: str) -> bool:
+    """True für Python-Dateien der beobachteten Verzeichnisse und für Injektionsquellen."""
+    norm = file_path.replace("\\", "/")
+    if any(norm.endswith(quelle) for quelle in _WATCHED_QUELLEN):
+        return True
+    if not norm.endswith(".py"):
+        return False
+    return any(seg in norm for seg in _WATCHED)
+
+
+def _format_failures(stdout: str) -> str:
+    """Baut die Meldung aus der `--tb=line`-Ausgabe von pytest."""
+    details: list[str] = []
+    summary = ""
+    for line in stdout.splitlines():
+        if "/tests/" in line and line.startswith("/"):
+            details.append("  " + line.split("/tests/", 1)[1])
+        elif _SUMMARY.match(line):
+            summary = line
+
+    shown = details[:_MAX_LINES]
+    if len(details) > _MAX_LINES:
+        shown.append(f"  … und {len(details) - _MAX_LINES} weitere")
+
+    body = "\n".join(shown) if shown else "  (keine Detailzeilen – vollständig via pytest)"
+    return (
+        "⚠️ Tooling-Tests rot – die eigene Werkzeug-Suite ist nach dieser Änderung nicht grün:\n"
+        f"{body}\n"
+        f"{summary}\n"
+        "  Diese Suite läuft in keinem anderen Gate. Ist das eine beabsichtigte RED-Phase, "
+        "ignorieren; sonst vor dem Weiterarbeiten beheben.\n"
+        "  Vollständig: python3 -m pytest tests/"
+    )
+
+
+def check(inp: HookInput) -> list[str]:
+    if not _is_watched(inp.file_path):
+        return []
+
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", _TESTS_REL, "-q", "--tb=line"],
+            cwd=_REPO_ROOT, capture_output=True, text=True, timeout=_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return []  # fail-open: ein nicht lauffähiger Testlauf ist kein Befund
+
+    if proc.returncode == 0:
+        return []
+    return [_format_failures(proc.stdout)]

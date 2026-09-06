@@ -78,7 +78,7 @@ Der Noise-Filter (die [Erfassungs-Fragen](../../../docs/kaizen/process.md#KPR-wa
 ## retro_report.py ausführen
 
 ```bash
-python3 .claude/scripts/retro_report.py
+python3 -m prozesscode.retro_report
 ```
 
 Standardpfade: `docs/kaizen/lessons_learned.md`, `docs/kaizen/archive/`, `docs/kaizen/countermeasures.md`. Für abweichende Pfade: `--current`, `--archive`, `--cm` als Named-Arguments übergeben.
@@ -106,7 +106,7 @@ Ergebnis intern festhalten für [Findings präsentieren](#KZN-findings-praesenti
 ## Guard-Auslösungen sichten
 
 ```bash
-python3 .claude/scripts/guard-stats.py
+python3 -m prozesscode.guard-stats
 ```
 
 **Warum in der Retro.** Der Ausfall eines Guards löst per Definition nichts aus – die Frage
@@ -136,7 +136,7 @@ Ergebnis intern festhalten für [Findings präsentieren](#KZN-findings-praesenti
 ## Testabdeckung des Prozess-Codes sichten
 
 ```bash
-python3 .claude/scripts/coverage-run.py
+python3 -m prozesscode.coverage-run
 ```
 
 **Metrik, kein Gate** ([Begründung](../../../docs/guidelines/coding-guideline-python.md#CGP-was-nicht-gilt)).

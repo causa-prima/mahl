@@ -14,7 +14,7 @@ aufnahmebedingung: Hier steht eine **noch nicht entschiedene** Frage am Produkt 
             `docs/history/adr.md`, sonst → `docs/tech-debt.md`.
             NICHT hierher gehört: (a) alles bereits **Entschiedene** – auch wenn die Umsetzung
             noch aussteht (das ist `docs/tech-debt.md`, nicht „offen"); (b) alles **Prozess**-
-            seitige, also wie gearbeitet wird (`.claude/**`, `docs/process/`, `docs/kaizen/`) –
+            seitige, also wie gearbeitet wird (`prozesscode/`, `.claude/**`, `docs/process/`, `docs/kaizen/`) –
             das läuft über `docs/kaizen/observations.md`; (c) eine Aufgabe, der nur die
             Priorisierung fehlt (das ist `docs/AGENT_MEMORY.md`).
             Abgrenzung ADR/TD/OQ kanonisch: `CLAUDE.md`, Sektion „Ablage: ADR, TD oder
@@ -33,7 +33,7 @@ Eintrag-Format:
   `Fällig` ist **Pflicht** und steuert die Vorlage (`check-oq-capture.py` erzwingt es). Ohne
   Termin fiele der Eintrag auf die Alters-Regel zurück – dann ist eine seit Dutzenden Sessions
   treibende Frage von einer frisch gestellten nicht mehr unterscheidbar. Es nutzt dieselbe Anker-Grammatik wie
-  `docs/tech-debt.md` – kanonisch in `.claude/scripts/td_anchors.py`, von `open_questions.py`
+  `docs/tech-debt.md` – kanonisch in `prozesscode/td_anchors.py`, von `open_questions.py`
   wiederverwendet (nicht kopiert). Der Kopf vor dem Gedankenstrich ist maschinenlesbar:
 
       jetzt              sofort vorlegen
@@ -49,7 +49,7 @@ Eintrag-Format:
   unterdrückt die Alters-Regel, sonst wäre er wirkungslos). **Ohne** das Feld gilt eine Frage
   nach ~10 Sessions als überaltert und wird vorgelegt.
 
-  Mechanisch geprüft an beiden Enden: `.claude/hooks/check-oq-capture.py` blockt zur
+  Mechanisch geprüft an beiden Enden: `prozesscode/hooks/check-oq-capture.py` blockt zur
   Schreibzeit ein gesetztes Feld, das nicht trägt (Vertipper, kein terminierter Anker);
   `open_questions.py` meldet zur Lesezeit einen dennoch unauswertbaren Anker, statt ihn zu
   verschlucken. Vorher fiel beides still auf die Alters-Regel zurück und blieb unbemerkt.

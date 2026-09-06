@@ -314,6 +314,9 @@ __pycache__/
 # requirements-dev.txt, siehe docs/process/dev-workflow.md.
 .venv/
 
+# Sandbox-Kopie, die mutmut für jeden Lauf anlegt (mutierter Prozess-Code + Testkontext).
+mutants/
+
 # Messdatei von coverage-run.py – ein Lauf-Artefakt, kein Projektstand.
 .coverage
 

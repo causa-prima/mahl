@@ -29,7 +29,7 @@ Alle übrigen Punkte (OBS, ADR, Story, offene Fragen) stehen weiterhin voll ausg
 
   1. **Titel** – fettgesetzter Vorspann, wird von `session-agenda.py` als Kurzform gelesen.
   2. **Fällig** – dieselbe Anker-Grammatik wie in `docs/tech-debt.md` (kanonisch dort im Header
-     und in `.claude/scripts/td_anchors.py`), inklusive der Bedeutung von `jetzt` („sofort" –
+     und in `prozesscode/td_anchors.py`), inklusive der Bedeutung von `jetzt` („sofort" –
      kein Ereignis steht mehr aus). Hier steuert der Anker zusätzlich die Vorlage: Nur ein
      Punkt mit `jetzt` kann den Aufgaben-Slot beanspruchen. Er bedeutet **nicht**, dass der
      Punkt überfällig sei – dass er hinter Retro und OBS-Drain wartet, ist die designte
@@ -49,17 +49,7 @@ Auswahl. TD-Einträge mit
 
 ## Nächste Prioritäten
 
-
-- **jscpd-Verdikt an die Duplikat-Politik angleichen** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/doc.py get CGP-duplikate` · Done: Ein Python-Lauf ohne Zuwachs meldet grün; nur echte neue Duplikate schlagen an.
-  Der Wrapper meldet `✗` für die 6 nicht extrahierbaren Bootstrap-Clones, während die Guideline „gemessen, nicht als Gate" sagt. Ein dauerhaft rotes Werkzeug wird ignoriert – dann auch bei echtem Fund.
-
-- **Review-Stufenmodell für Prozess-Code festlegen** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/doc.py get CGP-was-gilt` · Done: Stufen samt Verzichtskriterium stehen fest und sind in `review-code` verankert.
-  15.000 Zeilen Python reviewt derzeit niemand: `review-workflow` prüft Design, `review-docs` Texte, den Code selbst keiner.
-
-- **mutmut einbinden oder verwerfen** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/doc.py get CGP-was-nicht-gilt` · Done: Entweder ein gelegentlicher Volllauf ist verankert, oder das Werkzeug ist aus `requirements-dev.txt` entfernt und die Guideline nachgezogen.
-  Installiert, aber nicht verdrahtet. Ein Spike auf einem Modul beantwortet Laufzeit und Ausbeute; die Guideline stuft Mutation bewusst zurück, das gilt es zu bestätigen oder zu revidieren.
-
-- **Querschnitts-Testfundament aufsetzen (ADR-S112-5: Page-Object-Interface definieren, bestehende Tests überführen)** — `Fällig: jetzt` · Quelle: `python3 .claude/scripts/decisions.py get ADR-S112-5` · Done: Ein Page-Object-Interface existiert, die Suite läuft parametrisiert gegen die Zutaten-Seite, alle bisherigen Tests sind grün.
+- **Querschnitts-Testfundament aufsetzen (ADR-S112-5: Page-Object-Interface definieren, bestehende Tests überführen)** — `Fällig: jetzt` · Quelle: `python3 -m prozesscode.decisions get ADR-S112-5` · Done: Ein Page-Object-Interface existiert, die Suite läuft parametrisiert gegen die Zutaten-Seite, alle bisherigen Tests sind grün.
   Berührt nur Testcode. Jetzt, weil die Umformung teurer wird, sobald neue Seitenarbeit dazwischenliegt.
 
 - TD-S089-1 · Done: `collect_coverage` ist reaktiviert und `dotnet-test.py` meldet 100% Branch-Coverage grün.

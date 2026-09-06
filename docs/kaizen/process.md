@@ -125,7 +125,7 @@ Beim Aufgreifen ist die Zusammengehörigkeit am Volltext zu prüfen und ein nich
 
 **Durchführung:** Skill `draining-observations` (guardrailed Discovery + Entscheidung).
 
-**Aufgelöste Einträge** (Status `UMGESETZT` oder `VERWORFEN`) → nach `docs/kaizen/archive/observations_archive.md` verschieben, damit die Live-`observations.md` scannbar bleibt. Das übernimmt **mechanisch** `python3 .claude/scripts/obs-archive.py` (kein Hand-Cut/Paste); solange es aussteht, listet der Drain-Satz sie als **Hygiene-Reminder**.
+**Aufgelöste Einträge** (Status `UMGESETZT` oder `VERWORFEN`) → nach `docs/kaizen/archive/observations_archive.md` verschieben, damit die Live-`observations.md` scannbar bleibt. Das übernimmt **mechanisch** `python3 -m prozesscode.obs-archive` (kein Hand-Cut/Paste); solange es aussteht, listet der Drain-Satz sie als **Hygiene-Reminder**.
 
 <a id="KPR-rolle-retro"></a>
 ### Rolle in der Retro
@@ -139,7 +139,7 @@ Die Retro behandelt OBS nicht (das macht der Drain), berührt sie aber an einer 
 ## Session-Agenda: was verlangt zum Session-Start eine Entscheidung?
 
 Registriert sind **fünf** SessionStart-Hooks, je einer pro Injektionsblock:
-`python3 .claude/scripts/session-agenda.py --block <name>` (Blöcke: `verhalten`, `doku`,
+`python3 -m prozesscode.session-agenda --block <name>` (Blöcke: `verhalten`, `doku`,
 `kommunikation`, `bash-allowlist`, `agenda`; Module innerhalb der Agenda: `--list`, einzeln
 abrufen: `--only <name>`). Ziel ist **Fokus**, nicht Tokensparen – ein Session-Start mit
 mehreren konkurrierenden Aufträgen zeigt in keine Richtung.
@@ -296,7 +296,7 @@ Beschreibt *was* konkret betroffen war – feiner als die Kategorie.
 | `Sonstiges` | Passt in keinen anderen Tag. **Staging-Area:** dünne/unklare Cluster (z.B. Build/Deps, Harness-Tool-Bedienung wie Edit/replace_all) hier parken – graduieren zu eigenem Tag, sobald ein Muster wächst |
 
 **Diese Tabelle ist die einzige Quelle der erlaubten Tags – auch für die Scripte.**
-`.claude/scripts/kontext_tags.py` liest sie zur Laufzeit; `obs.py`/`lessons.py` weisen einen
+`prozesscode/kontext_tags.py` liest sie zur Laufzeit; `obs.py`/`lessons.py` weisen einen
 unbekannten Tag beim Anlegen ab, `retro_report.py` meldet ihn im Bestand (Report-Abschnitt „Tag-Bestand"). Ein
 neuer Tag entsteht daher durch Ergänzen **hier**, ohne Code-Änderung. Erhalten bleiben muss
 dafür nur die Form: Überschrift `## Kontext-Tags`, und jede Tag-Zeile beginnt mit
@@ -355,7 +355,7 @@ Script `jenga_score.py` berechnet ihn aus der aktuellen `lessons_learned.md`.
 
 **Bei Jenga-Score ≤ 0:** Nächste Session beginnt mit einer Retro (Skill `kaizen`).
 
-Scripts: `.claude/scripts/jenga_score.py` (nach jeder Session) und `.claude/scripts/retro_report.py` (zur Retro).
+Scripts: `prozesscode/jenga_score.py` (nach jeder Session) und `prozesscode/retro_report.py` (zur Retro).
 Nach einer Retro wird `lessons_learned.md` archiviert → Jenga-Score startet neu bei 100.
 
 ---
@@ -375,7 +375,7 @@ Läuft zu Beginn jeder Retro (im `kaizen`-Skill).
 Input: aktuelle `lessons_learned.md` + alle Archiv-Dateien in `docs/kaizen/archive/`
 Output: Aggregation, Zeitreihen-Charts, Pattern-Kandidaten (Muster ≥2× im Fenster, gefiltert gegen `countermeasures.md`),
 semantisches Clustering (ab 50 Einträgen), Trendanalyse je Kategorie.
-Details: Kommentar-Header in `.claude/scripts/retro_report.py`.
+Details: Kommentar-Header in `prozesscode/retro_report.py`.
 
 ---
 

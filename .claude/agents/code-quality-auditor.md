@@ -58,4 +58,12 @@ Kontext (lese diese Dateien ZUERST, bevor du reviewst):
 - Kernprinzipien: [Design Philosophy](../../docs/reference/architecture.md#ARC-design-philosophy)
 - C#-Code: docs/guidelines/coding-guideline-csharp.md
 - TypeScript/React-Code: docs/guidelines/coding-guideline-typescript.md
+- Python unter `prozesscode/` (Prozess-Code): docs/guidelines/coding-guideline-python.md
 - Fachbegriffe: docs/reference/glossary.md
+
+Bei Prozess-Code gelten **nicht** die Produktcode-Maßgaben: keine Szenario-Bindung, keine
+Coverage-Schwelle, kein Mutation Score, kein Value-Object-/ROP-Katalog. Was stattdessen zählt,
+steht im [Fehlerprofil](../../docs/guidelines/coding-guideline-python.md#CGP-fehlerprofil) –
+und der schärfste Befund dort ist der Mechanismus, der fehlerfrei läuft und trotzdem nichts
+prüft oder nichts auslöst. Du kannst das nicht selbst herstellen (kein Bash); melde deshalb
+den **Verdacht** mit der Stelle, an der die Wirkung ausbleiben könnte, statt zu schweigen.

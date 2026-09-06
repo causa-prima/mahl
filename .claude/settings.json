@@ -16,23 +16,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block verhalten"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.session-agenda --block verhalten"
           },
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block doku"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.session-agenda --block doku"
           },
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block kommunikation"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.session-agenda --block kommunikation"
           },
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block bash-allowlist"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.session-agenda --block bash-allowlist"
           },
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/scripts/session-agenda.py --block agenda"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.session-agenda --block agenda"
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-bash-permission.py"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.hooks.check-bash-permission"
           }
         ]
       },
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/dispatch-edit-write.py"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.hooks.dispatch-edit-write"
           }
         ]
       }
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/check-code-quality-nonblocking.py"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.hooks.check-code-quality-nonblocking"
           }
         ]
       }

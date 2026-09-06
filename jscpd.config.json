@@ -5,8 +5,8 @@
     "Client/src",
     "Server",
     "Infrastructure",
-    ".claude/scripts",
-    ".claude/hooks"
+    "prozesscode",
+    "tests"
   ],
   "ignore": [
     "**/node_modules/**",

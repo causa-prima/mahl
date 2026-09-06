@@ -1,0 +1,42 @@
+{
+  "prozesscode.anchors": {
+    "beurteilbar": 216,
+    "getoetet": 125
+  },
+  "prozesscode.hooks.check-bash-permission": {
+    "beurteilbar": 241,
+    "getoetet": 129
+  },
+  "prozesscode.hooks.check-dangling-refs": {
+    "beurteilbar": 84,
+    "getoetet": 64
+  },
+  "prozesscode.hooks.check-obs-capture": {
+    "beurteilbar": 75,
+    "getoetet": 48
+  },
+  "prozesscode.hooks.check-oq-capture": {
+    "beurteilbar": 70,
+    "getoetet": 43
+  },
+  "prozesscode.hooks.check-td-capture": {
+    "beurteilbar": 105,
+    "getoetet": 84
+  },
+  "prozesscode.hooks.checks.ruff_lint": {
+    "beurteilbar": 31,
+    "getoetet": 17
+  },
+  "prozesscode.hooks.checks.tooling_tests": {
+    "beurteilbar": 34,
+    "getoetet": 22
+  },
+  "prozesscode.hooks.dispatch-edit-write": {
+    "beurteilbar": 21,
+    "getoetet": 5
+  },
+  "prozesscode.td": {
+    "beurteilbar": 177,
+    "getoetet": 0
+  }
+}

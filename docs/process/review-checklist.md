@@ -18,11 +18,12 @@ kritische-regeln:
 | [Komplexität & Refactoring](#RCL-komplexitaet) | Methodenlänge, Verschachtelung, Duplikate | Immer |
 | [Tests](#RCL-tests) | Verhalten statt Implementierung, Fehlerpfade, Full State Assertion, kein shared mutable State | Bei neuen oder geänderten Tests |
 | [Test-Audit](#RCL-test-audit) | US-Tag im Testnamen, Traceability Spec↔Test, kein Gold-Plating in Tests | Bei jedem neuen Test |
+| [Prozess-Code](#RCL-prozess-code) | Wirkung statt Lauffähigkeit: Gegenprobe, Auslösestelle, Meldungsqualität, fail-open | Bei jeder Änderung an Python unter `prozesscode/` – und dann **statt** der Abschnitte darüber |
 
 > **Wann:** Nach jedem TDD-REFACTOR-Schritt, vor dem Aufruf der Review-Agenten.
 > Die Checklisten der Review-Agenten stehen in den Agent-Definitionen unter `.claude/agents/`.
 >
-> **Vollständige Regeln:** `docs/guidelines/coding-guideline-general.md` + `docs/guidelines/coding-guideline-csharp.md` / `docs/guidelines/coding-guideline-typescript.md`. Diese Checkliste ist der retrospektive Review-Modus dazu – sie prüft, ob die Guidelines eingehalten wurden.
+> **Vollständige Regeln:** `docs/guidelines/coding-guideline-general.md` + `docs/guidelines/coding-guideline-csharp.md` / `docs/guidelines/coding-guideline-typescript.md` / `docs/guidelines/coding-guideline-python.md`. Diese Checkliste ist der retrospektive Review-Modus dazu – sie prüft, ob die Guidelines eingehalten wurden.
 
 Gehe jeden Punkt durch. Findings sofort fixen – erst dann Review-Agenten starten.
 
@@ -137,3 +138,32 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 - [ ] Gibt es Backend- oder E2E-Tests ohne darüberliegendes Gherkin-Szenario? → Outside-In-Verletzung. Prozess: (1) Noch relevant? Nein → löschen. Ja → Szenario schreiben + `@US-NNN`-Tag ergänzen. (2) Befund in `docs/history/adr.md` dokumentieren.
 - [ ] Wurden nur Tests angelegt, die das Szenario wirklich fordert? Kein Gold-Plating in Tests (YAGNI gilt auch für Tests).
 - [ ] Stimmen bestehende Szenarien noch mit dem implementierten Verhalten überein (kein Silent Drift)?
+
+<a id="RCL-prozess-code"></a>
+## Prozess-Code (Python unter `prozesscode/`)
+
+Für Python unter `prozesscode/` gelten **diese Punkte statt der Abschnitte darüber** – jene prüfen
+Architektur, Domain-Modellierung und Szenario-Bindung, die es hier alle nicht gibt. Die Maßgaben
+und ihr Grund stehen in [`coding-guideline-python.md`](../guidelines/coding-guideline-python.md#CGP-was-gilt);
+diese Liste ist der retrospektive Prüfmodus dazu.
+
+Der gemeinsame Nenner aller Punkte: Ein Werkzeug kann fehlerfrei laufen und trotzdem nicht
+wirken. Lauffähigkeit prüfen bereits `ruff` und die Werkzeug-Suite automatisch – ungeprüft
+bleibt die Wirkung.
+
+- [ ] **Gegenprobe gefahren?** Prüfmechanismus (Hook, Gate, Guard, Wrapper) einmal absichtlich
+  gebrochen und beim Anspringen gesehen – nicht nur grüne Tests. → [`CGP-gegenprobe`](../guidelines/coding-guideline-python.md#CGP-gegenprobe)
+- [ ] **Gibt es eine Stelle, die den Mechanismus auslöst?** Ein Guard ohne Registrierung, eine
+  Ignore-Regel auf einem Pfad, den es nicht gibt, ein Ausgabeblock hinter einem Größen-Cap:
+  alle drei laufen fehlerfrei und tun nichts.
+- [ ] **Nennt jede Meldung den Ausweg**, nicht nur den Befund (herstellender Befehl, zu
+  ändernde Datei)? → [`CGP-meldungen`](../guidelines/coding-guideline-python.md#CGP-meldungen)
+- [ ] **Fail-open, wo ein Nebenzweck scheitern darf?** Protokollierung, Statistik und Parser
+  dürfen einen blockierenden Guard nie mitreißen – und ein Parser-Fehlgriff darf nie
+  Information verschlucken (er meldet sich, statt still „nichts gefunden" zu liefern).
+- [ ] **Wrapper-Ausgabe:** im Erfolgsfall nur das Verdikt, im Fehlerfall nur das
+  Analyse-Relevante, alles Weitere hinter `--verbose`?
+- [ ] **Prüft der Test die Wirkung oder nur den Aufruf?** Würde er rot, wenn der Mechanismus
+  das Fragliche nicht mehr prüft? Sonst deckt er Klasse LAUT doppelt und Klasse STUMM gar nicht.
+- [ ] **Trägt jeder Eintrag einer Bestandsliste** (Baseline, Ausnahme, Allow-Liste) seinen
+  Grund im Code? Ohne ihn wird sie zur Müllhalde, weil niemand mehr weiß, was raus darf.

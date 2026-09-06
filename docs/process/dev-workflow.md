@@ -4,7 +4,7 @@
 wann-lesen: Bei jedem Ausführen von Befehlen (Build, Test, Run, Migration, Stryker) und beim Entwickeln von Hooks
 kritische-regeln:
   - Toolchain ist WSL-nativ (.NET + Node) – dotnet/npm/npx direkt aufrufen
-  - Test- und Stryker-Aufrufe: immer Python-Wrapper aus .claude/scripts/ verwenden – Hook erzwingt das und zeigt den richtigen Befehl
+  - Test- und Stryker-Aufrufe: immer Python-Wrapper aus prozesscode/ verwenden – Hook erzwingt das und zeigt den richtigen Befehl
   - .NET-Tools (dotnet-ef, dotnet-stryker) sind lokal gepinnt (.config/dotnet-tools.json) – nach Clone: dotnet tool restore
   - Timeouts immer setzen – Richtwerte in der Tabelle unten
   - Stryker --mutate: Pfad ist projektrelativ (ohne Server/-Präfix für Backend, ohne Client/-Präfix für Frontend); mehrere Ziele als Kommaliste, keine Brace-Globs; ein Muster ohne Treffer bricht ab
@@ -45,7 +45,7 @@ kritische-regeln:
 
 **Zusammengesetzte Befehle** sind erlaubt, solange jedes Teilstück erlaubt ist – Verkettung, Zeilenumbruch, Variablenzuweisung, Substitution, Heredoc, Schleifen (im Rumpf nur lesende Befehle) und Sub-Befehle aus `find -exec`/`xargs`. Nicht erlaubt ist indirekte Ausführung (`$CMD`, `eval`, `bash -c`), weil sie jede Prüfung aushebelt.
 
-**Vollständige Liste:** `python3 .claude/hooks/check-bash-permission.py --list` zeigt alle erlaubten Befehle, die Projekt-Task-Wrapper (Tests/Lint/Mutation) und die Deny-Mechanik. Wird am Session-Start automatisch in den Kontext geladen.
+**Vollständige Liste:** `python3 -m prozesscode.hooks.check-bash-permission --list` zeigt alle erlaubten Befehle, die Projekt-Task-Wrapper (Tests/Lint/Mutation) und die Deny-Mechanik. Wird am Session-Start automatisch in den Kontext geladen.
 
 **Timeouts:** Vor jedem lang laufenden Prozess überlegen: *Wann sollte ich abbrechen?* Das Bash-Tool akzeptiert einen `timeout`-Parameter (Millisekunden). Richtwerte:
 
@@ -105,13 +105,13 @@ lokalen Tools dann automatisch auf.
 Test- und Stryker-Aufrufe immer via Projekt-Scripts:
 ```bash
 # Backend
-python3 .claude/scripts/dotnet-test.py [--filter ...] [--verbose]
-python3 .claude/scripts/dotnet-stryker.py [--mutate ...] [--verbose]
+python3 -m prozesscode.dotnet-test [--filter ...] [--verbose]
+python3 -m prozesscode.dotnet-stryker [--mutate ...] [--verbose]
 
 # Frontend
-python3 .claude/scripts/vitest-run.py [--filter ...] [--verbose]
-python3 .claude/scripts/playwright-test.py [--filter ...] [--verbose]
-python3 .claude/scripts/stryker-frontend.py [--mutate src/...] [--verbose]
+python3 -m prozesscode.vitest-run [--filter ...] [--verbose]
+python3 -m prozesscode.playwright-test [--filter ...] [--verbose]
+python3 -m prozesscode.stryker-frontend [--mutate src/...] [--verbose]
 ```
 
 > **Einheitliche CLI:** Alle Wrapper-Scripts (auch `eslint-run.py`, `jscpd-run.py`) nutzen
@@ -132,7 +132,7 @@ dotnet run --project Server          # Dev-Server (Port via Server/Properties/la
 <a id="DEV-python-werkzeuge"></a>
 ### Python-Werkzeuge für den Prozess-Code (`.venv`)
 
-Die Werkzeuge für den Prozess-Code unter `.claude/**` (ruff, mutmut, pytest) liegen in einem
+Die Werkzeuge für den Prozess-Code unter `prozesscode/` (ruff, mutmut, pytest) liegen in einem
 venv im Repo-Root. Das Verzeichnis ist nicht versioniert; hergestellt wird es aus
 `requirements-dev.txt`:
 
@@ -149,9 +149,22 @@ weist Installationen nach PEP 668 ab (`externally-managed-environment`).
 nicht auf der Bash-Allow-Liste:
 
 ```bash
-python3 .claude/scripts/ruff-run.py            # Linter über .claude/scripts + .claude/hooks
-python3 .claude/scripts/ruff-run.py --fix      # sichere Fixes anwenden (ändert Dateien)
+python3 -m prozesscode.ruff-run            # Linter über prozesscode + tests
+python3 -m prozesscode.ruff-run --fix      # sichere Fixes anwenden (ändert Dateien)
+python3 -m prozesscode.coverage-run        # Testabdeckung (Metrik, kein Gate)
+python3 -m prozesscode.mutmut-run --mutate prozesscode.anchors   # Mutationstest, Ausschnitt
 ```
+
+`mutmut-run` nimmt einen **Modulpfad**, keinen Dateipfad: mutmut adressiert Mutanten über den
+Modulnamen (`prozesscode.anchors.x_lies__mutmut_7`). Ohne `--mutate` läuft es über den
+gesamten Prozess-Code – Stunden, also eine Sichtung für die Retro, kein Gate.
+
+Mit `--ratchet` hält es den Score je Modul in `prozesscode/mutation-baseline.json` fest und
+meldet einen Rückschritt als `✗`; Gleichstand geht durch, eine Verbesserung zieht die
+Baseline nach. Auch das ist **kein Gate**: Ein Modul mittlerer Größe braucht gemessen 84 s,
+die großen deutlich mehr – ein Zwang in dieser Größenordnung erzeugt den Druck, unter dem er
+umgangen wird. `--frisch` wirft `mutants/` weg; nötig nach geänderten **Tests**, weil mutmut
+die Test-zu-Funktion-Zuordnung nur ergänzt und nie bereinigt.
 
 Zusätzlich läuft ruff **automatisch** über jede geänderte Python-Datei des Prozess-Codes
 (PostToolUse, `checks/ruff_lint.py`, nicht-blockierend). Fehlt das venv, sagt der Check das –
@@ -206,7 +219,7 @@ dotnet run --project Server -- --seed-data
 <a id="DEV-frontend"></a>
 ## Frontend
 
-Node wird von `fnm` verwaltet (Version in `Client/.nvmrc`); npm/npx laufen nativ. npm-Befehle **mit `--prefix Client` aus dem Repo-Root** ausführen, nicht per `cd Client` – ein Verzeichniswechsel überlebt den Befehl, und die folgenden Wrapper-Aufrufe scheitern dann an ihrem repo-root-relativen Pfad (`.claude/scripts/…`). Der Hook blockt `cd … && npm …` deshalb:
+Node wird von `fnm` verwaltet (Version in `Client/.nvmrc`); npm/npx laufen nativ. npm-Befehle **mit `--prefix Client` aus dem Repo-Root** ausführen, nicht per `cd Client` – ein Verzeichniswechsel überlebt den Befehl, und die folgenden Wrapper-Aufrufe scheitern dann an ihrem repo-root-relativen Pfad (`prozesscode/…`). Der Hook blockt `cd … && npm …` deshalb:
 
 ```bash
 # Dependencies installieren (reproduzierbar aus package-lock.json)
@@ -238,9 +251,9 @@ npm --prefix Client audit fix
 Updates – auch reine In-Range-Bumps via `npm update` – können Regressionen einführen (z.B. brach ein MUI-Minor-Bump den Vitest-Lauf über einen nicht unterstützten ESM-Directory-Import). Nach jedem `npm install`/`npm update` daher die volle Kette prüfen:
 
 ```bash
-python3 .claude/scripts/vitest-run.py      # Laufzeit
-python3 .claude/scripts/eslint-run.py      # Typ-Auflösung + Lint
-python3 .claude/scripts/jscpd-run.py       # Config-Kompatibilität (v.a. nach Major-Bumps)
+python3 -m prozesscode.vitest-run      # Laufzeit
+python3 -m prozesscode.eslint-run      # Typ-Auflösung + Lint
+python3 -m prozesscode.jscpd-run       # Config-Kompatibilität (v.a. nach Major-Bumps)
 npm --prefix Client run build              # tsc + Vite-Build
 ```
 
@@ -250,7 +263,7 @@ Wurde **Playwright** gebumpt, zusätzlich das passende Browser-Binary neu instal
 
 ```bash
 cd Client && npx playwright install chromium
-python3 .claude/scripts/playwright-test.py   # E2E-Kette nach dem Bump verifizieren
+python3 -m prozesscode.playwright-test   # E2E-Kette nach dem Bump verifizieren
 ```
 
 ---
@@ -260,20 +273,20 @@ python3 .claude/scripts/playwright-test.py   # E2E-Kette nach dem Bump verifizie
 
 ```bash
 # Backend Tests
-python3 .claude/scripts/dotnet-test.py
-python3 .claude/scripts/dotnet-test.py --filter TestMethodName
-python3 .claude/scripts/dotnet-test.py --verbose
+python3 -m prozesscode.dotnet-test
+python3 -m prozesscode.dotnet-test --filter TestMethodName
+python3 -m prozesscode.dotnet-test --verbose
 
 # Frontend Unit-Tests (vitest)
-python3 .claude/scripts/vitest-run.py
-python3 .claude/scripts/vitest-run.py --filter Pattern   # Substring-Match gegen Testname
-python3 .claude/scripts/vitest-run.py --file Pattern     # Filter nach Dateiname (kombinierbar mit --filter)
-python3 .claude/scripts/vitest-run.py --verbose
+python3 -m prozesscode.vitest-run
+python3 -m prozesscode.vitest-run --filter Pattern   # Substring-Match gegen Testname
+python3 -m prozesscode.vitest-run --file Pattern     # Filter nach Dateiname (kombinierbar mit --filter)
+python3 -m prozesscode.vitest-run --verbose
 
 # E2E-Tests (Playwright)
-python3 .claude/scripts/playwright-test.py
-python3 .claude/scripts/playwright-test.py --filter ingredients  # Datei- oder Testname-Filter
-python3 .claude/scripts/playwright-test.py --verbose
+python3 -m prozesscode.playwright-test
+python3 -m prozesscode.playwright-test --filter ingredients  # Datei- oder Testname-Filter
+python3 -m prozesscode.playwright-test --verbose
 ```
 
 > **E2E startet das Backend selbst** (`playwright.config.ts`, `reuseExistingServer:false` auf 5059) – vorher **keinen eigenen Backend auf 5059** laufen lassen (sonst Port-Konflikt), Postgres muss aber laufen. Begründung im Config-Kommentar.
@@ -340,13 +353,13 @@ dotnet ef database update --project Infrastructure --startup-project Server
 ```bash
 # Gezielt: Nur eine Datei (~1 min)
 # Pfad ist PROJEKTRELATIV (relativ zu Server/mahl.Server.csproj), nicht solution-relativ
-python3 .claude/scripts/dotnet-stryker.py --mutate Domain/Quantity.cs
+python3 -m prozesscode.dotnet-stryker --mutate Domain/Quantity.cs
 
 # Vollständiger Lauf Server (~2–3 min, am Ende jeder Phase – PFLICHT)
-python3 .claude/scripts/dotnet-stryker.py
+python3 -m prozesscode.dotnet-stryker
 
 # Mit allen nicht-getöteten Mutanten (Status, StatusReason, Zeile, Spalte)
-python3 .claude/scripts/dotnet-stryker.py --verbose
+python3 -m prozesscode.dotnet-stryker --verbose
 ```
 
 > **Ausgabe:** `dotnet-stryker.py` zeigt die letzten 30 Zeilen des Stryker-Outputs, dann eine kompakte
@@ -356,7 +369,7 @@ python3 .claude/scripts/dotnet-stryker.py --verbose
 > mit Status, StatusReason, Zeile und Spalte – nützlich für gezielte Analyse ohne Ad-hoc-Python.
 >
 > **Auswertungs-Script standalone** – nützlich für manuelle Analyse älterer Reports:
-> `python3 .claude/scripts/stryker-summary.py [path/to/report.json] [--verbose]`
+> `python3 -m prozesscode.stryker-summary [path/to/report.json] [--verbose]`
 > `--verbose` zeigt alle nicht-getöteten Mutanten (Survived, Ignored, Timeout, NoCoverage) mit Status, StatusReason, Zeile und Spalte.
 > Bei expliziter Pfad-Angabe wird der Timestamp-Check übersprungen.
 
@@ -400,13 +413,13 @@ python3 .claude/scripts/dotnet-stryker.py --verbose
 **Frontend (Stryker-JS):**
 ```bash
 # Alle Dateien (~variabel)
-python3 .claude/scripts/stryker-frontend.py
+python3 -m prozesscode.stryker-frontend
 
 # Gezielt: eine Datei (Pfad relativ zu Client/)
-python3 .claude/scripts/stryker-frontend.py --mutate src/pages/IngredientsPage.tsx
+python3 -m prozesscode.stryker-frontend --mutate src/pages/IngredientsPage.tsx
 
 # Mit allen nicht-getöteten Mutanten (analog zu Backend)
-python3 .claude/scripts/stryker-frontend.py --verbose
+python3 -m prozesscode.stryker-frontend --verbose
 ```
 
 > **Ausgabe:** `stryker-frontend.py` zeigt die letzten 30 Zeilen des Stryker-Outputs, dann eine kompakte
@@ -418,7 +431,7 @@ python3 .claude/scripts/stryker-frontend.py --verbose
 <a id="DEV-hook-entwicklung"></a>
 ## Hook-Entwicklung
 
-**Aktive Hooks:** Pre/PostToolUse-Hooks in `.claude/settings.json` prüfen Bash-Berechtigungen und Code-Qualitätsregeln automatisch. Bei unerwartetem Block → Hook-Feedback in der Fehlermeldung lesen (exit 2 + stderr). Hooks-Verzeichnis: `.claude/hooks/`.
+**Aktive Hooks:** Pre/PostToolUse-Hooks in `.claude/settings.json` prüfen Bash-Berechtigungen und Code-Qualitätsregeln automatisch. Bei unerwartetem Block → Hook-Feedback in der Fehlermeldung lesen (exit 2 + stderr). Hooks-Verzeichnis: `prozesscode/hooks/` – im Python-Paket, damit mutmut sie über den Modulpfad erreicht (`.claude` ist wegen des führenden Punkts kein gültiger Paketname).
 
 <a id="DEV-exit-codes"></a>
 ### Exit-Code-Semantik
@@ -440,18 +453,24 @@ python3 .claude/scripts/stryker-frontend.py --verbose
 Hook-Commands müssen **`$CLAUDE_PROJECT_DIR`** statt `$PWD` verwenden:
 
 ```json
-{ "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/mein-hook.py" }
+{ "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m prozesscode.hooks.mein-hook" }
 ```
+
+Die Hooks laufen als **Paketmodule** (`-m`), nicht als Dateipfad: Sie nutzen relative Importe
+und laden ohne Paketkontext nicht. Das `cd` davor setzt den Repo-Root als Arbeitsverzeichnis,
+damit `prozesscode` auf dem Importpfad liegt; es läuft in der Hook-eigenen Shell und
+persistiert nirgends.
 
 **Warum nicht `$PWD`?** `$PWD` ist fragil: wenn Claude `cd` in einem Bash-Tool-Call ausführt, persistiert der neue CWD für alle folgenden Bash-Calls in dieser Session. Hooks erben dieses CWD – alle `$PWD`-basierten Pfade zeigen dann auf das falsche Verzeichnis. `$CLAUDE_PROJECT_DIR` zeigt immer auf den Projekt-Root, unabhängig vom CWD.
 
-**KRITISCH:** `cd` in ein Unterverzeichnis **ohne Subshell** bricht die Hook-Chain bis zum nächsten Neustart:
+**KRITISCH:** `cd` in ein Unterverzeichnis **ohne Subshell** bricht im *Bash-Tool* die
+Hook-Chain bis zum nächsten Neustart:
 ```bash
 # FALSCH – persistiert CWD, bricht Hooks:
-cd .claude/hooks && python3 -m pytest tests/ -q
+cd Client && npm run build
 
 # RICHTIG – Subshell, CWD bleibt erhalten:
-(cd .claude/hooks && python3 -m pytest tests/ -q)
+(cd Client && npm run build)
 ```
 
 <a id="DEV-hooks-dynamisch"></a>
@@ -465,15 +484,15 @@ cd .claude/hooks && python3 -m pytest tests/ -q
 Nach Änderungen an Hook-Dateien automatisierte Tests ausführen:
 
 ```bash
-python3 -m pytest .claude/hooks/tests/ -q
+python3 -m pytest tests/ -q
 ```
 
-> pytest mit `.claude/hooks/tests/` als Pfad aufrufen (nicht `.claude/hooks/`), damit das
-> `checks`-Package korrekt importiert wird.
+> Vom Repo-Root aus aufrufen: `tests/conftest.py` legt den Root auf den Importpfad, damit
+> `prozesscode` als Paket auflöst.
 
 > **Edit vs. Write:** `tdd_one_test` und `test_patterns` berechnen bei Edit ein **Delta**
 > (new − old). Bei Write wird das Delta gegen die aktuelle Datei auf Disk berechnet
 > (existiert sie nicht: gegen leer). Alle anderen Checks prüfen nur `new_content` –
 > kein Unterschied zwischen Edit und Write.
 
-Die Testfälle liegen in `.claude/hooks/tests/test_<checkname>.py`.
+Die Testfälle liegen in `tests/test_<checkname>.py`.

@@ -16,7 +16,7 @@
 | E2E Testing / BDD/Gherkin / Outside-In ATDD | `docs/process/e2e-testing.md` |
 | C#-Code schreiben (Backend, Tests) | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-csharp.md` (enthält Verweise auf ROP/SumTypes/Stryker-Ergänzungen) |
 | TypeScript/React-Code schreiben | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-typescript.md` |
-| Python schreiben (Scripts, Hooks, Checks unter `.claude/**`) | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-python.md` (andere Maßgaben als Produktcode – der Grund steht dort) |
+| Python schreiben (Werkzeuge, Hooks, Checks – alle unter `prozesscode/`) | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-python.md` (andere Maßgaben als Produktcode – der Grund steht dort) |
 | Frontend-UX / Interaction Design | `docs/guidelines/coding-guideline-ux.md` |
 | Allgemeine Coding-Prinzipien (KISS, Naming, Komplexität) | `docs/guidelines/coding-guideline-general.md` |
 | Datenbank-Schema ändern | [Datenbank-Workflow](docs/process/dev-workflow.md#DEV-datenbank-workflow) (Drop+Recreate vs. Migrations) → [Projekt-Struktur](docs/reference/architecture.md#ARC-projekt-struktur) (wo DbTypes liegen) |
@@ -29,13 +29,15 @@
 | Workflow-/Prozess-Audit durchführen | Skill `review-workflow` verwenden |
 | Projektdokumentation prüfen | Skill `review-docs` verwenden |
 | Learnings dokumentieren | `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/process.md`) |
-| Tracker-Eintrag lesen/schreiben (OBS, LL, TD, OQ, ADR) | `python3 .claude/scripts/tracker.py` zeigt, welches Werkzeug welchen Tracker pflegt und welche Befehle es kennt – dann `obs.py` / `lessons.py` / `td.py` / `oq.py` / `decisions.py`, statt Read/Edit auf der ganzen Datei |
-| Wohin geht das Read-/Token-Budget? | `python3 .claude/scripts/read-breakdown.py` (nach Session-Art), `tool-usage.py` |
-| Hat ein Guard/Hook je angeschlagen – oder fällt er lautlos aus? | `python3 .claude/scripts/guard-stats.py` (Teil der Retro) |
-| Wo fehlen Tests im Prozess-Code? | `python3 .claude/scripts/coverage-run.py` (Metrik, kein Gate – Teil der Retro) |
-| Abschnitt einer Doku lesen (statt Volldatei) | `python3 .claude/scripts/doc.py toc <datei>` zeigt die Abschnitte, `doc.py get <ANKER>` holt einen davon |
-| Abschnitt referenzieren / Anker prüfen | `python3 .claude/scripts/anchors.py list\|check\|refs <ANKER>`; Nummern statt Namen findet `ordinale.py` |
-| Was steht schon in einer Testdatei? | `python3 .claude/scripts/test-inventory.py <datei>` – Testnamen mit Zeilenbereich |
+| Tracker-Eintrag lesen/schreiben (OBS, LL, TD, OQ, ADR) | `python3 -m prozesscode.tracker` zeigt, welches Werkzeug welchen Tracker pflegt und welche Befehle es kennt – dann `obs.py` / `lessons.py` / `td.py` / `oq.py` / `decisions.py`, statt Read/Edit auf der ganzen Datei |
+| Wohin geht das Read-/Token-Budget? | `python3 -m prozesscode.read-breakdown` (nach Session-Art), `tool-usage.py` |
+| Hat ein Guard/Hook je angeschlagen – oder fällt er lautlos aus? | `python3 -m prozesscode.guard-stats` (Teil der Retro) |
+| Wo fehlen Tests im Prozess-Code? | `python3 -m prozesscode.coverage-run` (Metrik, kein Gate – Teil der Retro) |
+| Prüft ein Guard überhaupt noch, was er prüfen soll? | `python3 -m prozesscode.mutmut-run --mutate prozesscode.hooks.<hook>` – überlebt ein Mutant, merkt kein Test die Änderung (Sichtung, kein Gate) |
+| Ist die Testgüte eines Moduls schlechter als beim letzten Mal? | dasselbe mit `--ratchet` – hält den Score je Modul in `prozesscode/mutation-baseline.json` fest und meldet einen Rückschritt |
+| Abschnitt einer Doku lesen (statt Volldatei) | `python3 -m prozesscode.doc toc <datei>` zeigt die Abschnitte, `doc.py get <ANKER>` holt einen davon |
+| Abschnitt referenzieren / Anker prüfen | `python3 -m prozesscode.anchors list\|check\|refs <ANKER>`; Nummern statt Namen findet `ordinale.py` |
+| Was steht schon in einer Testdatei? | `python3 -m prozesscode.test-inventory <datei>` – Testnamen mit Zeilenbereich |
 | Verhaltensprinzipien (immer gültig) | `docs/kaizen/principles.md` |
 | Maßnahmen-Tracking | `docs/kaizen/countermeasures.md` |
 | Retro durchführen | Skill `kaizen` verwenden |
@@ -44,7 +46,7 @@
 | Wohin gehört dieser Eintrag – ADR, TD, OQ oder OBS/CM/LL? | Sektion "[Ablage: in welchen Tracker gehört dieser Eintrag?](#CLA-ablage)" (unten in dieser Datei) |
 | Langsame Befehle dokumentieren | `docs/process/slow-commands.md` |
 | Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "[Befehlsauswahl & Timeouts](docs/process/dev-workflow.md#DEV-befehlsauswahl)") |
-| Warum wurde X so entschieden? | `docs/history/adr.md` (via `python3 .claude/scripts/decisions.py`) |
+| Warum wurde X so entschieden? | `docs/history/adr.md` (via `python3 -m prozesscode.decisions`) |
 | Was passierte in Session X? | `git log --grep='^Session-Ende: X$'` – die Commit-Nachricht **ist** die Session-Historie (Zwischen-Commits stehen davor, bis zur vorigen Marke). Wörtlicher Verlauf: Skill `recall-session` |
 | Neuen Agenten beauftragen | `.claude/agents/` (bestehende Definitionen als Vorlage) + Skill `review-code` |
 | Interface/API designen (Design It Twice) | Skill `design-an-interface` verwenden |
@@ -71,7 +73,7 @@ Drei Trennschnitte, jeder für sich eindeutig:
 
 **Schnitt „Produkt vs. Prozess".** Produkt ist der Code samt Build-/Test-Kette
 (`stryker-config.json`, `playwright.config.ts`, `Directory.Build.props`) → ADR/TD/OQ.
-Prozess ist, wie gearbeitet wird (`.claude/**`, `docs/process/`, `docs/kaizen/`) →
+Prozess ist, wie gearbeitet wird (`prozesscode/`, `.claude/**`, `docs/process/`, `docs/kaizen/`) →
 OBS/CM/LL; deren Taxonomie steht vollständig in
 [„Wann gehört etwas wohin?"](docs/kaizen/process.md#KPR-wohin) und wird hier nicht wiederholt.
 
@@ -90,7 +92,7 @@ zu klären → `docs/open-questions.md`. Alles Entschiedene fällt unter den nä
 aufgeschoben, wird der Aufschub-Teil ein eigener TD-Eintrag; die ADR behält nur den terminalen
 Rest. Bleibt kein terminaler Rest, war es nie eine ADR. Formulierungen wie "aufgeschoben",
 "vorerst", "bis zur Erweiterung", "technische Schuld" in einer ADR sind das Warnzeichen –
-bei **neu** erfassten Einträgen blockt `.claude/hooks/check-adr-capture.py` sie mechanisch
+bei **neu** erfassten Einträgen blockt `prozesscode/hooks/check-adr-capture.py` sie mechanisch
 (Escape für bewusste Einzelfälle: `adr-ok`-Marker im Eintrag). Bestehende Einträge bleiben
 frei änderbar, sonst wäre Aufräumen unmöglich.
 

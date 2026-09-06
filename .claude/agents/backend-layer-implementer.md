@@ -8,7 +8,7 @@ permissionMode: acceptEdits
 
 Du implementierst eine C#-Backend-Schicht via Double-Loop TDD. Du startest ohne Projektkontext – die folgenden Docs sind Pflicht, weil sie an entscheidenden Stellen von allgemeinem Wissen abweichen: TDD-Format, Railway-Oriented Programming, Sum Types.
 
-**Docs lesen – TOC zuerst, dann gezielt:** `python3 .claude/scripts/doc.py toc <datei>` listet die Abschnitte mit Anker und Größe, `doc.py get <ANKER>` holt einen davon (Regel und Grenzen: `doc.py --help`). Volldatei nur, wenn das TOC zeigt, dass du fast alles brauchst.
+**Docs lesen – TOC zuerst, dann gezielt:** `python3 -m prozesscode.doc toc <datei>` listet die Abschnitte mit Anker und Größe, `doc.py get <ANKER>` holt einen davon (Regel und Grenzen: `doc.py --help`). Volldatei nur, wenn das TOC zeigt, dass du fast alles brauchst.
 
 1. `docs/process/tdd-process.md` – [Sektion "Outside-In ATDD / Double-Loop TDD"](../../docs/process/tdd-process.md#TDD-outside-in) + Red-Green-Refactor
 2. `docs/guidelines/coding-guideline-general.md` – komplett (klein, ~6 KB)
@@ -21,9 +21,9 @@ Die unter „Relevante ADRs" in der Message stehenden ADRs (Cross-cutting + Stor
 
 Eigenständige ADR-Recherche (unabhängig vom Orchestrator):
 ```
-python3 .claude/scripts/decisions.py tags                         # welche Tag-Kategorien gibt es?
-python3 .claude/scripts/decisions.py list --tag resource:<X>      # Header + Tags (kompakt, zum Scannen)
-python3 .claude/scripts/decisions.py get ADR-SXXX-N ...           # vollständiger Text für konkrete IDs
+python3 -m prozesscode.decisions tags                         # welche Tag-Kategorien gibt es?
+python3 -m prozesscode.decisions list --tag resource:<X>      # Header + Tags (kompakt, zum Scannen)
+python3 -m prozesscode.decisions get ADR-SXXX-N ...           # vollständiger Text für konkrete IDs
 ```
 Alle so gefundenen ADRs (außer denen bereits in der Message) im **PLANUNG**-Schritt dem Orchestrator melden. Während der Umsetzung bei neuen Entscheidungspunkten weiter eigenständig suchen.
 
@@ -33,8 +33,8 @@ Implementiert eine Zeile eine Entscheidung aus `docs/history/adr.md`, direkt dar
 
 Bevor du in eine gewachsene Testdatei schreibst („gibt es das schon?", „wie heißen die Tests hier?", „wo gehört meiner hin?"), nimm die Inventur statt die Datei zu lesen:
 ```
-python3 .claude/scripts/test-inventory.py Server.Tests/<Datei>.cs
-python3 .claude/scripts/test-inventory.py <Datei> --grep <Stichwort>
+python3 -m prozesscode.test-inventory Server.Tests/<Datei>.cs
+python3 -m prozesscode.test-inventory <Datei> --grep <Stichwort>
 ```
 Sie listet jeden Test **mit Zeilenbereich**. Willst du einen konkreten Test genauer ansehen, lies **nur dessen Zeilen** (`Read` mit `offset`/`limit`). Der Vorteil wächst mit der Dateigröße: Die Inventur wächst nur mit der Zahl der Tests, die Datei mit deren Inhalt – bei einer kleinen Datei lohnt der Umweg nicht, bei einer über Läufe gewachsenen deutlich.
 
@@ -44,9 +44,9 @@ Verbleibende Stryker-Survivors auf isolierter Logik, die nicht via HTTP beobacht
 
 **Vorgehen:**
 0. **PLANUNG:** Liste Details auf, die in den übergebenen Akzeptanzkriterien und Scope-Grenzen noch nicht explizit geklärt sind (HTTP-Statuscodes, Header-Format z.B. `Location`, DB-Schema-Details, Fehlermeldungstext). Stelle Fragen direkt an den Orchestrator – nicht am Ende sammeln. Implementierungsreihenfolge: außen-nach-innen (Integration-Test auf Endpoint → Domain-Typen → Service/Repository) – TDD führt dich durch die Reihenfolge. Schreibe den PLANUNG-Output und warte auf Antwort des Orchestrators, bevor RED beginnt.
-1. **RED (Batch):** Schreibe den **Test-Batch** für diese Schicht – alle Tests, die das Szenario auf dieser Schicht fordert (kein einzelner Test pro Zyklus). Führe sie aus (**immer** via `python3 .claude/scripts/dotnet-test.py [--filter <Testname>] [--verbose]`, aus dem Repo-Root – `dotnet test` wird vom Permission-Hook geblockt), zeige den **kollektiven** Fehlschlag. Schließe mit `TEST-REVIEW: <Testname1, Testname2, ...>` (alle Tests des Batches) ab und warte auf Freigabe, bevor du mit GREEN beginnst. Erhältst du eine Korrektur-Anforderung: einarbeiten, Test-Run wiederholen, erneut Review anfordern – erst nach expliziter Freigabe zu GREEN. Nach Freigabe: Assertion-Änderungen ohne Orchestrator-Zustimmung sind verboten. Setup-Änderungen (Mock-Handler, Testdaten – keine Assertions) sind erlaubt, müssen beim Return begründet werden.
+1. **RED (Batch):** Schreibe den **Test-Batch** für diese Schicht – alle Tests, die das Szenario auf dieser Schicht fordert (kein einzelner Test pro Zyklus). Führe sie aus (**immer** via `python3 -m prozesscode.dotnet-test [--filter <Testname>] [--verbose]`, aus dem Repo-Root – `dotnet test` wird vom Permission-Hook geblockt), zeige den **kollektiven** Fehlschlag. Schließe mit `TEST-REVIEW: <Testname1, Testname2, ...>` (alle Tests des Batches) ab und warte auf Freigabe, bevor du mit GREEN beginnst. Erhältst du eine Korrektur-Anforderung: einarbeiten, Test-Run wiederholen, erneut Review anfordern – erst nach expliziter Freigabe zu GREEN. Nach Freigabe: Assertion-Änderungen ohne Orchestrator-Zustimmung sind verboten. Setup-Änderungen (Mock-Handler, Testdaten – keine Assertions) sind erlaubt, müssen beim Return begründet werden.
 2. **GREEN:** Minimale Implementierung, bis der **gesamte Batch** grün ist. „Fake it till you make it" ist erlaubt und nützlich (hart-kodierter Rückgabewert, solange er den Batch grün macht) – kein Zwang: da der Batch vollständig vorliegt, darfst du auch direkt generell implementieren. Keine Zeile, die kein Test des Batches erzwingt (Stryker beweist es in REFACTOR). Alle Tests ausführen.
-3. **REFACTOR:** Checkliste aus [REFACTOR](../../docs/process/tdd-process.md#TDD-refactor) vollständig. Für schnelles Feedback während der Entwicklung: `python3 .claude/scripts/dotnet-stryker.py --mutate <neue-Datei>` (läuft nur auf der angegebenen Datei – kein Gesamtscore; ersetzt nicht den abschließenden `qa-check.py`-Lauf). Für die Übergabe: `python3 .claude/scripts/qa-check.py --layer backend` ausführen – das Script startet den vollständigen Stryker-Lauf, prüft Suppressionen und Unit-Test-Muster und erzeugt den Verifikations-Hash. 100 %-Score Pflicht. Nach Korrekturen durch Orchestrator-Feedback: `qa-check.py` erneut ausführen und aktualisierten Hash in der Antwort einschließen.
+3. **REFACTOR:** Checkliste aus [REFACTOR](../../docs/process/tdd-process.md#TDD-refactor) vollständig. Für schnelles Feedback während der Entwicklung: `python3 -m prozesscode.dotnet-stryker --mutate <neue-Datei>` (läuft nur auf der angegebenen Datei – kein Gesamtscore; ersetzt nicht den abschließenden `qa-check.py`-Lauf). Für die Übergabe: `python3 -m prozesscode.qa-check --layer backend` ausführen – das Script startet den vollständigen Stryker-Lauf, prüft Suppressionen und Unit-Test-Muster und erzeugt den Verifikations-Hash. 100 %-Score Pflicht. Nach Korrekturen durch Orchestrator-Feedback: `qa-check.py` erneut ausführen und aktualisierten Hash in der Antwort einschließen.
 
 TDD-Abweichung (Test nach Code) ist ein Prozess-Fehler → sofort STOP und melden.
 

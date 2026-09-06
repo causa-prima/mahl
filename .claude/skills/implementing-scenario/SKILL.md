@@ -65,9 +65,9 @@ Fragen:
 
 1. **ATDD-Gate:** Lauf `$ARGUMENTS` in `features/` vorhanden?
    ```
-   python3 .claude/scripts/check-atdd-gate.py <STORY-TAG> <run-N>
+   python3 -m prozesscode.check-atdd-gate <STORY-TAG> <run-N>
    ```
-   Beispiel: `python3 .claude/scripts/check-atdd-gate.py @US-904 run-3`
+   Beispiel: `python3 -m prozesscode.check-atdd-gate @US-904 run-3`
    - Exit 1? → STOP. Erst `gherkin-workshop` (inkl. [Szenario-Clustering](../gherkin-workshop/SKILL.md#GHW-szenario-clustering)) für
      die User Story ausführen, dann zurückkommen. Ohne freigegebenen und geclusterten
      Szenario-Satz fehlt die objektive Fertigstellungsbedingung – der Code kann nicht als
@@ -76,7 +76,7 @@ Fragen:
      des Laufs (Lauf-Label, Schicht, Singleton-Flag im Kopf) – das ist die exakte Spec für
      den gesamten Lauf. Bei einem Frontend-only-Lauf (Schicht-Label im Output) entfällt
      der Backend-Subagent in [TDD-Zyklus](#IMP-tdd-zyklus) vollständig.
-   - **Sibling-Läufe überfliegen (Titel, keine Details):** `python3 .claude/scripts/next_run.py --open --story <US-NNN>` zeigt nur für diese Story alle noch **offenen** Lauf-Labels **mit Szenario-Titeln** – mechanisch, günstig, ohne Given/When/Then anderer Läufe lesen zu müssen (das widerspräche der Lese-Sparsamkeits-Regel oben) und ohne Rauschen aus anderen Storys/NFR-Features. Bewusst nur `--open`: ein bereits `--done`-Lauf hat seine Capability schon gebaut, dort gibt es nichts vorwegzunehmen. Dient ausschließlich [YAGNI/KISS-Scope](#IMP-yagni-scope).
+   - **Sibling-Läufe überfliegen (Titel, keine Details):** `python3 -m prozesscode.next_run --open --story <US-NNN>` zeigt nur für diese Story alle noch **offenen** Lauf-Labels **mit Szenario-Titeln** – mechanisch, günstig, ohne Given/When/Then anderer Läufe lesen zu müssen (das widerspräche der Lese-Sparsamkeits-Regel oben) und ohne Rauschen aus anderen Storys/NFR-Features. Bewusst nur `--open`: ein bereits `--done`-Lauf hat seine Capability schon gebaut, dort gibt es nichts vorwegzunehmen. Dient ausschließlich [YAGNI/KISS-Scope](#IMP-yagni-scope).
 2. <a id="IMP-yagni-scope"></a>**YAGNI/KISS-Scope:** Was ist das Minimal-Notwendige für genau diese Szenarien des Laufs?
    Was wäre Gold-Plating (= kein Test dafür existiert, kein Akzeptanzkriterium fordert es)?
    Notiere explizit: *"Folgendes implementiere ich NICHT: ..."*
@@ -109,15 +109,15 @@ Fragen:
 
    Überblick verschaffen – kompakt, nur Kopfzeilen:
    ```
-   python3 .claude/scripts/decisions.py tags                    # welche Dimensionen gibt es
-   python3 .claude/scripts/decisions.py list --tag scope:cross-cutting
-   python3 .claude/scripts/decisions.py list --tag story:us-NNN  # NNN aus $ARGUMENTS
+   python3 -m prozesscode.decisions tags                    # welche Dimensionen gibt es
+   python3 -m prozesscode.decisions list --tag scope:cross-cutting
+   python3 -m prozesscode.decisions list --tag story:us-NNN  # NNN aus $ARGUMENTS
    ```
 
    Vollständig lesen – nur die Kandidaten, gefiltert über die Dimensionen dieses Laufs:
    ```
-   python3 .claude/scripts/decisions.py list --tag arch:<X> --tag http:<Y> --full
-   python3 .claude/scripts/decisions.py get ADR-SXXX-N ADR-SYYY-M ...
+   python3 -m prozesscode.decisions list --tag arch:<X> --tag http:<Y> --full
+   python3 -m prozesscode.decisions get ADR-SXXX-N ADR-SYYY-M ...
    ```
 
    Falls neue Architekturentscheidung nötig: User fragen. Selbst Entschiedenes in `docs/history/adr.md` dokumentieren.
@@ -196,8 +196,8 @@ Relevante ADRs (von mir bewertet, Volltext – nicht nochmal abrufen):
 <Vollständiger Text der ADRs, die du im Architektur-Check als relevant eingestuft hast – oder "keine">
 
 Prüf das unabhängig nach; für deine Schicht einschlägig sind:
-  python3 .claude/scripts/decisions.py list --tag <dimension>:<wert>   # kompakt, zum Scannen
-  python3 .claude/scripts/decisions.py get ADR-SXXX-N                  # Volltext bei Bedarf
+  python3 -m prozesscode.decisions list --tag <dimension>:<wert>   # kompakt, zum Scannen
+  python3 -m prozesscode.decisions get ADR-SXXX-N                  # Volltext bei Bedarf
 Findest du eine relevante ADR, die oben fehlt – oder hältst du eine der genannten für nicht
 anwendbar –, sag das in deiner PLANUNG.
 ```
@@ -235,7 +235,7 @@ Gegen diesen Anker prüft [Orchestrator-Check](#IMP-orchestrator-check), dass na
 - **Per-Assertion-Pflicht (inkl. Given/When):** Für jede neue oder geänderte Assertion und signifikante Given/When-Schritte: Welches Gherkin-Kriterium erzwingt sie? Falls keines vorhanden – drei Diagnosen, der Haupt-Thread entscheidet:
   - a) **Gold-Plating** → Subagent löscht Assertion und ggf. zugehörigen Produktionscode.
   - b) **User-facing Verhalten ohne Szenario** → User-Freigabe für neues Szenario einholen, erst dann implementieren.
-  - c) **Technische API/Architektur-Entscheidung** → Test braucht `// ADR-SXXX-N`-Kommentar der auf den Eintrag in `docs/history/adr.md` verweist; Haupt-Thread verifiziert via `python3 .claude/scripts/decisions.py refs`.
+  - c) **Technische API/Architektur-Entscheidung** → Test braucht `// ADR-SXXX-N`-Kommentar der auf den Eintrag in `docs/history/adr.md` verweist; Haupt-Thread verifiziert via `python3 -m prozesscode.decisions refs`.
 
 - **Anpassungen an bestehenden Tests:** Was würde ohne diese Anpassung kaputtgehen, das nicht ohnehin durch andere Assertions auffiele? Keine Antwort → redundant (Diagnose a).
 
@@ -256,8 +256,8 @@ Playwright-Test erneut ausführen. Noch rot? Ursache identifizieren (Routing? AP
 
 Der Subagent hat in seinem Return einen `=== VERIFIKATIONS-HASH ===`-Block aus einem **frischen** `qa-check.py`-Lauf geliefert. Verifiziere ihn mechanisch – das Script führt **keinen** neuen Stryker-Lauf aus und meldet pass/fail. Übergib dabei die im Test-Review gemerkten Freigabe-Anker (`pfad=sha`-Paare aus [TDD-Zyklus](#IMP-tdd-zyklus)) via `--approved-tests` – das ist bei geänderten Test-Dateien **Pflicht** (sonst bricht qa-check ab):
 ```
-python3 .claude/scripts/qa-check.py --layer backend  --verify <hash-aus-return> --approved-tests <pfad1=sha1> <pfad2=sha2> …
-python3 .claude/scripts/qa-check.py --layer frontend --verify <hash-aus-return> --approved-tests <pfad1=sha1> <pfad2=sha2> …
+python3 -m prozesscode.qa-check --layer backend  --verify <hash-aus-return> --approved-tests <pfad1=sha1> <pfad2=sha2> …
+python3 -m prozesscode.qa-check --layer frontend --verify <hash-aus-return> --approved-tests <pfad1=sha1> <pfad2=sha2> …
 ```
 
 - `✅` (Exit 0) → Hash stimmt überein UND Score == 100 % → frischer, gültiger Übergabe-Lauf, mechanische Findings vertrauenswürdig.
@@ -348,7 +348,7 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor [Abschluss](#IMP
    - **Während des Ablaufs entdeckte technische Schuld / Tooling-Reibung.**
    - **TD-Abgleich (mechanisch, nicht aus dem Gedächtnis):**
      ```
-     python3 .claude/scripts/td_due.py --szenarien "<Titel 1>" "<Titel 2>" …
+     python3 -m prozesscode.td_due --szenarien "<Titel 1>" "<Titel 2>" …
      ```
      (die Szenario-Titel dieses Laufs, exakt aus der Feature-Datei). Das Script listet jeden `docs/tech-debt.md`-Eintrag, der per `Szenario:`-Anker auf ein Szenario dieses Laufs zeigt. Für **jeden** Treffer entscheiden: behoben → Eintrag entfernen; nicht behoben → begründen, warum der Lauf ihn nicht mit-erledigt hat.
      Prüfe zusätzlich, ob ein Eintrag **unbewusst nebenbei** behoben wurde (den fängt kein Anker) → ebenfalls schließen. Verhindert, dass `tech-debt.md` längst erledigte Posten weiterschleppt.

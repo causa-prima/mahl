@@ -71,6 +71,7 @@ Scope bestimmt welche Agenten nötig sind:
 | Nur Tests geändert (kein Produktionscode) | `test-quality-auditor` |
 | Nur Suppressionen hinzugefügt | [Suppression-Report bewerten](#RVC-suppression-report) deckt das ab – kein Agent-Spawn nötig |
 | Nur Dokumentation / Kommentare geändert | `code-quality-auditor` |
+| Prozess-Code (Python unter `prozesscode/`) | [Eigene Stufen](#RVC-prozess-code) – meist **kein** Agent |
 
 Jeden Agenten via Agent-Tool mit `subagent_type: "<name>"` spawnen (z.B. `subagent_type: "code-quality-auditor"`) – die Namen entsprechen der Tabelle (es sind registrierte Agenten in `.claude/agents/`, read-only).
 
@@ -87,7 +88,7 @@ Agent-Prompts enthalten (je Agent):
 - **ADR-Volltexte im Prompt, plus Auftrag zur eigenen Gegenprobe.** Die Auditoren haben **kein Bash**
   (Tools: Read, Grep, Glob, LSP – s. `.claude/agents/*.md`), und das bleibt so: Die Tool-Liste ist
   der Mechanismus, der „erzeugt ausschließlich Findings" garantiert – eine Allow-Liste wäre dafür
-  nur Disziplin. Ein Prompt, der ihnen `python3 .claude/scripts/decisions.py get …` aufträgt, läuft
+  nur Disziplin. Ein Prompt, der ihnen `python3 -m prozesscode.decisions get …` aufträgt, läuft
   deshalb ins Leere. Stattdessen zweigleisig:
   1. Die vom Orchestrator als relevant eingestuften ADRs **im Prompt ausschreiben**.
   2. Den Auditor ausdrücklich beauftragen, in `docs/history/adr.md` **per Grep selbst nachzusehen** –
@@ -113,6 +114,38 @@ Agent-Prompts enthalten (je Agent):
   Orchestrator-Fallback CM-S102-3 fängt das nur ab; diese Prompt-Zeile behebt die Ursache. (Läuft
   `review-code` ausnahmsweise standalone ohne Team – kein `SendMessage` verfügbar –, ist der
   Rückgabewert des Agenten der Kanal.)
+
+<a id="RVC-prozess-code"></a>
+### Prozess-Code: eigene Stufen
+
+Python unter `prozesscode/` folgt nicht der Scope-Matrix oben. Es hat keinen externen Nutzer, kein
+Szenario und keinen Stryker-Lauf – und sein Fehlerprofil ist ein anderes: Die Klasse, die hier
+weh tut, ist der Mechanismus, der fehlerfrei läuft und trotzdem nichts prüft
+([Fehlerprofil](../../../docs/guidelines/coding-guideline-python.md#CGP-fehlerprofil)). Ein
+zweiter Leser findet die nicht; sie fällt nur auf, wenn jemand die Wirkung herstellt.
+
+**Immer:** Selbstcheck gegen [`RCL-prozess-code`](../../../docs/process/review-checklist.md#RCL-prozess-code)
+– **statt** der übrigen Abschnitte der Checkliste. Suppression-Report entfällt (kein Stryker).
+
+**Zusätzlich ein Auditor**, wenn die Änderung eines von beidem betrifft:
+- einen **Hook, ein Gate oder einen Guard** – also Code, dessen Ausfall stumm ist,
+- ein **von mehreren Scripts genutztes Modul** (`_util.py`, `_hook_io.py`, `_wrapper_output.py`,
+  `td_anchors.py`, `anchors.py` und ihresgleichen) – dort trägt ein Fehlgriff weit.
+
+Welcher: `code-quality-auditor`; wurden überwiegend Tests geändert, stattdessen
+`test-quality-auditor`. Nur einer, nicht beide – der Nutzen des zweiten deckt sich hier
+weitgehend mit dem des ersten.
+
+**Sonst kein Agent.** Ein einzelnes Script, ein Wrapper, eine Testdatei: Der Selbstcheck genügt,
+`ruff` und die Werkzeug-Suite laufen ohnehin bei jeder Änderung. Das ist ein bewusster Verzicht,
+kein Vergessen – bei einer Änderungsrate von nahezu jeder Session wäre der Regelfall sonst
+teurer als der Ertrag, und geprüft würde überwiegend Lesbarkeit, also die bereits gedeckte
+Fehlerklasse.
+
+**Grenze des Auditors, im Prompt zu nennen:** Er hat kein Bash, kann also weder den Guard
+auslösen noch einen Wrapper fahren. Er beurteilt Struktur, Testdesign und Meldungsqualität –
+**nicht**, ob der Mechanismus wirkt. Dieser Beleg bleibt die Gegenprobe des Autors; ein
+Auditor-Report ersetzt sie nie.
 
 <a id="RVC-findings-zusammenfuehren"></a>
 ### Findings zusammenführen
