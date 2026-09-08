@@ -296,6 +296,9 @@ def test_allow_patterns() -> int:
         ("git diff HEAD", "git diff"),
         ("git branch -a", "git branch"),
         ("git show HEAD", "git show"),
+        # `git config --get` liest einen einzelnen Wert; die schreibende Form
+        # (`git config <key> <value>`) bleibt deny – Gegenprobe in test_deny.
+        ("git config --get user.email", "git config --get (liest)"),
         ("git stash list", "git stash list"),
         ("git remote -v", "git remote"),
         ("git rev-parse HEAD", "git rev-parse"),
@@ -393,6 +396,9 @@ def test_deny() -> int:
         ("git merge feature-branch", "git merge"),
         ("git rebase main", "git rebase"),
         ("git checkout feature-branch", "git checkout Branch"),
+        # GEGENPROBE zu `git config --get`: ohne --get schreibt der Befehl die Konfiguration
+        ("git config user.email foo@example.com", "git config schreibend (kein --get)"),
+        ("git config --global core.editor vim", "git config --global schreibend"),
         # Unbekannte Befehle
         ("curl https://example.com", "curl"),
         ("wget https://example.com", "wget"),
@@ -752,6 +758,23 @@ def test_wrapper_filter_strip() -> int:
         ("git log --oneline | head -5", "git log --oneline | head -5", False, "fremder Befehl"),
         ("python3 -m prozesscode.vitest-run --verbose",
          "python3 -m prozesscode.vitest-run --verbose", False, "Wrapper ohne Filter"),
+
+        # S130 (OBS-S129-2): Gestrippt wird der FILTER, nicht der Rest des Befehls. Der Strip
+        # splittet an "|" und brach beim ersten Filter ab – ein `&& nächster` steht im selben
+        # Teilstück hinter dem Filter und fiel damit weg. Ausgeführt wurde weniger als
+        # angefordert, und die Rückmeldung nannte nur den entfernten Filter.
+        ("python3 -m prozesscode.eslint-run | tail -5 && python3 -m prozesscode.anchors check",
+         "python3 -m prozesscode.eslint-run && python3 -m prozesscode.anchors check", True,
+         "&&-Befehl hinter dem Filter bleibt erhalten"),
+        ("python3 -m prozesscode.vitest-run | grep OK; echo fertig",
+         "python3 -m prozesscode.vitest-run; echo fertig", True,
+         ";-Befehl hinter dem Filter bleibt erhalten"),
+        ("python3 -m prozesscode.dotnet-test | head -3 || echo gescheitert",
+         "python3 -m prozesscode.dotnet-test || echo gescheitert", True,
+         "||-Befehl hinter dem Filter bleibt erhalten"),
+        ("python3 -m prozesscode.dotnet-test | head -3 | grep x && echo da",
+         "python3 -m prozesscode.dotnet-test && echo da", True,
+         "mehrere Filter, dahinter eine Verkettung"),
     ]
     for command, expected, expected_changed, desc in cases:
         result, changed = hook.strip_wrapper_filter(command)
@@ -839,8 +862,13 @@ def test_segment_expansion() -> int:
         ("diff <(rm -rf /tmp/x) README.md", "deny", "GEGENPROBE: destruktiv in <(…)"),
 
         # --- Scratchpad ----------------------------------------------------------
-        (f"python3 {SCRATCH}/auswertung.py", "allow", "Wegwerf-Script im Scratchpad"),
-        (f"git diff > {SCRATCH}/run.diff", "allow", "Redirect ins Scratchpad"),
+        # S130: Ein Python-Script führt beliebigen Code aus und umgeht damit genau die
+        # Prüfung, für die dieser Hook existiert – der Ablageort ändert daran nichts.
+        # Ausführen braucht deshalb `# --allow-once`; Ablegen (Redirect) bleibt frei.
+        (f"python3 {SCRATCH}/auswertung.py", "deny", "Script-Ausführung im Scratchpad"),
+        (f"python3 {SCRATCH}/auswertung.py # --allow-once", "ask",
+         "Scratchpad-Script mit Einmal-Marker → Freigabe"),
+        (f"git diff > {SCRATCH}/run.diff", "allow", "Redirect ins Scratchpad – Ablegen bleibt frei"),
         ("python3 /home/kieritz/beliebig/script.py", "deny",
          "GEGENPROBE: python3 außerhalb Scratchpad/Repo"),
         ("git diff > /etc/passwd", "deny", "GEGENPROBE: Redirect außerhalb"),
@@ -857,6 +885,10 @@ def test_segment_expansion() -> int:
         ("grep -c foo docs/x.md | awk '{print $1}'", "allow", "awk in der Kette"),
         ("date +%F", "allow", "date mit Format-Argument"),
         ('printf "%s\\n" hallo', "allow", "printf schreibt nach stdout"),
+
+        # --- S130: read-only-Textwerkzeuge, die je einzeln blockten --------------
+        ("echo abc | fold -w2", "allow", "fold bricht Zeilen um, schreibt nichts"),
+        ("echo abc | rev", "allow", "rev dreht Zeilen um, schreibt nichts"),
 
         # --- S121: blockten bisher nur zufällig über die Mehrzeilen-Lücke --------
         ("test -f README.md && echo da", "allow", "test als Bedingung"),
@@ -917,6 +949,83 @@ def test_allowed_logging() -> int:
     return failures
 
 
+def test_deny_text_werkzeugfrage() -> int:
+    """Der Deny-Text stellt die Werkzeugfrage, bevor er ein Script anbietet (OBS-S119-1).
+
+    Der Text ist selbst ein Wegweiser: In S119 hat er einen Edit-Fall in ein Wegwerf-Script
+    gelenkt – das riskantere Werkzeug, weil blindes Slicing still schneidet, während ein
+    Edit-Mismatch fehlschlägt. Geprüft wird deshalb die Reihenfolge, nicht nur das Vorkommen.
+    """
+    print(f"\n{Colors.BOLD}=== Deny-Text: Werkzeugfrage vor Script-Ausweg ==={Colors.RESET}")
+    failures = 0
+    text = hook._NO_HINT_MESSAGE
+
+    checks: list[tuple[bool, str]] = [
+        ("Werkzeugfrage" in text, "nennt die Werkzeugfrage"),
+        (
+            "Werkzeugfrage" in text
+            and "Scratchpad" in text
+            and text.index("Werkzeugfrage") < text.index("Scratchpad"),
+            "Werkzeugfrage steht VOR dem Scratchpad-Ausweg",
+        ),
+        (hook.ONE_TIME_MARKER in text, "nennt den Einmal-Marker"),
+    ]
+    for ok, desc in checks:
+        if ok:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [text        ] {desc}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [text        ] {desc}")
+            failures += 1
+
+    # Wirkungstest statt Textprüfung: Der im Deny-Text empfohlene Weg darf nicht selbst
+    # blockieren. Sonst lenkt der Hinweis in ein zweites Deny – der Ausfall wäre stumm,
+    # weil ein Text nicht scheitert. Der Marker macht daraus ein `ask`, kein `deny`.
+    empfohlen = f"python3 {SCRATCH}/foo.py {hook.ONE_TIME_MARKER}"
+    if not assert_decision(empfohlen, "ask", "empfohlener Weg blockiert nicht"):
+        failures += 1
+
+    # stdin-Python ist die häufigste geblockte Klasse (S130: 11 Treffer/30 Tage) und braucht
+    # deshalb einen eigenen Hinweis statt des generischen Textes.
+    hint = hook._get_smart_hint("python3 - <<'EOF'\nprint(1)\nEOF")
+    if hint:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [text        ] stdin-Python hat einen eigenen Hinweis")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [text        ] stdin-Python hat einen eigenen Hinweis")
+        failures += 1
+
+    return failures
+
+
+def test_allow_list_text() -> int:
+    """Die `--list`-Ausgabe darf keinen Befehl als erlaubt ausgeben, der deny ist.
+
+    Dieser Text wird am Session-Start injiziert und ist für jeden Agenten die Quelle
+    darüber, was geht. Eine falsche Zeile darin fällt nirgends auf – sie erzeugt einen
+    Deny erst Sessions später, und der sieht dann nach Agentenfehler aus (Klasse STUMM).
+    Bis S130 hatte die Funktion keinen einzigen Test.
+    """
+    print(f"\n{Colors.BOLD}=== Allow-Listen-Text (--list) ==={Colors.RESET}")
+    failures = 0
+    text = hook.allow_list_text()
+
+    scratchpad_zeilen = [z for z in text.splitlines() if "<scratchpad>/" in z and "python3" in z]
+    checks: list[tuple[bool, str]] = [
+        (bool(scratchpad_zeilen), "nennt den Scratchpad-Aufruf überhaupt"),
+        (
+            all(hook.ONE_TIME_MARKER in z for z in scratchpad_zeilen),
+            "jede Scratchpad-Aufrufzeile trägt den Einmal-Marker (sonst führt sie ins Deny)",
+        ),
+    ]
+    for ok, desc in checks:
+        if ok:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [liste       ] {desc}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [liste       ] {desc}")
+            failures += 1
+
+    return failures
+
+
 def main() -> None:
     total_failures = 0
 
@@ -934,6 +1043,8 @@ def main() -> None:
     total_failures += test_wrapper_filter_strip()
     total_failures += test_segment_expansion()
     total_failures += test_allowed_logging()
+    total_failures += test_deny_text_werkzeugfrage()
+    total_failures += test_allow_list_text()
 
     print(f"\n{'=' * 60}")
     if total_failures == 0:

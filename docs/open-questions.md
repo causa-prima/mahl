@@ -75,7 +75,7 @@ Eintrag-Format:
 
 ## OQ-S119-3 — Native C#-Union-Types statt `SumType.cs`, sobald .NET 11 verfügbar ist?
 **Frage:** Werden die handgerollten Sum-Types (`Server/Types/SumType.cs`, ADR-S040-1) auf native `union`-Typen umgestellt, sobald das Projekt auf .NET 11 / C# 15 steht?
-**Fällig:** S130 – reiner Backstop. Der tragende Trigger ist der **Wechsel auf .NET 11**; ein Anker dafür existiert im Vokabular nicht (weder Phase noch Szenario treffen es).
+**Fällig:** S150 – verschoben in S130. Die Richtung steht (User-Tendenz deutlich zu den nativen Union-Types); offen ist allein die Verfügbarkeit. Tragender Trigger bleibt der Wechsel auf .NET 11 (GA November 2026 angekündigt), S150 ist nur der Backstop dahinter (~3,3 Tage/Session zum Zeitpunkt der Schätzung). Bei Wiedervorlage sind die beiden Haken unten zu prüfen – Boxing der Struct-Unions und der tatsächliche Spec-Umfang zum GA-Zeitpunkt.
 
 **Hintergrund:** Recherchiert in S119. C# 15 führt `union` als nominale Deklaration ein (`public union Pet(Cat, Dog, Bird);`) mit compiler-erzwungener Exhaustivität in `switch`, dazu den `closed`-Modifier für geschlossene Hierarchien. Verfügbar ab .NET 11 Preview 2, GA für November 2026 angekündigt.
 

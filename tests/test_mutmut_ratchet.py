@@ -190,3 +190,45 @@ def test_geschriebene_baseline_ist_wieder_lesbar(tmp_path, monkeypatch):
     monkeypatch.setattr(mr, "BASELINE", tmp_path / "b.json")
     mr.schreibe_baseline({"prozesscode.a": {"getoetet": 3, "beurteilbar": 4}})
     assert mr.lies_baseline() == {"prozesscode.a": {"getoetet": 3, "beurteilbar": 4}}
+
+
+# --- Unvollständiger Lauf: zwei Scores, zwei Grundgesamtheiten ----------------
+# In S130 meldete die Klinke für `check-bash-permission` 53.5 % → 53.0 % VERSCHLECHTERT.
+# Gemessen waren 237 Mutanten, die Baseline hielt 241 fest: verglichen wurden zwei
+# verschiedene Grundgesamtheiten. Ursache ist ein Abbruch in mutmut selbst (KeyError bei
+# Exit-Code -9 = SIGKILL); der Wrapper rechnet dann mit dem, was vorher durchkam. Ein
+# erfundener Rückschritt ist teurer als gar keine Aussage: Er lässt Tests schreiben, die
+# keine Lücke schließen, und macht die Klinke unglaubwürdig für den echten Fall.
+def test_unvollstaendiger_lauf_meldet_keine_verschlechterung():
+    basis = {"prozesscode.a": {"getoetet": 6, "beurteilbar": 10}}
+    zeilen, schlechter, _neu = mr.ratchet({"prozesscode.a": (5, 10)}, basis,
+                                          offen={"prozesscode.a": 20})
+    assert schlechter is False
+    assert "unvollständig" in " ".join(zeilen).lower()
+
+
+def test_unvollstaendiger_lauf_schreibt_auch_eine_verbesserung_nicht_fort():
+    """Ein Teillauf darf die Messlatte nicht verschieben – in keine Richtung.
+
+    Sonst würde ein zufällig günstiger Ausschnitt zur neuen Baseline und deckte jede
+    spätere echte Verschlechterung bis auf dieses Niveau.
+    """
+    basis = {"prozesscode.a": {"getoetet": 5, "beurteilbar": 10}}
+    _zeilen, _schlechter, neu = mr.ratchet({"prozesscode.a": (9, 10)}, basis,
+                                           offen={"prozesscode.a": 20})
+    assert neu is None
+
+
+def test_vollstaendiger_lauf_meldet_die_verschlechterung_weiterhin():
+    """GEGENPROBE: Ohne offene Mutanten bleibt die Klinke scharf."""
+    basis = {"prozesscode.a": {"getoetet": 6, "beurteilbar": 10}}
+    _zeilen, schlechter, _neu = mr.ratchet({"prozesscode.a": (5, 10)}, basis,
+                                           offen={"prozesscode.a": 0})
+    assert schlechter is True
+
+
+def test_offene_mutanten_werden_je_modul_gezaehlt():
+    """Ein Teillauf in Modul a darf die Aussage über Modul b nicht entwerten."""
+    eintr = [("prozesscode.a.x_f__mutmut_1", mr.NICHT_BEWERTET),
+             ("prozesscode.b.x_g__mutmut_1", "killed")]
+    assert mr.offene_je_modul(eintr) == {"prozesscode.a": 1, "prozesscode.b": 0}

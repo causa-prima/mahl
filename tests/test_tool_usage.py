@@ -6,6 +6,8 @@ dem Wrapper filtert dessen Ausgabe nicht.
 """
 from importlib import import_module
 
+import pytest
+
 tu = import_module("prozesscode.tool-usage")
 
 STAMP = "[2026-07-15 10:00:00] "
@@ -105,3 +107,24 @@ def test_since_includes_the_stichtag_itself(tmp_path):
     log.write_text("[2026-07-30 09:00:00] python3 -m prozesscode.vitest-run\n", encoding="utf-8")
     runs, _, _, _ = tu.measure_filter_quote(log, since="2026-07-30")
     assert sum(runs.values()) == 1
+
+
+def test_since_mit_lsp_meldet_sich_statt_still_zu_wirkungslos_zu_sein(monkeypatch, capsys):
+    """`--since` wirkt nur auf die Filter-Quote – das muss auffallen, nicht durchrutschen.
+
+    In S130 wurde `--lsp --since <datum>` aufgerufen, um die LSP-Nutzung ab einem Stichtag zu
+    messen. Die Ausgabe war identisch zum Lauf ohne `--since`: Die Option wird von `print_lsp`
+    gar nicht entgegengenommen. Beide Zahlen sahen plausibel aus, und nur der Vergleich beider
+    Läufe deckte auf, dass die zweite gar nicht die erhobene Größe war.
+    """
+    monkeypatch.setattr("sys.argv", ["tool-usage", "--lsp", "--since", "2026-07-25"])
+    with pytest.raises(SystemExit) as fehler:
+        tu.main()
+    assert fehler.value.code != 0
+    assert "--since" in capsys.readouterr().err
+
+
+def test_since_mit_filter_laeuft_weiterhin(monkeypatch):
+    """GEGENPROBE: Die Ablehnung darf den regulären Anwendungsfall nicht mittreffen."""
+    monkeypatch.setattr("sys.argv", ["tool-usage", "--filter", "--since", "2026-08-08"])
+    tu.main()  # kein SystemExit

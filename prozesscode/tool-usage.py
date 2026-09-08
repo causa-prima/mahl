@@ -217,6 +217,13 @@ def main() -> None:
         parser.error(f"--since braucht das Format YYYY-MM-DD, nicht {args.since!r}")
 
     beide = not (args.filter or args.lsp)
+    # `--since` wirkt nur auf die Filter-Quote; die LSP-Auswertung kennt keinen Stichtag.
+    # Ohne diese Meldung liefe `--lsp --since <datum>` durch und gäbe die Zahlen über den
+    # GESAMTEN Zeitraum aus – plausibel aussehend, aber eine andere Größe als die verlangte
+    # (S130, real passiert: Nur der Vergleich mit dem Lauf ohne `--since` deckte es auf).
+    if args.since and args.lsp and not args.filter:
+        parser.error("--since wirkt nur auf die Filter-Quote (--filter), nicht auf --lsp. "
+                     "Die LSP-Auswertung gruppiert nach Session-Art, nicht nach Datum.")
     if args.filter or beide:
         print_filter_quote(args.verbose, args.since)
     if beide:

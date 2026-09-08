@@ -102,6 +102,16 @@ _NORMALIZE_ROOT = os.path.normpath(_REPO_ROOT)
 
 # Bare Repo-Root (optional mit einem Trailing-Slash) als eigenständige
 # Verzeichnis-Referenz – gefolgt von Whitespace, Ende oder einem Shell-Operator.
+#
+# Diese Zeile sieht nach Kosmetik aus (kürzerer Befehl, sonst nichts) und ist es nicht –
+# in S130 einmal durchgemessen, damit es niemand ein zweites Mal versucht. Nimmt man sie
+# heraus, brechen drei Dinge: `cd_npm_conflict` liest das cd-Ziel inhaltlich und hält nur
+# "." für "im Root geblieben", also würde `cd <root> && npm run x` fälschlich als
+# Verzeichniswechsel geblockt; `cd <root>/` wird vom nachfolgenden Präfix-Replace zu einem
+# argumentlosen `cd `; und der umgeschriebene Befehl in `_build_allow_output` ändert sich mit.
+# Der Preis dafür ist bekannt und akzeptiert: Steht die Shell nach einem vorangehenden `cd`
+# nicht im Repo-Root, heißt `cd .` "bleib hier" statt "geh zum Root". Das trifft nur
+# innerhalb EINES Befehls – zwischen Bash-Aufrufen setzt das Harness das Verzeichnis zurück.
 _BARE_ROOT_RE = re.compile(re.escape(_NORMALIZE_ROOT) + r'/?(?=\s|$|[&|;])')
 
 _NORMALIZE_HINT = (
@@ -178,15 +188,28 @@ def werkzeug_aufruf(modul: str) -> str:
 _WRAPPER_RUN_RE = re.compile(
     r'python3\s+' + werkzeug_aufruf("(?:" + "|".join(_FILTERABLE_WRAPPERS) + ")"))
 _FILTER_CMD_RE = re.compile(r'(?:tail|head|grep|sed|awk)\b')
+# Verkettung hinter einem Filter: ab hier steht ein eigener Befehl, kein Filter mehr.
+_VERKETTUNG_RE = re.compile(r'(?:&&|\|\||;)')
 
 
 def strip_wrapper_filter(command: str) -> tuple[str, bool]:
     """Entfernt nachgelagerte Filter-Pipes hinter einem Wrapper-Aufruf.
 
-    Gibt (neuer_befehl, geändert) zurück. Zwei Abgrenzungen tragen die Korrektheit:
+    Gibt (neuer_befehl, geändert) zurück. Drei Abgrenzungen tragen die Korrektheit:
     Ein Filter **vor** dem Wrapper filtert dessen Ausgabe nicht (`grep … | python3 … .py`)
-    und bleibt unberührt; und alles zwischen Wrapper und erstem Filter bleibt erhalten,
-    damit Argumente und Redirects (`--layer frontend 2>&1`) nicht verlorengehen.
+    und bleibt unberührt; alles zwischen Wrapper und erstem Filter bleibt erhalten,
+    damit Argumente und Redirects (`--layer frontend 2>&1`) nicht verlorengehen;
+    und hinter dem Filter endet die Filterung an der ersten Verkettung.
+
+    Der dritte Punkt ist S130 (OBS-S129-2): Zuvor brach die Schleife beim ersten Filter ab
+    und verwarf den ganzen Rest. Ein `&& nächster-befehl` steht im selben `|`-Teilstück
+    **hinter** dem Filter und fiel damit weg – ausgeführt wurde weniger als angefordert,
+    während die Rückmeldung nur den entfernten Filter nannte. Ein still verschwundener
+    Befehl fällt niemandem auf, der die Ausgabe nicht Zeile für Zeile gegenprüft.
+
+    Bewusst ohne String-Maskierung: Ein `&&` im Argument eines Filters (`grep "a && b"`)
+    wird als Verkettung gelesen, und der Filter bleibt dann stehen. Das ist die sichere
+    Richtung – es wird zu viel erhalten, nie zu wenig.
     """
     match = _WRAPPER_RUN_RE.search(command)
     if not match:
@@ -194,14 +217,26 @@ def strip_wrapper_filter(command: str) -> tuple[str, bool]:
 
     parts = command[match.end():].split("|")
     keep = [parts[0]]
-    for part in parts[1:]:
+    schwanz = ""
+    for i, part in enumerate(parts[1:], start=1):
         if _FILTER_CMD_RE.match(part.strip()):
-            break  # ab hier ist der Rest reine Filterung
+            # Ab hier ist es Filterung – aber nur bis zur ersten Verkettung. Der Rest wird
+            # aus den ungeteilten Stücken gelesen, damit ein `||` den Split übersteht.
+            rest = "|".join(parts[i:])
+            treffer = _VERKETTUNG_RE.search(rest)
+            schwanz = rest[treffer.start():] if treffer else ""
+            break
         keep.append(part)
 
     if len(keep) == len(parts):
         return command, False
-    return (command[:match.end()] + "|".join(keep)).rstrip(), True
+
+    ergebnis = (command[:match.end()] + "|".join(keep)).rstrip()
+    if schwanz:
+        # Das `.rstrip()` entfernt den Abstand, der im Original vor dem Filter stand –
+        # `&&`/`||` bekommen ihn zurück, `;` schließt üblicherweise direkt an.
+        ergebnis += schwanz if schwanz.startswith(";") else " " + schwanz
+    return ergebnis, True
 
 
 # ---------------------------------------------------------------------------
@@ -330,9 +365,12 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         'jscpd immer via Script aufrufen:\n'
         '  python3 -m prozesscode.jscpd-run [--verbose]',
     ),
-    # python3 mit absolutem Pfad (Ausnahmen, beide in ALLOW_PATTERNS: das globale
-    # recall-session-Script und das Session-Scratchpad – beide liegen zwangsläufig
-    # außerhalb des Repos, ein relativer Pfad existiert dafür nicht)
+    # python3 mit absolutem Pfad. Zwei Ausnahmen, beide liegen zwangsläufig außerhalb des
+    # Repos – ein relativer Pfad existiert dafür nicht:
+    #   recall-session: steht in ALLOW_PATTERNS, läuft also durch.
+    #   Scratchpad: seit S130 NICHT mehr erlaubt (s. dort). Der Lookahead bleibt trotzdem,
+    #     damit der Aufruf als gewöhnliches Deny mit der Werkzeugfrage landet statt mit
+    #     „nutze einen relativen Pfad" – ein Rat, den man hier nicht befolgen kann.
     (
         re.compile(r'\bpython3\s+(?!\S*\.claude/skills/recall-session/scripts/recall\.py)'
                    + (r'(?!' + re.escape(_SCRATCHPAD) + r'/)' if _SCRATCHPAD else '')
@@ -567,6 +605,9 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     (re.compile(r'^sort\b'), 'Shell', 'sort'),
     (re.compile(r'^uniq\b'), 'Shell', 'uniq'),
     (re.compile(r'^tr\b'), 'Shell', 'tr'),
+    # Wie tr/cut: formen stdin um und schreiben nach stdout (S130, OBS-S127-2 – blockten je einzeln).
+    (re.compile(r'^fold\b'), 'Shell', 'fold'),
+    (re.compile(r'^rev\b'), 'Shell', 'rev'),
     (re.compile(r'^cut\b'), 'Shell', 'cut'),
     (re.compile(r'^dirname\b'), 'Shell', 'dirname'),
     (re.compile(r'^basename\b'), 'Shell', 'basename'),
@@ -594,12 +635,12 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         None,
         'python3 -m prozesscode.<modul>  (Prozess-Code als Paket)',
     ),
-    # Wegwerf-Scripte im Session-Scratchpad – der reguläre Ort für Ad-hoc-Auswertungen.
-    *([(
-        re.compile(r'^python3\s+(?!-)' + re.escape(_SCRATCHPAD) + r'/\S+\.py\b'),
-        None,
-        'python3 <scratchpad>/<script>.py  (Wegwerf-Auswertungen)',
-    )] if _SCRATCHPAD else []),
+    # Kein Allow-Pattern für Scratchpad-Scripte (S130, OBS-S127-2): Ein Python-Script führt
+    # beliebigen Code aus und umgeht damit genau die Prüfung, für die dieser Hook existiert –
+    # der Ablageort ändert daran nichts. Bis S130 war `python3 <scratchpad>/x.py` erlaubt,
+    # während `python3 - <<EOF` blockte; das war keine Sicherheitsgrenze, sondern ein Umweg
+    # um dieselbe. Wegwerf-Auswertungen laufen weiter, brauchen aber `# --allow-once`.
+    # Das ABLEGEN im Scratchpad bleibt frei (SAFE_REDIRECT_PREFIXES) – nur das Ausführen nicht.
     # Globales recall-session-Script (read-only Session-Log-Analyse, liegt unter
     # ~/.claude/skills/ außerhalb des Repos). Absoluter Pfad ist hier erlaubt –
     # die WRONG_APPROACH-Regel für absolute python3-Pfade nimmt es explizit aus.
@@ -608,6 +649,14 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         re.compile(r'^python3\s+\S*\.claude/skills/recall-session/scripts/recall\.py\b'),
         None,
         'python3 ~/.claude/skills/recall-session/scripts/recall.py <befehl>  (read-only Session-Log-Analyse)',
+    ),
+    # `git config --get…` liest einen Wert (auch --get-all/--get-regexp). Ohne `--get` schreibt
+    # der Befehl die Konfiguration und bleibt deny – deshalb ein eigenes Muster statt eines
+    # weiteren Subcommands in der Liste darunter (S130, OBS-S127-2).
+    (
+        re.compile(r'^git\s+(?:-C\s+\S+\s+)?config\s+--get\b'),
+        None,
+        'git [-C <pfad>] config --get <key>  (lesend; ohne --get schreibt git config)',
     ),
     # git read-only (optional mit -C <pfad>, um in anderem Repo/Worktree zu lesen)
     (
@@ -632,6 +681,23 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
 # ---------------------------------------------------------------------------
 # Smart-Deny-Hints (für UNKNOWN-Fälle ohne passendes Pattern)
 # ---------------------------------------------------------------------------
+# Der Kern beider Deny-Texte, einmal formuliert (S130, OBS-S119-1): Ein Deny lenkte bis dahin
+# direkt in ein Wegwerf-Script, ohne die Vorfrage zu stellen, ob überhaupt eines nötig ist.
+# Genau ein Text erreicht den Agenten – der Smart-Hint ODER `_NO_HINT_MESSAGE` –, deshalb eine
+# geteilte Konstante statt zweier Fassungen, die auseinanderlaufen.
+_WERKZEUGFRAGE = (
+    "Erst die Werkzeugfrage – ein Deny heißt nicht, dass ein Script fällig ist:\n"
+    "  Datei ändern → Edit · Abschnitt lesen → Read / doc.py get\n"
+    "  suchen → Grep, Glob · Tracker/Doku → prozesscode-Werkzeug (tracker zeigt welches)\n"
+    "Ein eigenes Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist als\n"
+    "diese Werkzeuge – nicht deshalb, weil Bash gerade geblockt hat. Oft ist es das\n"
+    "riskantere Werkzeug: Ein Edit-Mismatch schlägt fehl, blindes Slicing schneidet still.\n"
+    "\n"
+    "Bleibt es echte Ad-hoc-Logik: ins Scratchpad schreiben, dann ausführen mit\n"
+    "  python3 <scratchpad>/foo.py " + ONE_TIME_MARKER + "\n"
+    "Auch das Ausführen ist freigabepflichtig – ein Script führt beliebigen Code aus und\n"
+    "umginge sonst genau diese Prüfung."
+)
 _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r'\bdocker-compose\b'),
@@ -662,14 +728,15 @@ _SMART_DENY_HINTS: list[tuple[re.Pattern[str], str]] = [
         "  Erlaubt: npm run <script>, npm audit, npm outdated, npm update, npm ci\n"
         "  Tests/Lint/Mutation NICHT direkt – via Wrapper-Scripts (vitest-run.py, eslint-run.py, …).",
     ),
+    # `python3 -c` und `python3 - <<EOF` sind derselbe Fall: beliebiger Code über die
+    # Kommandozeile bzw. stdin. Der Heredoc-Body ist zwar lesbar, aber der Hook prüft ihn
+    # nicht – ausgeführt wird er trotzdem (S130, OBS-S127-2). Die stdin-Form ist die
+    # häufigste geblockte Klasse; ohne eigenes Muster fiele sie auf den generischen Text.
     (
-        re.compile(r'^python3\s+-c\b'),
-        "python3 -c führt beliebigen Code aus (nicht erlaubt).\n"
-        "Für Ad-hoc-Analyse: Script ins Scratchpad schreiben (Write-Tool), dann\n"
-        "  python3 <scratchpad>/foo.py\n"
-        "Das Scratchpad liegt außerhalb des Repos und verschwindet mit der Session –\n"
-        "nichts muss aufgeräumt werden.\n"
-        "Für Datei-Inspektion: Read/Grep/Glob-Tools statt Python.",
+        re.compile(r'^python3\s+(?:-c\b|-\s*(?:<<|$))'),
+        "python3 -c / python3 - führt beliebigen Code aus – daran ändert der Heredoc nichts:\n"
+        "Der Body ist lesbar, geprüft wird er nicht.\n"
+        "\n" + _WERKZEUGFRAGE,
     ),
     (
         re.compile(r'^(?:for|while)\b'),
@@ -705,7 +772,7 @@ _NO_HINT_MESSAGE = (
     "Befehl nicht auf der Allow-Liste. Erlaubte Befehle + Alternativen ansehen:\n"
     "  python3 -m prozesscode.hooks.check-bash-permission --list\n"
     "\n"
-    "Für Ad-hoc-Logik: Script ins Scratchpad schreiben, dann python3 <scratchpad>/foo.py.\n"
+    + _WERKZEUGFRAGE + "\n"
     "\n"
     "Falls --list nichts Passendes zeigt – dem User erklären:\n"
     "  (1) Was der Befehl tun soll\n"
@@ -1325,7 +1392,11 @@ def allow_list_text() -> str:
         schreib("Scratchpad (Wegwerf-Scripte, Zwischenergebnisse, Redirect-Ziel):")
         schreib(f"  {_SCRATCHPAD}/")
         schreib("  Liegt außerhalb des Repos, verschwindet mit der Session – kein Aufräumen nötig.")
-        schreib("  python3 <scratchpad>/<name>.py ist erlaubt, .claude/tmp/ ist KEIN Schreibziel mehr.")
+        schreib("  Ablegen ist frei (Redirect, Write-Tool); .claude/tmp/ ist KEIN Schreibziel mehr.")
+        schreib("  AUSFÜHREN braucht eine Freigabe: python3 <scratchpad>/<name>.py " + ONE_TIME_MARKER)
+        schreib("  – ein Script führt beliebigen Code aus und umginge sonst diese Prüfung.")
+        schreib("  Vorher die Werkzeugfrage: Edit/Read/Grep/Glob und die prozesscode-Werkzeuge")
+        schreib("  zuerst; ein Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist.")
         schreib()
     schreib("Schreiben in Projektdokumente (User-Freigabe nötig, kein Marker):")
     schreib("  python3 -m prozesscode.obs add|set …       → docs/kaizen/observations.md")

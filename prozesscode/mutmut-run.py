@@ -260,12 +260,26 @@ def nach_modul(eintraege: list[tuple[str, str]],
     return {modul: score(paare, ignorieren) for modul, paare in je_modul.items()}
 
 
+def offene_je_modul(eintraege: list[tuple[str, str]]) -> dict[str, int]:
+    """{Modulpfad: Zahl der nicht bewerteten Mutanten} – der Nenner-Vorbehalt der Klinke.
+
+    Je Modul und nicht je Lauf, aus demselben Grund wie `nach_modul`: Ein Teillauf in einem
+    Modul darf die Aussage über ein anderes nicht entwerten.
+    """
+    je_modul: dict[str, int] = {}
+    for name, status in eintraege:
+        modul = name.rsplit(".", 1)[0]
+        je_modul[modul] = je_modul.get(modul, 0) + (1 if status == NICHT_BEWERTET else 0)
+    return je_modul
+
+
 def _prozent(getoetet: int, beurteilbar: int) -> str:
     return f"{100 * getoetet / beurteilbar:.1f} %" if beurteilbar else "–"
 
 
 def ratchet(gemessen: dict[str, tuple[int, int]],
-            baseline: dict) -> tuple[list[str], bool, dict | None]:
+            baseline: dict,
+            offen: dict[str, int] | None = None) -> tuple[list[str], bool, dict | None]:
     """Vergleicht die gemessenen Scores gegen die Baseline.
 
     Rückgabe: (Meldezeilen, verschlechtert, fortzuschreibende Baseline oder None).
@@ -279,7 +293,18 @@ def ratchet(gemessen: dict[str, tuple[int, int]],
     Verglichen wird als **Bruch**, nicht in gerundeten Prozenten: 100/300 und 33/100 sind
     auf zwei Nachkommastellen gleich, als Bruch ist das zweite kleiner. Eine Klinke, die
     kleine Rückschritte wegrundet, fängt genau die, die niemand bemerkt, nicht.
+
+    **Ein unvollständiger Lauf wird nicht verglichen** (`offen`, S130). Kam der Lauf nicht
+    durch alle Mutanten, steht der Score über einem anderen Nenner als die Baseline – die
+    Differenz misst dann den Ausschnitt, nicht die Tests. Belegt an
+    `check-bash-permission`: 237 bewertet gegen eine Baseline von 241, gemeldet als
+    „53.5 % → 53.0 % VERSCHLECHTERT". Eine erfundene Verschlechterung ist teurer als keine
+    Aussage – sie lässt Tests schreiben, die keine Lücke schließen, und stumpft die Klinke
+    für den echten Fall ab. Fortgeschrieben wird dann ebenfalls nicht, auch keine
+    Verbesserung: Ein günstiger Ausschnitt als neue Messlatte deckte jeden späteren
+    Rückschritt bis auf dieses Niveau.
     """
+    offen = offen or {}
     zeilen: list[str] = []
     verschlechtert = False
     neu = dict(baseline)  # fremde Module bleiben unberührt – ein Ausschnitt löscht nichts
@@ -289,6 +314,15 @@ def ratchet(gemessen: dict[str, tuple[int, int]],
         getoetet, beurteilbar = gemessen[modul]
         if not beurteilbar:
             zeilen.append(f"  {modul}: kein bewerteter Mutant – nichts zu vergleichen")
+            continue
+
+        if offen.get(modul):
+            zeilen.append(f"  {modul}: {_prozent(getoetet, beurteilbar)} über "
+                          f"{beurteilbar} von {beurteilbar + offen[modul]} Mutanten – "
+                          f"Lauf unvollständig, kein Vergleich mit der Baseline")
+            zeilen.append("    Erneut laufen lassen; bleibt die Zahl stehen, kommt mutmut "
+                          "auf diesem Modul nicht durch – dann ist die Klinke hier ohne "
+                          "Aussage, und das Modul braucht eine eigene Untersuchung.")
             continue
 
         vorher = baseline.get(modul)
@@ -427,7 +461,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.ratchet:
         zeilen, schlechter, fortschreibung = ratchet(
-            nach_modul(eintraege, an_texten), lies_baseline())
+            nach_modul(eintraege, an_texten), lies_baseline(),
+            offene_je_modul(eintraege))
         if fortschreibung is not None:
             schreibe_baseline(fortschreibung)
         details = (details or []) + [""] + zeilen

@@ -41,7 +41,9 @@ kritische-regeln:
 - **Auto-deny**: Alle anderen Befehle werden automatisch abgelehnt.
 - **`# --allow-once`**: Marker an den Befehl hängen → Hook fragt den User. Wird geloggt in `.claude/tmp/denied-commands.log`.
 
-**Wegwerf-Artefakte gehören ins Session-Scratchpad**, nicht ins Repo: Analyse-Scripte, Zwischenergebnisse, Diffs, Redirect-Ziele. Es liegt außerhalb des Repos, wird nicht committet und verschwindet mit der Session – nichts muss aufgeräumt werden. `python3 <scratchpad>/<name>.py` und Redirects dorthin sind erlaubt; den konkreten Pfad zeigt `check-bash-permission.py --list`. In `.claude/tmp/` leben nur die beiden Permission-Logs.
+**Wegwerf-Artefakte gehören ins Session-Scratchpad**, nicht ins Repo: Analyse-Scripte, Zwischenergebnisse, Diffs, Redirect-Ziele. Es liegt außerhalb des Repos, wird nicht committet und verschwindet mit der Session – nichts muss aufgeräumt werden. Redirects dorthin sind erlaubt; den konkreten Pfad zeigt `check-bash-permission.py --list`. In `.claude/tmp/` leben nur die beiden Permission-Logs.
+
+Das **Ausführen** eines dort liegenden Scripts ist dagegen freigabepflichtig (`python3 <scratchpad>/<name>.py # --allow-once`): Ein Script führt beliebigen Code aus und umginge sonst genau die Prüfung, für die der Hook existiert – der Ablageort ändert daran nichts. Davor steht ohnehin die Werkzeugfrage: Edit, Read, Grep/Glob und die `prozesscode`-Werkzeuge zuerst; ein eigenes Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist als diese – nicht deshalb, weil Bash gerade geblockt hat.
 
 **Zusammengesetzte Befehle** sind erlaubt, solange jedes Teilstück erlaubt ist – Verkettung, Zeilenumbruch, Variablenzuweisung, Substitution, Heredoc, Schleifen (im Rumpf nur lesende Befehle) und Sub-Befehle aus `find -exec`/`xargs`. Nicht erlaubt ist indirekte Ausführung (`$CMD`, `eval`, `bash -c`), weil sie jede Prüfung aushebelt.
 

@@ -77,23 +77,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
-## OBS-S101-1 – Flaky-Timeout einzelner Vitest-Tests unter Stryker-Systemlast
-- Quelle: Subagent
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: `US904_HappyPath_ReopenDialogAfterCancel_FieldsAreEmpty` lief während eines Stryker-Dry-Runs in einen 5000-ms-Timeout, isoliert (`vitest-run.py --filter`) sofort grün (~900 ms). Ursache vermutlich Systemlast durch viele parallele Checker-/Runner-Prozesse. Kein echter Regress, aber ein solcher Timeout kann einen Übergabe-`qa-check`-Hash fälschlich scheitern lassen (falscher Rot-Alarm).
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: –
-
 ## OBS-S085-3 – Agenten durchsuchen Tool-Outputs selbst statt unsere gezielten Scripte zu nutzen
 - Quelle: User
-- Status: IN BEOBACHTUNG bis S126 – **S115: Filter-Rewrite gebaut (mechanischer Guard), Wirkung offen; Re-Trigger an Wrapper-Läufe statt an eine Session-Nummer gebunden** (s. Entscheidung). S087: A (Wrapper-Audit, kein Change) + C (`--list`/SessionStart-Hinweis „ohne tail/grep") + D (`allowed-commands.log`) umgesetzt, B (Deny) zurückgestellt; **S095 wiederaufgegriffen** nach D-Analyse; **S099 (Drain) erneut aufgeschoben bis S109**; **S109: gemessen + Wrapper-Ausgabe umgebaut, Wirkung offen**.
+- Status: IN BEOBACHTUNG bis S138 – S130: gemessen, Trigger knapp verfehlt (88 von 100 Läufen), Quote aber deutlich gefallen
 - Impact: MITTEL    Häufigkeit: häufig
 - Kategorie: PROZESS    Kontext: Mutation-Testing
 - Beobachtung: Agenten greppen/`tail`-en Stryker-&-Co-Output, obwohl unsere Scripte gezielt nur das Relevante ausgeben sollen (Deny-Log S086: 81 head/tail-Zeilen).
-- Entscheidung/Maßnahme: **A + C + D**; **B zurückgestellt** bis mehr Daten (mittlere Gefahr, könnte legitime Nutzung blocken). C über `--list` + SessionStart-Injection: knappe Script-Anwendungsfälle + Hinweis „normal **ohne** Filter nutzen (Output ist optimal); wo nicht → als Beobachtung sammeln". D = erlaubte Befehle loggen. — **S115: mechanischer Guard gebaut, als Rewrite statt als Deny.** Erstmals **gemessen statt gerechnet**: `tool-usage.py` um `--since` erweitert (der Zeitstempel stand längst im Log, die Auswertung gruppierte ihn nur auf den Monat und warf den Tag weg – ein Stichtag mitten im Monat war deshalb nicht schneidbar). Ab dem Umbau-Commit (29.07. 00:49) **110 Läufe, 105 gefiltert = 95 %** gegen die Basislinie 83 %. Damit ist das vorab definierte Kriterium erfüllt: drei Soft-Maßnahmen (Hinweis S087, Rezidiv S090, Output-Umbau S109) haben nichts bewegt, das Verhalten ist antrainiert. **Gewählt: Rewrite, nicht Deny** (User-Entscheid) – `strip_wrapper_filter()` entfernt nachgelagerte Filter-Pipes hinter einem Wrapper-Aufruf via `updatedInput`, mit sichtbarem Hinweis auf `--verbose`. Begründung gegen das Deny: Subagenten starten immer frisch und können über Sessions nicht umlernen – ein Deny kostet sie jede Session erneut eine verlorene Runde (105 im Messfenster), der Rewrite keine. Zwei Abgrenzungen tragen die Korrektheit: ein Filter **vor** dem Wrapper filtert dessen Ausgabe nicht und bleibt unberührt, und zwischen Wrapper und erstem Filter bleibt alles erhalten (Argumente, `2>&1`). Analyse-Scripte sind ausgenommen – ihre lange Ausgabe ist zum Zerschneiden gedacht (dieselbe Grenze wie `tool-usage.py` WRAPPERS). **Deny (B) bleibt die Eskalationsstufe** (User-Vorgabe: „ggf. später zum Deny wechseln"). **Re-Trigger: ≥ 100 Wrapper-Läufe nach dem Rewrite-Stichtag 2026-08-08**, dann `python3 -m prozesscode.tool-usage --filter --since 2026-08-08`. Bewusst an Läufe statt an eine Session-Nummer gebunden: Zwischen dem 30.07. und heute fielen in drei Sessions nur **6** Läufe an (Drain-/tech-debt-Sessions führen kaum Wrapper aus) – ein Kalendertermin würde erneut auf Null-Daten urteilen, derselbe Fehler wie im LSP-Pilot. Backstop-Termin S126. **Sinkt die Quote dann nicht deutlich, ist der Rewrite widerlegt und das Deny fällig.**
+- Entscheidung/Maßnahme: S130-Drain-Entscheid: aufgeschoben, weil der vorab definierte Re-Trigger (>=100 Wrapper-Laeufe ab 2026-08-08) mit 88 Laeufen knapp nicht erreicht ist. Auf 88 zu urteilen waere genau der Fehler, den dieser Eintrag selbst benennt. Die Messung ist trotzdem aussagekraeftig und zeigt in die erwartete Richtung: 88 Laeufe, davon 55 gefiltert = 62 Prozent, gegen die Basislinie von 83 Prozent (S109) bzw. 85 Prozent (S114). Ein Rueckgang um gut 20 Punkte – der Rewrite aus S115 wirkt also, und das Deny (B) ist derzeit NICHT faellig. Verteilung der gefilterten Laeufe: jscpd-run 19, qa-check 15, dotnet-test 9, dotnet-stryker 3, vitest-run 3, stryker-summary 3, playwright-test 2, eslint-run 1. Re-Trigger unveraendert: >=100 Laeufe ab 2026-08-08, dann python3 -m prozesscode.tool-usage --filter --since 2026-08-08. Die fehlenden 12 Laeufe entstehen praktisch nur in Implementierungs-Sessions; seit S125 lief keine. Backstop S138. Bestaetigt sich die 62 Prozent bei >=100 Laeufen, ist der Rewrite belegt und der Eintrag wird UMGESETZT statt eskaliert.
 - **Rezidiv (S090, Quelle: User):** Trotz Gegenmaßnahme C erneut aufgetreten — `grep` mehrfach auf qa-check-Output, `tail` auf playwright-test. Der Session-Hinweis (C) allein verhindert das Verhalten nicht zuverlässig.
 - **D-Analyse durchgeführt + Neubewertung (S095):** `allowed-commands.log` ausgewertet (~15+ Filter-Instanzen S90–93). Befund: das Filtern ist **nicht** einheitlich Misuse, sondern zerfällt in drei Klassen — (1) **reines Kürzen** auf bereits kuratiertem Output (`vitest-run|tail`, `eslint-run|tail`) → Disziplin-Thema; (2) **gezieltes Feld-Extrahieren**, weil der Wrapper das Verdikt vergräbt (`qa-check --verify | grep | tail`, `stryker | grep Score/Survived`) → Wrapper sollte das Verdikt klar ausgeben; (3) **legitimer Workaround**, weil der Wrapper die relevante Info gar nicht liefert (`dotnet-test` bei RED ohne Assertion-Details → **OBS-S091-1**). Konsequenz (User-Entscheid): **kein pauschales Deny (B)** — es würde Klasse 2+3 bestrafen. Stattdessen **zuerst die Wrapper fixen** (Klasse 2+3, s. OBS-S091-1/-3), *dann* neu bewerten, ob für Restklasse 1 überhaupt noch eine Maßnahme nötig ist.
 - **S099-Drain-Entscheid (erneut aufgeschoben bis S109):** Wrapper-Fixes OBS-S091-1/-3 in S096 erledigt (Blocker weg). User-Korrektur zur Restklasse 1: sie hat **konkreten Schaden** (höherer Token-/Zeitverbrauch, weil der Output anschließend von Hand ausgewertet wird, statt den Tool-Output zu nutzen bzw. eine **Verbesserung am Wrapper** vorzuschlagen) — nicht bloß Disziplin. Da seit S096 kaum Anwendungsgelegenheit bestand, erst ~10 Sessions Post-S096-Daten sammeln, dann Maßnahme neu bewerten (ggf. doch Deny B, ggf. Wrapper-Nachschärfung). Re-Trigger: mehrere Läufe mit realer Wrapper-Nutzung.
@@ -104,11 +94,11 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S085-4 – Kein Language-Server für die Agenten-Programmierung im Einsatz
 - Quelle: User
-- Status: IN BEOBACHTUNG bis S126 – **S115 (Drain): vierte Runde, Termin an TS-Sessions gebunden statt an eine Session-Nummer** (s. Entscheidung). **S109 (Drain): gemessen, Nutzung nahe null → Empfehlung geschärft statt Pilot beendet.** **S099 (Drain) erneut aufgeschoben:** seit Aktivierung (2026-06-20) kaum echte TS-Arbeit, Evidenz-Schwelle (≥ ~3 TS-Sessions) nicht erreicht. **Pilot durchgeführt & technisch validiert (2026-06-20):** `typescript-lsp`@claude-plugins-official läuft auf **nativem** Claude-Install 2.1.183 (anthropics/claude-code #20050 hier **nicht** relevant – galt für ältere Versionen); `ENABLE_LSP_TOOL` nicht nötig; `/reload-plugins` statt Neustart genügt. Alle Ops ok (hover, documentSymbol, goToDefinition cross-file, workspaceSymbol, findReferences); **semantisch präziser als grep** (Kommentar-/String-Treffer korrekt ausgeschlossen). **CAVEAT:** erster `findReferences` direkt nach Plugin-Load = kalter/unvollständiger Index → erst nach Warmlauf vollständig (bei verdächtig wenigen Treffern wiederholen). C# weiter zurückgestellt (#1359). **S101 – Werkzeug-Zugang korrigiert:** LSP war nur dem Orchestrator zugeteilt, NICHT den Layer-Implementern noch den Auditoren; Fix S101 nahm `LSP` in die `tools` von frontend-/backend-layer-implementer + code-quality-/functional-correctness-/test-quality-/ux-ui-/security-auditor auf (workflow-auditor bewusst NICHT – auditiert Prozess, nicht Code). Konsequenz: Evidenzfenster für Implementer/Auditor-Nutzung startet effektiv ab S101.
+- Status: IN BEOBACHTUNG bis S145 – S130: fünfte Runde, mit Abbruchklausel gegen die Selbstblockade
 - Impact: MITTEL–HOCH (von GERING revidiert)    Häufigkeit: häufig
 - Kategorie: TOOLING    Kontext: Sonstiges
 - Beobachtung: Wir nutzen aktuell **keinen** Language-Server, der Claude Code Code-Intelligence bereitstellt. Recherche (S086): Claude Code v2.1.172 unterstützt LSP (`ENABLE_LSP_TOOL` + Marketplace-Plugin pro Sprache). Nutzen potenziell **hoch** (Auto-Typfehler nach jedem Edit, find-refs, Symbole, Call-Hierarchie → kürzere Edit-Fix-Schleifen) → Impact GERING→MITTEL/HOCH revidiert.
-- Entscheidung/Maßnahme: **(a) TS-LSP-Pilot** (`typescript-lsp`-Plugin); **(b) C# zurückgestellt** — offene Showstopper im Claude-Code-LSP-*Client* (claude-plugins-official#1359: 3 server→client-Requests unbeantwortet → csharp-ls-Solution-Loading bricht; claude-code#38683 Roslyn-Kompat). Trigger zum Wiederaufgreifen = #1359 geschlossen. — **S115-Entscheid (vierte Runde, User): Termin an TS-Sessions gebunden statt an eine Session-Nummer.** Die S109-Sichtbarkeitsmaßnahme ist im Bestand **verifiziert** (LSP-Block in `frontend-layer-implementer.md` und `code-quality-auditor.md`, samt Ladehinweis und Kalt-Index-Caveat) – nach ihr liefen aber nur **zwei** TS-Sessions (S110, S111), die vorab definierte Mindest-Evidenz von ≥3 ist also nicht erreicht; ein Urteil darauf wäre das im Eintrag ausdrücklich ausgeschlossene 'Urteil auf Null-Daten'. **S115-Messung:** 9 Calls gesamt, davon **1 in 22 implementierung-Sessions** – und dieser eine vom 2026-07-10, mithin *vor* der Maßnahme; post-S109 somit null. **Re-Trigger: 3 weitere Sessions, in denen ein `frontend-layer-implementer` oder `code-quality-auditor` real auf TS-Code läuft.** Bewusst nicht 'TS-Session': nur diese beiden Agenten tragen den LSP-Block, sonst wird erneut Gelegenheit statt Werkzeug gemessen. Backstop-Termin S126. **Vierte Nullrunde = verwerfen, ohne weitere Verlängerung.**
+- Entscheidung/Maßnahme: S130-Drain-Entscheid (User): aufgeschoben, obwohl der Eintrag selbst 'vierte Nullrunde = verwerfen, ohne weitere Verlaengerung' festlegt. Grund fuer die Abweichung: Die Klausel zielt auf eine Nullrunde des WERKZEUGS, hier fehlte aber die GELEGENHEIT – seit S125 lief keine einzige Implementierungs-Session, und der Re-Trigger verlangt 3 Sessions mit realem TS-Lauf eines frontend-layer-implementer oder code-quality-auditor. Genau diese Unterscheidung (Urteil ueber das Werkzeug vs. ueber die Gelegenheit) hat der Eintrag in S114 selbst eingefuehrt. Messstand unveraendert gegenueber S114 und S115: 9 Calls gesamt, davon 7 im Aktivierungstest, 1 in 26 implementierung-Sessions (dieser vom 2026-07-10, also vor der Sichtbarkeitsmassnahme), 1 in einer Drain-Session. ABBRUCHKLAUSEL fuer die naechste Runde: Laufen bis S145 drei TS-Sessions mit den beiden Agenten und bleibt die Nutzung null, wird VERWORFEN. Laeuft bis S145 erneut keine solche Session, wird ebenfalls verworfen – dann ist belegt, dass dieser Pilot unter den realen Arbeitsverhaeltnissen nicht bewertbar ist, und ein Pilot, der nie zur Bewertung kommt, ist keine offene Frage mehr, sondern ein Dauerposten. Keine sechste Verlaengerung. Messluecke am Rande (S130): tool-usage --lsp ignoriert die Option --since still, die Zahl 'TS-Sessions seit S115' ist damit nicht direkt erhebbar.
 - **Pilot-Bound & Abschluss-Kriterien:** Bewertung beim **nächsten Kaizen/Retro** (bewertet OBS ohnehin). Mindest-Evidenz: LSP in **≥ ~3 Sessions mit echter TS-Arbeit** verfügbar; sonst Ergebnis = „eine Runde verlängern" (kein Urteil auf Null-Daten).
   - **Erfolg → adoptieren** (alle drei): (1) tatsächlich genutzt (Frequenz, s. Messung); (2) materieller Mehrwert nachweisbar (konkrete HELP-Vorfälle, wo grep+Read schlechter gewesen wäre); (3) keine Zuverlässigkeits-Blocker über die umgehbare Kalt-Index-Caveat hinaus. → permanente Ein-Zeilen-Regel in `coding-guideline-typescript.md`, Pilot-Notiz raus, Status = UMGESETZT.
   - **Fehlschlag → verwerfen/parken** (eines): kaum genutzt / kein Vorteil ggü. grep+Read; oder Kosten > Nutzen (stale/Flakiness/Setup-Fragilität). → Plugin + Pilot-Notiz entfernen, Status = VERWORFEN (Grund).
@@ -141,29 +131,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
-## OBS-S112-4 – `eslint-run.py` meldet Fehlschlag bei null Errors
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: GERING    Häufigkeit: dauerhaft
-- Kategorie: TOOLING    Kontext: Wrapper-Scripts
-- Beobachtung: Auf unverändertem `main` endet `python3 -m prozesscode.eslint-run` mit „✗ ESLint: 3 Problem(e)" bei **0 Errors** und 3 Warnungen. Die Warnungen sind bewusst so eingestuft: `Client/eslint.config.js` setzt `max-params` und `max-lines-per-function` mit ausbuchstabierter Begründung auf `warn` statt `error`. Der Wrapper macht daraus ein Fehlschlag-Verdikt. Damit widersprechen sich Konfiguration und Werkzeug – entweder sind die Warnungen tolerabel, dann ist das ✗ unzutreffend, oder sie sind es nicht, dann steht die Regel-Einstufung falsch. Risiko: Ein Gate, das im sauberen Ausgangszustand rot ist, verliert seine Signalwirkung; ein echtes neues Problem geht im erwarteten Rot unter.
-- Bezug: OBS-S112-2
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
----
-
-## OBS-S112-5 – Bash-Allow-Liste hat keinen Weg, eine Dependency-Version zu ändern
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hooks
-- Beobachtung: Die Allow-Liste erlaubt `npm run|audit|outdated|update|ci`. Keiner dieser Befehle kann eine Dependency-Version über die deklarierte Semver-Range hinaus verschieben: `update` bleibt innerhalb der Range, `ci` installiert aus dem Lockfile und schreibt es nicht. In S112 war ein Sprung von `react-router` 7 auf 8 nötig, weil die Advisory-behebende Version außerhalb von `^7` lag; er ließ sich ausschließlich über `# --allow-once` durchführen. Dependency-Aktualisierungen sind kein Einzelfall, sondern wiederkehrende Wartung. Risiko: Der Ausnahmemechanismus wird für Routinearbeit verwendet und stumpft dadurch ab.
-- Zusammen-erledigen: OBS-S119-1
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
----
-
 ## OBS-S113-1 – Kein Ort für beschlossene, noch nicht gebaute OBS
 - Quelle: Orchestrator
 - Status: IN BEOBACHTUNG bis S136
@@ -175,11 +142,11 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S114-2 – Pflichtlektüre ist der zweitgrößte Leseposten und wird nie gefiltert
 - Quelle: Orchestrator
-- Status: IN BEOBACHTUNG bis S130
+- Status: IN BEOBACHTUNG bis S142 – S130: der im Eintrag vorgesehene Fall trat ein (0 statt 3 Implementierungs-Sessions)
 - Impact: MITTEL    Häufigkeit: dauerhaft
 - Kategorie: PROZESS    Kontext: Agent-Prompt
 - Beobachtung: Gemessen über 48 Sessions (`read-breakdown.py`): `docs/guidelines` und `docs/process` machen zusammen 21,4 % des gesamten Read-Volumens aus – in Implementierungs-Sessions sogar 27,9 %, hinter Client/ und Server/ der zweitgrößte Block. Die Einzelwerte sind hoch: Ø 12.234 Zeichen je Read auf `docs/guidelines`, 11.410 auf `docs/process`, und der Anteil gezielter Reads (mit offset/limit) liegt bei 3 % bzw. 7 % – praktisch jeder Aufruf liest das ganze Dokument. Ursache ist die Konstruktion: Die Agenten-Prompts schreiben diese Dateien als Pflichtlektüre vor, und jeder Subagent startet kalt. Anders als bei ADRs (`decisions.py` filtert nach Tags) und seit S114 bei Testdateien (`test-inventory.py` liefert eine Inventur) existiert für Guidelines kein Weg, gezielt nur den relevanten Abschnitt zu holen. Für die Gegenrichtung liegt eine Rechnung vor: Einen ADR in eine Guideline zu überführen kostet das 7- bis 12-Fache, weil eine Guideline von jedem Subagenten gelesen wird (180 Reads im Messzeitraum) statt on demand von den wenigen, die sie brauchen (14). Offen ist die umgekehrte Frage – ob selten gebrauchte Guideline-Abschnitte aus der Pflichtlektüre gelöst und abrufbar gemacht werden können, und woran „selten gebraucht" überhaupt erkennbar wäre. Der Block wächst mit +21 % über fünf Sessions langsamer als der Code, aber er schrumpft nicht.
-- Entscheidung/Maßnahme: **Umgesetzt S125 in vier Teilen; Wirkung noch unbewiesen – deshalb IN BEOBACHTUNG statt UMGESETZT.** (1) Werkzeug: prozesscode/doc.py mit get <ANKER> / toc <datei> / audit, Anker-Index aus anchors.py importiert statt kopiert (eigenes Script, weil die Zielgruppe eine andere ist: Retrieval fuer arbeitende Subagenten vs. Integritaetspruefung fuer Autor/Hook). Scope-Regel (User-Entscheid): Ueberschriften-Anker bis zur naechsten gleichrangigen oder hoeherrangigen Ueberschrift inkl. Unterabschnitte; Absatz-Anker nur der zusammenhaengende Block. Die Alternativen sparen im Median ~200 Zeichen und erkaufen das durch stilles Abschneiden. (2) Doku-Umbau: 7 Stellen, an denen fette Absatz-Leads als Abschnitte fungierten, zu echten Ueberschriften gemacht (coding-guideline-csharp, review-workflow, gherkin-workshop, implementing-scenario) - Bestand jetzt 0 mit zurueckgelassenem Text. (3) Absicherung: doc.py audit sichtet alle 344 Anker (Arten fortsetzung/lose/fence/gross, Geschwister-Listenpunkte werden gezaehlt statt still abgezogen), Pflichtschritt in review-docs, Prinzip in principles.md 'Ein Anker ist eine Abrufeinheit'. (4) Wirksamkeit: Implementer-Agenten nennen doc.py konkret, Skills bleiben projektneutral (nur Verweis auf die CLAUDE.md-Navigation, damit sie portabel bleiben - User-Entscheid), neue Sektion 'Gezielt lesen statt Volldatei' in der SessionStart-Injektion (check-bash-permission.py --list). Bewusst NICHT umgestellt: die Review-Auditoren - sie haben kein Bash, und gezieltes Abrufen setzt voraus, dass man weiss wonach man sucht; ein Reviewer weiss das per Definition nicht (begruendet in review-code). **Wiedervorlage-Kriterium:** python3 -m prozesscode.read-breakdown --by-area erneut erheben, aber erst nach mindestens 3 weiteren Implementierungs-Sessions - vorher ist die Datenbasis zu duenn und der Vergleich wertlos (Ausgangswert S125: docs/guidelines 13,9 Prozent bei 6 Prozent gezielten Reads, docs/process 6,5 Prozent bei 9 Prozent, zusammen 20,4 Prozent; Referenz nach oben: docs/history liegt dank decisions.py bei 72 Prozent gezielt). Sind bis S130 keine 3 Implementierungs-Sessions gelaufen, bleibt der Eintrag IN BEOBACHTUNG und bekommt einen neuen Termin, statt auf duenner Basis entschieden zu werden.
+- Entscheidung/Maßnahme: S130-Drain-Entscheid: aufgeschoben nach der Regel, die dieser Eintrag selbst festhaelt – 'Sind bis S130 keine 3 Implementierungs-Sessions gelaufen, bleibt der Eintrag IN BEOBACHTUNG und bekommt einen neuen Termin, statt auf duenner Basis entschieden zu werden.' Genau das ist eingetreten: Seit S125 lief KEINE Implementierungs-Session (S126 Session-Historie, S127 Retro, S128 und S129 Prozess-Code, S130 Drain). Der Vollstaendigkeit halber trotzdem erhoben (read-breakdown --by-area, S130): docs/guidelines 13,8 Prozent bei 6 Prozent gezielten Reads, gegen den S125-Ausgangswert von 13,9 Prozent bei 6 Prozent – also unveraendert. Diese Zahl ist NICHT als Wirkungsurteil zu lesen: Das Lesevolumen entsteht ganz ueberwiegend in Implementierungs-Sessions (69,3 Prozent des Gesamtvolumens), und davon lief seit der Massnahme keine. Gemessen wurde damit erneut die Gelegenheit, nicht die Wirkung. Re-Trigger unveraendert: dieselbe Erhebung nach mindestens 3 Implementierungs-Sessions. Backstop S142.
 
 ## OBS-S116-3 – retro_report.py zeigt je Muster nur zwei Beispiel-Einträge, auch wenn es mehr sind
 - Quelle: Orchestrator
@@ -216,16 +183,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Kategorie: PROZESS    Kontext: Doku
 - Beobachtung: principles.md ist mit 7.417 Bytes der groesste einzelne Block der Session-Start-Injektion – groesser als AGENT_MEMORY, dessen Volumen in S116/S117 als Problem behandelt wurde (OBS-S116-2). Der Block ist ein Immer-Block und wird bewusst nie unterdrueckt: Verhaltensregeln, die nicht geladen sind, fallen lautlos aus. Die Groesse ist damit nicht per Unterdrueckung adressierbar, sondern nur redaktionell. User-Einschaetzung S117: Der Text liesse sich kuerzen, und beim Hineinschreiben muesste rigoroser auf Knappheit ohne Verlust von Vollstaendigkeit geachtet werden. Bewusst nicht in S117 mitgemacht, weil das Kuerzen von Verhaltensregeln inhaltliche Arbeit ist und nicht als Nebenprodukt einer Tooling-Aenderung passieren sollte.
 - Zusammen-erledigen: OBS-S123-1
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
-## OBS-S119-1 – Deny-Text des Bash-Hooks lenkt in Einmalscripte, statt die Werkzeugfrage zu stellen
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Der Deny-Text von check-bash-permission.py (die Hinweise um `_SMART_DENY_HINTS` und den Standard-Deny-Text) bietet als Ausweg an: 'Für Ad-hoc-Logik: Script nach .claude/tmp/foo.py schreiben, dann python3 .claude/tmp/foo.py.' Der Text setzt damit stillschweigend voraus, dass der geblockte Befehl überhaupt Ad-hoc-Logik war, und bietet den Ausweg an, bevor die Vorfrage gestellt ist: Braucht es hier ein Script? Aufgetreten in S119: Ein zusammenhaengender, vollstaendig gelesener Textblock sollte aus einer Markdown-Datei geloescht werden. Das ist ein Edit-Fall. Ich habe reflexhaft einen Python-Heredoc in Bash versucht, der Hook hat geblockt, und ich bin dem angebotenen Ausweg direkt gefolgt und habe .claude/tmp/drop_oq.py geschrieben – ohne einen Schritt zurueckzugehen. Der Hook hat den Befehl korrekt geblockt und dann in eine zweite, ebenfalls unpassende Loesung gelenkt. Verschaerfend: Das Einmalscript war hier das riskantere Werkzeug. Ein Edit-Mismatch schlaegt fehl, waehrend index() + Slicing blind schneidet, ohne dass sichtbar wird, was rausfliegt. Der Deny-Text nennt kein Kriterium, wann ein Script gegenueber vorhandenen Tools und Scripten ueberhaupt gerechtfertigt ist.
-- Vorprägung: Der User hat als Kriterium genannt: ein Script lohnt nur, wenn es effizienter und/oder weniger fehleranfaellig ist als die vorhandenen Tools – nicht deshalb, weil Bash geblockt wurde. Einmalscripte haetten vor allem im Standardprozess nur begrenzt Sinn; primaer sollen vorhandene Tools und Scripte genutzt werden. Naheliegende Richtung waere daher, den Deny-Text um diese Vorfrage zu ergaenzen, statt direkt den tmp-Ausweg anzubieten.
-- Zusammen-erledigen: OBS-S112-5
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
 ## OBS-S120-3 – Der qa-check-Übergabe-Hash erzwingt einen zweiten Stryker-Volllauf, wenn nach dem ersten noch aufgeräumt wird
@@ -274,15 +231,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: keiner
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S125-3 – Fuer prozesscode gibt es kein Mutation-Testing, obwohl sie den ganzen Workflow steuern
-- Quelle: Orchestrator
-- Status: UMGESETZT (S128)
-- Impact: MITTEL    Häufigkeit: dauerhaft
-- Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: Stryker ist im Projekt C#- und TypeScript-exklusiv (Stryker.NET, stryker-frontend). Fuer die rund 9.800 Zeilen Python unter prozesscode und .claude/hooks gibt es 981 Tests, aber keinen Mutations-Backstop - also nichts, was vakuoese Tests aufdeckt. In S125 wurde das konkret sichtbar: Beim Bau von doc.py wurden drei Mutationen von Hand gesetzt, zwei davon fingen die Tests, die dritte deckte eine Testluecke auf. Anschliessend fanden die Review-Auditoren vier weitere echte Fehler, die keine dieser Handmutationen getroffen hatte - alle an den Nahtstellen zwischen Regeln. Handmutationen treffen das, woran der Autor beim Mutieren denkt; das ist dieselbe Auswahl, die schon beim Testschreiben gewirkt hat. Die Frage ist offen, ob es fuer Python einen tragbaren Mutations-Runner gibt (mutmut, cosmic-ray) und ob sich die Laufzeit fuer eine Suite dieser Groesse rechnet.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: W3 (User, S128): direkt umgesetzt. Der Eintrag fragte nach einem Mutations-Runner; der User hat die Frage umgedeutet - nicht das Werkzeug fehlt, sondern eine Maßgabe fuer Prozess-Code ueberhaupt (keine Szenarien, keine Coverage-Vorgabe, kein Linter, keine Reviews - bisher freie Hand). Ergebnis ist docs/guidelines/coding-guideline-python.md: Sie schneidet Prozess-Code nach seinem FEHLERPROFIL statt nach abgeschwaechten Produktcode-Regeln - Klasse LAUT (Werkzeug crasht, faellt sofort auf, durch 1.000 Tests gedeckt) gegen Klasse STUMM (Guard laeuft fehlerfrei und prueft trotzdem nichts). Was daraus folgte: ruff mit begruendeter Regelauswahl plus PostToolUse-Automatik; Gegenprobe-Pflicht beim Bau jedes Guards; Auslöse-Protokoll (guard_log.py) mit Retro-Sichtung (guard-stats.py); Coverage als Metrik ohne Gate (coverage-run.py, Ist 73 Prozent); jscpd um Python erweitert (0,25 Prozent nach Refactoring). Mutation-Testing selbst wurde BEWUSST zurueckgestuft und steht als solches in der Guideline: Es adressiert Klasse LAUT, die bereits gedeckt ist. Beleg aus derselben Session - der einzige echte Fund war ein zip() ohne strict=, das eine Regression bei ungleich langen Listen still falsch rechnen liess; gefunden hat ihn der billige Linter, keine Mutation, denn der Fehler lag in einer fehlenden Zusicherung und nicht in einer Bedingung. Offen und NICHT Teil dieses Eintrags: das Review-Stufenmodell fuer Prozess-Code und die Einbindung von mutmut (installiert, nicht verdrahtet) - beides gehoert in die naechsten Prioritaeten, nicht in diesen Tracker.
-
 ## OBS-S125-4 – Review-Auditoren koennen ihre Findings nicht verifizieren, weil ihnen Bash fehlt
 - Quelle: User
 - Status: NEU
@@ -320,16 +268,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: CM-S064-1, CM-S095-2, CM-S116-1, CM-S127-1
 
-## OBS-S127-2 – Wegwerf-Auswertung über python3-stdin ist geblockt, obwohl der Heredoc-Body als Text gilt
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: TOOLING    Kontext: Bash/Permission
-- Beobachtung: In der S127-Retro wurde das Deny-Log für S123-S126 ausgewertet: 144 Einträge, davon 96 gewollt (80 WRITE_ACCESS als vorgesehene Freigabe für Projektdokumente, 14 ONE_TIME, 2 destruktiv/indirekt). Es bleiben 48 vermeidbare Denies in vier Sessions, rund 12 je Session. Die erkennbare Hauptklasse ist die Wegwerf-Auswertung über stdin: python3 - mit Heredoc. Erlaubt ist nur python3 <scratchpad>/<script>.py, also der Umweg über eine Datei. Die Spannung liegt darin, dass die Allow-Liste den Heredoc-Body ausdrücklich als Text und nicht als Befehl behandelt und Heredocs als Zusammensetzung erlaubt – der stdin-Python-Aufruf ist damit nicht offensichtlich derselbe Fall wie eval oder bash -c, die wegen nicht inspizierbarer Herkunft gesperrt sind. Ob hier eine Lücke oder eine bewusste Grenze vorliegt, ist offen und in dieser Session nicht entschieden worden. Dazu kommt read-only-Kleinkram, der nicht auf der Liste steht und je einzeln blockte: git config --get, fold, rev. Zu klären ist auch, ob 12 vermeidbare Denies je Session überhaupt behandlungswürdig sind oder als Preis der Absicherung akzeptiert werden.
-- Zusammen-erledigen: OBS-S119-1
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: CM-S078-1
-
 ## OBS-S128-1 – test-inventory.py kennt kein Python und sieht damit die groesste Testsuite des Repos nicht
 - Quelle: Orchestrator
 - Status: NEU
@@ -339,29 +277,11 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: keiner
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S129-1 – Pfad-Normalisierung des Bash-Hooks bricht cd, wenn das Arbeitsverzeichnis nicht der Repo-Root ist
+## OBS-S130-1 – Mutationssichtung bewertet im größten Guard-Modul nur 41 % der Mutanten
 - Quelle: Orchestrator
 - Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Der PreToolUse-Bash-Hook ersetzt jeden absoluten Repo-Pfad im Befehl durch den relativen (OBS-1, damit Befehle mit absolutem Pfad nicht am Deny fuer 'python3 mit absolutem Pfad' haengenbleiben). Ein nackter Repo-Root wird dabei zu '.' – aus 'x' wird 'cd . && x'. Das ist genau dann falsch, wenn das Arbeitsverzeichnis der Bash-Session nicht der Repo-Root ist: Der Befehl landet dann in irgendeinem Unterverzeichnis statt im Repo-Root, und zwar lautlos – der Hook meldet die Ersetzung nur als additionalContext, der Befehl selbst laeuft mit Exit 0 durch, nur am falschen Ort. In dieser Session trat es beim Aufbau der Hook-Registrierung auf, wo genau diese Konstruktion gebraucht wird.
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: Gemessen in S130: 'mutmut-run --mutate prozesscode.hooks.check-bash-permission' bewertet je Lauf nur rund 241 von 583 Mutanten; der Rest bleibt 'not checked'. Drei aufeinanderfolgende Laeufe lieferten 237, 242 und 241 - der Ausschnitt schwankt, und der Hinweis 'weiterer Lauf noetig' fuehrt nicht zum Ziel, weil auch Wiederholungen nicht weiterkommen. Ursache ist ein Abbruch in mutmut selbst: Mit --verbose endet der Lauf mit 'KeyError: -9' in calculate_summary_stats (mutmut/__main__.py:866). -9 ist SIGKILL, also ein Mutanten-Prozess, den Timeout oder System getoetet hat; mutmut kennt diesen Exit-Code in status_by_exit_code nicht und stirbt beim Zusammenrechnen. Ohne --verbose faengt der Wrapper den Abbruch ab. Modulspezifisch: check-dangling-refs laeuft mit 84 von 84 Mutanten sauber durch. Folge: Fuer ausgerechnet den groessten und meistgenutzten Guard liefert die Sichtung ueber die Haelfte der Stellen keine Aussage - die Klinke meldet dort seit S130 ehrlich 'Lauf unvollstaendig' (vorher meldete sie einen erfundenen Rueckschritt von 53.5 auf 53.0 Prozent, das ist behoben), aber sie prueft dort eben auch nichts. Unklar und ungeprueft ist die Ursache des SIGKILL. Ein naheliegender Verdacht ist die Rekursion in check_command: Der --allow-once-Zweig ruft die Funktion erneut auf, und ein Mutant am replace-Aufruf koennte daraus eine Endlosschleife machen. Das ist eine Vermutung, keine Messung.
 - Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
-## OBS-S129-2 – Der Wrapper-Filter-Strip des Bash-Hooks schneidet in verketteten Befehlen die nachfolgenden Befehle mit ab
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Ruft man einen Projekt-Wrapper mit nachgelagertem Filter auf ('python3 -m prozesscode.ruff-run | tail -5'), entfernt der Hook den Filter und laesst den Wrapper allein laufen – gewollt, weil die Wrapper nur ein Verdikt ausgeben und ein Filter es abschneiden koennte. Der Strip greift aber auf den GANZEN Befehlsstring: Steht hinter dem Filter noch eine weitere Verkettung ('wrapper | tail -5 && python3 -m prozesscode.anchors check'), faellt der zweite Befehl mit weg. Ausgefuehrt wird also weniger als angefordert, und die Rueckmeldung sagt nur, dass ein Filter entfernt wurde – nicht, dass ein Befehl verschwunden ist. Wer die Ausgabe nicht Zeile fuer Zeile mit dem eigenen Befehl vergleicht, haelt den zweiten Schritt fuer erledigt.
-- Zusammen-erledigen: OBS-S129-1
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
-## OBS-S129-3 – Die Session-ID der Bash-Umgebung weicht von der ab, unter der Background-Tasks ihr Scratchpad anlegen
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Bash/Permission
-- Beobachtung: Der Bash-Hook loest das erlaubte Scratchpad-Verzeichnis aus CLAUDE_CODE_SESSION_ID auf. In dieser Session stand dort 3b72d930-..., waehrend Background-Tasks ihre Ausgabe und ihr Scratchpad unter 4cdd1a7e-... ablegten. Ein Script, das im Task-Scratchpad liegt, faellt damit aus dem erlaubten Pfad und wird mit 'python3 mit absolutem Pfad ist nicht erlaubt' geblockt - obwohl es genau der Ort ist, den das Harness selbst fuer diese Ausgabe gewaehlt hat. Umweg war, die Datei stattdessen unter der aelteren Session-ID abzulegen. Die Divergenz trat nach einem Neustart von Claude Code mitten in der Sitzung auf.
-- Zusammen-erledigen: OBS-S129-1, OBS-S129-2
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
