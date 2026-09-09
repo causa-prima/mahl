@@ -126,6 +126,59 @@ def add(spec: TrackerSpec, text: str, session: int, kurztitel: str,
     return text.rstrip("\n") + trenner + eintrag, eid
 
 
+_FELDZEILE_RE = re.compile(r"^\*\*(?P<feld>[^:*]+):\*\*[ \t]*(?P<wert>.*)$")
+_UEBERSCHRIFT_RE = re.compile(r"^## (\S+)")
+
+# Ab hier gilt eine Kürzung als meldenswert. Darunter liegen Tippfehler-Korrekturen und
+# Umformulierungen; eine Warnung, die bei jedem zweiten `set` erscheint, wird überlesen.
+_KUERZUNG_SCHWELLE = 40
+
+
+def _feldwerte(text: str) -> dict[tuple[str, str], str]:
+    """Feldwerte, adressiert als (Eintrag-Überschrift, Feldname).
+
+    Der Eintrag gehört in den Schlüssel: Eine Tracker-Datei enthält viele Einträge, und jeder
+    trägt dieselben Feldnamen. Rein nach Feldnamen gesammelt überschriebe der letzte Eintrag
+    alle vorigen, und ein Vergleich verglich Werte verschiedener Einträge miteinander.
+    """
+    werte: dict[tuple[str, str], str] = {}
+    eintrag = ""
+    for zeile in text.splitlines():
+        kopf = _UEBERSCHRIFT_RE.match(zeile)
+        if kopf:
+            eintrag = kopf.group(1)
+            continue
+        feld = _FELDZEILE_RE.match(zeile)
+        if feld:
+            werte[(eintrag, feld.group("feld"))] = feld.group("wert").strip()
+    return werte
+
+
+def kuerzungen(alt: str, neu: str) -> list[str]:
+    """Felder, deren Wert deutlich kürzer geworden ist – als fertige Meldungszeilen.
+
+    Ein `set` ersetzt den **ganzen** Feldwert. Wer das Feld nur aus einer Übersicht kennt
+    (`oq list` zeigt bei einer offenen Frage den Anker, nicht die Begründung dahinter),
+    überschreibt dabei unbemerkt Inhalt: Die Erfolgsmeldung nennt bis dahin nur, *welches*
+    Feld geändert wurde. In S131 gingen so vier Sätze Begründung verloren – gefangen allein
+    durch einen `git diff`, den niemand verlangt hatte.
+
+    Bewusst hier und nicht in `set_fields`: `obs_entry` schreibt an `set_fields` vorbei, hat
+    aber wie die übrigen Werkzeuge alten und neuen Volltext in der Hand.
+    """
+    alt_werte = _feldwerte(alt)
+    meldungen = []
+    for (eintrag, feld), wert in _feldwerte(neu).items():
+        vorher = alt_werte.get((eintrag, feld))
+        if vorher is None or len(vorher) - len(wert) < _KUERZUNG_SCHWELLE:
+            continue
+        meldungen.append(
+            f"⚠ {eintrag} · {feld}: {len(vorher)} → {len(wert)} Zeichen – der bisherige Wert "
+            f"ist ersetzt, nicht ergänzt. Verlorenen Text prüfen: git diff"
+        )
+    return meldungen
+
+
 def set_fields(spec: TrackerSpec, text: str, eid: str, werte: dict[str, str],
                titel: str | None = None) -> str:
     """Ersetzt Feldwerte und/oder den Titel.

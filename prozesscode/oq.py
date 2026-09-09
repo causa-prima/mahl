@@ -34,6 +34,7 @@ from .oq_entry import (  # noqa: E402
     remove,
     set_fields,
 )
+from .tracker_entry import kuerzungen
 
 _HOOKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".claude", "hooks")
 
@@ -113,6 +114,8 @@ def cmd_set(args) -> int:
                                 ("Fällig", args.faellig),
                                 ("Hintergrund", args.hintergrund)) if w]
     print(f"✓ {args.id}: {', '.join(geaendert)} aktualisiert.")
+    for warnung in kuerzungen(text, neu):
+        print(f"  {warnung}", file=sys.stderr)
     return 0
 
 

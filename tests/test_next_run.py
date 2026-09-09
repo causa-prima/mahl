@@ -149,36 +149,40 @@ def test_group_runs_orders_by_run_number_not_file_position():
 
 
 def test_next_run_respects_run_number_order_over_file_order():
-    scenarios = nr.parse_scenarios(FEATURE_RUN_ORDER_DIVERGES_FROM_FILE_ORDER)
-    nxt = nr.next_run(scenarios, implemented=set())
+    groups = nr.collect_runs([FEATURE_RUN_ORDER_DIVERGES_FROM_FILE_ORDER])
+    nxt = nr.next_run_global(groups, implemented=set(), phase=None, story="US-904")
     assert nxt["number"] == 1
 
 
-# --- next_run -----------------------------------------------------------------
+# --- next_run_global ------------------------------------------------------------
 def test_next_run_returns_first_unimplemented_singleton_run():
-    scenarios = nr.parse_scenarios(FEATURE)
-    nxt = nr.next_run(scenarios, implemented={"Erstes Szenario"})
+    groups = nr.collect_runs([FEATURE])
+    nxt = nr.next_run_global(groups, implemented={"Erstes Szenario"}, phase=None, story="US-904")
     assert nxt["scenarios"][0]["title"] == "Zweites Szenario"
 
 
 def test_next_run_none_when_all_done():
-    scenarios = nr.parse_scenarios(FEATURE)
+    groups = nr.collect_runs([FEATURE])
     done = {"Erstes Szenario", "Zweites Szenario", "Drittes Szenario"}
-    assert nr.next_run(scenarios, implemented=done) is None
+    assert nr.next_run_global(groups, implemented=done, phase=None, story="US-904") is None
 
 
 def test_next_run_skips_excluded_tags():
-    scenarios = nr.parse_scenarios(FEATURE)
+    groups = nr.collect_runs([FEATURE])
     done = {"Erstes Szenario", "Zweites Szenario"}
     # Einziges verbleibendes ist @US-904-error → ausgeschlossen → None
-    assert nr.next_run(scenarios, implemented=done, exclude_tags={"@US-904-error"}) is None
+    nxt = nr.next_run_global(
+        groups, implemented=done, phase=None, story="US-904",
+        exclude_tags=frozenset({"@US-904-error"}),
+    )
+    assert nxt is None
 
 
 def test_next_run_returns_whole_run_if_any_scenario_open():
-    scenarios = nr.parse_scenarios(FEATURE_WITH_RUNS)
+    groups = nr.collect_runs([FEATURE_WITH_RUNS])
     # run-1 komplett erledigt, run-2 hat noch ein offenes Szenario
     done = {"Zutat anlegen", "Leerer Name"}
-    nxt = nr.next_run(scenarios, implemented=done)
+    nxt = nr.next_run_global(groups, implemented=done, phase=None, story="US-904")
     assert nxt["number"] == 2
     assert [s["title"] for s in nxt["scenarios"]] == ["Leerer Name", "Leere Einheit"]
 
@@ -254,10 +258,17 @@ def test_check_run_consistency_clean_when_metadata_matches():
     assert nr.check_run_consistency(scenarios) == []
 
 
+def _scenario(title, number, label="X", layer="Full-Stack", phase="SKELETON", needs=()):
+    return {
+        "tags": set(), "title": title, "phase": phase, "needs": needs,
+        "run": {"number": number, "label": label, "layer": layer, "singleton": False},
+    }
+
+
 def test_check_run_consistency_flags_mismatched_label():
     scenarios = [
-        {"tags": set(), "title": "A", "run": {"number": 2, "label": "Anlegen·Validierung", "layer": "Full-Stack", "singleton": False}},
-        {"tags": set(), "title": "B", "run": {"number": 2, "label": "Anlegen·Validierung TYPO", "layer": "Full-Stack", "singleton": False}},
+        _scenario("A", 2, label="Anlegen·Validierung"),
+        _scenario("B", 2, label="Anlegen·Validierung TYPO"),
     ]
     violations = nr.check_run_consistency(scenarios)
     assert len(violations) == 1
@@ -265,10 +276,18 @@ def test_check_run_consistency_flags_mismatched_label():
 
 
 def test_check_run_consistency_flags_mismatched_layer():
-    scenarios = [
-        {"tags": set(), "title": "A", "run": {"number": 3, "label": "X", "layer": "Full-Stack", "singleton": False}},
-        {"tags": set(), "title": "B", "run": {"number": 3, "label": "X", "layer": "Frontend-only", "singleton": False}},
-    ]
+    scenarios = [_scenario("A", 3), _scenario("B", 3, layer="Frontend-only")]
+    assert len(nr.check_run_consistency(scenarios)) == 1
+
+
+def test_check_run_consistency_flags_mismatched_phase():
+    # Ein Lauf mit zwei Phasen wäre still: collect_runs() nähme die des ERSTEN Szenarios.
+    scenarios = [_scenario("A", 4), _scenario("B", 4, phase="MVP")]
+    assert len(nr.check_run_consistency(scenarios)) == 1
+
+
+def test_check_run_consistency_flags_mismatched_needs():
+    scenarios = [_scenario("A", 5), _scenario("B", 5, needs=("run-1",))]
     assert len(nr.check_run_consistency(scenarios)) == 1
 
 
@@ -312,3 +331,187 @@ def test_render_all_done_note():
     done = {"Erstes Szenario", "Zweites Szenario", "Drittes Szenario"}
     out = nr.render(memory, feature_texts=[FEATURE], implemented=done)
     assert "{{NEXT_RUN}}" not in out
+
+
+# --- Phasen und Abhängigkeitskanten -------------------------------------------
+STORY_FEATURE = textwrap.dedent("""\
+    @US-904
+    Feature: Zutaten verwalten
+
+      # @phase: SKELETON
+
+      Background:
+        Given die Anwendung ist gestartet
+
+      # @run-1 · Anlegen · Full-Stack
+      @US-904-happy-path
+      Scenario: Zutat anlegen
+        When a
+        Then b
+
+      # @run-8 · Löschen · Full-Stack
+      @US-904-happy-path
+      Scenario: Zutat löschen
+        When a
+        Then b
+
+      # @run-9 · Bearbeiten · Full-Stack · Phase:MVP
+      @US-904-happy-path
+      Scenario: Zutat bearbeiten
+        When a
+        Then b
+    """)
+
+CROSS_FEATURE = textwrap.dedent("""\
+    @CROSS-interaction
+    Feature: Querschnittliches Interaktionsverhalten
+
+      # @phase: SKELETON
+      # @braucht: US-904/run-8
+
+      @CROSS-interaction-happy-path
+      Scenario: Der Undo-Toast lässt sich manuell schließen
+        When a
+        Then b
+    """)
+
+ALL_TEXTS = [STORY_FEATURE, CROSS_FEATURE]
+
+
+def _collect(texts=None):
+    return nr.collect_runs(texts if texts is not None else ALL_TEXTS)
+
+
+def test_collect_runs_carries_phase_and_needs():
+    groups = _collect()
+    anlegen = next(g for g in groups if g["number"] == 1)
+    assert anlegen["phase"] == "SKELETON"
+    assert anlegen["needs"] == ()
+
+
+def test_collect_runs_takes_run_level_phase_over_file_default():
+    groups = _collect()
+    bearbeiten = next(g for g in groups if g["number"] == 9)
+    assert bearbeiten["phase"] == "MVP"
+
+
+def test_collect_runs_carries_needs_for_untagged_cross_scenario():
+    groups = _collect()
+    cross = next(g for g in groups if g["number"] is None)
+    assert cross["needs"] == ("US-904/run-8",)
+
+
+def test_run_out_of_phase_is_not_a_candidate():
+    # run-9 ist MVP, das Projekt steht auf SKELETON – er darf nicht vorgeschlagen werden.
+    group = nr.next_run_global(_collect(), implemented=set(), phase="SKELETON", story="US-904")
+    assert group["number"] == 1
+
+
+def test_run_becomes_candidate_once_phase_is_reached():
+    done = {"Zutat anlegen", "Zutat löschen", "Der Undo-Toast lässt sich manuell schließen"}
+    group = nr.next_run_global(_collect(), implemented=done, phase="MVP", story="US-904")
+    assert group["number"] == 9
+
+
+def test_dependency_blocks_run_until_predecessor_done():
+    # Das CROSS-Szenario braucht US-904/run-8 (Löschen) – solange offen, ist es kein Kandidat.
+    group = nr.next_run_global(_collect(), implemented=set(), phase="SKELETON", story="US-904")
+    assert group["number"] == 1
+    assert "CROSS" not in " ".join(group["tags"])
+
+
+def test_dependency_released_when_predecessor_done():
+    done = {"Zutat anlegen", "Zutat löschen"}
+    group = nr.next_run_global(_collect(), implemented=done, phase="SKELETON", story="US-904")
+    assert group["scenarios"][0]["title"] == "Der Undo-Toast lässt sich manuell schließen"
+
+
+def test_current_story_wins_over_other_features():
+    # Beide fällig und unblockiert: die aktuelle Story kommt zuerst (Arbeitsweise „eine Story am Stück").
+    cross_ohne_kante = CROSS_FEATURE.replace("  # @braucht: US-904/run-8\n", "")
+    groups = nr.collect_runs([STORY_FEATURE, cross_ohne_kante])
+    group = nr.next_run_global(groups, implemented=set(), phase="SKELETON", story="US-904")
+    assert group["number"] == 1
+
+
+def test_other_feature_reached_once_story_is_exhausted():
+    # Genau die Sackgasse aus OBS-S117-1: Story fertig, querschnittliche Szenarien bleiben offen.
+    done = {"Zutat anlegen", "Zutat löschen"}
+    group = nr.next_run_global(_collect(), implemented=done, phase="SKELETON", story="US-904")
+    assert group is not None
+    assert group["scenarios"][0]["title"] == "Der Undo-Toast lässt sich manuell schließen"
+
+
+def test_dead_dependency_reference_blocks_instead_of_passing_silently():
+    text = CROSS_FEATURE.replace("US-904/run-8", "US-904/run-99")
+    groups = nr.collect_runs([STORY_FEATURE, text])
+    done = {"Zutat anlegen", "Zutat löschen"}
+    group = nr.next_run_global(groups, implemented=done, phase="SKELETON", story="US-904")
+    assert group is None
+
+
+# --- Guard: Phasen und Kanten --------------------------------------------------
+def test_check_dependencies_clean():
+    assert nr.check_dependencies(_collect()) == []
+
+
+def test_check_dependencies_flags_dead_reference():
+    groups = nr.collect_runs([STORY_FEATURE, CROSS_FEATURE.replace("run-8", "run-99")])
+    violations = nr.check_dependencies(groups)
+    assert len(violations) == 1
+    assert "run-99" in violations[0]
+
+
+def test_check_dependencies_flags_cycle():
+    a = STORY_FEATURE.replace(
+        "# @run-1 · Anlegen · Full-Stack",
+        "# @run-1 · Anlegen · Full-Stack · braucht:run-8",
+    ).replace(
+        "# @run-8 · Löschen · Full-Stack",
+        "# @run-8 · Löschen · Full-Stack · braucht:run-1",
+    )
+    violations = nr.check_dependencies(nr.collect_runs([a]))
+    assert any("Zyklus" in v for v in violations)
+
+
+def test_check_dependencies_flags_missing_phase():
+    violations = nr.check_dependencies(nr.collect_runs([FEATURE_WITH_RUNS]))
+    assert any("ohne Phase" in v for v in violations)
+
+
+def test_check_dependencies_accepts_intra_file_reference():
+    text = STORY_FEATURE.replace(
+        "# @run-8 · Löschen · Full-Stack",
+        "# @run-8 · Löschen · Full-Stack · braucht:run-1",
+    )
+    assert nr.check_dependencies(nr.collect_runs([text])) == []
+
+
+# --- render mit Phase ----------------------------------------------------------
+def test_render_uses_phase_from_memory():
+    memory = "**Phase:** SKELETON 🔄\n**Aktuelle Story:** US-904\n\n- {{NEXT_RUN}}\n"
+    out = nr.render(memory, feature_texts=ALL_TEXTS, implemented=set())
+    assert "`run-1`" in out
+
+
+def test_render_names_the_next_phase_when_only_the_phase_blocks():
+    # Sonst verweist die Notiz auf --check, der hier grün ist: korrekt zurückgehaltene Läufe
+    # sind kein Verstoß. Der Leser braucht den Grund, nicht einen Befehl ohne Befund.
+    memory = "**Phase:** SKELETON 🔄\n**Aktuelle Story:** US-904\n\n- {{NEXT_RUN}}\n"
+    done = {"Zutat anlegen", "Zutat löschen", "Der Undo-Toast lässt sich manuell schließen"}
+    out = nr.render(memory, feature_texts=ALL_TEXTS, implemented=done)
+    assert "Phase MVP" in out
+
+
+def test_render_says_when_a_dependency_blocks():
+    memory = "**Phase:** SKELETON 🔄\n**Aktuelle Story:** US-904\n\n- {{NEXT_RUN}}\n"
+    done = {"Zutat anlegen"}
+    out = nr.render(memory, feature_texts=[CROSS_FEATURE], implemented=done)
+    assert "braucht:US-904/run-8" in out
+
+
+def test_render_reaches_cross_feature_when_story_done():
+    memory = "**Phase:** SKELETON 🔄\n**Aktuelle Story:** US-904\n\n- {{NEXT_RUN}}\n"
+    done = {"Zutat anlegen", "Zutat löschen"}
+    out = nr.render(memory, feature_texts=ALL_TEXTS, implemented=done)
+    assert "Der Undo-Toast lässt sich manuell schließen" in out

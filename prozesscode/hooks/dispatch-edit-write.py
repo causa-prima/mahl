@@ -40,6 +40,7 @@ CHECKS = [
     "check-dependency-allowlist",
     "check-code-quality-blocking",
     "check-e2e-scenario-ref",
+    "check-feature-plan",
     "check-ref-direction",
     "check-obs-capture",
     "check-td-capture",

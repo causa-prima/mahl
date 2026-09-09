@@ -432,9 +432,9 @@ def modul_open_questions() -> Block:
     )
 
 
-def ungeplante_szenarien(dateien: list[tuple[str, str]],
+def ungeclusterte_szenarien(dateien: list[tuple[str, str]],
                          implementiert: set[str]) -> tuple[int, list[str]]:
-    """(Anzahl, Befundzeilen) für Szenarien ohne Weg in die Implementierung.
+    """(Anzahl, Befundzeilen) für offene Szenarien ohne `# @run-N`-Clustering.
 
     Rein textbasiert, damit die Erkennung ohne Repo-Fixture testbar bleibt.
     """
@@ -443,47 +443,40 @@ def ungeplante_szenarien(dateien: list[tuple[str, str]],
     befunde: list[str] = []
     anzahl = 0
     for name, text in dateien:
-        ftags, _, szenarien = parse_feature(text)
-        story_gebunden = any(t.startswith("@US-") for t in ftags)
-        offen = [s for s in szenarien if s["title"] not in implementiert
-                 and (not story_gebunden or s["run"] is None)]
+        _, _, szenarien = parse_feature(text)
+        offen = [s for s in szenarien
+                 if s["title"] not in implementiert and s["run"] is None]
         if not offen:
             continue
         anzahl += len(offen)
-        grund = ("Datei trägt keinen `@US-`Tag – die Lauf-Auflösung läuft über die aktuelle "
-                 "Story und erreicht sie nie") if not story_gebunden else \
-                "kein `# @run-N` – nie geclustert"
-        befunde.append(f"  {name} ({grund}):")
+        befunde.append(f"  {name} (kein `# @run-N` – nie geclustert):")
         befunde += [f"    - „{s['title']}\"" for s in offen]
     return anzahl, befunde
 
 
-def modul_ungeplante_szenarien() -> Block:
-    """Geschriebene, nicht implementierte Szenarien, die kein Mechanismus je vorlegt.
+def modul_ungeclusterte_szenarien() -> Block:
+    """Offene Szenarien ohne `# @run-N` – der Resolver legt sie als Einzel-Läufe vor.
 
-    Zwei Wege, auf denen ein Szenario aus jedem Plan fällt:
-      (a) seine Feature-Datei trägt keinen `@US-`Tag (querschnittliche Dateien nach ADR-S103-1) –
-          `next_run.py` löst über die aktuelle Story auf und erreicht sie strukturell nie;
-      (b) es trägt keinen `# @run-N`-Kommentar – also nie geclustert worden.
-
-    Bewusst als eigenes Modul und nicht in `next-run` versteckt: Die Aufgabe darf nur die
-    Läufe DER AKTUELLEN STORY beanspruchen (sonst behauptet er Arbeit, die die Feature-Datei
-    ausdrücklich zurückstellt) – aber die Szenarien dann stillschweigend zu unterschlagen, wäre
-    die falsche Hälfte der Korrektur. Der Status ist **ungeklärt**, nicht „fällig": Sie können
-    bewusst zurückgestellt sein. Genau das soll die Zeile sagen.
+    **Wann** sie drankommen, ist seit dem Phasen-Anker geklärt: Jedes Szenario trägt über die
+    Datei-Direktive `# @phase:` oder seinen Run-Tag eine Phase, und `next_run.py` legt es vor,
+    sobald das Projekt sie erreicht hat und die `braucht:`-Kanten erfüllt sind. Offen bleibt
+    **wie**: Ohne Clustering fehlen Label, Schicht und Batch-Bildung, `implementing-scenario`
+    bekommt also je Szenario einen eigenen Lauf statt eines zusammenhängenden. Das ist kein
+    Verstoß (der Guard lässt es durch), aber vor der Implementierung einer solchen Datei gehört
+    ein `gherkin-workshop`-Lauf darüber.
     """
     from prozesscode import next_run
     dateien = [(p.name, _lies(p)) for p in sorted((ROOT / "features").glob("**/*.feature"))]
-    anzahl, befunde = ungeplante_szenarien(dateien, next_run._gather_implemented())
+    anzahl, befunde = ungeclusterte_szenarien(dateien, next_run._gather_implemented())
     if not anzahl:
         return Block(stub="")
     return Block(
-        stub=f"Ungeplante Szenarien: {anzahl} geschrieben, keinem Lauf zugeordnet – Einplanung ungeklärt",
-        inhalt=("Geschriebene Szenarien, die kein Mechanismus als „nächsten Lauf\" vorlegt.\n"
-                "Das heißt NICHT, dass sie fällig sind – sie können bewusst zurückgestellt sein\n"
-                "(Feature-Dateien tragen den Scope oft als Kommentar). Ungeklärt ist, WANN sie\n"
-                "eingeplant werden; solange das offen ist, brauchen TD-Einträge, die auf sie\n"
-                "ankern, einen Backstop-Anker.\n" + "\n".join(befunde)),
+        stub=f"Ungeclusterte Szenarien: {anzahl} offen, ohne `# @run-N` – je ein Einzel-Lauf",
+        inhalt=("Offene Szenarien ohne Lauf-Clustering. Ihre Einplanung ist geklärt (Phase +\n"
+                "`braucht:`-Kanten in der Feature-Datei); der Resolver legt sie vor, sobald das\n"
+                "Projekt ihre Phase erreicht. Ohne `# @run-N` wird dabei aber jedes Szenario ein\n"
+                "eigener Lauf – ohne Label, Schicht und Batch. Vor der Implementierung einer\n"
+                "solchen Datei einen `gherkin-workshop`-Lauf darüber führen.\n" + "\n".join(befunde)),
     )
 
 
@@ -602,7 +595,7 @@ MODULE: list[tuple[str, str, callable]] = [
     # Arbeitsauftrag für die Session, sie sollen vorgelegt werden.
     ("open-questions", ZUSTAND, modul_open_questions),
     ("td-due", STUB, modul_td_due),
-    ("ungeplante-szenarien", STUB, modul_ungeplante_szenarien),
+    ("ungeclusterte-szenarien", STUB, modul_ungeclusterte_szenarien),
     # STUB, nicht AUFGABE: ein defekter Verweis ist ein Befund, kein Arbeitsauftrag für die
     # Session. Er meldet sich nur, wenn wirklich etwas kaputt ist.
     ("anker-defekt", STUB, modul_anker_defekt),

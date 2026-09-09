@@ -4,10 +4,13 @@ Feature: Querschnittliches Interaktionsverhalten
   Aktionen, die Daten verändern, verhalten sich überall in der Anwendung gleich –
   unabhängig davon, in welcher Liste oder auf welcher Seite sie ausgelöst werden.
 
+  # @phase: V1
+  # @braucht: US-904/run-8
+  #
   # Gilt für alle Listen und Seiten – Szenarien nutzen die Zutaten-Seite als Vertreter.
   # Eigene Feature-Datei statt Ablage an einer Story, weil keines dieser Verhalten
   # zutatenspezifisch ist (Muster wie navigation.feature/resilience.feature, ADR-S103-1).
-  # Implementierungs-Scope: nach MVP.
+  # Alle drei Szenarien setzen Löschen samt Undo-Toast voraus – das ist US-904/run-8.
   #
   # ACHTUNG – Vollständigkeit NICHT per gherkin-workshop geprüft: Diese Szenarien stammen aus
   # Review-Findings und einem tech-debt-Durchgang, nicht aus einer systematischen Zustandsraum-

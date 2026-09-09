@@ -25,6 +25,7 @@ import sys
 
 
 from . import td_entry as tde  # noqa: E402
+from .tracker_entry import kuerzungen  # noqa: E402
 
 
 def _memory_lesen() -> tuple[object, str]:
@@ -105,6 +106,8 @@ def cmd_set(args) -> int:
                                 ("Problem", args.problem),
                                 ("Behebung", args.behebung)) if w]
     print(f"✓ {args.id}: {', '.join(geaendert)} aktualisiert.")
+    for warnung in kuerzungen(text, neu):
+        print(f"  {warnung}", file=sys.stderr)
 
     # Die Fälligkeit steuert, ob der Posten in AGENT_MEMORY gehört – beide Richtungen, sonst
     # bleibt beim Verschieben eine Karteileiche stehen bzw. beim Vorziehen fehlt der Punkt.

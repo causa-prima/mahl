@@ -136,9 +136,10 @@ def parse(faellig: str) -> tuple[list[Anker], list[str]]:
 def _szenario_terminiert(anker: Anker, ktx: Kontext) -> bool:
     """Ein Szenario-Anker ist nur terminiert, wenn das Szenario einem OFFENEN Lauf zugehört.
 
-    Ohne `# @run-N` ist das Szenario zwar geschrieben, aber von keinem Plan eingeplant – der
-    Anker könnte beliebig lange nicht eintreten. Real vorgekommen: die drei Szenarien in
-    `features/interaction.feature` („Implementierungs-Scope: nach MVP") tragen keinen Run-Tag.
+    Ohne `# @run-N` ist das Szenario zwar geschrieben und seit ADR-S131-1 auch eingeplant (über
+    die Phase seiner Datei), aber nicht geclustert – und seine Phase kann weit entfernt liegen.
+    Real vorgekommen: die drei Szenarien in `features/interaction.feature` tragen keinen Run-Tag
+    und hängen an Phase V1. Der Anker allein terminiert deshalb nicht; ein Backstop bleibt nötig.
     """
     eintrag = ktx.szenarien.get(anker.wert)
     return bool(eintrag and eintrag["lauf"] is not None and eintrag["lauf_offen"])

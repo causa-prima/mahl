@@ -236,44 +236,46 @@ def test_a_crash_of_the_score_script_still_fails_the_module(monkeypatch):
     raise AssertionError("Exit 1 muss als Ausfall gelten")
 
 
-# --- Ungeplante Szenarien ----------------------------------------------------
-# Ein Szenario fällt auf zwei Wegen aus jedem Plan: seine Feature-Datei trägt keinen
-# `@US-`Tag (die Lauf-Auflösung läuft über die aktuelle Story und erreicht sie nie), oder
-# ihm fehlt der `# @run-N`-Kommentar. Ohne diese Meldung behauptet der Session-Start
-# fälschlich Vollständigkeit („alle Läufe implementiert").
+# --- Ungeclusterte Szenarien -------------------------------------------------
+# Seit der Resolver über Phase und `braucht:`-Kanten auflöst, fällt kein Szenario mehr aus dem
+# Plan, nur weil seine Datei keinen `@US-`Tag trägt. Offen bleibt allein das Clustering: Ohne
+# `# @run-N` legt der Resolver jedes Szenario als Einzel-Lauf vor – ohne Label, Schicht und Batch.
 STORY_FEATURE = (
-    "@US-904\nFeature: Zutaten\n\n"
+    "@US-904\nFeature: Zutaten\n\n  # @phase: SKELETON\n\n"
     "  # @run-7 · Liste · Full-Stack\n  Scenario: Geplant\n    Given x\n"
 )
-CROSS_FEATURE = "@CROSS-interaction\nFeature: Querschnitt\n\n  Scenario: Waise\n    Given x\n"
+CROSS_FEATURE = (
+    "@CROSS-interaction\nFeature: Querschnitt\n\n  # @phase: V1\n\n"
+    "  Scenario: Waise\n    Given x\n"
+)
 
 
-def test_scenario_in_a_story_less_file_is_unplanned():
-    anzahl, befunde = agenda.ungeplante_szenarien([("cross.feature", CROSS_FEATURE)], set())
+def test_uncluster_scenario_is_reported_regardless_of_story_tag():
+    anzahl, befunde = agenda.ungeclusterte_szenarien([("cross.feature", CROSS_FEATURE)], set())
     assert anzahl == 1
     assert any("Waise" in z for z in befunde)
-    assert any("keinen `@US-`Tag" in z for z in befunde)
+    assert any("nie geclustert" in z for z in befunde)
 
 
 def test_clustered_story_scenario_is_not_unplanned():
-    assert agenda.ungeplante_szenarien([("s.feature", STORY_FEATURE)], set())[0] == 0
+    assert agenda.ungeclusterte_szenarien([("s.feature", STORY_FEATURE)], set())[0] == 0
 
 
 def test_story_scenario_without_a_run_tag_is_unplanned():
-    ohne_run = "@US-904\nFeature: Zutaten\n\n  Scenario: Ungeclustert\n    Given x\n"
-    anzahl, befunde = agenda.ungeplante_szenarien([("s.feature", ohne_run)], set())
+    ohne_run = "@US-904\nFeature: Zutaten\n\n  # @phase: SKELETON\n\n  Scenario: Ungeclustert\n    Given x\n"
+    anzahl, befunde = agenda.ungeclusterte_szenarien([("s.feature", ohne_run)], set())
     assert anzahl == 1
     assert any("nie geclustert" in z for z in befunde)
 
 
 def test_implemented_scenarios_are_not_reported():
     """Erledigtes ist kein offener Plan – sonst stünde die Meldung für immer da."""
-    assert agenda.ungeplante_szenarien([("cross.feature", CROSS_FEATURE)], {"Waise"})[0] == 0
+    assert agenda.ungeclusterte_szenarien([("cross.feature", CROSS_FEATURE)], {"Waise"})[0] == 0
 
 
 def test_no_findings_yields_no_stub():
-    assert callable(agenda.modul_ungeplante_szenarien)  # Modul existiert
-    anzahl, befunde = agenda.ungeplante_szenarien([], set())
+    assert callable(agenda.modul_ungeclusterte_szenarien)  # Modul existiert
+    anzahl, befunde = agenda.ungeclusterte_szenarien([], set())
     assert anzahl == 0 and befunde == []
 
 
@@ -622,7 +624,16 @@ def test_settings_registriert_genau_die_definierten_bloecke():
     registriert = [b.split("--block", 1)[1].strip() for b in befehle if "--block" in b]
     definiert = [name for name, _t, _f in agenda.INJEKTIONS_BLOECKE]
     assert sorted(registriert) == sorted(definiert)
-    assert len(befehle) == len(definiert), "SessionStart-Hook ohne --block registriert"
+
+    # Nicht jeder SessionStart-Hook ist ein Agenda-Block – aber jeder muss hier stehen, sonst
+    # fiele ein versehentlich hinzugefügter Fremd-Eintrag nicht mehr auf.
+    #   user-message: gibt JSON mit `systemMessage` aus (erreicht den USER, nicht den Agenten)
+    #     und darf deshalb kein Agenda-Block sein – Blöcke geben Plain-Text aus, und sobald ein
+    #     Hook JSON ausgibt, wird es als JSON statt als Kontext gelesen.
+    erlaubt_ohne_block = {"prozesscode.user-message"}
+    fremd = [b for b in befehle
+             if "--block" not in b and not any(e in b for e in erlaubt_ohne_block)]
+    assert fremd == [], f"unbekannter SessionStart-Hook ohne --block: {fremd}"
 
 
 def test_die_bloecke_zusammen_ergeben_die_gesamtausgabe():

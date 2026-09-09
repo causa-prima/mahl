@@ -120,17 +120,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
-## OBS-S110-1 – „Done"-Erkennung eines Laufs hängt am Test-Kommentar, nicht am grünen Test
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Testing
-- Beobachtung: `next_run.py` wertet einen Lauf als erledigt, sobald der `// Szenario: <Titel>`-Kommentar in einer E2E-Spec vorkommt (DONE-Erkennung nach ADR-S041-7 Addendum S088); daraus speist sich auch die Auflösung von `{{NEXT_RUN}}` in `AGENT_MEMORY.md`. Der Kommentar entsteht aber bereits im äußeren Loop von `implementing-scenario`, wenn der E2E-Test absichtlich noch rot ist und kein Produktionscode existiert. In S110 real beobachtet: Nach einem WSL-Absturz mitten in run-9 zeigte `AGENT_MEMORY.md` beim Neustart als nächsten Lauf bereits run-11 an, obwohl von run-9 nur ein roter Test existierte – der tatsächlich laufende Lauf war aus dem Zustandssignal verschwunden. Risiko: Ein Agent, der nach einer Unterbrechung neu startet und dem Zustandsdokument folgt, überspringt einen angefangenen Lauf oder hält ihn für fertig; der Fortschritt wird systematisch überschätzt, weil das Signal an einem Artefakt hängt, das am Anfang statt am Ende des Laufs entsteht.
-- Zusammen-erledigen: OBS-S117-1
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
----
-
 ## OBS-S113-1 – Kein Ort für beschlossene, noch nicht gebaute OBS
 - Quelle: Orchestrator
 - Status: IN BEOBACHTUNG bis S136
@@ -157,24 +146,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: keiner
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: CM-S064-2
-
-## OBS-S117-1 – Geschriebene Szenarien ohne Lauf-Zuordnung haben keinen Weg in die Implementierung
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Gherkin
-- Beobachtung: features/interaction.feature (3 Szenarien) und features/resilience.feature (5 Szenarien) enthalten geschriebene, freigegebene Szenarien ohne '# @run-N'-Kommentar. next_run.py behandelt ungetaggte Szenarien als eigenen Einzel-Lauf, erreicht sie aber nie, weil seine Story-Aufloesung ueber den @US-NNN-Feature-Tag laeuft und beide Dateien @CROSS-/@NFR-getaggt sind. Damit existiert kein Mechanismus, der diese Szenarien jemals als 'naechster Lauf' vorlegt. interaction.feature vermerkt 'Implementierungs-Scope: nach MVP' und verlangt vorher einen Workshop-Lauf – ein Plan, den kein Trigger aufruft. Sichtbar wurde es beim Bau des td-due-Moduls in S117: Drei TD-Eintraege ankern per Szenario: auf genau diese Szenarien und brauchen deshalb alle einen Phasen-Backstop, weil ihr eigentlicher Anker strukturell nicht eintreten kann. Die Waisen-TD ist damit nur das Symptom; die Waise ist das Szenario.
-- Zusammen-erledigen: OBS-S110-1
-- Entscheidung/Maßnahme: Teil-Umsetzung S117: Das Agenda-Modul `ungeplante-szenarien` macht die Szenarien sichtbar (Stub mit Anzahl, Volltext auf Abruf) und weist ihren Status ausdrücklich als *ungeklärt* aus – nicht als fällig. Damit ist die stille Unsichtbarkeit behoben; zusätzlich löst `next-run` nur noch story-gebunden auf, behauptet also keine Arbeit mehr, die die Feature-Datei zurückstellt. OFFEN bleibt der eigentliche Punkt: Es gibt weiterhin keine Regel, WANN querschnittliche Szenarien einen Lauf bekommen (interaction.feature verlangt vorher einen gherkin-workshop-Lauf, den kein Trigger aufruft). Solange das offen ist, brauchen TD-Einträge mit Szenario-Anker einen Phasen-Backstop.
-
-## OBS-S117-2 – Injizierter Kontext erreicht den User nur ueber die Disziplin des Agenten
-- Quelle: User
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: PROZESS    Kontext: Sonstiges
-- Beobachtung: Der Session-Start injiziert Bloecke, die fuer den USER bestimmt sind – etwa die faelligen offenen Fragen, die laut Skill draining-observations 'dem User zur Klaerung vorgelegt' werden muessen. Injiziert werden sie aber in den Agenten-Kontext; ob sie beim User ankommen, haengt allein daran, dass der Agent sie weiterreicht. Kein Mechanismus prueft die Uebergabe. Belegt in S117 durch den User selbst ('Mir wurde nichts vorgelegt') und durch den Agenten in derselben Session: OQ-S083-1/-2 und OQ-S094-1 standen im Startblock und wurden nicht vorgelegt. Der Befund ist allgemeiner als offene Fragen – er betrifft jeden Block, dessen Zweck die Weitergabe an den User ist. Nebenbefund zur Wirksamkeit: Die Vorlage funktioniert (die Fragen erscheinen seit S115 jede Session), die Aufloesung nicht. Das ist ein eigener Befund und steht jetzt in OBS-S117-4 – die hier zunaechst notierte Begruendung ('kein Wiedervorlage-Termin') war falsch, ein optionales Faellig-Feld existiert seit S115.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
 ## OBS-S117-3 – principles.md ist der groesste Session-Start-Block und ungeprueft auf Knappheit
 - Quelle: User

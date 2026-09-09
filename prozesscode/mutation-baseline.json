@@ -11,6 +11,10 @@
     "beurteilbar": 84,
     "getoetet": 64
   },
+  "prozesscode.hooks.check-feature-plan": {
+    "beurteilbar": 41,
+    "getoetet": 27
+  },
   "prozesscode.hooks.check-obs-capture": {
     "beurteilbar": 75,
     "getoetet": 48

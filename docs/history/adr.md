@@ -138,6 +138,22 @@ Zusätzlich strukturelle Vorgabe (Interaction Design, kein Szenario nötig dafü
 
 **Verworfen:** Eigene User Story/Epic "Navigation" – kein eigenständiger Business-Value, Gefahr von Premature-Abstraction (Nav-Framework vor dem zweiten konkreten Anwendungsfall).
 
+### ADR-S131-1: Der nächste Lauf ergibt sich aus Phase und Abhängigkeitskante, nicht aus der aktuellen Story
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:gherkin, testing:e2e
+
+**Entscheidung:** Jeder Implementierungs-Lauf trägt zwei maschinenlesbare Angaben in der Feature-Datei:
+
+- eine **Phase** (`SKELETON`, `MVP`, `V1`) – als Datei-Direktive `# @phase: <P>` im Feature-Header, für alle Läufe der Datei, oder pro Lauf als `· Phase:<P>` am `# @run-N`-Tag, was den Datei-Default ersetzt;
+- optionale **Abhängigkeitskanten** `· braucht:<refs>` bzw. `# @braucht: <refs>` – kommaseparierte Vorgänger-Läufe, `run-8` datei-intern und `US-904/run-8` datei-übergreifend (Präfix = Top-Level-Tag der Zieldatei ohne `@`).
+
+`next_run.py` löst den nächsten Lauf daraufhin über **alle** Feature-Dateien auf: Fällig ist ein Lauf, dessen Phase das Projekt laut `**Phase:**` in `AGENT_MEMORY.md` erreicht hat und dessen Vorgänger vollständig implementiert sind. Sortierung: aktuelle Story zuerst, dann Phasen-Rang, Feature-Datei, Run-Nummer. `--check` blockt einen Lauf ohne Phase, eine Kante ohne Ziel und jeden Zyklus. Ein Verweis ohne Ziel hält seinen Lauf **zurück** statt durchzulassen – ein Vertipper soll sichtbar bremsen, nicht still passieren.
+
+**Begründung:** Zuvor lief die Auflösung ausschließlich über den `@US-NNN`-Tag der aktuellen Story. Querschnittliche Dateien (`@CROSS-*`, `@NFR-*` nach ADR-S103-1) tragen keinen solchen Tag und wurden deshalb strukturell nie als nächster Lauf vorgelegt – acht geschriebene, freigegebene Szenarien hatten keinen Weg in die Implementierung. Die Phase allein behebt das nicht: Sie hat drei Stufen, innerhalb derer praktisch alles gleichzeitig liegt, und ersetzt zugleich den einzigen Reihenfolge-Schutz, den es gab (die Arbeitsweise „eine Story nach der anderen"). Reihenfolge braucht deshalb eine eigene, explizite Relation. Der `gherkin-workshop` ermittelt sie ohnehin bereits (Schritt „Zustands-Abhängigkeiten auflösen"), warf sie bisher aber weg und kodierte nur ihr Ergebnis in die Run-Nummer – die datei-lokal vergeben wird und über Dateigrenzen hinweg nichts ordnet.
+
+**Verworfen:** Globale, dateiübergreifende Run-Nummern – jede neue Story erzwänge Einschübe (`run-11.5`) oder eine Neunummerierung, die alle `// Szenario:`-Verweise und AGENT_MEMORY-Einträge bräche; zudem erzwingt eine totale Ordnung Reihenfolge auch dort, wo keine besteht. Ebenfalls verworfen: Phase nur an den beiden querschnittlichen Dateien statt an allen Läufen – die Scope-Angabe lag dort bereits als Prosa-Kommentar vor (`# Implementierungs-Scope: MVP`) und war zum Zeitpunkt dieser Entscheidung schon inkonsistent zu `architecture.md`, was genau der Drift ist, den ein maschinell gelesener Anker verhindert.
+
 ---
 
 ## API-Validierung & Fehlerbehandlung (alle Endpoints)

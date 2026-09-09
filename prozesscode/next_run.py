@@ -2,13 +2,23 @@
 """
 next_run.py – Lauf-Resolver für AGENT_MEMORY.md.
 
-Löst den Platzhalter `{{NEXT_RUN}}` zum nächsten offenen Implementierungs-Lauf der aktuellen
-Story auf. Ein Lauf ist ein oder mehrere Szenarien mit demselben `# @run-N`-Kommentar-Tag
-(Algorithmus + Format: `.claude/skills/gherkin-workshop/references/scenario-clustering.md`).
-Szenarien ohne Run-Tag bilden ihren eigenen Einzel-Lauf – rückwärtskompatibel zu Storys, die
-noch nicht per gherkin-workshop-Szenario-Clustering geclustert wurden. Mapping Feature-Datei ↔ E2E-Test
-über `// Szenario: <Titel>`-Kommentare in den Playwright-Specs (ADR-S041-7, Bidirektionale
+Löst den Platzhalter `{{NEXT_RUN}}` zum nächsten **fälligen** Implementierungs-Lauf auf. Ein Lauf
+ist ein oder mehrere Szenarien mit demselben `# @run-N`-Kommentar-Tag (Algorithmus + Format:
+`.claude/skills/gherkin-workshop/references/scenario-clustering.md`). Szenarien ohne Run-Tag bilden
+ihren eigenen Einzel-Lauf – rückwärtskompatibel zu Storys, die noch nicht per
+gherkin-workshop-Szenario-Clustering geclustert wurden. Mapping Feature-Datei ↔ E2E-Test über
+`// Szenario: <Titel>`-Kommentare in den Playwright-Specs (ADR-S041-7, Bidirektionale
 Traceability).
+
+Fälligkeit hat zwei Bedingungen (ADR-S131-1):
+  - **Phase** – der Lauf trägt eine Phase (`# @phase:` im Feature-Header, `· Phase:<P>` am
+    Run-Tag), und das Projekt hat sie laut `**Phase:**` in AGENT_MEMORY erreicht.
+  - **Kanten** – alle in `· braucht:<refs>` genannten Vorgänger-Läufe sind vollständig
+    implementiert. Die Phase allein kann die Reihenfolge nicht leisten: Sie hat drei Stufen, in
+    denen praktisch alles gleichzeitig liegt.
+Die Auflösung geht über **alle** Feature-Dateien, nicht nur die der aktuellen Story – sonst
+erreicht sie querschnittliche Dateien (`@CROSS-…`, `@NFR-…`) strukturell nie. Die aktuelle Story
+kommt in der Sortierung trotzdem zuerst, damit eine Story am Stück gebaut wird.
 
 Modi:
   --render <memory.md>   Liest AGENT_MEMORY, ersetzt {{NEXT_RUN}} durch den aufgelösten
@@ -17,7 +27,10 @@ Modi:
   --check                Mapping-Integritäts-Guard: jeder // Szenario:-Kommentar matcht genau
                          einen Feature-Titel, keine Duplikate; jede Run-Tag-Zeile ist syntaktisch
                          gültig; alle Szenarien derselben Run-Nummer tragen identische Metadaten
-                         (Label/Schicht/Singleton). Exit 1 bei Verstoß (für qa-check).
+                         (Label/Schicht/Singleton/Phase/Kanten); jeder Lauf hat eine Phase, jede
+                         braucht:-Kante ein Ziel, keine Kante bildet einen Zyklus.
+                         Exit 1 bei Verstoß. Manuelle Bestandsprüfung – im Moment der
+                         Entstehung greift der Hook `check-feature-plan.py`.
   --open / --done         Offene bzw. erledigte Läufe je Feature-Datei listen (ein Lauf gilt als
                          "erledigt", wenn alle seine Szenarien implementiert sind).
   --story US-NNN          Nur mit --open/--done: auf die Feature-Datei(en) dieser Story
@@ -35,7 +48,7 @@ import re
 import sys
 from pathlib import Path
 
-from ._feature import find_malformed_run_comments, parse_feature
+from ._feature import PHASEN, find_malformed_run_comments, parse_feature, phasen_rang
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _FEATURES_DIR = _REPO_ROOT / "features"
@@ -121,15 +134,95 @@ def _group_is_open(group: dict, implemented: set[str], exclude_tags: frozenset[s
     )
 
 
-def next_run(
-    scenarios: list[dict], implemented: set[str], exclude_tags: frozenset[str] = frozenset()
+def collect_runs(feature_texts: list[str]) -> list[dict]:
+    """Alle Läufe **aller** Feature-Dateien, angereichert um Phase, Kanten und Herkunft.
+
+    Der dateiübergreifende Blick ist nötig, weil Run-Nummern datei-lokal vergeben werden und eine
+    `braucht:`-Kante über Dateigrenzen zeigen darf (`US-904/run-8`). Phase und Kanten stehen je
+    Szenario schon aufgelöst im Parser (Run-Tag schlägt Datei-Direktive); ein Lauf übernimmt sie
+    von seinem ersten Szenario – dass alle Szenarien eines Laufs darin übereinstimmen, prüft
+    check_run_consistency().
+    """
+    groups: list[dict] = []
+    for file_index, text in enumerate(feature_texts):
+        tags = feature_tags(text)
+        for group in group_runs(parse_scenarios(text)):
+            first = group["scenarios"][0]
+            groups.append({
+                **group, "tags": tags, "file_index": file_index,
+                "phase": first["phase"], "needs": first["needs"],
+            })
+    return groups
+
+
+def run_label(group: dict) -> str:
+    """Kurzbezeichnung eines Laufs für Meldungen (`US-904/run-8` bzw. Titel bei ungetaggtem Lauf)."""
+    tag = sorted(group["tags"])[0].lstrip("@") if group["tags"] else "?"
+    if group["number"] is None:
+        return f'{tag}/„{group["scenarios"][0]["title"]}"'
+    return f'{tag}/run-{group["number"]}'
+
+
+def matches_ref(group: dict, ref: str, from_file_index: int) -> bool:
+    """Trifft `ref` (`run-8` datei-intern, `US-904/run-8` datei-übergreifend) diesen Lauf?"""
+    if "/" in ref:
+        tag, run_part = ref.split("/", 1)
+        if f"@{tag}" not in group["tags"]:
+            return False
+    else:
+        run_part = ref
+        if group["file_index"] != from_file_index:
+            return False
+    return group["number"] is not None and run_part == f"run-{group['number']}"
+
+
+def _is_done(group: dict, implemented: set[str]) -> bool:
+    return all(s["title"] in implemented for s in group["scenarios"])
+
+
+def _needs_satisfied(group: dict, groups: list[dict], implemented: set[str]) -> bool:
+    """Sind alle Vorgänger dieses Laufs erledigt?
+
+    Ein Verweis ohne Ziel gilt als **nicht** erfüllt: Ein Vertipper soll den Lauf sichtbar
+    zurückhalten (check_dependencies nennt ihn), statt still durchzulassen – ein durchgelassener
+    toter Verweis wäre genau der stumme Ausfall, den niemand bemerkt.
+    """
+    for ref in group["needs"]:
+        targets = [g for g in groups if matches_ref(g, ref, group["file_index"])]
+        if not targets or not all(_is_done(t, implemented) for t in targets):
+            return False
+    return True
+
+
+def next_run_global(
+    groups: list[dict],
+    implemented: set[str],
+    phase: str | None,
+    story: str | None,
+    exclude_tags: frozenset[str] = frozenset(),
 ) -> dict | None:
-    """Erster Lauf in Reihenfolge mit mindestens einem offenen (nicht implementiert/nicht
-    ausgeschlossen) Szenario."""
-    for group in group_runs(scenarios):
-        if _group_is_open(group, implemented, exclude_tags):
-            return group
-    return None
+    """Nächster fälliger Lauf über alle Feature-Dateien.
+
+    Fällig ist ein Lauf, dessen Phase das Projekt erreicht hat und dessen Vorgänger erledigt sind.
+    Sortierung: aktuelle Story zuerst (erhält die Arbeitsweise „eine Story am Stück"), dann
+    Phasen-Rang, dann Feature-Datei, dann Run-Nummer.
+    """
+    max_rang = phasen_rang(phase) if phase else len(PHASEN)
+    candidates = [
+        g for g in groups
+        if _group_is_open(g, implemented, exclude_tags)
+        and (g["phase"] is None or phasen_rang(g["phase"]) <= max_rang)
+        and _needs_satisfied(g, groups, implemented)
+    ]
+    if not candidates:
+        return None
+    story_tag = f"@{story}" if story else None
+    return min(candidates, key=lambda g: (
+        0 if story_tag and story_tag in g["tags"] else 1,
+        phasen_rang(g["phase"]) if g["phase"] else len(PHASEN),
+        g["file_index"],
+        g["number"] if g["number"] is not None else 10**6,
+    ))
 
 
 def open_runs(
@@ -199,7 +292,7 @@ def check_run_consistency(scenarios: list[dict]) -> list[str]:
         run = scenario["run"]
         if run is None:
             continue
-        meta = (run["label"], run["layer"], run["singleton"])
+        meta = (run["label"], run["layer"], run["singleton"], scenario["phase"], scenario["needs"])
         if run["number"] not in seen:
             seen[run["number"]] = meta
         elif seen[run["number"]] != meta:
@@ -208,6 +301,63 @@ def check_run_consistency(scenarios: list[dict]) -> list[str]:
                 f'{meta}, ein früheres Szenario dieses Laufs hatte {seen[run["number"]]}.'
             )
     return violations
+
+
+def _edge_map(groups: list[dict]) -> dict[int, list[int]]:
+    """Index eines Laufs → Indizes der Läufe, die er laut `braucht:` voraussetzt."""
+    return {
+        i: [
+            j for j, target in enumerate(groups)
+            for ref in g["needs"] if matches_ref(target, ref, g["file_index"])
+        ]
+        for i, g in enumerate(groups)
+    }
+
+
+def _find_cycles(groups: list[dict]) -> list[str]:
+    """Läufe, die sich über ihre `braucht:`-Kanten selbst voraussetzen (je Teilnehmer eine
+    Meldung – wer im Zyklus steckt, ist die eigentliche Information)."""
+    edges = _edge_map(groups)
+    violations: list[str] = []
+    for start, direct in edges.items():
+        seen: set[int] = set()
+        stack = list(direct)
+        while stack:
+            current = stack.pop()
+            if current == start:
+                violations.append(
+                    f"{run_label(groups[start])}: Zyklus in den `braucht:`-Kanten – keiner der "
+                    f"beteiligten Läufe kann je fällig werden. Eine Kante entfernen; setzen "
+                    f"sich zwei Läufe gegenseitig voraus, gehören sie zusammengelegt "
+                    f"(scenario-clustering.md, Schritt Zustands-Abhängigkeiten auflösen)."
+                )
+                break
+            if current not in seen:
+                seen.add(current)
+                stack.extend(edges[current])
+    return violations
+
+
+def check_dependencies(groups: list[dict]) -> list[str]:
+    """Prüft Phasen-Anker und Abhängigkeitskanten über alle Feature-Dateien.
+
+    Drei Verstöße, alle sonst still: ein Lauf ohne Phase wird nie durch einen Phasenwechsel
+    fällig, ein Verweis ohne Ziel hält seinen Lauf dauerhaft zurück, und ein Zyklus lässt keinen
+    seiner Teilnehmer je an die Reihe kommen.
+    """
+    violations: list[str] = []
+    for group in groups:
+        if group["phase"] is None:
+            violations.append(
+                f"{run_label(group)}: ohne Phase – ergänze `# @phase: <PHASE>` im Feature-Header "
+                f"oder `· Phase:<PHASE>` am Run-Tag."
+            )
+        for ref in group["needs"]:
+            if not any(matches_ref(t, ref, group["file_index"]) for t in groups):
+                violations.append(
+                    f"{run_label(group)}: `braucht:{ref}` zeigt auf keinen existierenden Lauf."
+                )
+    return violations + _find_cycles(groups)
 
 
 def render(
@@ -232,22 +382,44 @@ def _resolve_replacement(
     implemented: set[str],
     exclude_tags: frozenset[str],
 ) -> tuple[str, str | None]:
+    from .td_anchors import phase_aus_memory  # lokal: td_anchors importiert next_run seinerseits
+
     story = extract_story(memory_text)
-    if story is None:
-        return ("⚠️ nächster Lauf nicht ermittelbar (keine „Aktuelle Story“ gefunden)", "keine Story im Memory")
+    phase = phase_aus_memory(memory_text)
+    groups = collect_runs(feature_texts)
 
-    story_tag = f"@{story}"
-    matching = [t for t in feature_texts if story_tag in feature_tags(t)]
-    if len(matching) != 1:
-        return (
-            f"⚠️ nächster Lauf nicht ermittelbar (Feature für {story}: {len(matching)} Treffer)",
-            f"{len(matching)} Feature-Dateien mit {story_tag}",
-        )
-
-    group = next_run(parse_scenarios(matching[0]), implemented, exclude_tags)
+    group = next_run_global(groups, implemented, phase, story, exclude_tags)
     if group is None:
-        return (f"(alle Läufe der Story {story} implementiert)", None)
+        return (_blocked_note(groups, implemented, phase, exclude_tags), None)
     return (format_run(group), None)
+
+
+def _blocked_note(
+    groups: list[dict], implemented: set[str], phase: str | None, exclude_tags: frozenset[str]
+) -> str:
+    """Notiz, wenn kein Lauf fällig ist – mit dem **Grund**, nicht mit einem Befehl.
+
+    Ein Verweis auf `--check` wäre hier irreführend: Ein Lauf, den seine Phase oder eine erfüllte
+    Kante korrekt zurückhält, ist kein Verstoß, der Guard bliebe also grün.
+    """
+    offen = [g for g in groups if _group_is_open(g, implemented, exclude_tags)]
+    if not offen:
+        return "(alle Läufe implementiert)"
+
+    max_rang = phasen_rang(phase) if phase else len(PHASEN)
+    zu_frueh = [g for g in offen if g["phase"] and phasen_rang(g["phase"]) > max_rang]
+    if len(zu_frueh) == len(offen):
+        naechste = min((g["phase"] for g in zu_frueh), key=phasen_rang)
+        return (
+            f"(kein Lauf in Phase {phase} fällig – {len(offen)} offen, "
+            f"frühester ab Phase {naechste})"
+        )
+    wartend = [g for g in offen if g not in zu_frueh]
+    kanten = sorted({ref for g in wartend for ref in g["needs"]})
+    return (
+        f"(kein Lauf fällig – {len(offen)} offen; {len(wartend)} warten auf "
+        f"`braucht:{','.join(kanten)}`)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -345,6 +517,7 @@ def _cmd_check() -> int:
             run_violations.append(f"{path.name}: {v}")
         for v in check_run_consistency(parse_scenarios(text)):
             run_violations.append(f"{path.name}: {v}")
+    run_violations.extend(check_dependencies(collect_runs(_feature_texts())))
 
     if violations or run_violations:
         print("❌  E2E-Szenario-Mapping verletzt:", file=sys.stderr)

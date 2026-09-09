@@ -1,7 +1,11 @@
 """Tests für _feature.py – insbesondere das Parsen der `# @run-N`-Lauf-Kommentare."""
 import textwrap
 
-from prozesscode._feature import find_malformed_run_comments, parse_feature  # noqa: E402
+from prozesscode._feature import (  # noqa: E402
+    find_malformed_run_comments,
+    parse_feature,
+    phasen_rang,
+)
 
 
 FEATURE_WITH_RUNS = textwrap.dedent("""\
@@ -182,3 +186,129 @@ def test_malformed_run_comment_silently_drops_run_tag_in_parse_feature():
         """)
     _, _, scenarios = parse_feature(text)
     assert scenarios[0]["run"] is None
+
+
+# --- Phasen-Anker und Abhängigkeitskanten -------------------------------------
+FEATURE_WITH_DIRECTIVES = textwrap.dedent("""\
+    @US-904
+    Feature: Zutaten verwalten
+
+      # @phase: SKELETON
+      # @braucht: US-900/run-1
+
+      Background:
+        Given die Anwendung ist gestartet
+
+      # @run-1 · Anlegen·Success · Full-Stack
+      @US-904-happy-path
+      Scenario: Zutat anlegen
+        When a
+        Then b
+
+      # @run-4 · Bearbeiten · Full-Stack · Phase:MVP · braucht:run-1,US-900/run-2
+      @US-904-happy-path
+      Scenario: Zutat bearbeiten
+        When a
+        Then b
+
+      @US-904-error
+      Scenario: Ohne Run-Tag
+        When a
+        Then b
+    """)
+
+
+def test_file_phase_directive_applies_to_scenarios():
+    _, _, scenarios = parse_feature(FEATURE_WITH_DIRECTIVES)
+    assert scenarios[0]["phase"] == "SKELETON"
+
+
+def test_file_phase_directive_applies_to_untagged_scenario():
+    # Der Fall, für den der Datei-Default existiert: resilience/interaction haben keine Run-Tags.
+    _, _, scenarios = parse_feature(FEATURE_WITH_DIRECTIVES)
+    untagged = next(s for s in scenarios if s["title"] == "Ohne Run-Tag")
+    assert untagged["phase"] == "SKELETON"
+
+
+def test_run_tag_phase_overrides_file_default():
+    _, _, scenarios = parse_feature(FEATURE_WITH_DIRECTIVES)
+    bearbeiten = next(s for s in scenarios if s["title"] == "Zutat bearbeiten")
+    assert bearbeiten["phase"] == "MVP"
+
+
+def test_phase_is_none_without_any_directive():
+    _, _, scenarios = parse_feature(FEATURE_WITH_RUNS)
+    assert scenarios[0]["phase"] is None
+
+
+def test_file_needs_directive_applies_to_scenarios():
+    _, _, scenarios = parse_feature(FEATURE_WITH_DIRECTIVES)
+    assert scenarios[0]["needs"] == ("US-900/run-1",)
+
+
+def test_run_tag_needs_replaces_file_default():
+    # Ersetzen, nicht ergänzen – eine additive Semantik wäre am Tag nicht ablesbar.
+    _, _, scenarios = parse_feature(FEATURE_WITH_DIRECTIVES)
+    bearbeiten = next(s for s in scenarios if s["title"] == "Zutat bearbeiten")
+    assert bearbeiten["needs"] == ("run-1", "US-900/run-2")
+
+
+def test_needs_is_empty_without_any_directive():
+    _, _, scenarios = parse_feature(FEATURE_WITH_RUNS)
+    assert scenarios[0]["needs"] == ()
+
+
+def test_run_tag_keeps_legacy_metadata_when_phase_added():
+    _, _, scenarios = parse_feature(FEATURE_WITH_DIRECTIVES)
+    bearbeiten = next(s for s in scenarios if s["title"] == "Zutat bearbeiten")
+    assert bearbeiten["run"] == {
+        "number": 4, "label": "Bearbeiten", "layer": "Full-Stack", "singleton": False,
+    }
+
+
+def test_run_tag_with_singleton_and_phase():
+    text = "  # @run-5 · Foo · Full-Stack · Singleton · Phase:V1\n  @US-904-x\n  Scenario: Bar\n"
+    _, _, scenarios = parse_feature(text)
+    assert scenarios[0]["run"]["singleton"] is True
+    assert scenarios[0]["phase"] == "V1"
+
+
+# --- Direktiven-Validierung ---------------------------------------------------
+def test_unknown_phase_value_flagged():
+    text = "@US-904\nFeature: X\n\n  # @phase: PROTOTYP\n\n  @US-904-x\n  Scenario: Bar\n"
+    violations = find_malformed_run_comments(text)
+    assert len(violations) == 1
+    assert "PROTOTYP" in violations[0]
+
+
+def test_unknown_phase_value_in_run_tag_flagged():
+    text = "  # @run-5 · Foo · Full-Stack · Phase:IRGENDWAS\n  @US-904-x\n  Scenario: Bar\n"
+    violations = find_malformed_run_comments(text)
+    assert len(violations) == 1
+
+
+def test_phase_directive_after_first_scenario_flagged():
+    # Direktiven gelten für die ganze Datei – unterhalb des ersten Szenarios wären sie
+    # eine stille Falle (sähen lokal aus, wirkten global).
+    text = "@US-904\nFeature: X\n\n  @US-904-x\n  Scenario: Bar\n\n  # @phase: MVP\n"
+    violations = find_malformed_run_comments(text)
+    assert len(violations) == 1
+    assert "Zeile 7" in violations[0]
+
+
+def test_well_formed_directives_not_flagged():
+    assert find_malformed_run_comments(FEATURE_WITH_DIRECTIVES) == []
+
+
+# --- Phasen-Ordnung -----------------------------------------------------------
+def test_phasen_rang_is_ordered():
+    assert phasen_rang("SKELETON") < phasen_rang("MVP") < phasen_rang("V1")
+
+
+def test_phasen_rang_is_case_insensitive():
+    assert phasen_rang("skeleton") == phasen_rang("SKELETON")
+
+
+def test_phasen_rang_unknown_sorts_last():
+    # Unbekannte Phase blockiert nicht, landet aber hinter allen bekannten – der Guard meldet sie.
+    assert phasen_rang("PROTOTYP") > phasen_rang("V1")

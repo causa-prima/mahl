@@ -5,8 +5,11 @@ Der Dispatcher ersetzt die sechs zuvor einzeln in settings.json registrierten Ch
 die hat je Check eigene Tests.
 """
 from importlib import import_module
+from pathlib import Path
 
 dispatcher = import_module("prozesscode.hooks.dispatch-edit-write")
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 # --- Vertrag: jedes registrierte Modul ist ladbar und bietet check() ----------
@@ -17,6 +20,27 @@ def test_every_registered_check_is_importable_and_has_check():
         assert callable(mod.check)
 
 
+def test_every_hook_file_is_registered_somewhere():
+    """Die Gegenrichtung zum Registry-Test unten – und die Lücke, durch die S131 fast rutschte.
+
+    Der Registry-Test vergleicht `CHECKS` gegen eine feste Liste **im Test**: Legt jemand eine
+    neue `check-*.py` an und registriert sie nirgends, bleiben beide konsistent und nichts wird
+    rot. Ein Guard ohne Aufrufer prüft nichts, und sein Ausfall löst per Definition nichts aus –
+    von außen ist er nicht von einem zu unterscheiden, der nur nie angeschlagen hat.
+
+    Zwei Registrierungsorte, weil es zwei Aufrufwege gibt: der Dispatcher (`CHECKS`) für
+    Edit|Write, und `settings.json` direkt für alles andere (Bash-Permission, PostToolUse).
+    """
+    settings = (REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8")
+    hooks = sorted((REPO_ROOT / "prozesscode" / "hooks").glob("check-*.py"))
+    unregistriert = [p.stem for p in hooks
+                     if p.stem not in dispatcher.CHECKS and p.stem not in settings]
+    assert unregistriert == [], (
+        f"Guard ohne Aufrufer: {unregistriert} – in dispatch-edit-write.CHECKS aufnehmen "
+        f"oder in .claude/settings.json registrieren."
+    )
+
+
 def test_registry_covers_every_registered_check():
     # Regression: verhindert, dass ein Check bei einem Refactor still aus der
     # Liste fällt und damit wirkungslos wird, ohne dass etwas rot wird.
@@ -24,6 +48,7 @@ def test_registry_covers_every_registered_check():
         "check-dependency-allowlist",
         "check-code-quality-blocking",
         "check-e2e-scenario-ref",
+        "check-feature-plan",
         "check-ref-direction",
         "check-obs-capture",
         "check-td-capture",

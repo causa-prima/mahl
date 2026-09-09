@@ -5,9 +5,14 @@ Feature: Querschnittliche Fehlerbehandlung
   damit der Nutzer weiß was zu tun ist.
   Daten die aufwändig einzugeben sind, dürfen bei einem Fehler nicht verloren gehen.
 
+  # @phase: MVP
+  # @braucht: US-904/run-1,US-904/run-7
+  #
   # Gilt für alle Endpoints und Seiten – Szenarien nutzen die Zutaten-Seite als Vertreter.
   # 504-Fehler fallen in die Netzwerkfehler-Kategorie (Server hat Anfrage nie verarbeitet).
-  # Implementierungs-Scope: MVP
+  # Die Kanten oben decken die Vertreter-Seite ab: Laden braucht die Liste (run-7), Speichern den
+  # Anlege-Dialog (run-1). Das Sitzungs-Szenario braucht zusätzlich Auth – dafür existiert noch
+  # kein Lauf, den man referenzieren könnte (SKELETON hat kein Auth-Gate).
   #
   # BEWUSST NICHT hier als Szenario geführt – „die UI zeigt keine technischen Fehlerdetails an,
   # falls der Server doch welche sendet". Diese Vorbedingung ist in Produktion realistisch

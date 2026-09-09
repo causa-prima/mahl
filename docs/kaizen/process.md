@@ -191,11 +191,20 @@ Die **Agenda** selbst ist einer dieser fünf Blöcke und enthält zusammenhänge
 | 1 | `retro` | Jenga ≤ 0 |
 | 2 | `obs-drain` | `triggers()` erfüllt – Top-5-Score ≥ 9 oder ≥ 4 Einträge über 15 Sessions alt |
 | 3 | `priorities` | ein AGENT_MEMORY-Punkt trägt `Fällig: jetzt` |
-| 4 | `next-run` | die aktuelle Story hat einen offenen Lauf |
+| 4 | `next-run` | es gibt einen fälligen Lauf (Phase erreicht, Vorgänger erledigt) |
 
-`open-questions`, `td-due` und `ungeplante-szenarien` beanspruchen **nie** – sie verlangen eine
+`open-questions`, `td-due` und `ungeclusterte-szenarien` beanspruchen **nie** – sie verlangen eine
 Entscheidung, keinen Arbeitstag; als Aufgabe verdrängte eine 34 Sessions alte Frage eine
 laufende Story.
+
+**Fällige offene Fragen gehen zusätzlich direkt an den User.** Alle Agenda-Blöcke landen im
+Agenten-Kontext; ob ein Block, dessen Zweck die Weitergabe ist, beim User ankommt, hinge sonst
+allein an der Disziplin des Agenten – in S117 real durchgerutscht. `prozesscode/user-message.py`
+läuft deshalb als eigener SessionStart-Hook: Der User sieht die Fragen im Terminal, der Agent
+bekommt sie nicht. Die Zeile nennt ID, Titel und den Abrufbefehl – sie ersetzt die Vorlage
+nicht, sie macht ihr Ausbleiben bemerkbar. Nur die offenen Fragen: Eine Zeile, die bei jedem
+Start erscheint, bedeutet nichts mehr. Mechanik und die Warnung vor der irreführenden Hook-Doku
+stehen im Docstring des Moduls.
 
 **`priorities` zeigt nur den obersten Punkt voll**, den Rest als Titel + Fälligkeit mit Zeiger
 auf `AGENT_MEMORY.md`. Die Liste ist ein Terminplan, kein Auftrag: Neun Punkte im Volltext –
@@ -203,14 +212,15 @@ davon aktuell fünf mit `Fällig: jetzt` – wären wieder genau die konkurriere
 die die Rangfolge gebaut ist. Voll gezeigt wird der erste `jetzt`-Punkt, weil `jetzt` der
 Auslöser ist; ohne einen solchen (Übersteuerungs-Pfad `--only priorities`) der erste überhaupt.
 
-**Warum `next-run` story-gebunden auflöst und trotzdem nichts verschwindet:** Ein Szenario ohne
-`# @run-N` gilt in `next_run.py` als eigener Einzel-Lauf (Rückwärtskompatibilität für
-ungeclusterte Storys). Ohne Story-Filter meldete die Agenda deshalb querschnittliche Szenarien
-als offene Läufe, obwohl ihre Feature-Datei den Scope ausdrücklich zurückstellt – eine
-behauptete Arbeit. Mit Filter fielen sie ganz heraus – eine behauptete Vollständigkeit. Deshalb
-beides: `next-run` beansprucht nur für die aktuelle Story, und `ungeplante-szenarien` macht
-sichtbar, was geschrieben ist, aber auf keinem Weg vorgelegt wird. Der Status dort ist
-**ungeklärt**, nicht „fällig".
+**Warum `next-run` über alle Feature-Dateien auflöst und trotzdem nichts Zurückgestelltes
+behauptet:** Beide naheliegenden Zuschnitte sind falsch. Ohne Filter meldete die Agenda
+querschnittliche Szenarien als offene Läufe, obwohl ihre Feature-Datei den Scope ausdrücklich
+zurückstellt – eine behauptete Arbeit. Mit Story-Filter fielen sie ganz heraus und wurden nie
+vorgelegt – eine behauptete Vollständigkeit. Den Schnitt macht deshalb nicht die Story, sondern
+die **Phase**: Jeder Lauf trägt eine, und beansprucht wird nur, was das Projekt erreicht hat.
+Die Story bleibt Sortierkriterium (sie kommt zuerst, damit eine Story am Stück gebaut wird),
+nicht Filter. Was danach noch offen ist, meldet `ungeclusterte-szenarien` – und zwar als das,
+was es ist: eingeplant, aber ohne Lauf-Clustering.
 
 **Warum der Drain nicht an der Backlog-Größe hängt:** s. [„Lanes und Trigger"](#KPR-lanes-trigger) oben.
 

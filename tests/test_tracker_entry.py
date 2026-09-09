@@ -152,3 +152,79 @@ def test_remove_haelt_den_header():
 def test_remove_unbekannte_id_scheitert():
     with pytest.raises(ValueError):
         te.remove(SPEC, BESTAND, "XX-S999-9")
+
+
+# --- kuerzungen ---------------------------------------------------------------
+# Ein `set` ersetzt den ganzen Feldwert. Kennt der Aufrufer nur eine gekürzte Übersicht des
+# Felds (`list` zeigt bei einer offenen Frage nur den Anker, nicht die Begründung dahinter),
+# überschreibt er unbemerkt Inhalt – in S131 real passiert und nur durch `git diff` gefangen.
+# Die Erfolgsmeldung der Tracker-Werkzeuge nennt bis dahin nur, WELCHES Feld geändert wurde.
+LANG = "**Alpha:** S150 – verschoben in S130, tragender Trigger bleibt der Wechsel auf .NET 11.\n"
+KURZ = "**Alpha:** S150\n"
+
+
+def test_kuerzung_wird_gemeldet():
+    meldungen = te.kuerzungen(LANG, KURZ)
+    assert len(meldungen) == 1
+    assert "Alpha" in meldungen[0]
+
+
+def test_meldung_nennt_beide_laengen():
+    meldung = te.kuerzungen(LANG, KURZ)[0]
+    # Gezählt wird der Feldwert, nicht die Zeile – der `**Feld:**`-Präfix ist kein Inhalt.
+    assert "76" in meldung and "4" in meldung
+
+
+def test_meldung_nennt_den_weg_zum_verlorenen_text():
+    assert "git diff" in te.kuerzungen(LANG, KURZ)[0]
+
+
+def test_meldung_nennt_eintrag_und_feld_lesbar():
+    # Erste Fassung gab den Schlüssel als rohes Tupel aus: „('OQ-S119-3', 'Fällig')".
+    meldung = te.kuerzungen("## XX-S1-1 — Erster\n" + LANG, "## XX-S1-1 — Erster\n" + KURZ)[0]
+    assert "XX-S1-1 · Alpha" in meldung and "(" not in meldung
+
+
+def test_kleine_kuerzung_ist_kein_befund():
+    # Sonst meldet jede Tippfehler-Korrektur – eine Warnung bei jedem Aufruf bedeutet nichts.
+    assert te.kuerzungen("**Alpha:** abcdefghij\n", "**Alpha:** abcdefg\n") == []
+
+
+def test_verlaengerung_ist_kein_befund():
+    assert te.kuerzungen(KURZ, LANG) == []
+
+
+def test_unveraenderter_text_ist_kein_befund():
+    assert te.kuerzungen(LANG, LANG) == []
+
+
+def test_mehrere_felder_werden_einzeln_gemeldet():
+    alt = LANG + "**Beta:** " + "y" * 90 + "\n"
+    neu = KURZ + "**Beta:** y\n"
+    assert len(te.kuerzungen(alt, neu)) == 2
+
+
+def test_neues_feld_ohne_vorgaenger_ist_kein_befund():
+    # Beim `add` gibt es keinen alten Wert – dort ist nichts verloren gegangen.
+    assert te.kuerzungen("", LANG) == []
+
+
+def test_felder_werden_je_eintrag_verglichen():
+    """Der Fall, an dem die erste Fassung scheiterte – und mit ihr die ganze Wirkung.
+
+    Eine Tracker-Datei enthält viele Einträge, und jeder trägt dieselben Feldnamen. Wurden die
+    Werte dateiweit in ein dict gesammelt, überschrieb der letzte Eintrag alle vorigen: Die
+    Kürzung im ERSTEN Eintrag verglich sich gegen den Wert des letzten und fiel durch. Genau
+    so blieb die Warnung beim echten `oq set` aus – der Fehler, den sie verhindern sollte,
+    trat ein zweites Mal ein.
+    """
+    alt = ("## XX-S1-1 — Erster\n" + LANG + "\n## XX-S1-2 — Zweiter\n**Alpha:** kurz\n")
+    neu = ("## XX-S1-1 — Erster\n" + KURZ + "\n## XX-S1-2 — Zweiter\n**Alpha:** kurz\n")
+    meldungen = te.kuerzungen(alt, neu)
+    assert len(meldungen) == 1 and "Alpha" in meldungen[0]
+
+
+def test_gleicher_feldname_in_anderem_eintrag_bleibt_unberuehrt():
+    alt = ("## XX-S1-1 — Erster\n**Alpha:** kurz\n\n## XX-S1-2 — Zweiter\n" + LANG)
+    neu = ("## XX-S1-1 — Erster\n**Alpha:** kurz\n\n## XX-S1-2 — Zweiter\n" + KURZ)
+    assert len(te.kuerzungen(alt, neu)) == 1

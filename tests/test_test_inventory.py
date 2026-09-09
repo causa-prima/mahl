@@ -7,7 +7,13 @@ stimmen – auch wenn Klammern in Zeichenketten oder Kommentaren stehen.
 from pathlib import Path
 
 
-from prozesscode._test_inventory import block_ende, inventar, parse_csharp, parse_typescript
+from prozesscode._test_inventory import (
+    block_ende,
+    inventar,
+    parse_csharp,
+    parse_python,
+    parse_typescript,
+)
 
 
 def _lines(text: str) -> list[str]:
@@ -168,13 +174,79 @@ def test_inventar_is_sorted_by_start_line(tmp_path):
     assert starts == sorted(starts)
 
 
+# --- Python (pytest) ----------------------------------------------------------
+# Python kennt keine Blockklammern – das Ende ergibt sich aus der Einrückung. Deshalb reicht
+# block_ende() hier nicht, und die Fälle unten prüfen genau die Stellen, an denen eine
+# klammerbasierte Zählung falsch läge: Leerzeilen im Test, Fortsetzungszeilen, letzter Test.
+PY = '''
+"""Modul-Docstring."""
+import pytest
+
+
+def helfer():
+    return 1
+
+
+def test_erster():
+    assert helfer() == 1
+
+
+def test_mit_leerzeile():
+    a = 1
+
+    assert a == 1
+
+
+@pytest.mark.parametrize("x", [1, 2])
+def test_mit_dekorator(x):
+    assert x
+'''
+
+
+def test_python_finds_only_test_functions():
+    namen = [e.name for e in parse_python(_lines(PY))]
+    assert namen == ["test_erster", "test_mit_leerzeile", "test_mit_dekorator"]
+
+
+def test_python_range_ends_before_the_next_definition():
+    erster = parse_python(_lines(PY))[0]
+    assert (erster.start, erster.end) == (9, 10)
+
+
+def test_python_blank_line_inside_a_test_does_not_end_it():
+    zweiter = parse_python(_lines(PY))[1]
+    assert (zweiter.start, zweiter.end) == (13, 16)
+
+
+def test_python_decorator_belongs_to_the_test():
+    # Der Bereich muss beim Dekorator beginnen – sonst schneidet ein Folge-Read ihn ab.
+    dritter = parse_python(_lines(PY))[2]
+    assert dritter.start == 19
+
+
+def test_python_last_test_ends_at_the_last_line():
+    letzter = parse_python(_lines(PY))[-1]
+    assert letzter.end == len(_lines(PY))
+
+
+def test_python_tests_are_not_suites():
+    assert all(not e.ist_suite for e in parse_python(_lines(PY)))
+
+
+def test_inventar_dispatches_python(tmp_path):
+    py = tmp_path / "test_foo.py"
+    py.write_text(PY, encoding="utf-8")
+    assert len(inventar(py)) == 3
+
+
 # --- Gegen die echten Projektdateien -----------------------------------------
 def test_real_project_files_are_parsed(tmp_path):
     """Regression gegen die tatsächlich vorhandenen Testdateien – die Muster sollen an
     echtem Code halten, nicht nur an konstruierten Schnipseln."""
     repo = Path(__file__).resolve().parents[1]
     for pfad, mindestens in (("Server.Tests/IngredientsEndpointsTests.cs", 20),
-                             ("Client/src/pages/IngredientsPage.test.tsx", 20)):
+                             ("Client/src/pages/IngredientsPage.test.tsx", 20),
+                             ("tests/test_next_run.py", 20)):
         datei = repo / pfad
         if not datei.exists():
             continue

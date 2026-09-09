@@ -7,6 +7,7 @@ Inventur lesen, dann gezielt die interessante Stelle mit `Read` (`offset`/`limit
 Beispiele:
   python3 -m prozesscode.test-inventory Client/src/pages/IngredientsPage.test.tsx
   python3 -m prozesscode.test-inventory Server.Tests/IngredientsEndpointsTests.cs
+  python3 -m prozesscode.test-inventory tests/test_next_run.py
   python3 -m prozesscode.test-inventory Client/e2e/*.spec.ts --names
   python3 -m prozesscode.test-inventory <datei> --grep Reaktivierung
 """
@@ -22,7 +23,7 @@ def zeige(path: Path, nur_namen: bool, muster: str | None) -> int:
     """Gibt die Inventur einer Datei aus. Liefert die Zahl der gefundenen Tests."""
     eintraege = inventar(path)
     if not eintraege:
-        print(f"{path}: keine Tests erkannt (unterstützt: .cs, .ts/.tsx/.js/.jsx)")
+        print(f"{path}: keine Tests erkannt (unterstützt: .cs, .ts/.tsx/.js/.jsx, .py)")
         return 0
 
     if muster:
@@ -52,7 +53,8 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("dateien", nargs="+", help="Test-Dateien (.cs, .ts, .tsx, .js, .jsx)")
+    parser.add_argument("dateien", nargs="+",
+                        help="Test-Dateien (.cs, .ts, .tsx, .js, .jsx, .py)")
     parser.add_argument("--names", action="store_true",
                         help="nur Namen, ohne Zeilenbereiche (noch kompakter)")
     parser.add_argument("--grep", metavar="TEXT",

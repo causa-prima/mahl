@@ -67,6 +67,15 @@ ordnen und flaggen das fertige Ergebnis (Zustands-Abhängigkeiten, Erstmaligkeit
    Ohne diesen Schritt entsteht ein Lauf, dessen E2E-Arrangement keinen Weg über die Oberfläche
    hat – er erzwingt dann einen Test-only-Endpoint oder das Vorziehen eines späteren Laufs.
 
+   **Die gefundene Abhängigkeit wird aufgeschrieben, nicht nur eingeordnet.** Die Run-Nummer
+   allein trägt sie nicht: Sie ordnet nur innerhalb einer Datei, und sie sagt nicht, *warum*
+   diese Reihenfolge gilt. Jede Kante, die über die Datei hinausreicht oder die nicht schon
+   durch aufsteigende Nummern erfüllt ist, gehört als `· braucht:<ref>` an den Run-Tag (bzw. als
+   `# @braucht:` in den Header, wenn sie für die ganze Datei gilt). `next_run.py` legt einen
+   Lauf erst vor, wenn seine Vorgänger erledigt sind – eine nicht notierte Kante hat diese
+   Wirkung nicht, sondern verlässt sich darauf, dass jemand die Nummern in der richtigen
+   Reihenfolge vergeben hat.
+
 6. <a id="CLU-erstmaligkeiten"></a>**Erstmaligkeiten flaggen** – vor der Implementierung, nicht während:
    Prüfe je Lauf in der festgelegten Reihenfolge: *Was tut dieser Lauf, das noch kein Lauf zuvor
    getan hat?* Führt er den ersten Vertreter einer Klasse ein (erster mutierender
@@ -109,15 +118,43 @@ Jedes Szenario erhält einen **Kommentar-Tag** direkt oberhalb seiner `@US-NNN-�
   Scenario: Zutat anlegen
 ```
 
-Format: `# @run-<N> · <Cluster-Label> · <Schicht>[ · Singleton]`
+Format: `# @run-<N> · <Cluster-Label> · <Schicht>[ · Singleton][ · Phase:<P>][ · braucht:<refs>]`
 
 - **Frontend-only** / **Full-Stack** – die Schicht des Laufs: *Frontend-only* braucht keinen
   Backend-Subagenten (reines UI-/Dialog-Verhalten), *Full-Stack* berührt Frontend und Backend.
 - **Singleton** – ein Lauf mit nur einem Szenario; wird ergänzt, damit klar ist, dass der
   einzelne Eintrag Absicht ist (siehe [Hinweise](#CLU-hinweise)).
+- **Phase:`<P>`** – eine von `SKELETON`, `MVP`, `V1`. Bestimmt, ab wann der Lauf überhaupt
+  fällig ist. Weglassen, wenn die Datei-Direktive `# @phase:` (siehe unten) schon die richtige
+  Phase setzt; angeben, wenn dieser Lauf davon abweicht (z.B. eine Story, deren Bearbeiten-Läufe
+  erst im MVP kommen). Ein Lauf **ohne** Phase – weder hier noch per Direktive – wird nie fällig;
+  `next_run.py --check` blockt das.
+- **braucht:`<refs>`** – kommaseparierte Vorgänger-Läufe, die vor diesem gebaut sein müssen:
+  `run-8` innerhalb derselben Datei, `US-904/run-8` datei-übergreifend (Präfix = Top-Level-Tag
+  der Zieldatei ohne `@`). Ersetzt die Datei-Direktive `# @braucht:`, ergänzt sie nicht.
 - Bewusst ein **Kommentar**, kein echter Gherkin-`@tag`: der Bauplan soll die Spec nicht
   verunreinigen und keine Test-Runner-Tags belegen.
-- Greppbar via `# @run-`. `<N>` = Lauf-Nummer = Implementierungs-Reihenfolge.
+- Greppbar via `# @run-`. `<N>` = Lauf-Nummer = Implementierungs-Reihenfolge **innerhalb einer
+  Datei**. Über Dateigrenzen hinweg ordnet sie nichts – dafür sind `braucht:`-Kanten da.
+
+<a id="CLU-datei-direktiven"></a>
+### Datei-Direktiven: Phase und Kanten für die ganze Datei
+
+Im Feature-Header – vor `Background:`/dem ersten `Scenario:` – stehen zwei Direktiven, die als
+Default für **alle** Läufe der Datei gelten:
+
+```gherkin
+@NFR-resilience
+Feature: Querschnittliche Fehlerbehandlung
+
+  # @phase: MVP
+  # @braucht: US-904/run-1,US-904/run-7
+```
+
+Sie sind der einzige Weg für Dateien **ohne** Run-Tags (querschnittliche Features nach
+ADR-S103-1): Deren Szenarien bilden je einen Einzel-Lauf und hätten sonst nirgends eine Phase
+anzuschreiben. Unterhalb des Headers sind sie ein Verstoß – dort sähen sie lokal aus und wirkten
+global.
 
 ## Beispiel
 

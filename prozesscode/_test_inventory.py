@@ -1,4 +1,4 @@
-"""Testnamen samt Zeilenbereich aus Test-Dateien ziehen (C# xunit, TypeScript vitest).
+"""Testnamen samt Zeilenbereich aus Test-Dateien ziehen (C# xunit, TypeScript vitest, Python pytest).
 
 Zweck: Wer einen Test ergänzt, will meist nur wissen, *was schon da ist* und *wo* – und liest
 dafür heute die ganze Datei. Gemessen sind rund zwei Drittel des Lesens auf Code- und
@@ -10,8 +10,9 @@ Gegenüber LSP `documentSymbol`: Das liefert nur Startzeilen und listet zusätzl
 Property/Konstante mit auf – für eine große Testdatei ein Vielfaches dieser Ausgabe. Für
 C# steht ohnehin kein Language-Server bereit.
 
-Blockende per Klammerzählung. Zeichenketten und Zeilenkommentare werden vorher ausgeblendet,
-damit eine Klammer in einem Text-Literal die Zählung nicht verschiebt.
+Blockende per Klammerzählung (C#/TypeScript). Zeichenketten und Zeilenkommentare werden vorher
+ausgeblendet, damit eine Klammer in einem Text-Literal die Zählung nicht verschiebt. Python hat
+keine Blockklammern – dort ergibt sich das Ende aus der Einrückung.
 """
 import re
 from dataclasses import dataclass
@@ -27,6 +28,9 @@ CS_METHOD = re.compile(r"^\s*(?:public|private|internal|protected)[\w\s<>,\[\]]*
 TS_BLOCK = re.compile(
     r"""^(\s*)(describe|it|test)\b(?:\.\w+)*\s*\((?:.*\)\s*\(\s*)?\s*(['"`])(.+?)\3"""
 )
+
+# Python/pytest: Testfunktion = `def test_…`. Async-Tests eingeschlossen.
+PY_TEST = re.compile(r"^\s*(?:async\s+)?def\s+(test_\w*)\s*\(")
 
 _LINE_COMMENT = re.compile(r"//.*$")
 _LITERAL = re.compile(r"'[^']*'|\"[^\"]*\"|`[^`]*`")
@@ -97,6 +101,49 @@ def parse_typescript(lines: list[str]) -> list[Eintrag]:
     return eintraege
 
 
+def _einrueckung(line: str) -> int:
+    return len(line) - len(line.lstrip())
+
+
+def _python_block_ende(lines: list[str], start_idx: int, tiefe: int) -> int:
+    """Letzte Zeile (0-basiert) einer Python-Definition, bestimmt über die Einrückung.
+
+    Der Block endet vor der nächsten nicht-leeren Zeile, die höchstens so weit eingerückt ist
+    wie das `def` selbst. Leerzeilen zählen nicht als Ende – sie stehen regelmäßig *innerhalb*
+    eines Tests; deshalb wird bis zur letzten inhaltlichen Zeile zurückgegangen.
+    """
+    letzte_inhaltliche = start_idx
+    for idx in range(start_idx + 1, len(lines)):
+        if not lines[idx].strip():
+            continue
+        if _einrueckung(lines[idx]) <= tiefe:
+            return letzte_inhaltliche
+        letzte_inhaltliche = idx
+    return letzte_inhaltliche
+
+
+def parse_python(lines: list[str]) -> list[Eintrag]:
+    """pytest-Tests: `def test_…` auf Modulebene, Dekoratoren eingeschlossen.
+
+    Nur `test_`-Präfixe – Hilfsfunktionen und Fixtures sind kein Inventar-Gegenstand (dieselbe
+    Auswahl, die pytest selbst trifft). Testklassen kommen im Bestand nicht vor und werden
+    deshalb nicht erkannt; sie fielen als `def test_…` in ihrem Rumpf trotzdem auf.
+    """
+    eintraege = []
+    for idx, line in enumerate(lines):
+        treffer = PY_TEST.match(line)
+        if not treffer:
+            continue
+        tiefe = _einrueckung(line)
+        start = idx
+        # Dekoratoren gehören zum Test – ohne sie schnitte ein Folge-Read sie ab.
+        while start > 0 and lines[start - 1].lstrip().startswith("@"):
+            start -= 1
+        eintraege.append(Eintrag(treffer.group(1), start + 1,
+                                 _python_block_ende(lines, idx, tiefe) + 1, 0, False))
+    return eintraege
+
+
 def inventar(path: Path) -> list[Eintrag]:
     """Einträge der Datei, nach Startzeile sortiert. Unbekannte Endung → leer."""
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -104,6 +151,8 @@ def inventar(path: Path) -> list[Eintrag]:
         eintraege = parse_csharp(lines)
     elif path.suffix in (".ts", ".tsx", ".js", ".jsx"):
         eintraege = parse_typescript(lines)
+    elif path.suffix == ".py":
+        eintraege = parse_python(lines)
     else:
         return []
     return sorted(eintraege, key=lambda e: e.start)

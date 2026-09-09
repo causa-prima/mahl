@@ -31,6 +31,7 @@ from .obs_entry import (  # noqa: E402
     obs_path,
     set_fields,
 )
+from .tracker_entry import kuerzungen
 
 
 def cmd_get(args) -> int:
@@ -100,6 +101,7 @@ def cmd_set(args) -> int:
         return 1
     path = obs_path()
     inhalt = path.read_text(encoding="utf-8")
+    vorher = inhalt
     if (args.status is not None or args.entscheidung is not None
             or args.zusammen_erledigen is not None or args.titel is not None):
         inhalt = set_fields(inhalt, args.id, status=args.status, titel=args.titel,
@@ -114,6 +116,8 @@ def cmd_set(args) -> int:
                                          ("Beobachtung erweitert",
                                           args.beobachtung_anhaengen)) if v is not None)
     print(f"✓ {args.id}: {geaendert} aktualisiert.")
+    for warnung in kuerzungen(vorher, inhalt):
+        print(f"  {warnung}", file=sys.stderr)
     return 0
 
 

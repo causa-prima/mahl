@@ -4,8 +4,14 @@ Feature: Zutaten verwalten
   Als Rezept-Sammler möchte ich Zutaten anlegen und löschen,
   damit ich sie in Rezepten nutzen kann.
 
+  # @phase: SKELETON
+  #
   # Scope SKELETON: Create, Read (Liste), Delete.
-  # Update (Bearbeiten) und Tags: V1-Scope.
+  # Bearbeiten (PUT /api/ingredients/{id} samt Edit-UI) und Modifier: MVP – so die
+  # Akzeptanzkriterien in docs/stories/szenario_9_datenpflege.md, gestützt auf
+  # skeleton-spec.md („Verschoben auf MVP") und architecture.md (Analogie zu US-614).
+  # Tags: V1. Beide haben noch keine Szenarien; sobald sie geschrieben werden, tragen ihre
+  # Läufe ihre Phase am Run-Tag (z.B. Phase:MVP) und überschreiben damit den Default oben.
 
   # kein Auth-Gate in SKELETON-Scope
   Background:
