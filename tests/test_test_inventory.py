@@ -145,6 +145,21 @@ def test_typescript_handles_modifiers_like_it_each():
     assert "parametrisiert %i" in namen
 
 
+def test_typescript_playwright_describe_is_a_suite():
+    """Playwright schreibt `test.describe(…)` – das Wort vorn ist `test`, die Art steckt im Modifikator.
+    S132: `ingredients.spec.ts` meldete dadurch 53 Tests statt 41 (die 12 Suiten mitgezählt)."""
+    pw = """
+test.describe('Pending', () => {
+  test('sperrt', async ({ page }) => {
+  })
+})
+"""
+    assert [(e.name, e.ist_suite) for e in parse_typescript(_lines(pw))] == [
+        ("Pending", True),
+        ("sperrt", False),
+    ]
+
+
 def test_zeilen_counts_inclusive():
     erster_test = parse_typescript(_lines(TS))[1]
     assert (erster_test.start, erster_test.end) == (2, 4)

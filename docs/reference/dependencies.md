@@ -79,7 +79,7 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 | `Microsoft.AspNetCore.Mvc.Testing` | Server.Tests |
 | `Microsoft.EntityFrameworkCore.InMemory` | Server.Tests |
 | `Microsoft.NET.Test.Sdk` | Server.Tests |
-| `xunit.v3` | Server.Tests |
+| `xunit.v3.mtp-v2` | Server.Tests |
 | `xunit.runner.visualstudio` | Server.Tests |
 | `AwesomeAssertions` | Server.Tests |
 | `coverlet.MTP` | Server.Tests |

@@ -32,6 +32,7 @@ internal readonly record struct Bounded<TInner, TMax>
 
     // Parameterless ctor must be public (record struct limitation) – catches new Bounded():
     // Stryker disable once Statement,String : parameterless ctor unreachable via normal construction (ADR-S041-9)
+    [ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
     public Bounded() => throw new InvalidOperationException("Uninitialized");
 
     private Bounded(TInner inner) => _inner = inner;

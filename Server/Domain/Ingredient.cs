@@ -1,3 +1,5 @@
+using mahl.Server.Types;
+
 namespace mahl.Server.Domain;
 
 // Domain-Entity (docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession):
@@ -16,6 +18,7 @@ internal readonly record struct Ingredient
 
     // Parameterless ctor must be public (record struct limitation) – catches new Ingredient():
     // Stryker disable once Statement,String : parameterless ctor unreachable via normal construction (ADR-S041-9)
+    [ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
     public Ingredient() => throw new InvalidOperationException("Uninitialized");
 
     private Ingredient(IngredientId id, IngredientName name, Unit baseUnit)

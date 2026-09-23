@@ -19,11 +19,13 @@ internal readonly record struct Uuid7
     // Guid-Wertes; S4581 ist genau dafür freigegeben.
 #pragma warning disable S4581
     // Stryker disable once Equality,String,Conditional : default(T) guard unreachable via normal construction (ADR-S041-9)
+    [ExcludeFromCoverageGate("default(T) guard unreachable via normal construction (ADR-S041-9)")]
     public Guid Value => _value == default ? throw new InvalidOperationException("Uninitialized") : _value;
 #pragma warning restore S4581
 
     // Parameterless ctor must be public (record struct limitation) – catches new Uuid7():
     // Stryker disable once Statement,String : parameterless ctor unreachable via normal construction (ADR-S041-9)
+    [ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
     public Uuid7() => throw new InvalidOperationException("Uninitialized");
 
     private Uuid7(Guid value) => _value = value;

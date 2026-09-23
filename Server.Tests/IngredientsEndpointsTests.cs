@@ -17,7 +17,9 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     // unverändert – eine Erweiterung würde bestehende BeEquivalentTo-Assertions zwingen, einen xmin-Wert
     // vorherzusagen, den sie nicht kennen können.
     private sealed record IngredientWithEtagResponse(Guid Id, string Name, string BaseUnit, string Etag);
-    private sealed record CreateIngredientRequest(string Name, string BaseUnit);
+    // Nullable: ein explizit null gesetztes JSON-Property ist ein realer Client-Input (System.Text.Json
+    // erzwingt die NRT-Annotationen des Server-DTOs nicht) und muss wie leer behandelt werden.
+    private sealed record CreateIngredientRequest(string? Name, string? BaseUnit);
     private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
     // ADR-S004-1/ADR-S111-2: 409-Body von POST bei soft-deleted-Namenskonflikt.
@@ -196,15 +198,18 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     // Same invariant ("Pflichtfeld leer oder nur Whitespace -> 422 feld-keyed"), nur Input variiert
     // -> ein parametrisierter Test (docs/process/tdd-process.md "Parametrisierte Tests").
     // ADR-S051-1: Strings werden vor der Validierung getrimmt -> "   " ist nach Trimming leer.
+    // null: explizit null gesetztes Property – ohne Behandlung würde daraus ein 500er statt 422.
     [Theory]
     [InlineData("", "g", "name", "Name darf nicht leer sein.")]
     [InlineData("   ", "g", "name", "Name darf nicht leer sein.")]
+    [InlineData(null, "g", "name", "Name darf nicht leer sein.")]
     [InlineData("Salz", "", "baseUnit", "Einheit darf nicht leer sein.")]
     [InlineData("Salz", "   ", "baseUnit", "Einheit darf nicht leer sein.")]
+    [InlineData("Salz", null, "baseUnit", "Einheit darf nicht leer sein.")]
     public async Task US904_Error_CreateIngredient_InvalidInput_Returns422WithFieldKeyedError(
-        string name, string unit, string expectedKey, string expectedMessage)
+        string? name, string? unit, string expectedKey, string expectedMessage)
     {
-        // Given: a request whose required field is empty or whitespace-only
+        // Given: a request whose required field is empty, whitespace-only or null
         var request = new CreateIngredientRequest(Name: name, BaseUnit: unit);
 
         // When: the ingredient is created
@@ -885,14 +890,20 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     // wiederhergestellt wurde" – ein Restore auf eine bereits AKTIVE Zeile mit
     // ABWEICHENDEN Werten überschreibt nicht fremde Werte, sondern meldet 409 mit dem gespeicherten
     // Stand (ADR-S111-1/ADR-S111-3 – der Anzeigetext selbst ist Frontend-Sache).
-    [Fact]
-    public async Task US904_Error_RestoreIngredient_ActiveRowWithDifferentValues_Returns409WithAlreadyActiveConflictBody()
+    // Beide Felder einzeln abweichend: der Wertevergleich ist ordinal – eine nur in der Schreibweise
+    // abweichende Namensangabe ist ebenfalls ein Konflikt, obwohl der Duplikat-Check sie als dieselbe
+    // Zutat erkennt.
+    [Theory]
+    [InlineData("Koriander", "Bund")]
+    [InlineData("koriander", "Töpfchen")]
+    public async Task US904_Error_RestoreIngredient_ActiveRowWithDifferentValues_Returns409WithAlreadyActiveConflictBody(
+        string requestName, string requestUnit)
     {
-        // Given: an active ingredient (its real xmin ETag from creation)
+        // Given: an active ingredient "Koriander"/"Töpfchen" (its real xmin ETag from creation)
         var (created, etag) = await CreateIngredientAsync("Koriander", "Töpfchen");
 
-        // When: the ingredient is restored with a DIFFERENT unit ("Bund" vs. stored "Töpfchen")
-        var response = await RestoreIngredientAsync(created.Id, "Koriander", "Bund");
+        // When: the ingredient is restored with values that differ in exactly one field
+        var response = await RestoreIngredientAsync(created.Id, requestName, requestUnit);
 
         // Then: 409 Conflict with the SAVED (not the requested) values (ADR-S111-1)
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);

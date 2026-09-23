@@ -17,6 +17,7 @@
       "!**/E2ETestSupport.cs",
       "!**/*.cshtml.cs",
       "!**/Helpers.cs",
+      "!**/ExcludeFromCoverageGateAttribute.cs",
       "!**/SeedData.sql"
     ]
   }

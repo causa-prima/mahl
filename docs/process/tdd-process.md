@@ -396,6 +396,6 @@ Stryker-Bezüge (Zeilennummern, Mutantentypen) gehören **nicht** in Test-Namen 
 <a id="TDD-branch-coverage"></a>
 ## Branch Coverage
 
-- **C# Backend:** Coverlet (collector) mit `coverlet.runsettings` – automatisch bei vollem Test-Lauf (`dotnet-test.py` ohne `--filter`). Threshold: 100% Branch + Line.
+- **C# Backend:** `coverlet.MTP` – automatisch bei vollem Test-Lauf (`dotnet-test.py` ohne `--filter`), Messumfang und Ausschlüsse siehe ADR-S089-1. Threshold: 100% Branch + Line.
 - **TypeScript Frontend:** Vitest mit V8-Provider – `npm run test:coverage`. Threshold: 100% Branches, Functions, Lines, Statements.
-- **Suppressionen:** C# via `[ExcludeFromCodeCoverage]` + Begründung in `docs/history/adr.md`; TS via `/* v8 ignore next */` + Begründung. Jede Suppression muss begründet sein.
+- **Suppressionen:** C# via `[ExcludeFromCoverageGate("…")]` + Begründung in `docs/history/adr.md` (nicht `[ExcludeFromCodeCoverage]` – das nimmt Stryker den Code mit weg, ADR-S041-9); TS via `/* v8 ignore next */` + Begründung. Jede Suppression muss begründet sein.

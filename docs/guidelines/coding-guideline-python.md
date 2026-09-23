@@ -86,7 +86,7 @@ löst die Suite mit aus, weil dort der Text wächst, den ein Guard misst.
 `checks/ruff_lint.py`); der volle Lauf ist `python3 -m prozesscode.ruff-run`. Die
 Regelauswahl steht mit Begründung in `ruff.toml` und ist bewusst schmal: Fehlerregeln ja, Stil
 nein. **Jede `# noqa`-Suppression trägt eine Begründung im Code** – dieselbe Regel wie für
-`[ExcludeFromCodeCoverage]` im Produktcode.
+`[ExcludeFromCoverageGate]` im Produktcode.
 
 <a id="CGP-gegenprobe"></a>
 ### Die Gegenprobe – ein Guard ist erst fertig, wenn er angesprungen ist

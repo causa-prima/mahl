@@ -17,6 +17,12 @@ def test_string_property_write_blocked():
     inp = make_input(DOMAIN_FILE, "public string Name { get; init; }", tool="Write")
     assert check_blocking(inp) != []
 
+def test_attribute_argument_property_not_blocked():
+    """Positionale Attribut-Argumente brauchen eine Property (CA1019) – ein Domänentyp ginge als
+    Attribut-Argument gar nicht, dort sind nur Konstanten erlaubt."""
+    inp = make_input("Server/Types/ExcludeFromCoverageGateAttribute.cs", "public string Justification { get; } = justification;")
+    assert check_blocking(inp) == []
+
 def test_dto_not_blocked():
     inp = make_input(DTO_FILE, "public string Name { get; init; }")
     assert check_blocking(inp) == []

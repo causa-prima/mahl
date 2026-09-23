@@ -26,6 +26,7 @@ DOMAIN_EXCLUDED = re.compile(
     r'[/\\](?:Migrations|DatabaseTypes)[/\\]'
     r'|[/\\]Dtos[/\\]'
     r'|(?:Dto|Options|Settings)\.cs$'
+    r'|\wAttribute\.cs$'      # Attribut-Argumente sind Konstanten (string/int), keine Domänentypen
     r'|[/\\](?:Tests?|test)[/\\]'
     r'|\.Tests[/\\]'          # e.g. Server.Tests/foo.cs
     r'|Tests\.cs$'
@@ -39,6 +40,7 @@ IMMUTABILITY_EXCLUDED = re.compile(
     r'|DbContext\.cs$'            # EF DbContext muss class sein – kein record
     r'|(?:^|[/\\])Program\.cs$'  # public partial class Program für WebApplicationFactory
     r'|(?:Options|Settings)\.cs$'
+    r'|\wAttribute\.cs$'          # Records dürfen nicht von System.Attribute erben (CS8864)
     r'|[/\\](?:Tests?|test)[/\\]'
     r'|\.Tests[/\\]'          # e.g. Server.Tests/foo.cs
     r'|Tests\.cs$'

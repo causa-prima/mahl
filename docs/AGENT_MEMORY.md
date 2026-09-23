@@ -49,11 +49,6 @@ Auswahl. TD-Einträge mit
 
 ## Nächste Prioritäten
 
-- **Querschnitts-Testfundament aufsetzen (ADR-S112-5: Page-Object-Interface definieren, bestehende Tests überführen)** — `Fällig: jetzt` · Quelle: `python3 -m prozesscode.decisions get ADR-S112-5` · Done: Ein Page-Object-Interface existiert, die Suite läuft parametrisiert gegen die Zutaten-Seite, alle bisherigen Tests sind grün.
-  Berührt nur Testcode. Jetzt, weil die Umformung teurer wird, sobald neue Seitenarbeit dazwischenliegt.
-
-- TD-S089-1 · Done: `collect_coverage` ist reaktiviert und `dotnet-test.py` meldet 100% Branch-Coverage grün.
-
 - TD-S083-2 · Done: Alle interaktiven Controls messen ≥ 44×44px, der Infra-Test hält das fest.
 
 - TD-S083-4 · Done: `Client/src` führt in Domänentypen keine nackten `string`-Felder mehr, alle Tests grün.

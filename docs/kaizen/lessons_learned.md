@@ -140,3 +140,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Die Fixtures entstanden aus dem Minimalfall, der die Funktion aufruft, nicht aus der Form des echten Datenbestands. Ein Fixture mit einem Eintrag kann den Fehler strukturell nicht zeigen: Bei einem Eintrag ist das dateiweite dict identisch mit dem eintragsbezogenen. Erfolg und Misserfolg waren im Aufbau nicht unterscheidbar, das gruene Ergebnis trug also nichts. Gefangen wurde es allein durch die Gegenprobe am echten Werkzeug.
   Regel: Fixture-Form am echten Datenbestand ausrichten: Prueft eine Funktion eine Datei mit vielen Eintraegen, braucht das Fixture mehr als einen - sonst prueft der Test einen Fall, den es real nie gibt. Bei jedem Fixture fragen, worin es sich vom Produktivdatensatz unterscheidet und ob der Fehler in dieser Form ueberhaupt auftreten koennte.
   CM-Bezug: CM-S116-1 (Rueckfall, Auspraegung „untauglicher Pruefaufbau" – dieselbe Form wie LL-S123-7: gegen eine selbstgebaute Fixture geprueft statt gegen das echte Artefakt)
+
+## Session 132 – 2026-09-23
+
+- **[HOCH] [PROZESS] [Testing] LL-S132-1 – Beleg durch die eigene Änderung erzeugt: Stryker 50/50 unter [ExcludeFromCodeCoverage]**
+  Quelle: User
+  Was: Nach dem Ausschluss ganzer Methoden per [ExcludeFromCodeCoverage] meldete Stryker auf IngredientsEndpoints.cs 50/50 Mutanten getötet. Daraus wurde zweimal behauptet, die getestete Logik in diesen Methoden bleibe durch Stryker gedeckt; damit wurde ein Review-Finding (fehlende Stryker-Suppression laut ADR-S111-2) abgelehnt und die Ablehnung in einen ADR-Nachtrag geschrieben. Tatsächlich verwirft Stryker.NET Mutanten in so markiertem Code (Status Ignored, 18 Stück) – die 50 waren die Überlebenden der eigenen Änderung. Aufgedeckt erst durch den Einwand des Users, der JSON-Report enthalte jeden Mutanten mit Status.
+  Warum: Die Messung wurde als unabhängige Bestätigung der Änderung gelesen, obwohl die Änderung selbst in den Messaufbau eingriff. Die Gegenfrage „hätte das Ergebnis anders ausgesehen, wenn die Logik ungedeckt wäre?" wurde nicht gestellt; der Blick auf Ignored-Mutanten und deren Gründe im Report fehlte.
+  Regel: Greift eine Änderung in ein Prüfwerkzeug ein (Attribut, Ausschluss, Konfiguration), belegt ein grünes Ergebnis desselben Werkzeugs nichts über sie. Vorher die Grundgesamtheit vergleichen (Anzahl geprüfter Mutanten/Zeilen vor und nach) und die ausgeschlossenen Elemente samt Grund ansehen.
+  CM-Bezug: CM-S116-1
+
+- **[MITTEL] [PROZESS] [Doku] LL-S132-2 – Gescheiterter Versuch als „nicht erneut probieren" erfasst, ohne Ursache: richtiger Weg blieb 40 Sessions gesperrt**
+  Quelle: Orchestrator
+  Was: Der TD-Eintrag zum abgeschalteten Backend-Coverage-Gate (S089) führte coverlet.MTP unter „Nicht erneut probieren", weil es mit einer TypeLoadException gescheitert war. Die Ursache war nicht die Engine, sondern ein gemischter Graph: das Paket xunit.v3 ist die mtp-v1-Variante, coverlet.MTP verlangt MTP 2. Das Gate blieb rund 40 Sessions aus; in der Zeit liefen zwei echte Testlücken auf. Gelöst in S132 mit genau der als gescheitert markierten Engine – nach einem Blick in die nuspec-Abhängigkeiten.
+  Warum: Festgehalten wurde das Symptom (Exception-Text) samt Verbot, nicht die geprüfte oder vermutete Ursache. Ein späterer Leser kann ein Verbot ohne Begründung nicht gegen eine veränderte Lage prüfen und respektiert es – der Eintrag wirkte als Sperre statt als Wissen.
+  Regel: Einen gescheiterten Versuch nur mit diagnostizierter Ursache als Ausschluss erfassen; ist die Ursache unbekannt, das so benennen („gescheitert mit X, Ursache ungeklärt") statt „nicht erneut probieren". Vor dem Verwerfen einer Paket-Kombination die Abhängigkeiten der beteiligten Pakete vergleichen (nuspec).

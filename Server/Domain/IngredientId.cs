@@ -19,6 +19,7 @@ internal readonly record struct IngredientId
 
     // Parameterless ctor must be public (record struct limitation) – catches new IngredientId():
     // Stryker disable once Statement,String : parameterless ctor unreachable via normal construction (ADR-S041-9)
+    [ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
     public IngredientId() => throw new InvalidOperationException("Uninitialized");
 
     private IngredientId(Uuid7 value) => _value = value;

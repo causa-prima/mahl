@@ -23,10 +23,12 @@ CS_ATTRIBUTE = re.compile(r"^\s*\[\s*(Fact|Theory)\b")
 CS_METHOD = re.compile(r"^\s*(?:public|private|internal|protected)[\w\s<>,\[\]]*?\s(\w+)\s*\(")
 
 # TypeScript/JS: describe/it/test, ggf. mit Modifikatoren (`.only`, `.skip`, `.each`).
+# Die Modifikatoren werden mitgefangen, weil Playwright Suiten als `test.describe(…)` schreibt –
+# dort steht die Art im Modifikator, nicht im ersten Wort.
 # Die optionale Gruppe fängt die zweistufige Form `it.each([…])('name', …)` ab, bei der der
 # Name erst in der ZWEITEN Argumentliste steht.
 TS_BLOCK = re.compile(
-    r"""^(\s*)(describe|it|test)\b(?:\.\w+)*\s*\((?:.*\)\s*\(\s*)?\s*(['"`])(.+?)\3"""
+    r"""^(\s*)(describe|it|test)\b((?:\.\w+)*)\s*\((?:.*\)\s*\(\s*)?\s*(['"`])(.+?)\4"""
 )
 
 # Python/pytest: Testfunktion = `def test_…`. Async-Tests eingeschlossen.
@@ -89,15 +91,16 @@ def parse_csharp(lines: list[str]) -> list[Eintrag]:
 
 
 def parse_typescript(lines: list[str]) -> list[Eintrag]:
-    """`describe` als Suite, `it`/`test` als Test; Verschachtelung über die Einrückung."""
+    """`describe`/`test.describe` als Suite, `it`/`test` als Test; Verschachtelung über die Einrückung."""
     eintraege = []
     for idx, line in enumerate(lines):
         treffer = TS_BLOCK.match(line)
         if not treffer:
             continue
-        einrueckung, art, _, name = treffer.groups()
+        einrueckung, art, modifikatoren, _, name = treffer.groups()
+        ist_suite = art == "describe" or ".describe" in modifikatoren
         eintraege.append(Eintrag(name, idx + 1, block_ende(lines, idx) + 1,
-                                 len(einrueckung) // 2, art == "describe"))
+                                 len(einrueckung) // 2, ist_suite))
     return eintraege
 
 

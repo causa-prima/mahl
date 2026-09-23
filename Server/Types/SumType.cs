@@ -6,5 +6,6 @@ namespace mahl.Server.Types;
 internal static class SumType
 {
     // Stryker disable once String : "Unreachable." message in the structurally unreachable sum-type Match arm (ADR-S018-2)
+    [ExcludeFromCoverageGate("structurally unreachable sum-type/enum default arm (ADR-S040-1)")]
     public static T Unreachable<T>() => throw new InvalidOperationException("Unreachable.");
 }

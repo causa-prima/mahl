@@ -27,6 +27,7 @@ internal readonly record struct Unit
 
     // Parameterless ctor must be public (record struct limitation) – catches new Unit():
     // Stryker disable once Statement,String : parameterless ctor unreachable via normal construction (ADR-S041-9)
+    [ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
     public Unit() => throw new InvalidOperationException("Uninitialized");
 
     private Unit(Bounded<NonEmptyTrimmedString, Max20> value) => _value = value;

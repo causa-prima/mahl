@@ -35,6 +35,16 @@ def test_excluded_path_allowed():
     inp = make_input(EXCLUDED_FILE, "public class FooDbType")
     assert immutability_strict.check(inp) == []
 
+def test_attribute_class_allowed():
+    """C#-Attribute müssen `class` sein: Records dürfen nicht von System.Attribute erben (CS8864)."""
+    inp = make_input("Server/Types/ExcludeFromCoverageGateAttribute.cs", "internal sealed class ExcludeFromCoverageGateAttribute : Attribute")
+    assert immutability_strict.check(inp) == []
+
+def test_class_in_file_only_starting_with_attribute_still_blocked():
+    """Die Ausnahme hängt am Suffix `Attribute.cs`, nicht am bloßen Wortbestandteil."""
+    inp = make_input("Server/Types/AttributeHelper.cs", "public class AttributeHelper")
+    assert immutability_strict.check(inp) != []
+
 def test_init_setter_allowed():
     inp = make_input(DOMAIN_FILE, "public string Name { get; init; }")
     assert immutability_strict.check(inp) == []

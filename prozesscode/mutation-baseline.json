@@ -27,6 +27,10 @@
     "beurteilbar": 105,
     "getoetet": 84
   },
+  "prozesscode.hooks.checks.common": {
+    "beurteilbar": 28,
+    "getoetet": 0
+  },
   "prozesscode.hooks.checks.ruff_lint": {
     "beurteilbar": 31,
     "getoetet": 17

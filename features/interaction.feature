@@ -17,9 +17,10 @@ Feature: Querschnittliches Interaktionsverhalten
   # Analyse. Vor der Implementierung einen Workshop-Lauf über diese Datei führen (fehlende
   # Nachbarfälle, Fehlerpfade). Der Anlass für jedes Szenario steht in docs/tech-debt.md.
   #
-  # Offen: Die Vertreter-Konvention belegt das Verhalten nur für die eine geprüfte Seite. Womit
-  # sichergestellt wird, dass andere Seiten es ebenfalls zeigen – dieselbe Komponente statt
-  # nachgebautem Verhalten –, ist noch nicht festgelegt.
+  # Ein Vertreter belegt das Verhalten nur für die eine geprüfte Seite. Dass andere Seiten es
+  # ebenfalls zeigen, sichert ADR-S112-5: geteilte Implementierung statt nachgebautem Verhalten,
+  # nachgewiesen durch eine Suite, die je Seite über ein Page Object läuft
+  # (Client/e2e/interaction.spec.ts). Szenarien dieser Datei gehören in diese Suite.
 
   @CROSS-interaction-pending
   Scenario: Rückgängig ist während des Wiederherstellens deaktiviert

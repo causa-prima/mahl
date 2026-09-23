@@ -159,6 +159,9 @@ file static class IngredientMappings
     // deutscher Text). Die Zuordnung liegt hier an der API-Grenze, die das Request-Format kennt –
     // der Domänentyp bleibt feldagnostisch (ADR-S120-1; Meldungen an die Grenze). Je Verwendungsstelle eine eigene
     // Zuordnung: die Rezept-Einheit bekommt später ihre eigene, der Typ `Unit` bleibt einer.
+    // Coverage-Ausschluss je ganze Methode, weil coverlet nicht feiner ausschließen kann: der Enum-
+    // Default-Arm ist unerreichbar; die echten Arme bleiben durch die 422-Tests und Stryker gedeckt.
+    [ExcludeFromCoverageGate("structurally unreachable sum-type/enum default arm (ADR-S040-1)")]
     private static FieldError DescribeName(IngredientNameError error) => error switch
     {
         IngredientNameError.Empty => new FieldError("name", "Name darf nicht leer sein."),
@@ -166,6 +169,7 @@ file static class IngredientMappings
         _ => SumType.Unreachable<FieldError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
     };
 
+    [ExcludeFromCoverageGate("structurally unreachable sum-type/enum default arm (ADR-S040-1)")]
     private static FieldError DescribeBaseUnit(UnitError error) => error switch
     {
         UnitError.Empty => new FieldError("baseUnit", "Einheit darf nicht leer sein."),
@@ -198,6 +202,11 @@ file static class IngredientMappings
     // entscheidet nur noch, welche Fehlerantwort rausgeht: 409 (soft-deleted) oder 422 (aktives
     // Duplikat). Das nicht persistierte Entity hängt sonst als Added im ChangeTracker und würde den
     // Lookup verfälschen -> Detach. AsNoTracking: die gelesene Zeile wird nicht mutiert.
+    // Coverage-Ausschluss der ganzen Methode: `conflicting is null` tritt nur ein, wenn ein parallel
+    // laufender Restore die kollidierende Zeile zwischen abgelehnter Insert-Operation und Lookup
+    // umbenennt – über HTTP nicht deterministisch herstellbar, und coverlet schließt nur ganze Methoden
+    // aus. Die 409/422-Entscheidung darunter bleibt durch Integrationstests und Stryker gedeckt.
+    [ExcludeFromCoverageGate("null branch only reachable via a concurrent-restore race, not deterministically testable over HTTP (ADR-S041-9, ADR-S111-2)")]
     internal static async Task<OneOf<IngredientDto, IResult>> SoftDeletedOrDuplicateConflict(
         IngredientDbType failedInsert, Ingredient ingredient, MahlDbContext db)
     {
@@ -285,6 +294,28 @@ file static class IngredientMappings
         row.DeletedAt = null;
         try
         {
+            return await SaveOrResolveConcurrentRestore(row, requested, db);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
+        {
+            // Restore ist seit run-11 ein allgemeiner Schreib-Endpoint auf der eindeutigkeitsbeschränkten
+            // Name-Spalte (ADR-S105-2/ADR-S111-2) – ein Request-Name, der mit einer ANDEREN Zeile
+            // kollidiert, verletzt den Index genauso wie beim POST. Über die aktuelle UI nicht
+            // erreichbar (der Client sendet nur LOWER-gleiche Namen), über die API sehr wohl -> derselbe
+            // 422-Pfad wie POST (ADR-S090-1/ADR-S051-2).
+            return OneOf<IngredientDto, IResult>.FromT1(
+                ValidationProblemFor([DuplicateName(requested.Name.Value)]));
+        }
+    }
+
+    // Eigene Methode, damit der getestete Unique-Violation-Zweig im Aufrufer gemessen bleibt: coverlet
+    // schließt nur ganze Methoden aus. Der Preis: der (getestete) Speichern-Erfolgsfall dieser Methode
+    // fällt mit aus der Messung – gedeckt bleibt er durch die Restore-Integrationstests und Stryker.
+    [ExcludeFromCoverageGate("concurrency branch not deterministically triggerable over HTTP (ADR-S041-9, ADR-S111-1)")]
+    private static async Task<OneOf<IngredientDto, IResult>> SaveOrResolveConcurrentRestore(IngredientDbType row, IngredientValues requested, MahlDbContext db)
+    {
+        try
+        {
             await db.SaveChangesAsync();
         }
         // ADR-S111-1 Parallelfall (Addendum, s. dort): zwei überlappende Restores derselben
@@ -306,16 +337,6 @@ file static class IngredientMappings
         {
             await db.Entry(row).ReloadAsync();
             return await RestoreActiveRow(row, requested, db);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
-        {
-            // Restore ist seit run-11 ein allgemeiner Schreib-Endpoint auf der eindeutigkeitsbeschränkten
-            // Name-Spalte (ADR-S105-2/ADR-S111-2) – ein Request-Name, der mit einer ANDEREN Zeile
-            // kollidiert, verletzt den Index genauso wie beim POST. Über die aktuelle UI nicht
-            // erreichbar (der Client sendet nur LOWER-gleiche Namen), über die API sehr wohl -> derselbe
-            // 422-Pfad wie POST (ADR-S090-1/ADR-S051-2).
-            return OneOf<IngredientDto, IResult>.FromT1(
-                ValidationProblemFor([DuplicateName(requested.Name.Value)]));
         }
         var xmin = (uint) db.Entry(row).Property("xmin").CurrentValue!;
         return row.ToDto(xmin);

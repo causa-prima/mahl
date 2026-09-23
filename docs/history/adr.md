@@ -519,6 +519,8 @@ Der Body durchläuft **dieselbe Validierung wie der POST** (`ToDomain()`, field-
 
 **Findet der Lookup keine Zeile,** obwohl die DB gerade eine Unique-Violation gemeldet hat, ist das strukturell unerreichbar (es gibt keinen Hard-Delete). Der Guard fällt auf die 422-Duplikat-Antwort zurück und trägt eine begründete Stryker-Suppression – ein Test dafür ließe sich nicht schreiben.
 
+**Addendum (S132) – der Fall ist erreichbar, nur nicht herstellbar.** „Strukturell unerreichbar" gilt nicht mehr, seit Restore Name und Einheit aus dem Request übernimmt (ADR-S111-1, run-11): Benennt ein paralleler Restore die kollidierende soft-deleted Zeile zwischen abgelehnter Insert-Operation und Lookup um, findet der Lookup nichts. Über HTTP ist dieses Fenster nicht deterministisch zu öffnen – der Zweig gehört damit zur Race-Kategorie in ADR-S041-9 (Addendum S132) und ist von der Coverage ausgeschlossen. Die im Absatz oben genannte Stryker-Suppression existiert im Code nicht und ist auch nicht nötig: Für den Zweig erzeugt Stryker.NET nur die Equality-Mutation `conflicting is not null`, und die tötet der 409-Test auf eine soft-deleted Zeile; einen Entfernungs-Mutanten für das `return` erzeugt es nicht (S132, Mutanten-Liste im JSON-Report geprüft).
+
 **Verworfen:** Vorab-Prüfung „existiert der Name (auch soft-deleted)?" vor dem Insert – genau das Check-then-Insert-Muster, das ADR-S105-2 aus TOCTOU-Gründen verwirft. Partieller Unique-Index nur auf aktive Zeilen (`WHERE DeletedAt IS NULL`) – erlaubte zwei Zeilen gleichen Namens nebeneinander und bricht ADR-S000-2.
 
 ---
@@ -694,7 +696,7 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 **Entscheidung:**
 1. `Match<T>` nutzt immer `switch` mit `_ => SumType.Unreachable<T>()`. Der Helper `SumType.Unreachable<T>()` liegt in `Server/Types/SumType.cs` – Stryker-Suppress einmal dort, nicht in jeder Implementierung.
 2. Kein Ternary (`this is X u ? ... : ...`) – bei einer neuen Variante die in `Match<T>` vergessen wird, ruft Ternary still den falschen Arm auf; Switch wirft klar.
-3. `[ExcludeFromCodeCoverage]` auf `Match<T>` (strukturell unerreichbarer `_`-Arm).
+3. `[ExcludeFromCodeCoverage]` auf `Match<T>` (strukturell unerreichbarer `_`-Arm). **Ersetzt (S132):** `[ExcludeFromCoverageGate]` – `[ExcludeFromCodeCoverage]` nähme Stryker die Methode mit weg (ADR-S041-9, Addendum S132).
 4. **S3060 pro Sum-Type-Datei unterdrücken (S091):** SonarAnalyzer S3060 feuert auf den `this switch`-Typ-Test in `Match<T>` (will polymorphen Dispatch, der hier nach Punkt 2 bewusst verworfen ist). Pro Sum-Type-Datei einen `[<pfad>]`-Block mit `dotnet_diagnostic.S3060.severity = none` in `.editorconfig` (Muster S091, analog zu S1118/MA0048). **Nicht** projektweit – S3060 hat außerhalb von Sum-Types legitime Treffer (Typ-Test-Verzweigung, die Polymorphie sein sollte).
 
 **Verworfen:** Ternary – besser für Coverage, schlechter für Korrektheit bei Erweiterungen.
@@ -1088,6 +1090,15 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Kategorien:** Parameterloser Ctor: `Statement,String`. `default(T)` NullCoalescing-Guard (z.B. `_value ?? throw ...`): `NullCoalescing,String`. Equality-Guard (z.B. `_id == default`): `Equality,String`. Die `String`-Kategorie ist jeweils zusätzlich nötig weil Stryker auch den Exception-Meldungstext mutiert. Ist der Equality-Guard als Ternär formuliert (`_id == default ? throw new InvalidOperationException("…") : _id` – die kanonische Form für `Guid`), erzeugt Stryker zusätzlich einen `Conditional`-Mutanten → `Equality,String,Conditional`.
 
+**Addendum (S132) – dieselben Guards brauchen auch einen Coverage-Ausschluss.** Die Entscheidung regelte nur Stryker; das 100-%-Branch-Gate hätte an jedem Guard angeschlagen, fiel aber nicht auf, weil es seit S089 aus war (ADR-S089-1). Regel: Jeder Guard dieser ADR trägt zusätzlich `[ExcludeFromCoverageGate("…(ADR-S041-9)")]` direkt am Member – dieselbe Begründung wie die Stryker-Direktive darüber. Gilt ebenso für zwei verwandte Fälle:
+- **Unerreichbarer Default-Arm** (`SumType.Unreachable`, Enum-`switch` mit `_`-Arm, ADR-S040-1).
+- **Erreichbar, aber über HTTP nicht deterministisch herstellbar** – Zweige, die nur ein Race zwischen zwei Requests öffnet (Parallel-Restore, ADR-S111-1). Das ist die Kategorie, die der Code-Kommentar am Restore schon „analog ADR-S041-9" nannte.
+
+**Granularität:** coverlet schließt nur ganze Methoden, Klassen oder Dateien aus, keine Zeilen. Liegt der unerreichbare Zweig neben getesteter Logik, wird er in eine eigene Methode ausgelagert, wo das sauber trennt (Speichern samt Nebenläufigkeits-Ausweg beim Restore). Wo das nicht geht – eine Null-Prüfung bleibt beim Aufrufer ein Zweig –, fällt die ganze Methode heraus; die getestete Logik darin bleibt über Integrationstests und Stryker gedeckt, zählt aber nicht mehr zur Coverage. Das ist der Preis, und er gehört im Kommentar über dem Attribut benannt.
+
+**Warum ein eigenes Attribut statt `[ExcludeFromCodeCoverage]`:** Stryker.NET verwirft Mutanten in Membern mit `[ExcludeFromCodeCoverage]` (Status `Ignored`, „Removed by exclude from code coverage filter"; S132 gemessen: 18 Mutanten, darunter getestete Meldungstexte und die 409/422-Entscheidung) – und die Stryker-Konfiguration bietet laut Doku keinen Schalter dagegen. Ein Methoden-Ausschluss hätte getestete Logik damit still aus **beiden** Netzen genommen. `ExcludeFromCoverageGateAttribute` (`Server/Types/`) kennt nur coverlet (`--coverlet-exclude-by-attribute` in `dotnet-test.py`); Mutations-Ausschlüsse bleiben zeilengenau bei `// Stryker disable`. Mit dem Wechsel prüfte Stryker auf `IngredientsEndpoints.cs` 65 statt 50 Mutanten, alle getötet. Die Attribut-Datei selbst steht in Strykers `mutate`-Ausschlüssen (reine Metadaten, zur Laufzeit nie instanziiert) und fällt darüber auch aus der Coverage.
+Das gilt auch für ADR-S040-1 Punkt 3: `Match<T>` bekommt, sobald es einen gibt, `[ExcludeFromCoverageGate]`, nicht `[ExcludeFromCodeCoverage]`.
+
 ---
 
 ### ADR-S000-9: Stryker `additional-timeout`: 15000ms (statt Default 5000ms)
@@ -1162,16 +1173,18 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 **Verworfen:** Weiterhin VSTest-Runner – 0% Mutation Score für alle Endpoints trotz korrekter Tests.
 
+**Addendum (S132) – `dotnet test` im MTP-Modus:** Seit MTP 2 (ADR-S089-1, Addendum S132) ist der Weg über `TestingPlatformDotnetTestSupport=true` unter dem .NET-10-SDK nicht mehr unterstützt (Build-Fehler „Testing with VSTest target is no longer supported"). `dotnet test` läuft stattdessen im MTP-Modus, eingeschaltet über `global.json` (`"test": { "runner": "Microsoft.Testing.Platform" }`, Microsoft-Doku „Testing with dotnet test"). Die Property ist damit wirkungslos; Test-App-Argumente gehen ohne das VSTest-`--` direkt an `dotnet test`. Stryker (`"test-runner": "mtp"`) ist davon unberührt und unter MTP 2 geprüft (S132: Mutanten werden erkannt).
+
 ---
 
 ### ADR-S089-1: MTP-natives Coverage-Gate (coverlet.MTP bevorzugt)
 
-**Status:** Proposed
+**Status:** Accepted
 **Tags:** scope:cross-cutting, tooling:build
 
 **Kontext:** Das Test-Projekt nutzt den MTP-Runner (ADR-S063-1). Darunter ist `coverlet.collector` (VSTest-DataCollector) wirkungslos. Beim WSL-/ext4-Umzug (S089) zeigte sich, dass das Branch-Coverage-Gate dadurch nur über veraltete cobertura-Reports „bestand" (Stale-Masking).
 
-**Entscheidung:** Das Coverage-Gate läuft über eine **MTP-native** Engine, bevorzugt **`coverlet.MTP`** (in der Dependency-Allowlist). Die Umsetzung ist vertagt; operativer Stand + Trigger: **TD-S089-1**. <!-- ref-ok: bewusster ADR→TD-Statusverweis (Entscheidung stabil, Umsetzungs-Tracking im TD) -->
+**Entscheidung:** Das Coverage-Gate läuft über eine **MTP-native** Engine, bevorzugt **`coverlet.MTP`** (in der Dependency-Allowlist).
 
 **Begründung:** `coverlet.MTP` reproduziert die bisherige Mess-Semantik (gleiche Engine; `--coverlet-skip-auto-props` schließt **präzise** nur Auto-Properties aus, nicht async/yield) → „100%" behält dieselbe Bedeutung; cobertura ist coverlet-nativ (Parser-kompatibel); OSS/inspizierbar.
 
@@ -1180,7 +1193,10 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 - **`Microsoft.Testing.Extensions.CodeCoverage`** – Auto-Props nur via breitem `CompilerGeneratedAttribute`-Exclude (schließt async/yield mit aus → überzeichnet ein 100%-Branch-Gate); Closed-Source. Bleibt **Fallback**.
 - **Zurück zu VSTest** – Rückschritt gegen die xunit-v3/MTP-Wahl (ADR-S063-1).
 
-**Status Proposed (nicht Accepted):** vor der realen Nutzung ist noch eine MTP-Versions-Kompatibilität zu lösen – Details und Trigger in TD-S089-1. <!-- ref-ok: bewusster ADR→TD-Statusverweis (Entscheidung stabil, Umsetzungs-Tracking im TD) -->
+**Addendum (S132) – umgesetzt, Status Accepted.** Die in S089 gescheiterten Versuche (`TypeLoadException` auf `TestHost.IDataConsumer`) lagen nicht an der Coverage-Engine, sondern an einem gemischten Graphen: Das Paket `xunit.v3` ist die **mtp-v1**-Variante (gebaut gegen MTP 1.x), `coverlet.MTP` verlangt MTP ≥ 2.0.2 (nuspec). Behoben durch Tausch auf **`xunit.v3.mtp-v2`** (dasselbe Framework, gleiche Version, gebaut gegen MTP 2) plus `coverlet.MTP` 10.0.1 und den MTP-Modus von `dotnet test` (ADR-S063-1, Addendum S132).
+- **Messumfang wie vor S089:** nur `mahl.Server`, `--coverlet-skip-auto-props`. Die Datei-Ausschlüsse leitet `dotnet-test.py` aus den `!`-Einträgen von Strykers `mutate` ab – eine Liste statt zwei (die alte `coverlet.runsettings` hatte sie per Kommentar „gleiche Ausschlüsse wie stryker-config.json" kopiert).
+- **Fail-closed:** coverlet.MTP hängt einen Zeitstempel an den Dateinamen (real: `coverage.cobertura.<ts>.xml`, abweichend vom Doku-Beispiel). Der Wrapper leert das Report-Verzeichnis vor dem Lauf und akzeptiert nur genau einen Report danach.
+- **Nachgeholt:** Das Gate war seit S089 aus; beim Einschalten zeigte es 81,6 % Branch. Die Lücken waren überwiegend per Design unerreichbare Guards (ADR-S041-9, Addendum S132), zwei davon echte Testlücken.
 
 ---
 
