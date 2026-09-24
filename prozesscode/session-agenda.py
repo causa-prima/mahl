@@ -777,7 +777,8 @@ def rendere_alles() -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    # `or ""`: Im Mutantenbaum von mutmut ist `__doc__` None (S133, s. td_due.main).
+    ap = argparse.ArgumentParser(description=(__doc__ or "").partition("\n")[0])
     gruppe = ap.add_mutually_exclusive_group()
     gruppe.add_argument("--block", metavar="NAME",
                         help="einen Injektionsblock ausgeben (so ruft der SessionStart-Hook)")

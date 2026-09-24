@@ -11,6 +11,8 @@ Nachricht kam nirgends an.
 läuft grün weiter, und dass etwas fehlt, sieht man nur, wenn man es ohnehin schon weiß.
 """
 import json
+
+import pytest
 from importlib import import_module
 
 modul = import_module("prozesscode.user-message")
@@ -73,6 +75,7 @@ def test_main_prints_nothing_when_nothing_is_due(monkeypatch, capsys):
     assert capsys.readouterr().out == ""
 
 
+@pytest.mark.aufrufpfad("user-message")
 def test_main_prints_json_when_something_is_due(monkeypatch, capsys):
     monkeypatch.setattr(modul, "faellige_fragen", lambda: [_frage()])
     assert modul.main() == 0

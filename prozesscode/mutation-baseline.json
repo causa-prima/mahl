@@ -3,6 +3,10 @@
     "beurteilbar": 216,
     "getoetet": 125
   },
+  "prozesscode.eintrag_felder": {
+    "beurteilbar": 21,
+    "getoetet": 20
+  },
   "prozesscode.hooks.check-bash-permission": {
     "beurteilbar": 241,
     "getoetet": 129
@@ -16,20 +20,28 @@
     "getoetet": 27
   },
   "prozesscode.hooks.check-obs-capture": {
-    "beurteilbar": 75,
-    "getoetet": 48
+    "beurteilbar": 81,
+    "getoetet": 54
   },
   "prozesscode.hooks.check-oq-capture": {
-    "beurteilbar": 70,
-    "getoetet": 43
+    "beurteilbar": 79,
+    "getoetet": 52
+  },
+  "prozesscode.hooks.check-ordinale": {
+    "beurteilbar": 40,
+    "getoetet": 31
   },
   "prozesscode.hooks.check-td-capture": {
-    "beurteilbar": 105,
-    "getoetet": 84
+    "beurteilbar": 113,
+    "getoetet": 92
   },
   "prozesscode.hooks.checks.common": {
     "beurteilbar": 28,
     "getoetet": 0
+  },
+  "prozesscode.hooks.checks.mengenangaben": {
+    "beurteilbar": 70,
+    "getoetet": 59
   },
   "prozesscode.hooks.checks.ruff_lint": {
     "beurteilbar": 31,
@@ -42,6 +54,10 @@
   "prozesscode.hooks.dispatch-edit-write": {
     "beurteilbar": 21,
     "getoetet": 5
+  },
+  "prozesscode.ordinale": {
+    "beurteilbar": 105,
+    "getoetet": 97
   },
   "prozesscode.td": {
     "beurteilbar": 177,

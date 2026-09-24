@@ -7,6 +7,8 @@ der kaizen-Skill – sowie einzelne Zeilen mit `ref-ok`-Marker.
 """
 from importlib import import_module
 
+import pytest
+
 hook = import_module("prozesscode.hooks.check-ref-direction")
 
 
@@ -82,6 +84,22 @@ def test_reports_line_numbers():
 
 def test_clean_content_yields_no_refs():
     assert hook.find_volatile_refs("Nur normaler Text ohne IDs.\nZweite Zeile.") == []
+
+
+# --- Einstieg über den Dispatcher-Weg ---------------------------------------
+def _write(pfad: str, inhalt: str) -> dict:
+    return {"tool_name": "Write", "tool_input": {"file_path": pfad, "content": inhalt}}
+
+
+@pytest.mark.aufrufpfad("check-ref-direction")
+def test_check_blockt_volatile_id_in_einer_guideline():
+    grund = hook.check(_write("docs/guidelines/aufrufpfad-probe.md", "Siehe TD-S999-1.\n"))
+    assert grund and "TD-S999-1" in grund
+
+
+def test_check_laesst_dieselbe_id_im_volatilen_tracker_durch():
+    """Gegenprobe: Der Block oben liegt an der stabilen Zieldatei, nicht an der ID."""
+    assert hook.check(_write("docs/tech-debt.md", "Siehe TD-S999-1.\n")) is None
 
 
 # Die compute_post_content-Tests standen bis S128 hier und prüften eine LOKALE Kopie mit

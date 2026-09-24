@@ -41,6 +41,9 @@ Eintrag-Format:
             nur auseinanderlaufen. `obs.py get` zeigt eingehende Kanten mit an, ein Eintrag
             verrät seine Einheit also von beiden Seiten. Ziele werden beim Schreiben auf
             Existenz geprüft (Vertipper blockt), nicht mehr drainbare meldet der Drain-Satz.
+  - Aufschubgrund: User | Umfang | Recherche – <warum erfasst statt sofort behoben>   (Pflicht
+            für neue Einträge seit S133; trifft keiner zu, wird behoben statt erfasst. Bedeutung
+            der Werte: `prozesscode/eintrag_felder.py`)
   - Entscheidung/Maßnahme: <bei Erfassung offen; beim Drain: gewählte Lösung + warum statt Alternativen / Verwerf-Grund / Aufschub-Grund + Re-Trigger>; → CM-… falls stehende Leitplanke
             (bei Erfassung mechanisch erzwungen: `prozesscode/hooks/check-obs-capture.py` lässt bei einem NEUEN Eintrag nur
              genau zwei Werte durch – `offen` oder `offen - beim Drain Kandidaten erstellen und bewerten`, nichts davor
@@ -139,12 +142,12 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S116-3 – retro_report.py zeigt je Muster nur zwei Beispiel-Einträge, auch wenn es mehr sind
 - Quelle: Orchestrator
-- Status: NEU
+- Status: UMGESETZT (S133)
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: Im Report-Abschnitt „Pattern-Kandidaten" sammelt retro_report.py:523 pro Tag-Tripel hoechstens zwei Beispiele, gibt aber die volle Anzahl aus. In der S116-Retro meldete ein Kandidat '3x' und listete zwei Eintraege; der dritte (LL-S114-3) war nur ueber einen eigenen grep auffindbar. Der kaizen-Skill verlangt an derselben Stelle ausdruecklich, vor jedem Vorschlag die konkreten Eintraege zu lesen, weil Cluster Tag-Kombinationen sind und keine semantischen Gruppen - die Kappung entzieht dieser Pflicht gerade bei den groessten und damit wichtigsten Mustern die Grundlage. Wer die Diskrepanz zwischen Zahl und Liste nicht bemerkt, haelt die zwei gezeigten Eintraege fuer das ganze Muster.
 - Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: In S133 als Teil der Kaizen-Retro behoben (Finding E1): render_pattern zeigt jetzt alle Mitglieder eines Kandidaten und markiert die der aktuellen Periode mit ▸; abgedeckte Tripel nennen zusätzlich die abdeckende CM, weil der Abgleich nur übers Tripel läuft und fachfremde Abdeckung sonst unsichtbar blieb. Tests in tests/test_retro_report.py.
 - Bezug: CM-S064-2
 
 ## OBS-S117-3 – principles.md ist der groesste Session-Start-Block und ungeprueft auf Knappheit
@@ -256,3 +259,25 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Gemessen in S130: 'mutmut-run --mutate prozesscode.hooks.check-bash-permission' bewertet je Lauf nur rund 241 von 583 Mutanten; der Rest bleibt 'not checked'. Drei aufeinanderfolgende Laeufe lieferten 237, 242 und 241 - der Ausschnitt schwankt, und der Hinweis 'weiterer Lauf noetig' fuehrt nicht zum Ziel, weil auch Wiederholungen nicht weiterkommen. Ursache ist ein Abbruch in mutmut selbst: Mit --verbose endet der Lauf mit 'KeyError: -9' in calculate_summary_stats (mutmut/__main__.py:866). -9 ist SIGKILL, also ein Mutanten-Prozess, den Timeout oder System getoetet hat; mutmut kennt diesen Exit-Code in status_by_exit_code nicht und stirbt beim Zusammenrechnen. Ohne --verbose faengt der Wrapper den Abbruch ab. Modulspezifisch: check-dangling-refs laeuft mit 84 von 84 Mutanten sauber durch. Folge: Fuer ausgerechnet den groessten und meistgenutzten Guard liefert die Sichtung ueber die Haelfte der Stellen keine Aussage - die Klinke meldet dort seit S130 ehrlich 'Lauf unvollstaendig' (vorher meldete sie einen erfundenen Rueckschritt von 53.5 auf 53.0 Prozent, das ist behoben), aber sie prueft dort eben auch nichts. Unklar und ungeprueft ist die Ursache des SIGKILL. Ein naheliegender Verdacht ist die Rekursion in check_command: Der --allow-once-Zweig ruft die Funktion erneut auf, und ein Mutant am replace-Aufruf koennte daraus eine Endlosschleife machen. Das ist eine Vermutung, keine Messung.
 - Zusammen-erledigen: keiner
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S133-1 – Die Logik in main() der Prozess-Werkzeuge ist nur an der Verdrahtung getestet
+- Quelle: User + Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: QUALITÄT    Kontext: Testing
+- Beobachtung: Seit S133 erzwingt tests/test_aufrufpfad.py für jedes der 51 Werkzeuge einen Test über den echten Aufrufpfad (main bzw. check). Die Mutationssichtung zeigt aber, dass diese Tests die Argument-Verdrahtung halten, nicht die Logik in main dahinter. Gesichtet wurden drei Werkzeuge: vitest-run (34 überlebende main-Mutanten), lessons (56) und check-atdd-gate (12). Darunter waren fünf echte Lücken, die ein Fehlurteil still durchgelassen hätten: ein ignorierter Titel-Filter im ATDD-Gate, ein ungetesteter get-Unterbefehl, ein grünes Verdikt bei rotem Exit-Code. Diese fünf sind in S133 geschlossen. Die übrigen 48 Werkzeuge sind nicht gesichtet; wahrscheinlich, aber nicht belegt, gibt es dort dieselbe Klasse: ungetestete Unterbefehle und Aufrufformen, Verdikt-Bedingungen ohne Test. Ein großer Teil der Überlebenden sind argparse-Hilfetexte und Meldungstexte ohne Aussagekraft; wie groß der Anteil echter Lücken ist, hängt je Werkzeug davon ab, wie viel Logik in main statt im Kern liegt.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: Umfang – 48 Werkzeuge je mit Mutationslauf (1–2 min) und Sichtung der Überlebenden; sprengt die Retro-Session
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: CM-S133-1, LL-S128-1
+
+## OBS-S133-2 – qa-check nummeriert seine Prüfungen als CHECK 1 bis 6
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Die Ausgabe von qa-check gliedert ihre Prüfungen als „CHECK 1“ bis „CHECK 6“ (geänderte Testdateien, Suppressionen, Testmuster, ESLint, Given/When/Then, ADR-Referenzen). Das sind selbst vergebene Ordnungszahlen – genau die Zweitadresse, die das Prinzip „Namen statt Nummern“ verbietet, weil sie bei jedem Umsortieren oder Einfügen still falsch wird. Verweise darauf existieren bereits: Commit cc660d5 nennt „Check-6 ADR-Referenz-Erkennung“; ob Skills, Doku oder Tests die Nummern ebenfalls zitieren, ist nicht gesichtet. check-ordinale sieht Ausgabetexte in Python-Strings nicht als Gliederung und schlägt deshalb nicht an. Aufgefallen in S133, als der User fragen musste, was „CHECK 6“ ist – die Nummer trug keine Bedeutung.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: Umfang – vor dem Umbenennen müssen alle Verweise repo-weit gesucht werden (LL-S124-1: Umbenennung ohne Verweissuche); die Session wird gerade abgeschlossen
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: LL-S124-1

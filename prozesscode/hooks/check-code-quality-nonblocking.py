@@ -3,12 +3,12 @@
 import sys
 
 from .checks.common import parse_input
-from .checks import constructors, guard_log, ruff_lint, test_patterns
+from .checks import constructors, guard_log, mengenangaben, ruff_lint, test_patterns
 from .checks import tooling_tests
 from .checks.primitives import check_nonblocking as primitives_nonblocking
 
 CHECKS = [constructors.check, test_patterns.check, primitives_nonblocking,
-          tooling_tests.check, ruff_lint.check]
+          tooling_tests.check, ruff_lint.check, mengenangaben.check]
 
 
 def main() -> None:

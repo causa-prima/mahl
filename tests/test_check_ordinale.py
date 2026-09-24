@@ -1,7 +1,8 @@
 """Tests für check-ordinale.py – der PreToolUse-Check um ordinale.py herum.
 
 Getrennt von test_ordinale.py: Dort steht die Mustererkennung, hier der Hook-Vertrag
-(welche Datei wird geprüft, wann wird geblockt, was landet im Log, fail-open).
+(welche Datei wird geprüft, wann wird geblockt, fail-open). Mengenangaben meldet seit S133
+`checks/mengenangaben.py` als Warnung – Tests dazu in test_mengenangaben_check.py.
 """
 from importlib import import_module
 
@@ -19,12 +20,12 @@ def _edit(pfad, alt, neu):
 def md(tmp_path, monkeypatch):
     """Eine Markdown-Datei im simulierten Repo-Root."""
     monkeypatch.setattr(check_ordinale.anchors, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(check_ordinale, "_LOG", tmp_path / ".claude" / "tmp" / "mengen.log")
     datei = tmp_path / "docs" / "guide.md"
     datei.parent.mkdir(parents=True)
     return datei
 
 
+@pytest.mark.aufrufpfad("check-ordinale")
 def test_neue_nummerierte_ueberschrift_blockt(md):
     md.write_text("# Guide\n\nText.\n", encoding="utf-8")
     grund = check_ordinale.check(_edit(md, "Text.", "Text.\n\n## 3. Nachtrag"))
@@ -59,7 +60,6 @@ def test_history_wird_nicht_geprueft(tmp_path, monkeypatch):
 
 def test_python_kommentar_blockt_nicht(tmp_path, monkeypatch):
     monkeypatch.setattr(check_ordinale.anchors, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(check_ordinale, "_LOG", tmp_path / ".claude" / "tmp" / "mengen.log")
     datei = tmp_path / "skript.py"
     datei.write_text("x = 1\n", encoding="utf-8")
     assert check_ordinale.check(_edit(datei, "x = 1", "x = 1\n# 2. Schritt: rechnen")) is None
@@ -85,45 +85,10 @@ def test_anderes_tool_wird_ignoriert(md):
     assert check_ordinale.check(daten) is None
 
 
-# --- Mengenangaben: Log statt Block ------------------------------------------
+# --- Mengenangaben blocken nicht ----------------------------------------------
 
-def test_mengenangabe_blockt_nicht_und_landet_im_log(md):
+def test_mengenangabe_blockt_nicht(md):
+    """Die Klasse ist Warnung (checks/mengenangaben.py), kein Block."""
     md.write_text("# Guide\n\nText.\n", encoding="utf-8")
     grund = check_ordinale.check(_edit(md, "Text.", "Text.\n\nWarte auf alle vier Agenten."))
     assert grund is None
-    assert "alle vier Agenten" in check_ordinale._LOG.read_text(encoding="utf-8")
-
-
-def test_log_haelt_die_fundstelle_fest(md):
-    md.write_text("# Guide\n\nText.\n", encoding="utf-8")
-    check_ordinale.check(_edit(md, "Text.", "Text.\n\nDie drei Felder sind Pflicht."))
-    zeile = check_ordinale._LOG.read_text(encoding="utf-8")
-    assert "docs/guide.md" in zeile
-
-
-def test_log_zeigt_die_umgebung_des_treffers(md):
-    """Doku-Zeilen sind lang: In den ersten drei echten Log-Einträgen lag die Fundstelle
-    jenseits der Kappungsgrenze, protokolliert wurde der Zeilenanfang. Damit misst das Log
-    nicht, wofür es da ist – die spätere Beurteilung braucht die Umgebung des Treffers."""
-    md.write_text("# Guide\n\nText.\n", encoding="utf-8")
-    lang = "Vorspann dazu. " * 20 + "Warte auf alle vier Agenten, dann weiter."
-    check_ordinale.check(_edit(md, "Text.", "Text.\n\n" + lang))
-    assert "dann weiter" in check_ordinale._LOG.read_text(encoding="utf-8")
-
-
-def test_ohne_mengenangabe_kein_log(md):
-    md.write_text("# Guide\n\nText.\n", encoding="utf-8")
-    check_ordinale.check(_edit(md, "Text.", "Text.\n\nWarte auf alle Agenten."))
-    assert not check_ordinale._LOG.exists()
-
-
-def test_log_fehler_blockt_den_edit_nicht(md, monkeypatch):
-    """Fail-open: Ein kaputtes Log darf nie einen Edit verhindern (CM-S116-1-Logik)."""
-    monkeypatch.setattr(check_ordinale, "_LOG", md.parent / "nicht" / "existent" / "x.log")
-    monkeypatch.setattr(check_ordinale.Path, "mkdir", _wirft)
-    grund = check_ordinale.check(_edit(md, "", "Warte auf alle vier Agenten."))
-    assert grund is None
-
-
-def _wirft(*_args, **_kwargs):
-    raise OSError("Platte voll")

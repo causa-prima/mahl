@@ -53,6 +53,7 @@ def test_jeder_eintrag_zeigt_auf_einen_existierenden_test():
     tests_dir = pathlib.Path(__file__).parent
     for nodeid in conftest.UNTER_MUTMUT_UEBERSPRUNGEN:
         datei, _, testname = nodeid.partition("::")
+        testname = testname.split("[")[0]  # parametrisierte ID: `test_x[obs]` → `test_x`
         pfad = tests_dir / pathlib.Path(datei).name
         assert pfad.is_file(), f"{nodeid}: Datei {datei} gibt es nicht"
         assert f"def {testname}(" in pfad.read_text(encoding="utf-8"), \

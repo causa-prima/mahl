@@ -1,6 +1,8 @@
 """Tests für check-e2e-scenario-ref.py – PreToolUse-Poka-Yoke für // Szenario:-Verweise."""
 from importlib import import_module
 
+import pytest
+
 hook = import_module("prozesscode.hooks.check-e2e-scenario-ref")
 
 
@@ -108,3 +110,22 @@ def test_validate_flags_only_the_uncommented_test():
     violations = hook.validate(post, FEATURE_TITLES)
     assert any("'B'" in v or "B" in v for v in violations)
     assert not any("'A'" in v for v in violations)
+
+
+# --- Einstieg über den Dispatcher-Weg (gegen die echten features/) ------------
+def _spec_write(inhalt: str) -> dict:
+    return {"tool_name": "Write",
+            "tool_input": {"file_path": "Client/e2e/aufrufpfad-probe.spec.ts", "content": inhalt}}
+
+
+@pytest.mark.aufrufpfad("check-e2e-scenario-ref")
+def test_check_blockt_verweis_auf_ein_szenario_das_es_nicht_gibt():
+    grund = hook.check(_spec_write("// Szenario: Dieses Szenario gibt es in keinem Feature\n"
+                                   "test('x', () => {})\n"))
+    assert grund and "Dieses Szenario gibt es in keinem Feature" in grund
+
+
+def test_check_ignoriert_dateien_ausserhalb_von_specs_und_features():
+    daten = {"tool_name": "Write",
+             "tool_input": {"file_path": "Client/src/x.ts", "content": "// Szenario: egal\n"}}
+    assert hook.check(daten) is None

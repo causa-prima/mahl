@@ -12,6 +12,8 @@ selbst meldet, meldet der Wrapper das als Fehler – sonst wäre eine Formatänd
 """
 from importlib import import_module
 
+import pytest
+
 jscpd = import_module("prozesscode.jscpd-run")
 
 
@@ -51,6 +53,7 @@ def _lauf(monkeypatch, ausgabe: str, exit_code: int = 0):
     monkeypatch.setattr(jscpd, "run_npm", lambda *_a, **_k: (ausgabe, exit_code))
 
 
+@pytest.mark.aufrufpfad("jscpd-run")
 def test_bekannter_bestand_meldet_gruen(monkeypatch, capsys):
     _lauf(monkeypatch, _ausgabe(_klon(_A, _B), _klon(_C, _D)))
     assert jscpd.main([]) == 0

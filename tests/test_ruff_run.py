@@ -10,6 +10,8 @@ Drei Zusagen, die der Wrapper hält:
 """
 from importlib import import_module
 
+import pytest
+
 ruff_run = import_module("prozesscode.ruff-run")
 
 
@@ -28,6 +30,7 @@ _FUNDE = ("prozesscode/foo.py:12:5: F401 [*] `os` imported but unused\n"
           "Found 2 errors.\n")
 
 
+@pytest.mark.aufrufpfad("ruff-run")
 def test_sauberer_lauf_meldet_nur_das_verdikt(monkeypatch, capsys):
     monkeypatch.setattr(ruff_run, "_ruff_vorhanden", lambda: True)
     monkeypatch.setattr(ruff_run, "_laufe", lambda *_a: _Lauf(_SAUBER, 0))

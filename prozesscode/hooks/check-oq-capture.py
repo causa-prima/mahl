@@ -35,6 +35,7 @@ import sys
 from pathlib import Path
 
 from .. import td_anchors
+from ..eintrag_felder import AUFSCHUB_FELD, aufschub_verstoss, fett_feldwert
 from ._hook_io import edit_zustand
 
 OQ_FILE = "docs/open-questions.md"
@@ -55,7 +56,7 @@ def parse_oq_entries(content: str) -> dict[str, str]:
 
 
 def faellig_of(body: str) -> str | None:
-    """Wert des `**Fällig:**`-Feldes (None, wenn das optionale Feld fehlt)."""
+    """Wert des `**Fällig:**`-Feldes (None, wenn das Feld fehlt)."""
     match = _FAELLIG_RE.search(body)
     return match.group(1).strip() if match else None
 
@@ -74,13 +75,20 @@ def check_entry(oq_id: str, body: str, ktx: td_anchors.Kontext | None = None) ->
 
 def find_violations(pre: str, post: str,
                     ktx: td_anchors.Kontext | None = None) -> list[tuple[str, str]]:
-    """(OQ-ID, Begründung) für jeden neuen oder geänderten Eintrag, der die Regeln verletzt."""
+    """(OQ-ID, Begründung) für jeden neuen oder geänderten Eintrag, der die Regeln verletzt.
+
+    `Aufschubgrund` gilt nur für NEUE Einträge (S133), wie bei check-td-capture."""
     before = parse_oq_entries(pre)
-    return [
-        (oid, " · ".join(reasons))
-        for oid, body in parse_oq_entries(post).items()
-        if before.get(oid) != body and (reasons := check_entry(oid, body, ktx))
-    ]
+    verstoesse = []
+    for oid, body in parse_oq_entries(post).items():
+        if before.get(oid) == body:
+            continue
+        reasons = check_entry(oid, body, ktx)
+        if oid not in before and (neu := aufschub_verstoss(fett_feldwert(body, AUFSCHUB_FELD))):
+            reasons.append(neu)
+        if reasons:
+            verstoesse.append((oid, " · ".join(reasons)))
+    return verstoesse
 
 
 def repo_root_for(oq_path: str) -> Path:
@@ -111,12 +119,14 @@ def check(data: dict) -> str | None:
 
     lines = "\n".join(f"  - {oid}: {reason}" for oid, reason in violations)
     return (
-        "❌ OQ-Fälligkeit (Poka-Yoke): `**Fällig:**` fehlt oder trägt nicht:\n"
+        "❌ OQ-Erfassung (Poka-Yoke): Eintrag verletzt die Regeln:\n"
         f"{lines}\n"
-        "  Das Feld ist optional – ohne es wird die Frage nach ~10 Sessions als überaltert "
-        "vorgelegt. Ist es aber gesetzt, unterdrückt es genau diese Alters-Regel: Ein Anker, "
-        "der nie eintritt oder nicht gelesen werden kann, lässt die Frage dauerhaft "
-        "verwaisen – schlechter als gar kein Feld.\n"
+        "  Neue Fragen tragen `**Aufschubgrund:** <User|Umfang|Recherche> – <Grund>` – meist "
+        "`User`: Du hast gefragt, und der User will die Antwort später geben.\n"
+        "  `**Fällig:**` ist Pflicht: Ohne es greift nur die Alters-Regel (~10 Sessions), und die "
+        "macht eine treibende Frage von einer frisch gestellten ununterscheidbar. Ein gesetzter "
+        "Anker unterdrückt diese Regel – einer, der nie eintritt oder nicht gelesen werden "
+        "kann, lässt die Frage deshalb dauerhaft verwaisen.\n"
         "  Anker-Vokabular: `jetzt`, `Phase:<NAME>`, `S<NNN>`, `Szenario:„<Titel>\"`, "
         "`US-<NNN>`, `TD-S<NNN>-<n>`; mehrere mit Komma, alles Erklärende hinter den "
         "Gedankenstrich. Kanonisch: `prozesscode/td_anchors.py`, Vorlage im Header von "

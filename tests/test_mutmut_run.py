@@ -6,9 +6,38 @@ Ausweisung der Ausnahmeliste. Das Lesen der Ergebnisse selbst steht in
 Ein echter Mutationslauf kommt hier nicht vor – er dauert Minuten bis Stunden und liefe
 pytest aus pytest heraus.
 """
+import subprocess
 from importlib import import_module
 
+import pytest
+
 mr = import_module("prozesscode.mutmut-run")
+
+
+# --- Eine Stelle ansehen (S133) ------------------------------------------------
+def test_das_verdikt_zeigt_auf_den_erlaubten_weg_zur_stelle():
+    """Bis S133 empfahl es `.venv/bin/mutmut show` – den Befehl blockt der Bash-Hook."""
+    _, details = mr.baue_verdikt([("a.x__mutmut_1", "survived")])
+    hinweis = "\n".join(details)
+    assert "mutmut-run --show" in hinweis
+    assert ".venv/bin/mutmut show" not in hinweis
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_show_gibt_die_mutation_aus_statt_einen_lauf_zu_starten(tmp_path, monkeypatch, capsys):
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    aufrufe = []
+
+    def fake_laufe(*argv):
+        aufrufe.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="- alt\n+ neu\n", stderr="")
+
+    monkeypatch.setattr(mr, "_laufe", fake_laufe)
+    assert mr.main(["--show", "prozesscode.anchors.x_f__mutmut_3"]) == 0
+    assert aufrufe == [("show", "prozesscode.anchors.x_f__mutmut_3")]
+    assert "+ neu" in capsys.readouterr().out
 
 # --- Verdikt -----------------------------------------------------------------
 def test_verdikt_ohne_befund_ist_gruen():
@@ -81,6 +110,15 @@ def test_verdikt_ohne_jeden_eintrag():
     """Ein Filter ohne Treffer: kein Befund, aber auch keine Messung – das muss auffallen."""
     verdikt, _ = mr.baue_verdikt([])
     assert "0 Mutanten" in verdikt
+    # S133: Bis dahin stand hier ✓ – ein Filter wie `…x_main` traf keinen Mutanten (die heißen
+    # `x_main__mutmut_N`), und der Lauf meldete „keiner überlebt" über eine leere Menge.
+    assert verdikt.startswith("✗")
+    assert "__mutmut_" in verdikt  # nennt die Namensform, an der der Filter vorbeiging
+
+
+def test_nur_nicht_bewertete_zaehlen_ebenfalls_als_leere_messung():
+    verdikt, _ = mr.baue_verdikt([("a.x__mutmut_1", "not checked")])
+    assert verdikt.startswith("✗")
 
 
 # --- Frischer Baum -----------------------------------------------------------

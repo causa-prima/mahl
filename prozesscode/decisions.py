@@ -268,8 +268,12 @@ def cmd_check(args):
         print("Keine ADR-Referenzen im Code gefunden.")
         sys.exit(0)
 
+    # Nur Befunde zeilenweise, Gültiges als Zählzeile: Bis S133 stand jede Fundstelle mit
+    # „✓ Accepted" da – 195 Zeilen ohne einen Befund, die qa-check (CHECK 6) in jedem
+    # Übergabe-Lauf in den Subagenten-Kontext schrieb. ⚠ bleibt sichtbar, obwohl Exit 0.
     exit_code = 0
     col_width = max(len(f"{r[0]}:{r[1]}") for r in refs) + 2
+    befunde = 0
 
     for filepath, lineno, adr_id in refs:
         loc = f"{filepath}:{lineno}"
@@ -277,11 +281,16 @@ def cmd_check(args):
         if entry is None:
             print(f"{loc:<{col_width}} {adr_id:<15} ✗ nicht gefunden")
             exit_code = 1
-        elif entry["status"] == "Accepted":
-            print(f"{loc:<{col_width}} {adr_id:<15} ✓ Accepted")
-        else:
+        elif entry["status"] != "Accepted":
             print(f"{loc:<{col_width}} {adr_id:<15} ⚠ {entry['status']}")
+        else:
+            continue
+        befunde += 1
 
+    if befunde:
+        print(f"{len(refs)} ADR-Verweise im Code, davon {befunde} mit Befund (oben)")
+    else:
+        print(f"✓ {len(refs)} ADR-Verweise im Code, alle gültig")
     sys.exit(exit_code)
 
 

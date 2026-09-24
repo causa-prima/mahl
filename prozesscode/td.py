@@ -25,6 +25,7 @@ import sys
 
 
 from . import td_entry as tde  # noqa: E402
+from .eintrag_felder import AUFSCHUB_HILFE  # noqa: E402
 from .tracker_entry import kuerzungen  # noqa: E402
 
 
@@ -77,7 +78,8 @@ def cmd_add(args) -> int:
     pfad = tde.td_path()
     text = pfad.read_text(encoding="utf-8")
     neu, tid = tde.add(text, args.session or tde.laufende_session(), titel=args.titel,
-                       faellig=args.faellig, problem=args.problem, behebung=args.behebung)
+                       faellig=args.faellig, problem=args.problem, behebung=args.behebung,
+                       aufschubgrund=args.aufschubgrund)
     pfad.write_text(neu, encoding="utf-8")
     print(f"✓ {tid} angelegt.")
 
@@ -168,6 +170,7 @@ def main() -> int:
                             "Grammatik: td_anchors.py")
     p_add.add_argument("--problem", required=True, help="Was ist die Schuld")
     p_add.add_argument("--behebung", required=True, help="Wie behoben wird")
+    p_add.add_argument("--aufschubgrund", required=True, help=AUFSCHUB_HILFE)
     p_add.add_argument("--done", help="Done-Kriterium für AGENT_MEMORY.md "
                                       "(Pflicht bei `Fällig: jetzt`)")
     p_add.add_argument("--session", type=int, help="Session-Nummer (Default: laufende)")

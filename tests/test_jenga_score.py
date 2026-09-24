@@ -1,6 +1,8 @@
 """Tests für jenga_score.py – Finding-Parser (Slash- und Bindestrich-Kontexte) und Exit-Code."""
 import sys
 
+import pytest
+
 from prozesscode import jenga_score as js  # noqa: E402
 
 
@@ -69,6 +71,7 @@ def _lauf(tmp_path, findings: str) -> int:
     return js.main()
 
 
+@pytest.mark.aufrufpfad("jenga_score")
 def test_exit_code_is_zero_when_a_retro_is_due(tmp_path, capsys):
     code = _lauf(tmp_path, "- **[KRITISCH] [TOOLING] [Hook/Script] LL-1 – a**\n" * 5)
     ausgabe = capsys.readouterr().out

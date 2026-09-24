@@ -57,7 +57,9 @@ Szenario-Bindung.
 Was stattdessen gilt – vier Dinge:
 
 1. **Tests, und sie laufen von selbst.** Jede Änderung fährt die Werkzeug-Suite; rot bleiben
-   ist keine Option. Red-Green-Refactor gilt unverändert.
+   ist keine Option. Red-Green-Refactor gilt unverändert. Getestet wird gegen das **echte
+   Artefakt** – Aufrufpfad, echte Fremd-Ausgabe, Fixture in Bestandsform
+   ([`CGP-echtes-artefakt`](../../../docs/guidelines/coding-guideline-python.md#CGP-echtes-artefakt)).
 2. **Gegenprobe bei jedem Guard.** Wer einen Hook, ein Gate oder einen Wrapper baut oder
    ändert, bricht ihn einmal absichtlich und sieht ihn anspringen. Ohne diesen Schritt ist
    nicht belegt, dass er überhaupt prüft.

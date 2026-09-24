@@ -19,7 +19,8 @@ kanonisch festgelegt – dieselbe Kopplung wie `obs_parse.py` und `check-obs-cap
 import re
 from pathlib import Path
 
-from . import kontext_tags
+from . import eintrag_felder, kontext_tags
+from .eintrag_felder import AUFSCHUB_FELD
 from .obs_parse import OBS_FILE
 from .repo_kontext import current_session, repo_root
 
@@ -113,7 +114,8 @@ def _pruefe(name: str, wert: str, erlaubt: tuple[str, ...]) -> None:
 # Felder, die je Eintrag auf einer EIGENEN Zeile stehen. `Häufigkeit` und `Kontext` fehlen
 # absichtlich – sie teilen sich eine Zeile mit `Impact` bzw. `Kategorie`.
 FELDER_EIGENE_ZEILE = ("Quelle", "Status", "Impact", "Kategorie", "Beobachtung",
-                       "Vorprägung", "Zusammen-erledigen", "Entscheidung/Maßnahme", "Bezug")
+                       "Vorprägung", "Zusammen-erledigen", AUFSCHUB_FELD,
+                       "Entscheidung/Maßnahme", "Bezug")
 
 
 def pruefe_wohlgeformt(oid: str, block: str) -> None:
@@ -194,7 +196,8 @@ def _pruefe_zusammen(wert: str) -> str:
 
 def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: str,
                  kategorie: str, kontext: str, beobachtung: str, bezug: str | None,
-                 zusammen: str = "", vorpraegung: str | None = None) -> str:
+                 zusammen: str = "", vorpraegung: str | None = None, *,
+                 aufschubgrund: str) -> str:
     """Baut einen formatgetreuen Eintrag. `Entscheidung/Maßnahme` ist bewusst nicht setzbar.
 
     `vorpraegung` nimmt auf, was die Kandidatenbildung prägen würde – genannte Lösungen,
@@ -207,12 +210,14 @@ def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: st
     # Kontext-Tags stehen in process.md, nicht hier – siehe kontext_tags.py (OBS-S116-4).
     _pruefe("Kontext", kontext, kontext_tags.erlaubte())
     zusammen_wert = _pruefe_zusammen(zusammen)
+    quelle = eintrag_felder.pruefe_quelle(quelle, kombinierbar=True)
+    aufschub = eintrag_felder.pruefe_aufschubgrund(aufschubgrund)
     if not titel.strip() or not beobachtung.strip():
         raise ValueError("Titel und Beobachtung dürfen nicht leer sein.")
 
     zeilen = [
         f"## {oid} – {titel.strip()}",
-        f"- Quelle: {quelle.strip()}",
+        f"- Quelle: {quelle}",
         "- Status: NEU",
         f"- Impact: {impact}    Häufigkeit: {haeufigkeit}",
         f"- Kategorie: {kategorie}    Kontext: {kontext.strip()}",
@@ -224,6 +229,7 @@ def format_entry(oid: str, titel: str, quelle: str, impact: str, haeufigkeit: st
         zeilen.append(f"- {VORPRAEGUNG_FELD}: {vorpraegung.strip()}")
     zeilen += [
         f"- {ZUSAMMEN_FELD}: {zusammen_wert}",
+        f"- {AUFSCHUB_FELD}: {aufschub}",
         f"- Entscheidung/Maßnahme: {KANON_OFFEN}",
     ]
     if bezug and bezug.strip():
@@ -257,6 +263,8 @@ def set_fields(text: str, oid: str, status: str | None = None,
 
     block = text[span[0]:span[1]]
     pruefe_wohlgeformt(oid, block)
+    if status is not None:
+        eintrag_felder.pruefe_obs_status(status)
     if titel is not None:
         if not titel.strip():
             raise ValueError(f"{oid}: leerer Titel.")

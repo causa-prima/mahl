@@ -67,7 +67,9 @@ def fuer_szenarien(root: Path, titel: list[str]) -> list[tuple[str, str]]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    # `or ""`: Im Mutantenbaum von mutmut ist `__doc__` None – ohne Absicherung bräche der
+    # Aufrufpfad-Test dort ab und mit ihm jeder Mutationslauf (S133).
+    ap = argparse.ArgumentParser(description=(__doc__ or "").partition("\n")[0])
     ap.add_argument("--szenarien", nargs="+", metavar="TITEL",
                     help="TD-Einträge listen, die auf diese Szenario-Titel ankern "
                          "(implementing-scenario, Offene-Punkte-Triage im Abschluss)")

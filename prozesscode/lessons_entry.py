@@ -13,7 +13,7 @@ import re
 from datetime import date
 from pathlib import Path
 
-from . import kontext_tags
+from . import eintrag_felder, kontext_tags
 from .repo_kontext import current_session, repo_root
 
 LL_FILE = "docs/kaizen/lessons_learned.md"
@@ -114,6 +114,7 @@ def format_entry(lid: str, titel: str, impact: str, kategorie: str, kontext: str
     _pruefe("Kategorie", kategorie, KATEGORIE_WERTE)
     # Kontext-Tags stehen in process.md, nicht hier – siehe kontext_tags.py (OBS-S116-4).
     _pruefe("Kontext", kontext, kontext_tags.erlaubte())
+    eintrag_felder.pruefe_quelle(quelle, kombinierbar=False)
     for name, wert in (("Titel", titel), ("Was", was), ("Warum", warum), ("Regel", regel)):
         if not wert.strip():
             raise ValueError(f"{name} darf nicht leer sein.")

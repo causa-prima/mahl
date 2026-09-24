@@ -22,6 +22,9 @@ Eintrag-Format:
   **Fällig:** <Anker>[, <Anker>…] – <Freitext-Erläuterung>
   **Problem:** <was ist die Schuld>
   **Behebung:** <wie behoben wird>
+  **Aufschubgrund:** User | Umfang | Recherche – <warum erfasst statt sofort behoben>
+            (Pflicht für neue Einträge seit S133; trifft keiner der drei Werte zu, wird behoben
+             statt erfasst. Bedeutung der Werte: `prozesscode/eintrag_felder.py`)
 
   ID: TD-S<NNN>-<n> – 3-stellige Session (Ursprung), laufende Nummer innerhalb der Session.
   Freie fettgesetzte Absätze (`**Zusammenhang:**`, `**Reichweite präzisiert:**` …) sind erlaubt,

@@ -31,6 +31,7 @@ from .obs_entry import (  # noqa: E402
     obs_path,
     set_fields,
 )
+from .eintrag_felder import AUFSCHUB_HILFE  # noqa: E402
 from .tracker_entry import kuerzungen
 
 
@@ -67,6 +68,7 @@ def cmd_add(args) -> int:
         bezug=args.bezug,
         zusammen=args.zusammen_erledigen,
         vorpraegung=args.vorpraegung,
+        aufschubgrund=args.aufschubgrund,
     )
     path.write_text(neu, encoding="utf-8")
     print(f"✓ {oid} erfasst.")
@@ -161,6 +163,7 @@ def main() -> None:
                             "weniger? Typisch bei denselben Artefakten. Nicht: dasselbe Problem "
                             "(konsolidieren), eine Vorfrage, bloße Themen-Nähe. Offene Einträge "
                             "zeigt `obs.py list-offen`.")
+    p_add.add_argument("--aufschubgrund", required=True, help=AUFSCHUB_HILFE)
     p_add.add_argument("--bezug", help="optional: LL-/OBS-/CM-IDs (freier Querverweis – bildet "
                                        "KEINE Drain-Einheit, dafür ist --zusammen-erledigen da)")
     p_add.add_argument("--session", type=int, help="überschreibt die erkannte Session-Nummer")

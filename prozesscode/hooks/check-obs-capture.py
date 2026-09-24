@@ -31,6 +31,7 @@ import re
 import sys
 from pathlib import Path
 
+from ..eintrag_felder import AUFSCHUB_FELD, aufschub_verstoss
 from ._hook_io import edit_zustand
 
 OBS_FILE = "docs/kaizen/observations.md"
@@ -42,7 +43,7 @@ _OBS_OK = "obs-ok"
 # Feld-Zeile = uneingerückt, benannt, mit Doppelpunkt. Eingerückte Bullets sind Prosa.
 _FIELD_RE = re.compile(r"^- ([^:\n]{1,40}?):", re.M)
 ALLOWED_FIELDS = ("Quelle", "Status", "Impact", "Kategorie", "Beobachtung", "Vorprägung",
-                  "Zusammen-erledigen", "Entscheidung/Maßnahme", "Bezug")
+                  "Zusammen-erledigen", AUFSCHUB_FELD, "Entscheidung/Maßnahme", "Bezug")
 # `Vorprägung` und `Bezug` sind laut Header optional. `Verwandt` ist Pflicht (S122): Der Drain
 # bildet daraus Einheiten, und ein fehlendes Feld wäre von "geprüft, es gibt keine" nicht zu
 # unterscheiden – deshalb die explizite Negativ-Angabe `keiner`.
@@ -112,6 +113,9 @@ def check_entry(body: str) -> list[str]:
     names = field_names(body)
     reasons += [f"unbekanntes Feld `- {n}:`" for n in names if n not in ALLOWED_FIELDS]
     reasons += [f"Pflichtfeld `- {n}:` fehlt" for n in REQUIRED_FIELDS if n not in names]
+    aufschub = re.search(rf"^- {AUFSCHUB_FELD}:\s*(.*)$", body, re.M)
+    if aufschub and (verstoss := aufschub_verstoss(aufschub.group(1))):
+        reasons.append(verstoss)
 
     proposal = _PROPOSAL_RE.search(body)
     if proposal:

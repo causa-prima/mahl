@@ -156,6 +156,9 @@ bleibt die Wirkung.
 - [ ] **Gibt es eine Stelle, die den Mechanismus auslöst?** Ein Guard ohne Registrierung, eine
   Ignore-Regel auf einem Pfad, den es nicht gibt, ein Ausgabeblock hinter einem Größen-Cap:
   alle drei laufen fehlerfrei und tun nichts.
+- [ ] **Läuft der Test gegen das echte Artefakt?** Aufrufpfad statt nur Funktion, echte Ausgabe
+  des fremden Werkzeugs statt erfundener Fixture, Fixture in der Form des Bestands (mehrere
+  Einträge, Header). → [`CGP-echtes-artefakt`](../guidelines/coding-guideline-python.md#CGP-echtes-artefakt)
 - [ ] **Nennt jede Meldung den Ausweg**, nicht nur den Befund (herstellender Befehl, zu
   ändernde Datei)? → [`CGP-meldungen`](../guidelines/coding-guideline-python.md#CGP-meldungen)
 - [ ] **Fail-open, wo ein Nebenzweck scheitern darf?** Protokollierung, Statistik und Parser

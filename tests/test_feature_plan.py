@@ -5,6 +5,8 @@ die Bauplan-Konsistenz *innerhalb* der Feature-Dateien (ADR-S131-1).
 """
 from importlib import import_module
 
+import pytest
+
 hook = import_module("prozesscode.hooks.check-feature-plan")
 
 
@@ -31,6 +33,7 @@ def test_clean_feature_passes():
 
 
 # --- Phasen-Anker -------------------------------------------------------------
+@pytest.mark.aufrufpfad("check-feature-plan")
 def test_blocks_run_without_any_phase():
     ohne_phase = FEATURE_OK.replace("  # @phase: SKELETON\n\n", "")
     grund = hook.check(_daten("features/ingredients.feature", ohne_phase))

@@ -1,20 +1,25 @@
 """Tests für check-oq-capture.py – Schreibzeit-Prüfung der OQ-Fälligkeit.
 
-Regel: `**Fällig:**` ist bei offenen Fragen **optional** (ohne das Feld greift die
-Alters-Regel nach ~10 Sessions). Ist es gesetzt, unterdrückt es genau diese Alters-Regel –
-dann muss es tragen: auswertbarer Kopf, mindestens ein terminierter Anker, Referenziertes
-existiert. Geprüft werden nur neue und geänderte Einträge.
+Regel: `**Fällig:**` ist bei offenen Fragen **Pflicht** (seit S121). Weil ein gesetzter
+Anker die Alters-Regel unterdrückt, muss er tragen: auswertbarer Kopf, mindestens ein
+terminierter Anker, Referenziertes existiert. Geprüft werden nur neue und geänderte Einträge.
 """
 from importlib import import_module
+
+import pytest
 
 hook = import_module("prozesscode.hooks.check-oq-capture")
 
 
-def oq(oid: str, faellig: str | None = None, title: str = "Frage?") -> str:
+def oq(oid: str, faellig: str | None = None, title: str = "Frage?",
+       aufschub: str | None = "User – im Gespräch geparkt") -> str:
     block = f"## {oid} — {title}\n**Frage:** Was gilt?\n"
     if faellig is not None:
         block += f"**Fällig:** {faellig}\n"
-    return block + "**Hintergrund:** Kontext.\n\n"
+    block += "**Hintergrund:** Kontext.\n"
+    if aufschub is not None:
+        block += f"**Aufschubgrund:** {aufschub}\n"
+    return block + "\n"
 
 
 # --- is_oq_file --------------------------------------------------------------
@@ -92,6 +97,20 @@ def test_changed_entry_is_rechecked():
     assert [oid for oid, _ in hook.find_violations(pre, post)] == ["OQ-S001-1"]
 
 
+# --- Aufschubgrund (S133): Pflicht nur für NEUE Einträge ----------------------
+def test_new_entry_without_aufschubgrund_blocks():
+    post = oq("OQ-S002-1", faellig="S140 – sauber", aufschub=None)
+    verstoesse = hook.find_violations("", post)
+    assert [oid for oid, _ in verstoesse] == ["OQ-S002-1"]
+    assert "Aufschubgrund" in verstoesse[0][1]
+
+
+def test_changed_old_entry_without_aufschubgrund_passes():
+    pre = oq("OQ-S001-1", faellig="S140 – sauber", aufschub=None)
+    post = oq("OQ-S001-1", faellig="S150 – verschoben", aufschub=None)
+    assert hook.find_violations(pre, post) == []
+
+
 # --- check(): Dispatcher-Vertrag ---------------------------------------------
 def _write_tracker(tmp_path, content: str):
     docs = tmp_path / "docs"
@@ -113,6 +132,7 @@ def test_check_ignores_other_files(tmp_path):
     assert hook.check(data) is None
 
 
+@pytest.mark.aufrufpfad("check-oq-capture")
 def test_check_blocks_typo_via_edit(tmp_path):
     old = oq("OQ-S001-1", faellig="S140 – sauber")
     target = _write_tracker(tmp_path, old)

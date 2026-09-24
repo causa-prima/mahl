@@ -41,6 +41,7 @@ import sys
 from pathlib import Path
 
 from .. import td_anchors
+from ..eintrag_felder import AUFSCHUB_FELD, aufschub_verstoss, fett_feldwert
 from ._hook_io import edit_zustand, read_file_text
 
 TD_FILE = "docs/tech-debt.md"
@@ -84,8 +85,7 @@ def field_names(body: str) -> list[str]:
 
 def value_of(body: str, field: str) -> str | None:
     """Wert eines Feldes (None, wenn das Feld fehlt)."""
-    match = re.search(rf"^\*\*{re.escape(field)}:\*\*(.*)$", body, re.M)
-    return match.group(1).strip() if match else None
+    return fett_feldwert(body, field)
 
 
 def is_now(faellig: str) -> bool:
@@ -122,13 +122,21 @@ def check_entry(td_id: str, body: str, memory_text: str,
 
 def find_violations(pre: str, post: str, memory_text: str,
                     ktx: td_anchors.Kontext | None = None) -> list[tuple[str, str]]:
-    """(TD-ID, Begründung) für jeden neuen oder geänderten Eintrag, der die Regeln verletzt."""
+    """(TD-ID, Begründung) für jeden neuen oder geänderten Eintrag, der die Regeln verletzt.
+
+    `Aufschubgrund` gilt nur für NEUE Einträge (S133) – Bestandseinträge führen es nicht, und
+    wer sie ändert, soll nicht fremde Altlast nachtragen müssen."""
     before = parse_td_entries(pre)
-    return [
-        (tid, " · ".join(reasons))
-        for tid, body in parse_td_entries(post).items()
-        if before.get(tid) != body and (reasons := check_entry(tid, body, memory_text, ktx))
-    ]
+    verstoesse = []
+    for tid, body in parse_td_entries(post).items():
+        if before.get(tid) == body:
+            continue
+        reasons = check_entry(tid, body, memory_text, ktx)
+        if tid not in before and (neu := aufschub_verstoss(value_of(body, AUFSCHUB_FELD))):
+            reasons.append(neu)
+        if reasons:
+            verstoesse.append((tid, " · ".join(reasons)))
+    return verstoesse
 
 
 def repo_root_for(td_path: str) -> Path:
@@ -177,12 +185,14 @@ def check(data: dict) -> str | None:
 
     lines = "\n".join(f"  - {tid}: {reason}" for tid, reason in violations)
     return (
-        "❌ TD-Format (Poka-Yoke): Eintrag ohne belastbare Fälligkeit:\n"
+        "❌ TD-Format (Poka-Yoke): Eintrag verletzt das Format:\n"
         f"{lines}\n"
         "  Die Vorlage lautet:\n"
         "    **Fällig:** <Anker>[, <Anker>…] – <Freitext-Erläuterung>\n"
         "    **Problem:** <was ist die Schuld>\n"
         "    **Behebung:** <wie behoben wird>\n"
+        "    **Aufschubgrund:** <User|Umfang|Recherche> – <warum nicht sofort behoben> "
+        "(nur bei neuen Einträgen; trifft keiner zu: beheben statt erfassen)\n"
         "  1. `**Fällig:**` ist Pflicht. Ein Eintrag, der nur sagt, WIE behoben wird, schuldet "
         "niemandem einen Zeitpunkt.\n"
         "  2. Der Kopf vor dem Gedankenstrich ist maschinenlesbar. Anker-Vokabular:\n"

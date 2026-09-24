@@ -10,6 +10,8 @@ heißt hier „gilt als nicht vorhanden", also gerade kein Fehler, sondern still
 """
 from importlib import import_module
 
+from conftest import cli_aufruf
+
 dec = import_module("prozesscode.decisions")
 
 
@@ -65,3 +67,37 @@ def test_plain_line_yields_nothing():
 
 def test_malformed_ids_are_ignored():
     assert dec.adr_refs_in_line("// ADR-111-1 und ADR-SXXX-1") == []
+
+
+# --- check: Befunde zeigen, Gültiges zählen (S133) ------------------------------------
+# Gegen die echte adr.md; nur die Code-Verweise werden vorgegeben. ADR-S100-1 ist Accepted,
+# ADR-S000-1 Superseded, ADR-S999-9 gibt es nicht.
+def _check(monkeypatch, refs):
+    monkeypatch.setattr(dec, "find_code_refs", lambda: refs)
+    return cli_aufruf(monkeypatch, dec, "check")
+
+
+def test_check_zeigt_bei_lauter_gueltigen_verweisen_nur_die_zaehlzeile(monkeypatch, capsys):
+    """Bis S133 stand hier jede Fundstelle mit „✓ Accepted" – 195 Zeilen ohne einen Befund,
+    die qa-check in jedem Übergabe-Lauf in den Subagenten-Kontext schrieb."""
+    code = _check(monkeypatch, [("a.cs", 1, "ADR-S100-1"), ("b.cs", 2, "ADR-S100-1")])
+    ausgabe = capsys.readouterr().out
+    assert code == 0
+    assert ausgabe.strip().splitlines() == ["✓ 2 ADR-Verweise im Code, alle gültig"]
+
+
+def test_check_zeigt_abgeloeste_adr_als_warnung_trotz_exit_0(monkeypatch, capsys):
+    """⚠ ist kein Fehler, aber ein Befund – er darf beim Kürzen nicht mit wegfallen."""
+    code = _check(monkeypatch, [("a.cs", 1, "ADR-S100-1"), ("b.cs", 7, "ADR-S000-1")])
+    ausgabe = capsys.readouterr().out
+    assert code == 0
+    assert "b.cs:7" in ausgabe and "ADR-S000-1" in ausgabe and "Superseded" in ausgabe
+    assert "a.cs:1" not in ausgabe
+
+
+def test_check_zeigt_unbekannte_adr_und_scheitert(monkeypatch, capsys):
+    code = _check(monkeypatch, [("a.cs", 1, "ADR-S100-1"), ("c.cs", 3, "ADR-S999-9")])
+    ausgabe = capsys.readouterr().out
+    assert code == 1
+    assert "c.cs:3" in ausgabe and "nicht gefunden" in ausgabe
+    assert "a.cs:1" not in ausgabe

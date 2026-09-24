@@ -8,15 +8,10 @@ einen Schritt 7, „Script-Output Abschnitt 9" ohne Entsprechung). Danach hielt 
 Zustand: Nichts hinderte den nächsten Edit daran, wieder eine Nummer zu vergeben. Dieser Hook
 tut es – dieselbe Bauform wie `check-anchors.py`, dessen Migration er absichert.
 
-Zwei Klassen, bewusst verschieden scharf (Begründung in `ordinale.py`):
-  - **blockierend**: nummerierte Überschrift, Nummer im Verweistext, ordinaler Absatz-Lead
-  - **nur protokolliert**: Mengenangaben („alle vier Agenten") → `.claude/tmp/mengenangaben.log`
-
-Der Log-Teil ist bewusst stumm. Am Bestand wären 65–75 % Fehlalarm, aber das misst den falschen
-Gegenstand: Der Bestand ist über 124 Sessions gewachsen und besteht überwiegend aus
-Code-Kommentaren, die selten neu entstehen. Was dieser Hook sieht, sind **neue** Zeilen, und
-deren Quote ist unbekannt. Statt sie zu schätzen, sammelt das Log sie – nach ein paar Sessions
-entscheidet die Messung, ob die Klasse scharf geschaltet wird oder rausfliegt.
+Blockierend sind nummerierte Überschrift, Nummer im Verweistext und ordinaler Absatz-Lead.
+Mengenangaben („alle vier Agenten") erkennt `ordinale.py` ebenfalls, gemeldet werden sie aber
+nicht hier, sondern als Warnung nach dem Edit (`checks/mengenangaben.py`): Zum Blocken sind sie
+zu selten echt (S133 gesichtet), und ein PreToolUse-Hook kann nur blocken oder schweigen.
 
 Geprüft werden nur hinzugekommene Zeilen: Der Bestand enthält legitime Altfälle, und ein Edit
 an einer solchen Datei darf nicht kollateral blockieren.
@@ -33,7 +28,6 @@ from pathlib import Path
 from ._hook_io import edit_zustand
 from .. import anchors, ordinale
 
-_LOG = Path(__file__).resolve().parent.parent / "tmp" / "mengenangaben.log"
 _MAX_HITS = 10
 
 
@@ -56,34 +50,6 @@ def _zustaendig(file_path: str) -> bool:
     return "ordinal" not in anchors.ausnahmen_fuer(rel)
 
 
-def _ausschnitt(zeile: str, fund: str, breite: int = 160) -> str:
-    """Fenster um die Fundstelle statt Zeilenanfang.
-
-    Doku-Zeilen sind regelmäßig länger als das Log-Fenster; die ersten drei echten Einträge
-    trugen deshalb nur Vorspann. Das Log existiert aber, um die Fehlalarmquote später zu
-    beurteilen – und dafür ist die Umgebung des Treffers das Einzige, was zählt.
-    """
-    start = zeile.find(fund)
-    if start < 0 or len(zeile) <= breite:
-        return zeile[:breite]
-    rand = max(0, (breite - len(fund)) // 2)
-    links, rechts = max(0, start - rand), min(len(zeile), start + len(fund) + rand)
-    return ("…" if links else "") + zeile[links:rechts] + ("…" if rechts < len(zeile) else "")
-
-
-def _protokolliere(rel: str, funde: list[tuple[int, str, str]]) -> None:
-    """Stumm sammeln. Ein Fehler hier darf den Edit nie verhindern (CM-S116-1)."""
-    if not funde:
-        return  # sonst legte `open("a")` ein leeres Log an und täuschte Aktivität vor
-    try:
-        _LOG.parent.mkdir(parents=True, exist_ok=True)
-        with _LOG.open("a", encoding="utf-8") as f:
-            for _nr, zeile, fund in funde:
-                f.write(f"{rel}\t{fund}\t{_ausschnitt(zeile, fund)}\n")
-    except OSError:
-        pass
-
-
 def check(data: dict) -> str | None:
     """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py."""
     zustand = edit_zustand(data, _zustaendig)
@@ -93,7 +59,6 @@ def check(data: dict) -> str | None:
 
     rel = _rel(file_path)
     markdown = rel.endswith(".md")
-    _protokolliere(rel, ordinale.neue_mengenangaben(pre, post))
 
     funde = ordinale.ordinale_in(
         ordinale._neu_hinzugekommen(pre, post), markdown=markdown)

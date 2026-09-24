@@ -6,6 +6,8 @@ Warum kein Gate: `coding-guideline-python.md`, „Was nicht gilt".
 """
 from importlib import import_module
 
+import pytest
+
 cov = import_module("prozesscode.coverage-run")
 
 
@@ -30,6 +32,7 @@ class _Lauf:
         self.returncode = returncode
 
 
+@pytest.mark.aufrufpfad("coverage-run")
 def test_die_gesamtzahl_wird_berichtet(monkeypatch, capsys):
     monkeypatch.setattr(cov, "_venv_vorhanden", lambda: True)
     monkeypatch.setattr(cov, "_laufe", lambda *_a: _Lauf())

@@ -170,3 +170,56 @@ def test_unbekannter_tag_in_einer_cm_wird_gemeldet():
 def test_cm_ohne_kontext_ist_kein_verstoss():
     """Leere Kontextliste heißt Wildcard, nicht 'fehlerhaft'."""
     assert rr.unbekannte_tags([], [_cm(kontexte=[])]) == []
+
+
+# --- render_pattern: was die Retro zum Prüfen eines Kandidaten braucht ---------
+def _periode(num: int, *titel: str, impact="MITTEL", kategorie="AGENT", kontext="Doku"):
+    findings = [rr.Finding(session_num=num, impact=impact, kategorie=kategorie,
+                           kontext=kontext, titel=t) for t in titel]
+    return rr.SessionData(num=num, date="2026-01-01", findings=findings)
+
+
+def test_load_cm_behaelt_den_kurztitel_neben_dem_problemtext(tmp_path):
+    """Die Problem-Zeile überschreibt `problem`; der Kurztitel wird für die Anzeige gebraucht."""
+    cms = rr.load_cm(_write_cm(tmp_path))
+    assert cms[0].titel == "Multi-Kontext-Maßnahme"
+
+
+def test_neuer_kandidat_zeigt_jedes_mitglied_nicht_nur_die_aeltesten():
+    """S127: Ein 4×-Cluster zeigte nur zwei Alt-Mitglieder – das aus der aktuellen Periode fehlte."""
+    archiv = [[_periode(10, "LL-S010-1 – alt eins", "LL-S010-2 – alt zwei")]]
+    aktuell = [_periode(20, "LL-S020-1 – neu")]
+    ausgabe = rr.render_pattern(aktuell, archiv, [])
+    for titel in ("alt eins", "alt zwei", "LL-S020-1 – neu"):
+        assert titel in ausgabe
+
+
+def test_mitglied_der_aktuellen_periode_ist_markiert_alte_nicht():
+    archiv = [[_periode(10, "LL-S010-1 – alt")]]
+    aktuell = [_periode(20, "LL-S020-1 – neu")]
+    zeilen = rr.render_pattern(aktuell, archiv, []).splitlines()
+    neu = next(z for z in zeilen if "LL-S020-1" in z)
+    alt = next(z for z in zeilen if "LL-S010-1" in z)
+    assert rr.MARKE_AKTUELL in neu
+    assert rr.MARKE_AKTUELL not in alt
+
+
+def test_abgedeckter_kandidat_nennt_die_abdeckende_cm():
+    """Nur so fällt auf, wenn das Tripel zufällig von einer fachfremden CM abgedeckt wird."""
+    cm = _cm(impact="MITTEL", kategorie="AGENT", kontexte=["Doku"], cm_id="CM-S105-1")
+    cm.titel = "Postgres-Init-Config"
+    aktuell = [_periode(20, "LL-S020-1 – eins", "LL-S020-2 – zwei")]
+    zeile = next(z for z in rr.render_pattern(aktuell, [], [cm]).splitlines()
+                 if "[MITTEL] [AGENT] [Doku]" in z)
+    assert "CM-S105-1" in zeile
+    assert "Postgres-Init-Config" in zeile
+
+
+def test_abgedeckter_kandidat_zeigt_nur_die_mitglieder_der_aktuellen_periode():
+    """Alte Mitglieder lagen früheren Retros vor; neu zu prüfen sind nur die aktuellen."""
+    cm = _cm(impact="MITTEL", kategorie="AGENT", kontexte=["Doku"], cm_id="CM-S105-1")
+    archiv = [[_periode(10, "LL-S010-1 – alt")]]
+    aktuell = [_periode(20, "LL-S020-1 – neu")]
+    ausgabe = rr.render_pattern(aktuell, archiv, [cm])
+    assert "LL-S020-1 – neu" in ausgabe
+    assert "LL-S010-1" not in ausgabe

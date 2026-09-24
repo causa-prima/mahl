@@ -49,18 +49,21 @@ def test_get_unbekannte_id_ist_none():
 
 
 # --- Anlegen -----------------------------------------------------------------
+AUFSCHUB = "User – im Gespräch auf später gelegt"
+
+
 def test_add_vergibt_die_naechste_id_der_laufenden_session():
     neu, oid = oq.add(BESTAND, 124, titel="Dritte", frage="Wie?",
-                      faellig="S140 – Backstop", hintergrund="H")
+                      faellig="S140 – Backstop", hintergrund="H", aufschubgrund=AUFSCHUB)
     assert oid == "OQ-S124-1"
     assert oq.get(neu, oid) is not None
 
 
 def test_add_zaehlt_innerhalb_der_session_hoch():
     zwischen, _ = oq.add(BESTAND, 124, titel="A", frage="?",
-                         faellig="S140 – x", hintergrund="H")
+                         faellig="S140 – x", hintergrund="H", aufschubgrund=AUFSCHUB)
     _, zweite = oq.add(zwischen, 124, titel="B", frage="?",
-                       faellig="S140 – x", hintergrund="H")
+                       faellig="S140 – x", hintergrund="H", aufschubgrund=AUFSCHUB)
     assert zweite == "OQ-S124-2"
 
 
@@ -68,14 +71,27 @@ def test_add_weist_untragfaehigen_anker_ab():
     """Dieselbe Grammatik wie check-oq-capture.py – ein Vertipper darf nicht durchrutschen."""
     with pytest.raises(ValueError):
         oq.add(BESTAND, 124, titel="X", frage="?", faellig="irgendwann mal",
-               hintergrund="H")
+               hintergrund="H", aufschubgrund=AUFSCHUB)
 
 
 def test_add_akzeptiert_gueltigen_anker():
     """Gegenprobe zum Test darüber."""
     neu, oid = oq.add(BESTAND, 124, titel="X", frage="?",
-                      faellig="Phase:MVP – beim Wechsel", hintergrund="H")
+                      faellig="Phase:MVP – beim Wechsel", hintergrund="H",
+                      aufschubgrund=AUFSCHUB)
     assert oq.get(neu, oid) is not None
+
+
+def test_add_schreibt_den_aufschubgrund():
+    neu, oid = oq.add(BESTAND, 124, titel="X", frage="?", faellig="S140 – x",
+                      hintergrund="H", aufschubgrund=AUFSCHUB)
+    assert f"**Aufschubgrund:** {AUFSCHUB}" in oq.get(neu, oid)
+
+
+def test_add_ohne_tragenden_aufschubgrund_scheitert():
+    with pytest.raises(ValueError):
+        oq.add(BESTAND, 124, titel="X", frage="?", faellig="S140 – x",
+               hintergrund="H", aufschubgrund="Entscheidung – steht mir nicht zu")
 
 
 # --- Ändern ------------------------------------------------------------------

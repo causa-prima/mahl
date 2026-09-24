@@ -34,6 +34,7 @@ from .oq_entry import (  # noqa: E402
     remove,
     set_fields,
 )
+from .eintrag_felder import AUFSCHUB_HILFE  # noqa: E402
 from .tracker_entry import kuerzungen
 
 _HOOKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".claude", "hooks")
@@ -95,7 +96,8 @@ def cmd_add(args) -> int:
     path = oq_path()
     text = path.read_text(encoding="utf-8")
     neu, oid = add(text, args.session or laufende_session(), titel=args.titel,
-                   frage=args.frage, faellig=args.faellig, hintergrund=args.hintergrund)
+                   frage=args.frage, faellig=args.faellig, hintergrund=args.hintergrund,
+                   aufschubgrund=args.aufschubgrund)
     path.write_text(neu, encoding="utf-8")
     print(f"✓ {oid} angelegt.")
     return 0
@@ -164,6 +166,7 @@ def main() -> int:
                             "Grammatik: td_anchors.py")
     p_add.add_argument("--hintergrund", required=True,
                        help="Auslöser, Kontext, betroffene Artefakte")
+    p_add.add_argument("--aufschubgrund", required=True, help=AUFSCHUB_HILFE)
     p_add.add_argument("--session", type=int, help="Session-Nummer (Default: laufende)")
     p_add.set_defaults(fn=cmd_add)
 

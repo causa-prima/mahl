@@ -109,6 +109,7 @@ def test_since_includes_the_stichtag_itself(tmp_path):
     assert sum(runs.values()) == 1
 
 
+@pytest.mark.aufrufpfad("tool-usage")
 def test_since_mit_lsp_meldet_sich_statt_still_zu_wirkungslos_zu_sein(monkeypatch, capsys):
     """`--since` wirkt nur auf die Filter-Quote – das muss auffallen, nicht durchrutschen.
 

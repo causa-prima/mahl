@@ -86,6 +86,12 @@ _ZEILENVERWEIS = re.compile(r"\bZeile\s+\d+")
 
 _FENCE = re.compile(r"^\s*(?:```|~~~)")
 
+# Vorfilter: Jedes blockierende Muster oben braucht eine Ziffer – außer Überschrift (`#`) und
+# Absatz-Lead (`**`), die auch Buchstaben- und römische Nummern kennen („## A.", „**A)").
+# Zeilen ohne alle drei können nicht treffen; das spart den Großteil der Regex-Arbeit (S133).
+# Wer ein Muster ohne Ziffer ergänzt, muss es hier aufnehmen – test_ordinale deckt jede Form ab.
+_KANDIDAT = re.compile(r"\d|#|\*\*")
+
 # Mengenangaben: Zahlwort als Attribut eines Substantivs. Der Artikel muss im Nominativ/Akkusativ
 # stehen – „der beide Seiten benennt" ist ein Relativsatz, kein Ordinalbezug (S124-Fehlalarm).
 _MENGE = re.compile(
@@ -130,6 +136,8 @@ def ordinale_in(text: str, markdown: bool = True,
     treffer = []
     frei = freie_zahlen or set()
     for nr, zeile in _pruefbare_zeilen(text):
+        if not _KANDIDAT.search(zeile):
+            continue
         if _ID_UEBERSCHRIFT.match(zeile):
             continue
         if markdown and (_H_PRAEFIX.match(zeile) or _H_WORT.match(zeile)
@@ -223,8 +231,7 @@ def bestand(wurzel: Path | None = None) -> list[tuple[str, int, str, str]]:
     # das erst durch `node_modules` hindurchliefe (dort: 3161 ms → 28 ms). Bewusst kein
     # Nachbau: Zwei Ausschlusslisten driften auseinander, und die Divergenz fällt erst auf,
     # wenn eine Seite blind geworden ist (CM-S116-1).
-    for datei in sorted(anchors.relevante_dateien(wurzel)):
-        rel = datei.relative_to(wurzel).as_posix()
+    for rel, datei in sorted(anchors.relevante_eintraege(wurzel), key=lambda e: e[1]):
         if "ordinal" in anchors.ausnahmen_fuer(rel):
             continue  # führt die Muster als Eingabe – siehe anchors.MUSTER_AUSNAHMEN
         try:

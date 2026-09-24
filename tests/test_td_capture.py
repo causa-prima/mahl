@@ -8,6 +8,8 @@ Session-Start gelesen wird. Unberührte Bestands-Einträge blocken nie.
 """
 from importlib import import_module
 
+import pytest
+
 hook = import_module("prozesscode.hooks.check-td-capture")
 
 
@@ -17,6 +19,7 @@ def _td(
     problem: str | None = "Irgendwas ist Schuld.",
     behebung: str | None = "Irgendwie beheben.",
     extra: str = "",
+    aufschub: str | None = "Umfang – eigener Umbau",
 ) -> str:
     """Minimaler, formatgetreuer TD-Block."""
     lines = [f"## {tid} — Kurztitel"]
@@ -26,6 +29,8 @@ def _td(
         lines.append(f"**Problem:** {problem}")
     if behebung is not None:
         lines.append(f"**Behebung:** {behebung}")
+    if aufschub is not None:
+        lines.append(f"**Aufschubgrund:** {aufschub}")
     if extra:
         lines.append(extra)
     return "\n".join(lines) + "\n\n---\n\n"
@@ -60,7 +65,7 @@ def test_header_comment_is_not_an_entry():
 # --- field_names / value_of --------------------------------------------------
 def test_reads_field_names_and_values():
     body = hook.parse_td_entries(_td(faellig="ab MVP"))["TD-S120-1"]
-    assert hook.field_names(body) == ["Fällig", "Problem", "Behebung"]
+    assert hook.field_names(body) == ["Fällig", "Problem", "Behebung", "Aufschubgrund"]
     assert hook.value_of(body, "Fällig") == "ab MVP"
 
 
@@ -162,6 +167,27 @@ def test_new_broken_entry_blocks():
     assert [tid for tid, _ in hook.find_violations(pre, post, "")] == ["TD-S120-1"]
 
 
+# --- Aufschubgrund (S133): Pflicht nur für NEUE Einträge ----------------------
+def test_new_entry_without_aufschubgrund_blocks():
+    pre = _td("TD-S119-1")
+    post = pre + _td("TD-S120-1", aufschub=None)
+    verstoesse = hook.find_violations(pre, post, "")
+    assert [tid for tid, _ in verstoesse] == ["TD-S120-1"]
+    assert "Aufschubgrund" in verstoesse[0][1]
+
+
+def test_new_entry_with_untenable_aufschubgrund_blocks():
+    post = _td("TD-S120-1", aufschub="Entscheidung – steht mir nicht zu")
+    assert [tid for tid, _ in hook.find_violations("", post, "")] == ["TD-S120-1"]
+
+
+def test_changed_old_entry_without_aufschubgrund_passes():
+    """Bestandseinträge führen das Feld legitim nicht – sonst wären sie unänderbar."""
+    pre = _td("TD-S119-1", aufschub=None)
+    post = _td("TD-S119-1", aufschub=None, problem="Jetzt umformuliert.")
+    assert hook.find_violations(pre, post, "") == []
+
+
 def test_changed_entry_is_rechecked():
     pre = _td("TD-S119-1")
     post = _td("TD-S119-1", faellig=None, problem="Jetzt umformuliert.")
@@ -192,6 +218,7 @@ def test_check_ignores_other_tools_and_files(tmp_path):
     assert hook.check(_payload(str(tmp_path / "docs" / "open-questions.md"), _td(faellig=None))) is None
 
 
+@pytest.mark.aufrufpfad("check-td-capture")
 def test_check_reports_the_offending_entry(tmp_path):
     td = tmp_path / "docs" / "tech-debt.md"
     td.parent.mkdir()

@@ -70,6 +70,7 @@ _ARGUMENT_ZU_FELD = {
     "--hintergrund": "Hintergrund",
     "--problem": "Problem",
     "--behebung": "Behebung",
+    "--aufschubgrund": "Aufschubgrund",
     "--done": "Done-Kriterium (AGENT_MEMORY)",
 }
 
@@ -105,10 +106,11 @@ def _argumente(teile: list[str]) -> tuple[str | None, list[tuple[str, str]]]:
     while i < len(teile):
         wort = teile[i]
         if wort.startswith("--"):
-            feld = _ARGUMENT_ZU_FELD.get(wort)
+            # Ein hier nicht eingetragenes Argument erscheint unter seinem Rohnamen, statt still
+            # aus dem Freigabedialog zu fallen – sonst sieht der User ein neues Feld nie (S133).
+            feld = _ARGUMENT_ZU_FELD.get(wort, wort)
             wert = teile[i + 1] if i + 1 < len(teile) else ""
-            if feld is not None:
-                felder.append((feld, wert))
+            felder.append((feld, wert))
             i += 2
             continue
         if eintrag is None and re.fullmatch(r"(OBS|LL|OQ|TD)-S\d+-\d+", wort):

@@ -170,6 +170,7 @@ def test_check_ignores_other_tools(tmp_path):
     assert hook.check(data) is None
 
 
+@pytest.mark.aufrufpfad("check-adr-capture")
 def test_check_blocks_new_deferring_adr(tmp_path):
     adr_dir = tmp_path / "docs" / "history"
     adr_dir.mkdir(parents=True)

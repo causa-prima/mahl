@@ -100,6 +100,23 @@ def test_add_listet_felder_ohne_diff(tmp_path):
     assert "obs add → docs/kaizen/observations.md" in out
 
 
+def test_add_zeigt_den_aufschubgrund_unter_seinem_feldnamen(tmp_path):
+    out = klartext(tp.vorschau(
+        'python3 -m prozesscode.td add --titel "X" --aufschubgrund "Umfang – eigener Umbau"',
+        root=repo(tmp_path)))
+    assert "▸ Aufschubgrund" in out
+    assert "Umfang – eigener Umbau" in out
+
+
+def test_unbekanntes_argument_erscheint_statt_still_zu_fehlen(tmp_path):
+    """Ein neues Feld, das hier noch nicht eingetragen ist, darf im Dialog nicht verschwinden –
+    genau das wäre beim Aufschubgrund passiert (S133)."""
+    out = klartext(tp.vorschau(
+        'python3 -m prozesscode.td add --titel "X" --kuenftiges-feld "sichtbar bleiben"',
+        root=repo(tmp_path)))
+    assert "sichtbar bleiben" in out
+
+
 # --- Shell-Metazeichen -------------------------------------------------------
 def test_metazeichen_werden_gemeldet(tmp_path):
     out = klartext(tp.vorschau(

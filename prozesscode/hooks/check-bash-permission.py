@@ -269,7 +269,7 @@ def cd_npm_conflict(segments: list[str]) -> bool:
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-def _log_command(command: str, log_type: str, log_file: str = _LOG_FILE) -> None:
+def _log_command(command: str, log_type: str, log_file: str | None = None) -> None:
     """Protokolliert einen Befehl in einem Log (Default: denied-commands.log).
 
     log_type: ALLOW | WRONG_APPROACH | DESTRUCTIVE | UNSAFE_REDIRECT | UNKNOWN |
@@ -278,7 +278,12 @@ def _log_command(command: str, log_type: str, log_file: str = _LOG_FILE) -> None
     log_file: Zielpfad – erlaubte Befehle gehen nach _ALLOWED_LOG_FILE (OBS-S085-3 D),
               alles andere nach _LOG_FILE.
     Fehler beim Schreiben dürfen den Hook nicht unterbrechen.
+
+    Der Default wird erst beim Aufruf aufgelöst: Als Default-Argument band er `_LOG_FILE` beim
+    Import, und ein Test, der das Log umlenkte, schrieb trotzdem ins echte Deny-Log (S133) –
+    die Datenquelle, aus der die Retro Reibung misst.
     """
+    log_file = log_file or _LOG_FILE
     try:
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')

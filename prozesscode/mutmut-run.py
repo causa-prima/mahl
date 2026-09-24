@@ -24,6 +24,12 @@ Gleichstand geht durch (sonst wäre es eine Steigerungspflicht), und eine Verbes
 die Baseline nach (sonst friert sie beim ersten Glücksfall ein). Verglichen wird als Bruch,
 nicht in gerundeten Prozenten.
 
+Grenze des Bruchs: Zieht ein Refactoring gut getestete Logik in ein anderes Modul, verliert
+das Quellmodul getötete Mutanten, seine Überlebenden bleiben – der Anteil sinkt ohne jeden
+Güteverlust (S133: Feldwert-Regex aus zwei Capture-Hooks nach `eintrag_felder`). Dann die
+Überlebenden vor/nach vergleichen und, wenn sie gleich sind, `mutation-baseline.json` von Hand
+auf den neuen Stand setzen – mit Begründung in der Commit-Nachricht.
+
 Bewusst **kein Gate** – kein Hook, kein Commit-Zwang. Gemessen dauert ein Modul mittlerer
 Größe 84 s, die großen liegen darüber; ein Zwang in dieser Größenordnung erzeugt den Druck,
 unter dem er umgangen wird. Die Klinke greift, wenn jemand sie zieht.
@@ -164,6 +170,13 @@ def baue_verdikt(eintraege: list[tuple[str, str]],
         umfang += (f", +{an_texten} überlebende an Meldungstexten (nicht sinnvoll tötbar – "
                    f"s. string_mutanten)")
 
+    if not bewertet:
+        # Keine Messung ist kein bestandener Lauf – „keiner überlebt" über eine leere Menge
+        # wäre falsch-grün (S133: `--mutate …x_main` traf nichts).
+        return (f"✗ mutmut: {umfang} – der Ausschnitt trifft keinen Mutanten. Die Namen haben "
+                f"die Form `<paket>.<modul>.x_<funktion>__mutmut_<n>`; `--mutate` nimmt einen "
+                f"Modul-Namensraum wie `prozesscode.anchors`."), None
+
     zeilen = [f"  {status:11s} {name}" for name, status in auffaellig][:MAX_ZEILEN]
     if len(auffaellig) > MAX_ZEILEN:
         zeilen.append(f"  … und {len(auffaellig) - MAX_ZEILEN} weitere")
@@ -184,7 +197,7 @@ def baue_verdikt(eintraege: list[tuple[str, str]],
         "  „überlebt\" heißt: die Änderung an dieser Stelle bricht keinen Test – die Lücke "
         "liegt im Test.\n"
         "  „ohne deckenden Test\" heißt: kein Test berührt die Stelle überhaupt.\n"
-        "  Eine Stelle ansehen: .venv/bin/mutmut show <name>"
+        "  Eine Stelle ansehen: python3 -m prozesscode.mutmut-run --show <name>"
     )
     return f"✗ mutmut: {umfang}, {', '.join(teile)}", zeilen
 
@@ -428,11 +441,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--frisch", action="store_true",
                         help="mutants/ vorher wegwerfen (nach geänderten TESTS – s. raeume_baum)")
     parser.add_argument("--verbose", action="store_true", help="Vollständige Ausgabe")
+    # Der Rohaufruf `mutmut show` ist per Bash-Hook gesperrt (dort zusammen mit run/results);
+    # ohne diesen Weg zeigte das Verdikt auf eine Sackgasse.
+    parser.add_argument("--show", metavar="MUTANT",
+                        help="Diff eines Mutanten zeigen (Name aus dem Verdikt), kein Lauf")
     args = parser.parse_args(argv)
 
     if not MUTMUT.is_file():
         print(_FEHLT.format(pfad=MUTMUT))
         return 2
+
+    if args.show:
+        gezeigt = _laufe("show", args.show)
+        print(gezeigt.stdout + gezeigt.stderr, end="")
+        return gezeigt.returncode
 
     if args.frisch:
         raeume_baum()

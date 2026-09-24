@@ -16,7 +16,7 @@ kritische-regeln:
 |-----------|--------|------------|
 | [Geltungsbereich](#CGP-geltungsbereich) | Was dieser Code ist und was ihn von Produktcode trennt | Einmal, zum Einordnen |
 | [Das Fehlerprofil](#CGP-fehlerprofil) | Warum hier andere Maßgaben gelten als für C#/TypeScript | Vor jeder Diskussion über Qualitätswerkzeuge |
-| [Was gilt](#CGP-was-gilt) | Tests, Linter, Gegenprobe, Protokoll | Bevor du etwas schreibst |
+| [Was gilt](#CGP-was-gilt) | Tests, Linter, Gegenprobe, echtes Artefakt, Protokoll | Bevor du etwas schreibst |
 | [Was nicht gilt](#CGP-was-nicht-gilt) | Bewusst nicht übernommene Produktcode-Regeln, mit Grund | Wenn du eine Regel vermisst |
 | [Werkzeuge](#CGP-werkzeuge) | venv, ruff, Wrapper | Beim ersten Aufsetzen |
 
@@ -101,6 +101,32 @@ löschen. Das kostet zwei Minuten und ist der einzige Beleg, den es für Klasse 
 Die Regel steht kanonisch in
 [`principles.md`](../kaizen/principles.md#KPI-kommunikation) – hier steht sie, weil sie beim
 Schreiben von Guards der wichtigste Einzelschritt ist.
+
+<a id="CGP-echtes-artefakt"></a>
+### Tests laufen gegen das echte Artefakt, nicht gegen einen Ersatz
+
+Die häufigste Form von Klasse STUMM in diesem Code: Der Test ist grün, weil er gegen etwas
+prüft, das dem Gemeinten nur ähnelt. Fünf Fälle in zwei Retro-Perioden, alle mit grüner Suite.
+Drei konkrete Formen, jede mit ihrer Regel:
+
+- **Aufrufpfad.** Ein Werkzeug, das über CLI, Hook oder Registrierung erreicht wird, bekommt
+  mindestens einen Test über genau diesen Weg – `main(argv)` oder den Prozessstart, nicht nur
+  die Funktion dahinter. Gibt es mehrere Varianten, prüft der Test, dass sie sich
+  **unterscheiden**. (S128: 59 Tests prüften `rendere_block()`; der CLI-Parameter `--block` wurde
+  nie ausgewertet, alle fünf Hooks hätten denselben Text injiziert.) Kann der Prozessstart im
+  Mutantenbaum nicht laufen, gehört der Test mit Grund nach `prozesscode/_mutmut_ausnahmen.py`.
+- **Fremdes Werkzeug.** Wer die Ausgabe eines fremden Werkzeugs auswertet, prüft dessen
+  Exit-Code und hat mindestens einen Test gegen eine **echte, gespeicherte** Ausgabe.
+  Handgeschriebene Fixtures prüfen den eigenen Parser, nicht die Schnittstelle. (S129: ein
+  Abbruch von `mutmut results` mitten in der Ausgabe wurde als vollständiges Ergebnis gelesen.)
+- **Form des Bestands.** Eine Fixture hat die Form der echten Datei: mehrere Einträge, wenn
+  die Datei viele hat, und den Header mit seinen Beispielzeilen, wenn sie einen trägt.
+  (S131: bei genau einem Eintrag ist ein dateiweites dict vom eintragsweisen nicht zu
+  unterscheiden – die Warnung gegen Datenverlust ließ den Datenverlust durch. S123/S116: der
+  Header einer Tracker-Datei trägt Beispielzeilen im Eintragsformat und wurde mitgezählt.)
+
+Prüffrage für jeden neuen Test: *Worin unterscheidet sich mein Aufbau vom Produktivfall – und
+könnte der Fehler in dieser Form überhaupt auftreten?*
 
 <a id="CGP-guard-protokoll"></a>
 ### Guards protokollieren ihre Auslösungen

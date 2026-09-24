@@ -11,6 +11,7 @@ Vier Zusagen, die der Session-Start hält:
   4. Ein ausgefallenes Modul reißt die Agenda nicht mit, sondern meldet sich als Warnzeile.
      Ein leerer Session-Start wäre von „nichts zu tun" ununterscheidbar.
 """
+import functools
 import json
 import subprocess
 import sys
@@ -22,6 +23,24 @@ import pytest
 agenda = import_module("prozesscode.session-agenda")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+_BESTANDSSCANS = ("anker-defekt", "ordinale")
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _bestand_nur_einmal_pruefen():
+    """Die Module `anker-defekt` und `ordinale` prüfen je ~1,7 s den ganzen Repo-Bestand, und
+    elf Tests fuhren beide neu – zusammen rund 36 s, gut 90 % der Werkzeug-Suite (S133
+    gemessen). Innerhalb eines Laufs ändert sich der Bestand nicht; geprüft wird er daher
+    einmal. Gecacht wird der Eintrag in `MODULE`, nicht die Funktion: Tests, die
+    `modul_anker_defekt()` direkt mit ersetztem Bestand rufen, bleiben unberührt.
+    Subprozess-Tests (echter CLI-Pfad) erreicht der Cache bewusst nicht."""
+    mp = pytest.MonkeyPatch()
+    mp.setattr(agenda, "MODULE", [(n, a, functools.cache(f) if n in _BESTANDSSCANS else f)
+                                  for n, a, f in agenda.MODULE])
+    yield
+    mp.undo()
 # Als Modul starten, nicht als Datei: die Agenda nutzt paketinterne Importe und findet ihren
 # Paketkontext nur so. `cwd` macht `prozesscode` für den Subprozess auffindbar.
 CLI = ["-m", "prozesscode.session-agenda"]
@@ -569,6 +588,7 @@ def test_unbekannter_blockname_wird_abgewiesen():
         agenda.rendere_block("gibt-es-nicht")
 
 
+@pytest.mark.aufrufpfad("session-agenda")
 def test_die_cli_liefert_je_blockname_verschiedene_bloecke():
     """Geprüft wird der Pfad, den der HOOK nimmt – die CLI, nicht die Funktion.
 

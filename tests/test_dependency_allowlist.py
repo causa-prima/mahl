@@ -1,6 +1,8 @@
 """Tests für prozesscode/hooks/check-dependency-allowlist.py"""
 from importlib import import_module
 
+import pytest
+
 get_denial_reason = import_module(
     "prozesscode.hooks.check-dependency-allowlist").get_denial_reason
 
@@ -39,3 +41,20 @@ def test_cs_file_not_blocked():
 
 def test_ts_file_not_blocked():
     assert get_denial_reason("Client/src/App.tsx") is None
+
+
+# --- Einstieg über den Dispatcher-Weg ---
+_hook = import_module("prozesscode.hooks.check-dependency-allowlist")
+
+
+@pytest.mark.aufrufpfad("check-dependency-allowlist")
+def test_check_blockt_edit_an_package_json_mit_absolutem_pfad(monkeypatch):
+    """Der Dispatcher liefert absolute Pfade; `check` kürzt sie um CLAUDE_PROJECT_DIR."""
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/repo")
+    daten = {"tool_name": "Edit", "tool_input": {"file_path": "/repo/Client/package.json"}}
+    assert _hook.check(daten) is not None
+
+
+def test_check_ignoriert_andere_werkzeuge():
+    daten = {"tool_name": "Read", "tool_input": {"file_path": "Client/package.json"}}
+    assert _hook.check(daten) is None

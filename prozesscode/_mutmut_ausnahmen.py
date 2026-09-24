@@ -24,4 +24,15 @@ UNTER_MUTMUT_UEBERSPRUNGEN: dict[str, str] = {
         "Hooks (`python3 -m prozesscode.session-agenda --block <name>`) je Block einen "
         "anderen Text liefert – in-process aufgerufen prüfte er die Funktion statt die "
         "Wirkung, und genau diese Lücke hat er aufgedeckt.",
+    **{
+        f"tests/test_erfassung_cli.py::test_add_verlangt_den_aufschubgrund[{modul}]":
+            "Der Subprozess IST der Prüfgegenstand: Der Test belegt, dass die CLI das Pflichtfeld "
+            "Aufschubgrund verlangt (LL-S128-1: getestete Funktion, unverdrahtete CLI). Den "
+            "Kern prüfen die in-process-Tests der Eintragsmodule und Hooks."
+        for modul in ("obs", "td", "oq")
+    },
+    "tests/test_aufrufpfad_wrapper.py::test_stryker_guard_suite_ist_gruen":
+        "Die Suite prüft `resolve_mutate` gegen die echten Verzeichnisse Server/ und Client/; "
+        "mutmut kopiert sie nicht in den Mutantenbaum (`also_copy` in setup.cfg – Client/ "
+        "brächte node_modules mit). Außerhalb von mutmut läuft der Test im Werkzeug-Gate.",
 }

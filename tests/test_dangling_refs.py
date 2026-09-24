@@ -6,6 +6,8 @@ das Ziel verschwindet, und listet die verbliebenen Fundstellen auf.
 """
 from importlib import import_module
 
+import pytest
+
 hook = import_module("prozesscode.hooks.check-dangling-refs")
 
 
@@ -205,6 +207,7 @@ def test_check_ignores_other_files(tmp_path):
     assert hook.check(data) is None
 
 
+@pytest.mark.aufrufpfad("check-dangling-refs")
 def test_check_blocks_removal_with_remaining_reference(monkeypatch, tmp_path):
     monkeypatch.setattr(hook, "_REPO_ROOT", tmp_path)
     docs = tmp_path / "docs"

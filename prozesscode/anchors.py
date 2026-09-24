@@ -30,6 +30,7 @@ löscht, merkte nichts; wer den Verweis liest, fände nichts. Dieselbe Überlegu
 `check-dangling-refs.py` für volatile Tracker-IDs.
 """
 import argparse
+import functools
 import os
 import re
 import sys
@@ -143,6 +144,9 @@ MUSTER_AUSNAHMEN: dict[str, frozenset[str]] = {
     "tests/test_check_anchors.py": frozenset({"verweis", "ordinal"}),
     "tests/test_ordinale.py": frozenset({"verweis", "ordinal"}),
     "tests/test_check_ordinale.py": frozenset({"verweis", "ordinal"}),
+    # Mengenangaben sind dort die Eingabe der Warnung (checks/mengenangaben.py, S133).
+    "tests/test_mengenangaben_check.py": frozenset({"ordinal"}),
+    "tests/test_aufrufpfad_einstiege.py": frozenset({"ordinal"}),
 }
 
 
@@ -213,7 +217,15 @@ def verweise_aus(datei: str, text: str) -> list[tuple[str, int, str]]:
     """
     if "verweis" in ausnahmen_fuer(datei):
         return []
-    return verweise_in(text) if datei.endswith(".md") else klartext_verweise_in(text)
+    return list(_verweise_im_text(datei.endswith(".md"), text))
+
+
+@functools.lru_cache(maxsize=8192)
+def _verweise_im_text(markdown: bool, text: str) -> tuple[tuple[str, int, str], ...]:
+    """Gecacht, weil tote Verweise, falsche Pfade und Verweis-Anzahl denselben Bestand je
+    einmal vollständig durchsuchten – dreimal dieselbe Arbeit (S133: ~0,9 s je Scan).
+    Die Muster-Ausnahme bleibt bewusst außerhalb: Sie hängt am Dateinamen, nicht am Text."""
+    return tuple(verweise_in(text) if markdown else klartext_verweise_in(text))
 
 
 def verweis_anzahl(bestand: dict[str, str]) -> int:
@@ -351,15 +363,26 @@ def relevante_dateien(root: Path | None = None) -> list[Path]:
     `node_modules` hindurch, was den Aufruf von Millisekunden auf Sekunden hebt – spürbar,
     weil der Hook bei JEDEM Edit den ganzen Bestand liest.
     """
+    return [pfad for _rel, pfad in relevante_eintraege(root)]
+
+
+def relevante_eintraege(root: Path | None = None) -> list[tuple[str, Path]]:
+    """(repo-relativer Pfad, Pfad) je geprüfter Datei.
+
+    Der relative Pfad entsteht einmal je Ordner als Text: `Path.relative_to` je Datei kostete
+    bei rund 2.000 Dateien und zwei Scans pro Session-Start ~0,4 s (S133 gemessen) – und der
+    Anker-Hook liest den Bestand bei jedem Edit.
+    """
     basis = root or REPO_ROOT
-    dateien = []
+    eintraege = []
     for wurzel, ordner, namen in os.walk(basis):
         ordner[:] = [o for o in ordner if o not in SKIP_ORDNER]
+        rel_ordner = os.path.relpath(wurzel, basis).replace(os.sep, "/")
+        praefix = "" if rel_ordner == "." else rel_ordner + "/"
         for name in namen:
-            pfad = Path(wurzel) / name
-            if wird_geprueft(pfad.relative_to(basis).as_posix()):
-                dateien.append(pfad)
-    return dateien
+            if wird_geprueft(praefix + name):
+                eintraege.append((praefix + name, Path(wurzel) / name))
+    return eintraege
 
 
 def _text_oder_none(pfad: Path) -> str | None:
@@ -376,12 +399,11 @@ def _text_oder_none(pfad: Path) -> str | None:
 
 
 def lies_bestand(root: Path | None = None) -> dict[str, str]:
-    basis = root or REPO_ROOT
     bestand = {}
-    for pfad in relevante_dateien(basis):
+    for rel, pfad in relevante_eintraege(root):
         text = _text_oder_none(pfad)
         if text is not None:
-            bestand[pfad.relative_to(basis).as_posix()] = text
+            bestand[rel] = text
     return bestand
 
 

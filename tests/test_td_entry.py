@@ -63,17 +63,40 @@ def test_remove_entfernt_nur_den_eintrag():
 
 
 # --- Anker-Grammatik ---------------------------------------------------------
+AUFSCHUB = "Umfang – eigener Umbau"
+
+
 def test_add_weist_untragfaehigen_anker_ab():
     with pytest.raises(ValueError):
-        td.add(BESTAND, 124, titel="X", faellig="irgendwann", problem="P", behebung="B")
+        td.add(BESTAND, 124, titel="X", faellig="irgendwann", problem="P", behebung="B",
+               aufschubgrund=AUFSCHUB)
 
 
 def test_add_akzeptiert_gueltigen_anker():
     """Gegenprobe zum Test darüber."""
     neu, tid = td.add(BESTAND, 124, titel="X", faellig="Phase:MVP – beim Wechsel",
-                      problem="P", behebung="B")
+                      problem="P", behebung="B", aufschubgrund=AUFSCHUB)
     assert tid == "TD-S124-1"
     assert td.get(neu, tid) is not None
+
+
+# --- Aufschubgrund (S133) ----------------------------------------------------
+def test_add_schreibt_den_aufschubgrund():
+    neu, tid = td.add(BESTAND, 124, titel="X", faellig="Phase:MVP – beim Wechsel",
+                      problem="P", behebung="B", aufschubgrund=AUFSCHUB)
+    assert f"**Aufschubgrund:** {AUFSCHUB}" in td.get(neu, tid)
+
+
+def test_add_ohne_tragenden_aufschubgrund_scheitert():
+    with pytest.raises(ValueError):
+        td.add(BESTAND, 124, titel="X", faellig="Phase:MVP – beim Wechsel",
+               problem="P", behebung="B", aufschubgrund="später")
+
+
+def test_bestandseintrag_ohne_aufschubgrund_bleibt_aenderbar():
+    """Das Feld gilt ab S133 – ältere Einträge führen es legitim nicht."""
+    neu = td.set_fields(BESTAND, "TD-S044-1", behebung="anders lösen")
+    assert "Aufschubgrund" not in td.get(neu, "TD-S044-1")
 
 
 # --- AGENT_MEMORY-Kopplung (OBS-S118-1) --------------------------------------

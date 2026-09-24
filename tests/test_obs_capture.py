@@ -8,6 +8,8 @@ sind ausgenommen.
 """
 from importlib import import_module
 
+import pytest
+
 hook = import_module("prozesscode.hooks.check-obs-capture")
 
 
@@ -18,10 +20,12 @@ def _obs(
     extra: str = "",
     bezug: str | None = "–",
     verwandt: str | None = "keiner",
+    aufschub: str | None = "Umfang – eigener Umbau",
 ) -> str:
     """Minimaler, formatgetreuer OBS-Block."""
     entscheidung = "" if decision is None else f"- Entscheidung/Maßnahme: {decision}\n"
     verwandt_zeile = "" if verwandt is None else f"- Zusammen-erledigen: {verwandt}\n"
+    verwandt_zeile += "" if aufschub is None else f"- Aufschubgrund: {aufschub}\n"
     return (
         f"## {oid} – Kurztitel\n"
         "- Quelle: Orchestrator\n"
@@ -238,6 +242,39 @@ def test_canonical_decision_does_not_trip_the_proposal_marker():
 def test_obs_ok_marker_exempts_the_whole_entry():
     post = _obs("OBS-S100-1", "Kandidat notiert <!-- obs-ok -->", extra="- Lösungsidee: Hook\n")
     assert hook.find_violations("", post) == []
+
+
+# --- Aufschubgrund (S133): auch der Edit-Pfad muss die Frage beantworten ----------
+def test_new_entry_without_aufschubgrund_is_rejected():
+    reasons = hook.check_entry(_obs("OBS-S100-1", aufschub=None))
+    assert any("Aufschubgrund" in r for r in reasons)
+
+
+def test_new_entry_with_untenable_aufschubgrund_is_rejected():
+    reasons = hook.check_entry(_obs("OBS-S100-1", aufschub="später – keine Zeit"))
+    assert any("Aufschubgrund" in r for r in reasons)
+
+
+@pytest.mark.aufrufpfad("check-obs-capture")
+def test_check_blocks_a_new_entry_with_a_solution_candidate(tmp_path):
+    ziel = tmp_path / "docs" / "kaizen" / "observations.md"
+    daten = {"tool_name": "Write", "tool_input": {
+        "file_path": str(ziel), "content": _obs("OBS-S100-1", "offen – Richtung: Hook bauen")}}
+    grund = hook.check(daten)
+    assert grund and "OBS-S100-1" in grund
+
+
+def test_check_passes_a_wellformed_new_entry(tmp_path):
+    ziel = tmp_path / "docs" / "kaizen" / "observations.md"
+    daten = {"tool_name": "Write", "tool_input": {"file_path": str(ziel), "content": _obs("OBS-S100-1")}}
+    assert hook.check(daten) is None
+
+
+def test_existing_entry_without_aufschubgrund_stays_editable():
+    """Das Feld gilt ab S133 – der Drain muss Alteinträge weiter ändern können."""
+    pre = _obs("OBS-S100-1", aufschub=None)
+    post = pre.replace("irgendwas fiel auf", "irgendwas anderes fiel auf")
+    assert hook.find_violations(pre, post) == []
 
 
 # Die pre/post-Tests standen bis S128 hier und prüften `_hook_io` durch dieses Modul

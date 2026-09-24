@@ -112,6 +112,7 @@ class Countermeasure:
     status: str             # OFFEN | AKTIV | BEWÄHRT | IN UMSETZUNG
     seit_session: int = 0
     cm_id: str = ""
+    titel: str = ""         # Kurztitel aus dem Header – `problem` überschreibt die Problem-Zeile
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +243,7 @@ def load_cm(path: str) -> list[Countermeasure]:
                     k.strip() for k in kontext_raw.split(',') if k.strip()
                 ]
                 cms.append(Countermeasure(
-                    cm_id=cur_id, problem=cur_titel,
+                    cm_id=cur_id, problem=cur_titel, titel=cur_titel,
                     impact=m.group("impact"), kategorie=m.group("kategorie"),
                     kontexte=kontexte, status=m.group("status"),
                     seit_session=int(m.group("seit")),
@@ -267,8 +268,13 @@ def is_bewährt(f: Finding, cms: list[Countermeasure]) -> bool:
     return any(cm.status == 'BEWÄHRT' and cm_matches(cm, f.impact, f.kategorie, f.kontext) for cm in cms)
 
 
+def abdeckende_cms(impact: str, kategorie: str, kontext: str,
+                   cms: list[Countermeasure]) -> list[Countermeasure]:
+    return [cm for cm in cms if cm_matches(cm, impact, kategorie, kontext)]
+
+
 def has_cm(impact: str, kategorie: str, kontext: str, cms: list[Countermeasure]) -> bool:
-    return any(cm_matches(cm, impact, kategorie, kontext) for cm in cms)
+    return bool(abdeckende_cms(impact, kategorie, kontext, cms))
 
 
 # ---------------------------------------------------------------------------
@@ -554,46 +560,60 @@ def render_pattern(current_sessions: list[SessionData], archive_periods: list[li
     n_periods = min(PATTERN_WINDOW, len(archive_periods))
     lines.append(f"  Fenster: aktuelle Periode + letzte {n_periods} Archiv-Perioden ({len(window)} Sessions gesamt)\n")
 
+    lines.append(f"  {MARKE_AKTUELL} = Mitglied der aktuellen Periode\n")
+
     findings = [f for s in window for f in s.findings]
     if not findings:
         lines.append("  Keine Findings im Fenster.")
         return "\n".join(lines)
 
-    triplet_count: dict[tuple, int] = defaultdict(int)
-    triplet_ex: dict[tuple, list[str]] = defaultdict(list)
+    mitglieder: dict[tuple, list[Finding]] = defaultdict(list)
     for f in findings:
-        key = (f.impact, f.kategorie, f.kontext)
-        triplet_count[key] += 1
-        if len(triplet_ex[key]) < 2:
-            triplet_ex[key].append(f"S{f.session_num}: {f.titel}")
-
-    candidates = [(k, v) for k, v in triplet_count.items() if v >= 2]
-    candidates.sort(key=lambda x: -x[1])
-
+        mitglieder[(f.impact, f.kategorie, f.kontext)].append(f)
+    candidates = sorted(((k, v) for k, v in mitglieder.items() if len(v) >= 2),
+                        key=lambda x: -len(x[1]))
     if not candidates:
         lines.append("  Keine Kombination tritt ≥2× auf.")
         return "\n".join(lines)
 
-    new_found = False
-    for (impact, kategorie, kontext), count in candidates:
-        covered = has_cm(impact, kategorie, kontext, cms)
-        if not covered:
-            new_found = True
-            lines.append(f"  {clr('NEU', RED+BOLD)} [{impact}] [{kategorie}] [{kontext}] – {count}×")
-            for ex in triplet_ex[(impact, kategorie, kontext)]:
-                lines.append(f"    · {ex}")
-            lines.append("")
-
-    if not new_found:
-        lines.append("  Alle Muster haben bereits eine Countermeasure.\n")
-
-    covered_list = [(k, v) for k, v in candidates if has_cm(k[0], k[1], k[2], cms)]
-    if covered_list:
-        lines.append("  Bereits abgedeckt:")
-        for (impact, kategorie, kontext), count in covered_list:
-            lines.append(f"    [{impact}] [{kategorie}] [{kontext}] – {count}×")
-
+    aktuell = {s.num for s in current_sessions}
+    lines += _neue_kandidaten([c for c in candidates if not has_cm(*c[0], cms)], aktuell)
+    lines += _abgedeckte_kandidaten([c for c in candidates if has_cm(*c[0], cms)], cms, aktuell)
     return "\n".join(lines)
+
+
+MARKE_AKTUELL = "▸"
+
+
+def _mitglied_zeile(f: Finding, aktuell: set[int]) -> str:
+    marke = MARKE_AKTUELL if f.session_num in aktuell else "·"
+    return f"    {marke} S{f.session_num}: {f.titel}"
+
+
+def _neue_kandidaten(neu: list[tuple], aktuell: set[int]) -> list[str]:
+    """Alle Mitglieder – die Retro priorisiert nach denen aus der aktuellen Periode."""
+    if not neu:
+        return ["  Alle Muster haben bereits eine Countermeasure.\n"]
+    lines = []
+    for (impact, kategorie, kontext), fs in neu:
+        lines.append(f"  {clr('NEU', RED+BOLD)} [{impact}] [{kategorie}] [{kontext}] – {len(fs)}×")
+        lines += [_mitglied_zeile(f, aktuell) for f in fs] + [""]
+    return lines
+
+
+def _abgedeckte_kandidaten(abgedeckt: list[tuple], cms: list[Countermeasure],
+                           aktuell: set[int]) -> list[str]:
+    """Nennt die abdeckende CM: Der Abgleich läuft nur übers Tripel und trifft auch Fachfremdes
+    (S133: „erfasst statt behoben" galt als abgedeckt durch den Schritt-0-Architektur-Check)."""
+    if not abgedeckt:
+        return []
+    lines = ["  Bereits abgedeckt (Tripel-Abgleich – inhaltlich gegenprüfen):"]
+    for (impact, kategorie, kontext), fs in abgedeckt:
+        durch = ", ".join(f"{cm.cm_id} ({cm.titel[:50]})"
+                          for cm in abdeckende_cms(impact, kategorie, kontext, cms))
+        lines.append(f"    [{impact}] [{kategorie}] [{kontext}] – {len(fs)}×  → {durch}")
+        lines += ["  " + _mitglied_zeile(f, aktuell) for f in fs if f.session_num in aktuell]
+    return lines
 
 
 def render_clustering(all_sessions: list[SessionData], cms: list[Countermeasure]) -> str:

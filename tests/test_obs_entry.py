@@ -6,6 +6,7 @@ Aufzählungswerte werden geprüft statt übernommen.
 """
 from importlib import import_module
 
+import pytest
 
 from prozesscode import obs_entry as oe
 
@@ -45,6 +46,7 @@ FELDER = dict(
     beobachtung="Etwas fiel auf.",
     bezug=None,
     zusammen="keiner",
+    aufschubgrund="Umfang – eigener Umbau",
 )
 
 
@@ -355,20 +357,23 @@ VORPRAEGUNG_BESTAND = """## OBS-S115-9 – Etwas ist nicht ideal
 
 def test_format_entry_writes_the_field_when_given():
     eintrag = oe.format_entry("OBS-S115-1", "T", "User", "MITTEL", "häufig", "TOOLING",
-                              "Hook/Script", "Beobachtet.", None, "keiner", vorpraegung="Ansatz Z.")
+                              "Hook/Script", "Beobachtet.", None, "keiner", vorpraegung="Ansatz Z.",
+                              aufschubgrund=FELDER["aufschubgrund"])
     assert "- Vorprägung: Ansatz Z." in eintrag
 
 
 def test_format_entry_omits_the_field_when_absent():
     eintrag = oe.format_entry("OBS-S115-1", "T", "User", "MITTEL", "häufig", "TOOLING",
-                              "Hook/Script", "Beobachtet.", None, "keiner")
+                              "Hook/Script", "Beobachtet.", None, "keiner",
+                              aufschubgrund=FELDER["aufschubgrund"])
     assert "Vorprägung" not in eintrag
 
 
 def test_field_sits_between_observation_and_decision():
     """Reihenfolge ist Teil des Formats – und macht beim Lesen der Datei die Trennung sichtbar."""
     eintrag = oe.format_entry("OBS-S115-1", "T", "User", "MITTEL", "häufig", "TOOLING",
-                              "Hook/Script", "Beobachtet.", None, "keiner", vorpraegung="Ansatz Z.")
+                              "Hook/Script", "Beobachtet.", None, "keiner", vorpraegung="Ansatz Z.",
+                              aufschubgrund=FELDER["aufschubgrund"])
     zeilen = [z.split(":")[0] for z in eintrag.splitlines() if z.startswith("- ")]
     assert zeilen.index("- Beobachtung") < zeilen.index("- Vorprägung") < zeilen.index("- Entscheidung/Maßnahme")
 
@@ -469,3 +474,31 @@ def test_set_changes_both_fields_at_once():
     eintrag = oe.get(neu, "OBS-S110-1")
     assert "VERWORFEN (Gegenstand entfallen)" in eintrag
     assert "existiert nicht mehr" in eintrag
+
+
+# --- Aufschubgrund und feste Wertebereiche (S133) ---------------------------------
+def test_neuer_eintrag_traegt_den_aufschubgrund_als_eigene_zeile():
+    eintrag = oe.format_entry("OBS-S114-1", **FELDER)
+    assert "\n- Aufschubgrund: Umfang – eigener Umbau\n" in eintrag
+    oe.pruefe_wohlgeformt("OBS-S114-1", eintrag)
+
+
+def test_ohne_tragenden_aufschubgrund_entsteht_kein_eintrag():
+    with pytest.raises(ValueError):
+        oe.format_entry("OBS-S114-1", **{**FELDER, "aufschubgrund": "Umfang"})
+
+
+def test_unbekannte_quelle_wird_abgewiesen():
+    """LL-S131-1 trug 'Agent' – ein Wert ohne definierte Bedeutung kam durch den Freitext."""
+    with pytest.raises(ValueError):
+        oe.format_entry("OBS-S114-1", **{**FELDER, "quelle": "Agent"})
+
+
+def test_kombinierte_quelle_bleibt_bei_obs_zulaessig():
+    eintrag = oe.format_entry("OBS-S114-1", **{**FELDER, "quelle": "User + Orchestrator"})
+    assert "- Quelle: User + Orchestrator" in eintrag
+
+
+def test_set_weist_status_ohne_bekanntes_schluesselwort_ab():
+    with pytest.raises(ValueError):
+        oe.set_fields(BESTAND, "OBS-S110-1", status="ERLEDIGT")

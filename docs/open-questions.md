@@ -27,6 +27,9 @@ Eintrag-Format:
   **Frage:** <die offene, mit dem User zu klärende Frage>
   **Fällig:** <Anker>[, <Anker>…] – <Prosa>   (Pflicht – wann vorlegen?)
   **Hintergrund:** <Auslöser / Kontext / betroffene Artefakte>
+  **Aufschubgrund:** User | Umfang | Recherche – <warum nicht sofort geklärt>   (Pflicht für neue
+            Einträge seit S133, meist `User`: gefragt, Antwort bewusst vertagt. Bedeutung der
+            Werte: `prozesscode/eintrag_felder.py`)
 
   ID: OQ-S<NNN>-<n> – 3-stellige Session (geparkt), laufende Nummer innerhalb der Session.
 

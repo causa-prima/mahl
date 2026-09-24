@@ -23,12 +23,15 @@ from pathlib import Path
 
 from . import td_anchors  # noqa: E402
 from . import tracker_entry as te  # noqa: E402
+from .eintrag_felder import AUFSCHUB_FELD, pruefe_aufschubgrund  # noqa: E402
 from .repo_kontext import current_session, repo_root  # noqa: E402
 
 OQ_FILE = "docs/open-questions.md"
 
+# `Aufschubgrund` ist Pflicht beim Anlegen (S133) – bei einer Frage meist `User`: Sie wurde
+# gestellt und bewusst geparkt, statt sie sofort zu klären.
 SPEC = te.TrackerSpec(datei=OQ_FILE, praefix="OQ",
-                      felder=("Frage", "Fällig", "Hintergrund"))
+                      felder=("Frage", "Fällig", "Hintergrund", AUFSCHUB_FELD))
 
 FELDER_EIGENE_ZEILE = SPEC.felder
 
@@ -67,18 +70,20 @@ def _pruefe_anker(oid: str, faellig: str, root: Path | None = None) -> None:
 
 
 def format_entry(oid: str, titel: str, frage: str, faellig: str, hintergrund: str,
-                 root: Path | None = None) -> str:
+                 aufschubgrund: str, root: Path | None = None) -> str:
     _pruefe_anker(oid, faellig, root)
     return te.format_entry(SPEC, oid, titel,
-                           {"Frage": frage, "Fällig": faellig, "Hintergrund": hintergrund})
+                           {"Frage": frage, "Fällig": faellig, "Hintergrund": hintergrund,
+                            AUFSCHUB_FELD: pruefe_aufschubgrund(aufschubgrund)})
 
 
 def add(text: str, session: int, root: Path | None = None, *, titel: str, frage: str,
-        faellig: str, hintergrund: str) -> tuple[str, str]:
+        faellig: str, hintergrund: str, aufschubgrund: str) -> tuple[str, str]:
     """Hängt eine neue Frage unten an. Liefert (neuer Dateiinhalt, vergebene ID)."""
     _pruefe_anker(te.next_id(SPEC, text, session), faellig, root)
     return te.add(SPEC, text, session, titel,
-                  {"Frage": frage, "Fällig": faellig, "Hintergrund": hintergrund})
+                  {"Frage": frage, "Fällig": faellig, "Hintergrund": hintergrund,
+                   AUFSCHUB_FELD: pruefe_aufschubgrund(aufschubgrund)})
 
 
 def set_fields(text: str, oid: str, frage: str | None = None, faellig: str | None = None,

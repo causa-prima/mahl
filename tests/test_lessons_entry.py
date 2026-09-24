@@ -4,7 +4,7 @@ Die Struktur ist parse-kritisch: `jenga_score.py` und `retro_report.py` lesen di
 Bullets. Deshalb prüfen die Tests die exakte Klammerform und dass bestehende Einträge beim
 Anhängen unberührt bleiben.
 """
-
+import pytest
 
 from prozesscode import lessons_entry as le
 
@@ -246,3 +246,10 @@ def test_entry_with_cm_reference_is_found_by_the_own_parser():
     neu, lid = le.add(BESTAND, 114, **_mit(impact="HOCH", cm_bezug="neu"))
     assert le.get(neu, lid) is not None
     assert "CM-Bezug: neu" in le.get(neu, lid)
+
+
+@pytest.mark.parametrize("quelle", ["Agent", "User + Orchestrator"])
+def test_quelle_ausserhalb_des_wertebereichs_wird_abgewiesen(quelle):
+    """LL-S131-1 trug 'Agent'. Ein LL hat genau eine Herkunft – kombiniert nur bei OBS."""
+    with pytest.raises(ValueError):
+        le.format_entry("LL-S114-1", **_mit(quelle=quelle))

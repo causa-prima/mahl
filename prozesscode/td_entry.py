@@ -23,13 +23,16 @@ from pathlib import Path
 
 from . import td_anchors  # noqa: E402
 from . import tracker_entry as te  # noqa: E402
+from .eintrag_felder import AUFSCHUB_FELD, pruefe_aufschubgrund  # noqa: E402
 from .repo_kontext import current_session, repo_root  # noqa: E402
 
 TD_FILE = "docs/tech-debt.md"
 MEMORY_FILE = "docs/AGENT_MEMORY.md"
 
+# `Aufschubgrund` ist Pflicht beim Anlegen (S133); Bestandseinträge führen es nicht – die
+# Struktur-Invariante in tracker_entry prüft bewusst nicht auf Vollständigkeit.
 SPEC = te.TrackerSpec(datei=TD_FILE, praefix="TD",
-                      felder=("Fällig", "Problem", "Behebung"))
+                      felder=("Fällig", "Problem", "Behebung", AUFSCHUB_FELD))
 
 _JETZT = re.compile(r"^jetzt\b", re.I)
 _PRIO_UEBERSCHRIFT = re.compile(r"^## Nächste Prioritäten\s*$", re.M)
@@ -77,11 +80,12 @@ def _pruefe_anker(tid: str, faellig: str, root: Path | None = None) -> None:
 
 
 def add(text: str, session: int, root: Path | None = None, *, titel: str, faellig: str,
-        problem: str, behebung: str) -> tuple[str, str]:
+        problem: str, behebung: str, aufschubgrund: str) -> tuple[str, str]:
     """Hängt einen Eintrag unten an. Liefert (neuer Dateiinhalt, vergebene ID)."""
     _pruefe_anker(te.next_id(SPEC, text, session), faellig, root)
     return te.add(SPEC, text, session, titel,
-                  {"Fällig": faellig, "Problem": problem, "Behebung": behebung})
+                  {"Fällig": faellig, "Problem": problem, "Behebung": behebung,
+                   AUFSCHUB_FELD: pruefe_aufschubgrund(aufschubgrund)})
 
 
 def set_fields(text: str, tid: str, faellig: str | None = None, problem: str | None = None,

@@ -2,8 +2,9 @@
 """repo_kontext.py – Auskunft über das Repo, in dem gerade gearbeitet wird: wo liegt es,
 welche Session läuft.
 
-Konsumenten sind alle fünf Erfassungswerkzeuge (OBS, LL, TD, OQ, ADR) plus `session-agenda.py`
-und `td_anchors.py` – deshalb ein eigenes Modul und keines davon als Wirt.
+Konsumenten sind die Erfassungswerkzeuge aller Tracker und jedes weitere Werkzeug, das die
+Repo-Wurzel oder die laufende Session braucht – deshalb ein eigenes Modul und keines davon als
+Wirt.
 
 Die Session-Nummer hängt an der Git-Historie: Der Abschluss-Commit einer Session trägt den
 Trailer `Session-Ende: <NNN>` (geschrieben von `closing-session`), und das ist das einzige
