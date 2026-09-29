@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useResultMutation } from './useResultMutation'
 import { createIngredient } from '../services/ingredientsApi'
-import type { NewIngredient, CreateIngredientResult } from '../services/ingredientsApi'
+import type { CreateIngredientResult } from '../services/ingredientsApi'
+import { asIngredientName } from '../domain/ingredient'
+import type { NewIngredient, IngredientName, Unit } from '../domain/ingredient'
 
 export type ReactivationConflictNotice = {
-  readonly requestedName: string
-  readonly savedName: string
-  readonly savedUnit: string
+  readonly requestedName: IngredientName
+  readonly savedName: IngredientName
+  readonly savedUnit: Unit
 }
 
 // Direkter kind-Check statt matchKind, konsistent mit dem bereits bestehenden
@@ -20,7 +22,8 @@ export type ReactivationConflictNotice = {
 function toConflictNotice(result: Readonly<CreateIngredientResult>): ReactivationConflictNotice | null {
   return result.kind === 'ReactivationConflict'
     ? {
-        requestedName: result.requestedName.trim(),
+        // Trimmen macht aus dem Namen keinen anderen Begriff – nur String.prototype.trim verliert den Brand.
+        requestedName: asIngredientName(result.requestedName.trim()),
         savedName: result.savedIngredient.name,
         savedUnit: result.savedIngredient.baseUnit,
       }

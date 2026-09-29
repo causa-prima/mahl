@@ -80,18 +80,6 @@ Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
 **Problem:** 400 vs. 500 bei ungültigem URI; STJ via `OriginalString` unverifiziert.
 **Behebung:** STJ-Pfad verifizieren und 400 statt 500 erzwingen.
 
----
-
-## TD-S077-1 — `IngredientsPage`: manuelles State-Sync, fehlende UX-Baseline, überlange Komponenten
-**Fällig:** TD-S083-2 – Theme-Foundation (dort `jetzt`). (a) und (c) auch früher, sobald die Datei ohnehin angefasst wird.
-**Problem:** Drei Befunde in derselben Datei, alle auf zu grob geschnittene Komponenten zurückgehend:
-(a) **Manuelles State-Sync.** `closeDialog` setzt drei `useState`-Slices von Hand zurück (`isDialogOpen`, `name`, `unit`) – jeder künftige Feld-Zustand muss dort mitgepflegt werden, sonst bleibt ein Rest stehen.
-(b) **Fehlende UX-Baseline.** Der Leerzustand ist ein nacktes `<p>Noch keine Zutaten angelegt.</p>` statt `Typography`; die TextFields tragen weder `fullWidth` noch `margin`; der Seitenrumpf ist ein blankes `<div>` ohne Layout-Container und ohne Überschrift.
-(c) **Zwei Funktionen über dem Lint-Deckel.** `CreateIngredientDialog` (53 Zeilen) und `IngredientsPage` (57 Zeilen) gegen `max-lines-per-function` 50 – die einzigen beiden ESLint-Warnungen des Projekts neben einer Test-Helper-Warnung.
-**Behebung:** (b) reist mit der Theme-Foundation aus TD-S083-2 – gleiche Datei, gleiche visuelle Baseline. (a) und (c) sind reine Refactorings **ohne beobachtbare Verhaltensänderung** und brauchen deshalb kein Szenario: bei grünen Tests mitnehmen.
-
----
-
 ## TD-S080-1 — Frontend Deps: `qs`-DoS (dev-only, akzeptiert)
 **Fällig:** Phase:MVP – primär der nächste Stryker-Major-Bump; ein Dependency-Bump ist kein maschinenlesbarer Anker, deshalb trägt hier der Backstop: ab MVP neu bewerten, falls der Bump bis dahin ausbleibt.
 **Problem:** `qs`-DoS (moderate) via `@stryker-mutator/core`→`typed-rest-client`→`qs` – dev-only, kein untrusted-Input-Pfad, akzeptiert.
@@ -106,28 +94,10 @@ Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
 (b) **`useResultQuery` schluckt den `Err`** via `unwrapOr(undefined as TData)` (Type-Lie) → ein GET-Fehler ist nicht von „noch keine Daten"/Leerzustand unterscheidbar.
 **Behebung:** GET-Fehlerpfad einführen: `response.ok`-Check in `conditionalGet`, GET-Err in `useResultQuery` als beobachtbaren Fehlerzustand statt Leerzustand.
 
----
-
-## TD-S083-2 — Keine Theme-Foundation; Touch-Targets verletzen dadurch eine stehende Anforderung
-**Fällig:** jetzt – die Accessibility-Anforderung gilt heute und wird heute verletzt; terminiert in `docs/AGENT_MEMORY.md` (vor Beginn der nächsten Story)
-**Problem:** In `Client/src` existiert weder `ThemeProvider` noch `CssBaseline` noch `createTheme` – `main.tsx` hält allein den `QueryClientProvider`. Folge 1: `docs/process/nfr.md` (Accessibility) fordert Touch-Targets ≥ 44×44px; `IngredientsPage.tsx` rendert **sechs** interaktive Controls (Zeilen 124, 125, 148, 246, 296) ohne jede Größenangabe – `size=` und `sx=` kommen in der Datei nicht vor – und liegt damit auf MUIs Defaults (Button ~36,5px, IconButton 40×40). Einzig die TextFields (56px) erfüllen die Anforderung. Folge 2: kein MD3-Type-Scale, keine zentrale Quelle für Spacing/Hierarchie/Farbe, keine MUI-Baseline-Styles – jede Komponente entscheidet visuell für sich.
-**Behebung:** `ThemeProvider` + `CssBaseline` in `main.tsx`, Mindestgrößen als Komponenten-Defaults (`MuiButton`/`MuiIconButton`). Verworfen: Mindestgrößen je Element via `sx` – sechs Stellen, und das siebte Control fällt wieder durch. Der Nachweis ist eine NFR-Eigenschaft, kein Nutzer-Szenario: als ausgewiesener Infra-Test nach ADR-S106-3 über die Bounding-Box führen. Zieht die Priorität „Visuelle Konsistenz-Guideline" in `docs/AGENT_MEMORY.md` mit – das Theme ist der Mechanismus, den jene Guideline vorschreiben würde.
-
----
-
 ## TD-S083-3 — Frontend: Cold-Start-Race beim ersten GET
 **Fällig:** TD-S083-1 – Query-Zustand in `useResultQuery` (heutige Minimal-Form: TD-S101-1); vorher technisch nicht umsetzbar.
 **Problem:** Feuert der POST/`invalidateQueries`, während der initiale Listen-GET noch in-flight ist, koalesziert react-query und nutzt das stale leere Ergebnis (kein zweiter GET) → gerade angelegte Zutat erscheint nicht. Nur bei kaltem Server / langsamem erstem GET (warm: unkritisch). **Vorher nicht umsetzbar:** `useResultQuery` liefert ausschließlich `TData | undefined` und exponiert keinerlei Lade-/Fehlerzustand – die Seite *kann* nicht wissen, ob der initiale GET gesettled ist.
 **Behebung:** Speichern sperren, solange die Ingredients-Query nicht gesettled ist. **Achtung:** Das vorhandene `disabled={isPending}` löst das nicht – dessen `isPending` stammt aus `useCreateIngredientWithReactivation` und ist der Zustand der *POST-Mutation*, greift also erst, nachdem der POST bereits feuerte.
-
----
-
-## TD-S083-4 — Frontend-Domänentypen ohne Branded Types
-**Fällig:** jetzt – [Branded Types](guidelines/coding-guideline-typescript.md#CGT-branded-types) gilt heute und wird heute verletzt; terminiert in `docs/AGENT_MEMORY.md` (vor Beginn der nächsten Story)
-**Problem:** `ingredientsApi.ts` definiert `Ingredient` (id, name, baseUnit, etag) und `NewIngredient` (name, baseUnit) mit nackten `string`-Feldern; in `Client/src` existiert kein einziger Branded Type. Die [Guideline](guidelines/coding-guideline-typescript.md#CGT-branded-types) verlangt die Kapselung. Signaturen mit mehreren gleichartigen Parametern hintereinander – etwa `restoreIngredient(id, name, baseUnit)` – sind dadurch gegen Vertauscher ungeschützt, obwohl der Compiler sie fangen könnte; genau diese Signatur führt [Branded Types](guidelines/coding-guideline-typescript.md#CGT-branded-types) als Motivation an.
-**Behebung:** Nominale Brands nach ADR-S112-4 (Vergabe an der API-Grenze, keine Regelprüfung) für beide Typen.
-
----
 
 ## TD-S083-5 — Backend Read-Pfad: `GET /api/ingredients` mappt DB→DTO direkt, ohne `ToDomain()`
 **Fällig:** Phase:MVP – der tragende Auslöser ist ein dediziertes DB-Inkonsistenz-Szenario, das den Fehlerzweig erstmals ausübt; es existiert in `features/` noch nicht und lässt sich deshalb nicht als Anker setzen. Vorher umzubauen erzeugt einen Zweig, den kein Szenario ausübt → Survivor → Suppression außerhalb des treibenden Szenarios. Spätestens zum MVP muss der Read-Pfad stimmen.
@@ -177,7 +147,7 @@ Beide Tests gehören zu dieser Behebung: Sie werden sinnvoll, sobald ein fremder
 
 ## TD-S102-1 — Backend: kein explizites app-weites Request-Body-Size-Limit
 **Fällig:** Phase:MVP – vor MVP-Auth; spätestens sobald ein Endpoint authentifizierte oder größere Payloads annimmt.
-**Problem:** `POST /api/ingredients` deserialisiert/bindet den vollständigen Request-Body, BEVOR die Feld-Validierung greift (`name.Value.Length > 30` läuft erst nach Model-Binding). Ein anonymer Client kann daher wiederholt große Bodies (bis Kestrels implizitem ~30-MB-Default, in `Program.cs` nirgends explizit gesetzt) senden → Parsing-/Trimming-Last vor jeder Ablehnung. Heute entschärft durch SKELETON ohne Auth und Kestrels impliziten Default; kein durch run-3 verschärftes Risiko – der Zustand ist ggü. vorher unverändert. (Die fehlende `baseUnit`-Längenbegrenzung ist Teil von TD-S083-4, nicht hier.) Quelle: security-auditor (Review run-3, SR-2).
+**Problem:** `POST /api/ingredients` deserialisiert/bindet den vollständigen Request-Body, BEVOR die Feld-Validierung greift (`name.Value.Length > 30` läuft erst nach Model-Binding). Ein anonymer Client kann daher wiederholt große Bodies (bis Kestrels implizitem ~30-MB-Default, in `Program.cs` nirgends explizit gesetzt) senden → Parsing-/Trimming-Last vor jeder Ablehnung. Heute entschärft durch SKELETON ohne Auth und Kestrels impliziten Default; kein durch run-3 verschärftes Risiko – der Zustand ist ggü. vorher unverändert. Quelle: security-auditor (Review run-3, SR-2).
 **Behebung:** Explizites app-weites `MaxRequestBodySize` in `Program.cs`, statt sich auf den impliziten Framework-Default zu verlassen.
 
 ---

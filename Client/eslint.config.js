@@ -27,6 +27,19 @@ export default defineConfig([
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    // Workaround, Stand eslint-plugin-functional 10.0.0 / is-immutable-type 5.0.4 (beim Update prüfen):
+    // prefer-immutable-types hält Branded Types (`string & { readonly __brand }`, CGT-branded-types) für nur
+    // flach readonly, weil is-immutable-type die String-Methoden mitzählt. Der Override greift nur über den
+    // Alias-Namen – einer auf einen generischen `Brand<T, N>` griff im Versuch nicht. Neuer Brand → hier
+    // eintragen; fehlt er, meldet die Regel jedes Objekt, das ihn als Feld trägt. Namen im Client eindeutig
+    // halten: Ein anderer Typ gleichen Namens gälte sonst still als unveränderlich.
+    settings: {
+      immutability: {
+        overrides: [
+          { type: /^(IngredientId|IngredientName|Unit|ETag)$/, to: 'Immutable' },
+        ],
+      },
+    },
     rules: {
       'prefer-const': 'error',
       'no-var': 'error',

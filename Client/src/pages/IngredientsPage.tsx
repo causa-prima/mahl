@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import Button from '@mui/material/Button'
+import Container from '@mui/material/Container'
+import Typography from '@mui/material/Typography'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -19,21 +21,63 @@ import type { DeletedIngredient } from '../hooks/useDeleteIngredientWithUndo'
 import { useCreateIngredientWithReactivation } from '../hooks/useCreateIngredientWithReactivation'
 import type { ReactivationConflictNotice } from '../hooks/useCreateIngredientWithReactivation'
 import { fetchIngredients } from '../services/ingredientsApi'
-import type { Ingredient } from '../services/ingredientsApi'
+import { asIngredientName, asUnit } from '../domain/ingredient'
+import type { Ingredient, IngredientId, NewIngredient } from '../domain/ingredient'
 
 const ingredientsKey = ['ingredients'] as const
 
+const emptyNewIngredient: NewIngredient = { name: asIngredientName(''), baseUnit: asUnit('') }
+
 type CreateIngredientDialogProps = {
-  readonly open: boolean
-  readonly name: string
-  readonly unit: string
+  // null = Dialog geschlossen. Ein Wert statt open-Flag plus Feld-Slices: "offen ohne Eingabe" und
+  // "geschlossen mit Resteingabe" sind so nicht darstellbar, und Schließen verwirft alle Felder auf
+  // einmal – auch künftige, ohne dass der Schließen-Pfad sie kennen muss.
+  readonly newIngredient: NewIngredient | null
   readonly nameError: string | undefined
   readonly unitError: string | undefined
   readonly isPending: boolean
-  readonly onNameChange: (value: string) => void
-  readonly onUnitChange: (value: string) => void
+  readonly onChange: (newIngredient: NewIngredient) => void
   readonly onClose: () => void
-  readonly onSubmit: () => void
+  readonly onSubmit: (newIngredient: NewIngredient) => void
+}
+
+type NewIngredientFieldsProps = {
+  readonly value: NewIngredient
+  readonly nameError: string | undefined
+  readonly unitError: string | undefined
+  readonly nameInputRef: React.RefObject<HTMLInputElement | null>
+  readonly unitInputRef: React.RefObject<HTMLInputElement | null>
+  readonly onChange: (newIngredient: NewIngredient) => void
+}
+
+function NewIngredientFields(props: Readonly<NewIngredientFieldsProps>) {
+  const { value, nameError, unitError, nameInputRef, unitInputRef, onChange } = props
+  return (
+    <>
+      <TextField
+        label="Name"
+        fullWidth
+        margin="dense"
+        value={value.name}
+        onChange={(e) => { onChange({ ...value, name: asIngredientName(e.target.value) }) }}
+        error={Boolean(nameError)}
+        helperText={nameError}
+        required
+        inputRef={nameInputRef}
+      />
+      <TextField
+        label="Einheit"
+        fullWidth
+        margin="dense"
+        value={value.baseUnit}
+        onChange={(e) => { onChange({ ...value, baseUnit: asUnit(e.target.value) }) }}
+        error={Boolean(unitError)}
+        helperText={unitError}
+        required
+        inputRef={unitInputRef}
+      />
+    </>
+  )
 }
 
 // UX-Guideline „Formular-/Dialog-Baseline" ("Fokus aufs erste fehlerhafte Feld", TD-S094-1): nach einem
@@ -58,7 +102,9 @@ function useFocusFirstInvalidField(
 // Ausgelagert aus IngredientsPage (Refactor, keine eigenes Szenario/Test – die
 // Komponenten-Tests decken diesen Dialog weiterhin über die IngredientsPage-API ab).
 function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
-  const { open, name, unit, nameError, unitError, isPending, onNameChange, onUnitChange, onClose, onSubmit } = props
+  const { newIngredient, nameError, unitError, isPending, onChange, onClose, onSubmit } = props
+  // Während der Schließ-Transition ist newIngredient schon null, die Felder sind aber noch zu sehen.
+  const value = newIngredient ?? emptyNewIngredient
   const nameInputRef = useRef<HTMLInputElement>(null)
   const unitInputRef = useRef<HTMLInputElement>(null)
   useFocusFirstInvalidField(nameInputRef, unitInputRef, nameError, unitError)
@@ -73,7 +119,7 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
 
   return (
     <Dialog
-      open={open}
+      open={newIngredient !== null}
       onClose={handleClose}
       aria-labelledby="create-ingredient-title"
       // Framework-geliefert (Formular-/Dialog-Baseline,"Enter sendet ab"): echtes <form> via
@@ -87,7 +133,7 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
           // typisiert; component="form" ändert nur das gerenderte Element zur Laufzeit.
           onSubmit: (e: Readonly<React.SyntheticEvent<HTMLDivElement>>) => {
             e.preventDefault()
-            onSubmit()
+            onSubmit(value)
           },
         },
         // Framework-geliefert (Formular-/Dialog-Baseline,"Autofokus beim Öffnen"): `autoFocus` auf dem
@@ -101,23 +147,13 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
     >
       <DialogTitle id="create-ingredient-title">Zutat anlegen</DialogTitle>
       <DialogContent>
-        <TextField
-          label="Name"
-          value={name}
-          onChange={(e) => { onNameChange(e.target.value) }}
-          error={Boolean(nameError)}
-          helperText={nameError}
-          required
-          inputRef={nameInputRef}
-        />
-        <TextField
-          label="Einheit"
-          value={unit}
-          onChange={(e) => { onUnitChange(e.target.value) }}
-          error={Boolean(unitError)}
-          helperText={unitError}
-          required
-          inputRef={unitInputRef}
+        <NewIngredientFields
+          value={value}
+          nameError={nameError}
+          unitError={unitError}
+          nameInputRef={nameInputRef}
+          unitInputRef={unitInputRef}
+          onChange={onChange}
         />
       </DialogContent>
       <DialogActions>
@@ -129,8 +165,9 @@ function CreateIngredientDialog(props: Readonly<CreateIngredientDialogProps>) {
 }
 
 type IngredientListProps = {
-  readonly ingredients: readonly Ingredient[]
-  readonly deletingId: string | null
+  // undefined, solange die Liste nicht geladen ist – dann steht wie bei leerer Liste der Leerzustand.
+  readonly ingredients: readonly Ingredient[] | undefined
+  readonly deletingId: IngredientId | null
   readonly onDelete: (ingredient: Readonly<Ingredient>) => void
 }
 
@@ -138,12 +175,16 @@ type IngredientListProps = {
 // nennt die Zutat, damit die Aktion auch ohne visuellen Kontext eindeutig ist ("Mehl löschen").
 // run-9: nur die Zeile, deren DELETE gerade läuft, ist deaktiviert (deletingId) – kein globales
 // Sperren der übrigen Zeilen (Scope-Grenze run-9).
+// Leerzustand hier statt als Ternary in IngredientsPage – Muster wie ReactivationConflictToast.
 function IngredientList({ ingredients, deletingId, onDelete }: Readonly<IngredientListProps>) {
+  if (!ingredients || ingredients.length === 0) return <Typography gutterBottom>Noch keine Zutaten angelegt.</Typography>
   return (
     <List data-testid="ingredient-list">
       {ingredients.map((ingredient) => (
         <ListItem
           key={ingredient.id}
+          // Bündig mit Überschrift und Anlegen-Button: der Container polstert bereits seitlich.
+          disableGutters
           secondaryAction={
             <IconButton
               aria-label={`${ingredient.name} löschen`}
@@ -209,14 +250,14 @@ function ReactivationConflictToast({ conflict, onDismiss }: Readonly<Reactivatio
 }
 
 type UndoToastProps = {
-  readonly deleted: DeletedIngredient
-  readonly onUndo: () => void
+  readonly deleted: DeletedIngredient | null
+  readonly onUndo: (deleted: DeletedIngredient) => void
   readonly onDismiss: () => void
 }
 
 // UX-Guideline „Destructive Actions schützen" ("Destructive Actions schützen"): Soft-Delete + Undo-Toast ersetzt
 // den Bestätigungsdialog. Nicht-blockierende Snackbar; autoHideDuration großzügig, damit
-// "Rückgängig" klickbar bleibt.
+// "Rückgängig" klickbar bleibt. Null-Check hier statt in IngredientsPage – Muster wie ReactivationConflictToast.
 function UndoToast({ deleted, onUndo, onDismiss }: Readonly<UndoToastProps>) {
   // clickaway (Klick irgendwo auf der Seite) darf den Toast NICHT schließen: sonst wäre die
   // bewusst großzügige autoHideDuration wertlos, sobald der Nutzer nach dem Löschen woanders
@@ -227,6 +268,7 @@ function UndoToast({ deleted, onUndo, onDismiss }: Readonly<UndoToastProps>) {
     if (reason === 'clickaway') return
     onDismiss()
   }
+  if (!deleted) return null
 
   // `key={deleted.id}`: erzwingt einen Remount pro Löschvorgang. Ohne key behält React beim
   // Wechsel von einer gelöschten Zutat zur nächsten (deleted-Objekt ändert sich, open/
@@ -243,15 +285,14 @@ function UndoToast({ deleted, onUndo, onDismiss }: Readonly<UndoToastProps>) {
       autoHideDuration={6000}
       onClose={handleClose}
       message={`${deleted.name} gelöscht`}
-      action={<Button onClick={onUndo}>Rückgängig</Button>}
+      // color="inherit": Primärblau auf dem dunklen Snackbar-Grund ist zu kontrastarm (nfr.md, Accessibility).
+      action={<Button color="inherit" onClick={() => { onUndo(deleted) }}>Rückgängig</Button>}
     />
   )
 }
 
 export default function IngredientsPage() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [unit, setUnit] = useState('')
+  const [newIngredient, setNewIngredient] = useState<NewIngredient | null>(null)
   const queryClient = useQueryClient()
   const ingredients = useResultQuery(ingredientsKey, fetchIngredients)
 
@@ -263,11 +304,7 @@ export default function IngredientsPage() {
     void queryClient.invalidateQueries({ queryKey: ingredientsKey })
   }
 
-  const closeDialog = () => {
-    setIsDialogOpen(false)
-    setName('')
-    setUnit('')
-  }
+  const closeDialog = () => { setNewIngredient(null) }
 
   const { deleted, deletingId, requestDelete, undoDelete, dismissUndo } = useDeleteIngredientWithUndo(invalidateIngredients)
 
@@ -289,34 +326,24 @@ export default function IngredientsPage() {
   }
 
   return (
-    <div>
-      {ingredients && ingredients.length > 0
-        ? <IngredientList ingredients={ingredients} deletingId={deletingId} onDelete={requestDelete} />
-        : <p>Noch keine Zutaten angelegt.</p>}
-      <Button variant="contained" onClick={() => { setIsDialogOpen(true) }}>Zutat anlegen</Button>
+    <Container component="main" maxWidth="sm">
+      <Typography variant="h5" component="h1" gutterBottom>Zutaten</Typography>
+      <IngredientList ingredients={ingredients} deletingId={deletingId} onDelete={requestDelete} />
+      <Button variant="contained" onClick={() => { setNewIngredient(emptyNewIngredient) }}>Zutat anlegen</Button>
       <CreateIngredientDialog
-        open={isDialogOpen}
-        name={name}
-        unit={unit}
+        newIngredient={newIngredient}
         nameError={nameError}
         unitError={unitError}
         isPending={isPending}
-        onNameChange={setName}
-        onUnitChange={setUnit}
+        onChange={setNewIngredient}
         onClose={handleCancel}
-        onSubmit={() => { save({ name, baseUnit: unit }) }}
+        onSubmit={save}
       />
-      {deleted && (
-        <UndoToast
-          deleted={deleted}
-          onUndo={() => { undoDelete(deleted) }}
-          onDismiss={dismissUndo}
-        />
-      )}
+      <UndoToast deleted={deleted} onUndo={undoDelete} onDismiss={dismissUndo} />
       <ReactivationConflictToast
         conflict={conflictNotice}
         onDismiss={dismissConflictNotice}
       />
-    </div>
+    </Container>
   )
 }

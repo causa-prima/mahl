@@ -51,6 +51,7 @@
 | Neuen Agenten beauftragen | `.claude/agents/` (bestehende Definitionen als Vorlage) + Skill `review-code` |
 | Interface/API designen (Design It Twice) | Skill `design-an-interface` verwenden |
 | Session abschließen | Skill `closing-session` verwenden |
+| Commit, Amend oder Push – auch ad hoc | Skill `committing` verwenden (Gesamtprüfung des Diffs unmittelbar vorher) |
 
 ---
 

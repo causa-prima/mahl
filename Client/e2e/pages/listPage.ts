@@ -1,8 +1,8 @@
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
 
 // Page-Object-Interface der Querschnitts-Suite (ADR-S112-5, Nachweis-Schicht). Jede Listen-Seite liefert
-// eine Implementierung; `interaction.spec.ts` läuft gegen jede davon. Das Interface enthält nur, was sich
-// von Seite zu Seite UNTERSCHEIDET (Pfade, Beschriftungen, Testdaten). Was überall gleich sein soll,
+// eine Implementierung; `interaction.spec.ts` und `accessibility.spec.ts` laufen gegen jede davon. Das
+// Interface enthält nur, was sich von Seite zu Seite UNTERSCHEIDET (Pfade, Beschriftungen, Testdaten). Was überall gleich sein soll,
 // spricht die Suite direkt an – genau das ist der Vertrag, den sie prüft. Eine Seite, die hier
 // eingebunden wird, muss ihn erfüllen:
 //   - Anlegen läuft über einen MUI-Dialog (role=dialog, Backdrop-Klick über `.MuiDialog-container`),

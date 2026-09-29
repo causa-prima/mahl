@@ -844,6 +844,19 @@ def test_segment_expansion() -> int:
          "Heredoc: commit bleibt User-Aktion"),
         ("bash <<'EOF'\nrm -rf /\nEOF", "deny", "GEGENPROBE: Interpreter frisst Heredoc"),
         ("python3 - <<'PY'\nprint(1)\nPY", "deny", "GEGENPROBE: python3 - bleibt gesperrt"),
+        # Ein Heredoc in "$(…)" ist ebenso Text – die Substitution hebt die äußeren
+        # Anführungszeichen auf. Sonst gälte etwa das `>` einer Mailadresse im
+        # Co-Author-Trailer als Datei-Redirect.
+        ('echo "$(cat <<\'EOF\'\nfoo > bar\nEOF\n)"', "allow",
+         'Heredoc in "$(…)": > im Body ist kein Redirect'),
+        ('echo "$(bash <<\'EOF\'\nrm -rf /\nEOF\n)"', "deny",
+         'GEGENPROBE: Interpreter in "$(…)" frisst Heredoc'),
+        ('echo "a > b"', "allow", "> in einem normalen String bleibt Text"),
+        # Nach `)` gilt wieder das äußere "…": Ein `<<X` dort ist Text. Würde es als Heredoc
+        # gelesen, verschwänden die echten Befehle der Folgezeilen aus der Prüfung.
+        # Aufbau so, dass ein falsch gelesenes `<<X` ein gültiges `echo "…"` übrig ließe.
+        ('echo "$(pwd) <<X"\nrm -rf /tmp/x\nX\n"', "deny",
+         'GEGENPROBE: <<X in "…" nach $(…) blendet Folgezeilen nicht aus'),
 
         # --- Schleifen -----------------------------------------------------------
         ("for f in a b; do echo $f; done", "allow", "Schleife mit lesendem Rumpf"),
@@ -910,6 +923,35 @@ def test_segment_expansion() -> int:
         print(f"  {Colors.RED}FAIL{Colors.RESET} [heredoc    ] Body entfernt, Träger bleibt")
         print(f"       Got: {stripped!r}")
         failures += 1
+
+    # Klammer-Stapel isoliert: eine Subshell `( … )` – frei oder in "$(…)" – kehrt danach in
+    # den Kontext zurück, in dem sie begann; der folgende Heredoc wird ausgeblendet.
+    for label, command in [
+        ("nach freier Subshell", "(true); cat <<'EOF'\nBODY\nEOF"),
+        ('nach Subshell in "$(…)"', "echo \"$( (true); cat <<'EOF'\nBODY\nEOF\n)\""),
+    ]:
+        stripped = strip_heredoc_bodies(command)
+        if "BODY" not in stripped:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [heredoc    ] Body entfernt {label}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [heredoc    ] Body entfernt {label}")
+            print(f"       Got: {stripped!r}")
+            failures += 1
+
+    # Beide Commit-Formen bekommen denselben Grund – auch mit Co-Author-Trailer, dessen
+    # `<…@…>` kein Redirect ist. Der Grund landet im Freigabe-Prompt.
+    trailer = "Betreff\n\nText\n\nCo-Authored-By: Claude <noreply@anthropic.com>"
+    for form, command in [
+        ("-F -", f"git commit -F - <<'EOF' # --allow-once\n{trailer}\nEOF"),
+        ('-m "$(…)"', f"git commit -m \"$(cat <<'EOF'\n{trailer}\nEOF\n)\" # --allow-once"),
+    ]:
+        decision, reason, _ = check_command(command)
+        if decision == "ask" and "Commits sind User-Aktionen" in reason:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [heredoc    ] commit {form}: Grund ist die User-Aktion")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [heredoc    ] commit {form}: Grund ist die User-Aktion")
+            print(f"       Got: {decision!r} | reason: {reason[:80]!r}")
+            failures += 1
 
     # Unbeendetes Heredoc: fail-closed, der Rest darf nicht verschwinden
     stripped = strip_heredoc_bodies("cat <<'EOF'\nrm -rf /")

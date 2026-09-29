@@ -49,9 +49,8 @@ Auswahl. TD-Einträge mit
 
 ## Nächste Prioritäten
 
-- TD-S083-2 · Done: Alle interaktiven Controls messen ≥ 44×44px, der Infra-Test hält das fest.
-
-- TD-S083-4 · Done: `Client/src` führt in Domänentypen keine nackten `string`-Felder mehr, alle Tests grün.
+- **Visuelle Konsistenz-Guideline erweitern** — `Fällig: Phase:MVP` · Quelle: `docs/guidelines/coding-guideline-ux.md` → Visuelle Baseline · Done: Spacing/Hierarchie/Farbe sind dort als System geregelt und im Theme verankert.
+  Vor dem ersten Lauf der US-904-MVP-Stufe (Bearbeiten, Modifizierer): Ab da treffen mehr als ~3 Komponenten dieselben visuellen Entscheidungen – der Auslöser, den der Kopf der UX-Guideline nennt.
 
 - TD-S108-1 · Done: `features/resilience.feature` übt auch DELETE aus.
   Kein Workshop nötig – beide entstehen bei der Resilience-Arbeit ohnehin.
@@ -61,6 +60,3 @@ Auswahl. TD-Einträge mit
 
 - **Deep-Link-Anforderung klären** — `Fällig: US-602, Phase:V1` · Quelle: `docs/open-questions.md` · Done: Entschieden und als ADR festgehalten, welche Entitäten deep-linkbar sind.
   US-602 ist zugleich die erste Story mit zweiter Seite → Navigations-Szenario nach ADR-S103-1.
-
-- **Visuelle Konsistenz-Guideline erweitern** — `Fällig: TD-S083-2` · Quelle: `docs/guidelines/coding-guideline-ux.md` · Done: Spacing/Hierarchie/Farbe sind dort geregelt.
-  Das Theme aus TD-S083-2 ist der Mechanismus, den die Guideline vorschreiben würde.

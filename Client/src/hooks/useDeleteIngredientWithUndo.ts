@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { useResultMutation } from './useResultMutation'
 import { deleteIngredient, restoreIngredient } from '../services/ingredientsApi'
-import type { Ingredient } from '../services/ingredientsApi'
+import type { Ingredient, IngredientId } from '../domain/ingredient'
 
 // run-11: `baseUnit` ergänzt, weil der Restore-Body ab jetzt Pflicht ist (ADR-S111-1-Addendum
 // zu ADR-S108-2) – der Undo-Aufruf muss Name UND Einheit der gelöschten Zeile mitschicken.
-export type DeletedIngredient = { readonly id: string; readonly name: string; readonly baseUnit: string }
+export type DeletedIngredient = Pick<Ingredient, 'id' | 'name' | 'baseUnit'>
 
 type DeleteIngredientWithUndo = {
   readonly deleted: DeletedIngredient | null
-  readonly deletingId: string | null
+  readonly deletingId: IngredientId | null
   readonly requestDelete: (ingredient: Readonly<Ingredient>) => void
   readonly undoDelete: (deleted: DeletedIngredient) => void
   readonly dismissUndo: () => void
@@ -28,10 +28,10 @@ export function useDeleteIngredientWithUndo(onChanged: () => void): DeleteIngred
   // bewusst am Erfolgspfad (onSuccess feuert nur bei Ok) – ein Netzwerkfehler (Err) lässt den
   // Button dauerhaft deaktiviert. Bekannte Lücke, gehört zu TD-S108-1 (fehlender Status-Check
   // in deleteIngredient), hier bewusst nicht behoben.
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<IngredientId | null>(null)
 
   const [deleteMutate] = useResultMutation(
-    (vars: { readonly id: string; readonly etag: string }) => deleteIngredient(vars.id, vars.etag),
+    (vars: Pick<Ingredient, 'id' | 'etag'>) => deleteIngredient(vars.id, vars.etag),
     () => {
       setDeletingId(null)
       onChanged()
@@ -42,7 +42,7 @@ export function useDeleteIngredientWithUndo(onChanged: () => void): DeleteIngred
   // Codepfad im Endpoint. Der Wrapper bündelt die drei Werte zum vars-Objekt, das
   // restoreIngredient als Positionsparameter erwartet.
   const [restoreMutate] = useResultMutation(
-    (vars: { readonly id: string; readonly name: string; readonly baseUnit: string }) =>
+    (vars: DeletedIngredient) =>
       restoreIngredient(vars.id, vars.name, vars.baseUnit),
     () => {
       setDeleted(null)

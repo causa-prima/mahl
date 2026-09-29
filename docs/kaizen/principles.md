@@ -138,6 +138,9 @@ Rückfallzählung nur bei eindeutiger Zuordnung etwas wert ist.
   wofür die Ziffer steht. Der Kurztitel ist der **Titel** des Eintrags; trägt der den Punkt
   nicht, Alternativen vorschlagen und die Wahl per `--titel` zurückschreiben, statt einen
   zweiten Namen danebenzustellen (der veraltete still und behauptete dann Falsches).
+  Dasselbe gilt für jedes Kürzel, das nur der Agent kennt – Review-Findings („A1", „FC-6"),
+  selbst vergebene Befund-Labels, Werkzeug- und Prüfnamen: Eine Frage an den User nennt
+  Gegenstand, Problem und Vorschlag ausgeschrieben, das Kürzel höchstens als Zusatz.
 
 - **"Unterstützt" ≠ "beweist" – Empirie vor Behauptung, Empfehlung und Fertig-Erklärung.**
   Vor jeder Aussage oder Handlung, die auf angenommenem Tool-/Prozess-Verhalten beruht – eine

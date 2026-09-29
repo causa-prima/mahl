@@ -371,17 +371,12 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor [Abschluss](#IMP
 
 3. <a id="IMP-session-abschluss"></a>**Session-Abschluss** (falls gewählt): `closing-session`-Skill laden und ausführen. Die dort entstandenen/geänderten Dateien fließen in den nachfolgenden Commit ein.
 
-4. **Commit erstellen** (falls gewählt; kein Amend): Der Agent committet selbst. `git commit` steht auf Auto-Deny (PreToolUse-Hook) → mit angehängtem `# --allow-once` ausführen (einmalige User-Freigabe).
-   `git status` prüfen – alle noch unstaged Änderungen stagen (`git add <dateien>`), **inklusive** der Dateien aus dem Session-Abschluss.
+4. **Commit erstellen** (falls gewählt; kein Amend): Der Agent committet selbst, über den Skill
+   `committing` (Gesamtprüfung, Befehl, Freigabe) – **inklusive** der Dateien aus dem
+   Session-Abschluss. Betreff:
    ```
-   git commit -m "$(cat <<'EOF'
    US-XXX: Lauf N – [Cluster-Label]
-
-   Co-Authored-By: <MODELLNAME> <noreply@anthropic.com>
-   EOF
-   )"  # --allow-once
    ```
    Mapping: Story-Tag ohne `@`, Lauf-Nummer und Cluster-Label aus dem `check-atdd-gate.py`-Output
    von [Architektur-Check](#IMP-architektur-check) übernehmen.
    Beispiel: `$ARGUMENTS = @US-904 run-3` (Label „Anlegen·Name-Validierung") → `"US-904: Lauf 3 – Anlegen·Name-Validierung"`
-   Co-Authored-By: Modellname aus dem System-Kontext einsetzen.

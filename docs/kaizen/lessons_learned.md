@@ -80,3 +80,17 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: Viermal in einer Session musste der User nachfragen, worum es überhaupt ging: „C1b“ (was ist das Problem, was die Lösung?), „CLI-Verdrahtung wovon“, „E2/E3 – was geprüft, was sagen die Ergebnisse“, „Was ist CHECK 6?“. Jedes Mal hatte ich einen Befund mit internem Kurzlabel und Werkzeugbegriff vorgelegt, ohne Gegenstand, Problem und Bedeutung der Optionen zu erklären. Die Entscheidung verzögerte sich jeweils um eine Runde; bei C1b ging die frühere Erklärung zudem in einer langen Nachricht unter.
   Warum: Die Labels waren mir aus der laufenden Arbeit geläufig, und ich habe sie für geteiltes Wissen gehalten. Das Prinzip „Tracker-ID nie nackt nennen“ deckt nur Tracker-IDs ab – Befund-Labels, Werkzeug- und Prüfnamen fühlen sich nicht wie IDs an, tragen aber dasselbe Problem.
   Regel: Vor jeder Frage an den User prüfen, ob sie ohne Session-Kontext verständlich ist: Was ist der Gegenstand (ein Satz), was ist das Problem, was bedeutet jede Option? Selbst vergebene Labels (A1, C1b, CHECK 6) nur zusammen mit dieser Erklärung, nie allein. Entscheidungsfragen am Ende einer langen Nachricht gesammelt wiederholen.
+
+## Session 134 – 2026-09-29
+
+- **[MITTEL] [AGENT] [Doku] LL-S134-1 – Eingetretenen Fälligkeits-Anker mechanisch in jetzt übersetzt**
+  Quelle: User
+  Was: Als TD-S083-2 (Theme-Foundation) behoben war, setzte ich die daran verankerte Priorität 'Visuelle Konsistenz-Guideline erweitern' auf Fällig: jetzt und bot sie als nächste Aufgabe an. Erst die Frage des Users, warum jetzt der richtige Zeitpunkt sei, zeigte: Die UX-Guideline nennt im Kopf einen eigenen Auslöser (mehr als ~3 Komponenten mit denselben visuellen Entscheidungen), der mit einer einzigen Seite nicht erfüllt ist. Umgesetzt wurde daraufhin nur eine kleine Baseline der getroffenen Entscheidungen.
+  Warum: Der Anker TD-S083-2 war eine Voraussetzung (ohne Theme kein Ort für die Werte), kein Auslöser. Beim Eintreten habe ich die Fälligkeit aus dem Anker abgeleitet, statt sie aus dem Zieldokument neu zu bestimmen.
+  Regel: Tritt ein Fälligkeits-Anker ein, zuerst fragen: War er Voraussetzung oder Auslöser? Bei Voraussetzung die Fälligkeit aus dem Gegenstand selbst neu bestimmen – das Zieldokument kann einen eigenen Auslöser nennen.
+
+- **[MITTEL] [AGENT] [Review] LL-S134-2 – Entscheidungsfragen mit Finding-Kürzeln gestellt, die nur ich kannte**
+  Quelle: User
+  Was: Nach dem Zusammenführen von vier Auditor-Berichten bat ich den User, über 'A1', 'FC-7 (Teil Pending/Fehlerzustand)' und 'FC-6' zu entscheiden – Kürzel aus Berichten, die nur ich gesehen hatte. Der User konnte nicht entscheiden und musste nachfragen; erst die zweite, selbsttragende Fassung jeder Frage machte die Entscheidung möglich.
+  Warum: Rückfall zu LL-S133-4 (Entscheidungsfragen in Werkzeug- und Session-Jargon vorgelegt) – dessen Regel stand nur in lessons_learned.md, das Prinzip 'Eine Tracker-ID nie nackt nennen' deckte weiter nur Tracker-Einträge ab. Finding-IDs aus Review-Berichten fühlten sich wie gemeinsamer Kontext an, weil ich die Berichte im Kopf hatte. Als Maßnahme ist das Prinzip jetzt auf selbst vergebene Kürzel erweitert.
+  Regel: Jede Frage an den User muss ohne den Bericht verständlich sein, aus dem sie stammt: Was ist der Einwand, was habe ich geprüft, was schlage ich vor. Ein Finding-Kürzel darf nur als Zusatz zum ausgeschriebenen Punkt stehen.

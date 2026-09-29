@@ -104,14 +104,15 @@ user-invocable: true
      ```
 
 6. <a id="CLS-abschluss-commit"></a>Abschluss-Commit – **Pflicht, letzter Schritt**:
-   Der Commit **ist** die Session-Historie. Form:
+   Der Commit **ist** die Session-Historie. Committet wird über den Skill `committing` –
+   Gesamtprüfung des Diffs, Befehl, Freigabe. Die Nachricht hat diese Form:
    ```
    <Betreff: was sich geändert hat, höchstens 72 Zeichen>
 
    <Rumpf: siehe Inhaltsregel>
 
    Session-Ende: <NNN>
-   Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+   Co-Authored-By: <MODELLNAME> <noreply@anthropic.com>
    ```
    **`Session-Ende: <NNN>` ist keine Zierde.** Daraus leitet `repo_kontext.current_session()`
    die Session-Nummer ab, und daran hängt **jede** Tracker-ID. Nur der Abschluss-Commit trägt
@@ -153,4 +154,4 @@ user-invocable: true
    Trifft nichts davon zu, endet der Rumpf nach dem Orientierungsabsatz. Zwei, drei Sätze sind
    dann das richtige Ergebnis, kein Mangel.
 
-   Vorher `git status` prüfen: Alles, was zur Session gehört, gehört in diesen Commit.
+   Alles, was zur Session gehört, gehört in diesen Commit.

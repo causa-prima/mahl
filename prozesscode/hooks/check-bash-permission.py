@@ -887,8 +887,16 @@ def strip_heredoc_bodies(command: str) -> str:
     `bash` da, beides ohne Allow-Muster. Ein Heredoc erkauft keine Freigabe.
 
     Fail-closed bei fehlendem Endmarker: Rest bleibt stehen und wird geprüft.
+
+    Eine Klammer – `$(…)` oder `(…)` – hebt die umgebenden Anführungszeichen auf: In
+    `git commit -m "$(cat <<'EOF' … EOF)"` ist der Heredoc echt. Der Stapel merkt sich
+    je offener Klammer, ob sie in "…" begann, und stellt das bei `)` wieder her. Eine
+    überzählige `)` (etwa ein case-Muster) schließt zu früh – dann wird weniger
+    ausgeblendet. Eine überzählige `(` ist nicht abgesichert: Sie kann nur in einem
+    Heredoc-Text stehen, dessen Endmarker hier nicht erkannt wird (`<<"$VAR"`).
     """
     in_single = in_double = False
+    quote_stack: list[bool] = []
     i = 0
     while i < len(command):
         c = command[i]
@@ -904,7 +912,20 @@ def strip_heredoc_bodies(command: str) -> str:
             in_double = not in_double
             i += 1
             continue
+        if not in_single and command.startswith('$(', i):
+            quote_stack.append(in_double)
+            in_double = False
+            i += 2
+            continue
         if in_single or in_double:
+            i += 1
+            continue
+        if c == '(':
+            quote_stack.append(False)
+            i += 1
+            continue
+        if c == ')' and quote_stack:
+            in_double = quote_stack.pop()
             i += 1
             continue
 

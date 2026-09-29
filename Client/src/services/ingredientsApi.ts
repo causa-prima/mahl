@@ -1,5 +1,6 @@
 import { ResultAsync, errAsync } from 'neverthrow'
 import type { ApiError } from '../types/apiError'
+import type { ETag, Ingredient, IngredientId, IngredientName, NewIngredient, Unit } from '../domain/ingredient'
 import { conditionalGetJson } from './conditionalGet'
 
 // ADR-S090-1: 422-Body ist feld-keyed. Das Frontend konsumiert ausschließlich `errors`.
@@ -7,25 +8,11 @@ type FieldErrorBody = { readonly errors: Readonly<Record<string, readonly string
 
 // ADR-S004-1: 409-Body von POST /api/ingredients bei soft-deleted-Duplikat. Nur `id` wird
 // konsumiert (der `code` ist der einzig mögliche POST-409-Grund, kein zusätzlicher Zweig nötig).
-type SoftDeletedConflictBody = { readonly id: string }
+type SoftDeletedConflictBody = { readonly id: IngredientId }
 
 // ADR-S111-1: 409-Body von POST /{id}/restore, wenn die Zeile bereits aktiv ist, aber mit
 // abweichenden Werten – der gespeicherte Stand geht mit, damit der Client ihn benennen kann.
 type AlreadyActiveConflictBody = { readonly ingredient: Ingredient }
-
-export type Ingredient = {
-  readonly id: string
-  readonly name: string
-  readonly baseUnit: string
-  // ADR-S108-1: per-Zeile xmin-ETag (hex, "{xmin:x8}") aus dem GET-Body – die If-Match-Quelle
-  // fürs Löschen einer aus der Liste geladenen Zutat.
-  readonly etag: string
-}
-
-export type NewIngredient = {
-  readonly name: string
-  readonly baseUnit: string
-}
 
 // ADR-S111-1/-3: `createIngredient` liefert im Ok-Pfad zwei unterscheidbare Erfolgsfälle – ein
 // echtes Anlegen/Reaktivieren ('Saved') oder eine Reaktivierung, die auf eine parallel bereits
@@ -36,7 +23,7 @@ export type CreateIngredientResult =
   | { readonly kind: 'Saved'; readonly ingredient: Ingredient }
   | {
       readonly kind: 'ReactivationConflict'
-      readonly requestedName: string
+      readonly requestedName: IngredientName
       readonly savedIngredient: Ingredient
     }
 
@@ -66,7 +53,7 @@ export function createIngredient(ingredient: NewIngredient): ResultAsync<CreateI
 
 // ADR-S108-1/S058-1: DELETE einer Zutat verlangt If-Match; der Wert ist der per-Zeile-xmin-ETag
 // aus dem GET-Body. Nur Erfolgspfad (run-8) – die Response wird nicht ausgewertet.
-export function deleteIngredient(id: string, etag: string): ResultAsync<Response, ApiError> {
+export function deleteIngredient(id: IngredientId, etag: ETag): ResultAsync<Response, ApiError> {
   return ResultAsync.fromPromise(
     fetch(`/api/ingredients/${id}`, {
       method: 'DELETE',
@@ -79,7 +66,7 @@ export function deleteIngredient(id: string, etag: string): ResultAsync<Response
 // ADR-S111-1 (überholt ADR-S108-2): Restore verlangt ab run-11 einen Pflicht-Body { name,
 // baseUnit } – auch der Undo-Aufruf (run-8/9, useDeleteIngredientWithUndo) schickt ihn jetzt
 // mit, fachlich ein No-op, aber ein einziger Codepfad im Endpoint. Erfolgs-Status 200 (statt 204).
-export function restoreIngredient(id: string, name: string, baseUnit: string): ResultAsync<RestoreOutcome, ApiError> {
+export function restoreIngredient(id: IngredientId, name: IngredientName, baseUnit: Unit): ResultAsync<RestoreOutcome, ApiError> {
   return ResultAsync.fromPromise(
     fetch(`/api/ingredients/${id}/restore`, {
       method: 'POST',
@@ -109,7 +96,7 @@ function toCreateIngredientResult(response: Response, requested: NewIngredient):
   )
 }
 
-function reactivateSoftDeletedIngredient(id: string, requested: NewIngredient): ResultAsync<CreateIngredientResult, ApiError> {
+function reactivateSoftDeletedIngredient(id: IngredientId, requested: NewIngredient): ResultAsync<CreateIngredientResult, ApiError> {
   return restoreIngredient(id, requested.name, requested.baseUnit).map((outcome): CreateIngredientResult =>
     outcome.kind === 'Restored'
       ? { kind: 'Saved', ingredient: outcome.ingredient }

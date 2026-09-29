@@ -92,6 +92,9 @@ const asRecipeId = (value: string): RecipeId => value as RecipeId;
 export type ValidationError = { readonly message: string }
 ```
 
+**Neuer Brand → in `Client/eslint.config.js` unter `settings.immutability.overrides` eintragen**
+(Grund dort).
+
 **Faustregel:** Wenn ein String-Parameter mehrere verschiedene Konzepte darstellen könnte (z.B. `id` für Rezept, Zutat und Wochenpool), braucht jedes Konzept einen eigenen Branded Type.
 
 **Dependency Rule:** Factory Functions nehmen Domain-Typen oder Primitives (`string`, `number`) entgegen – niemals API-Response-Typen (DTOs) oder direkte Zugriffe auf `fetch`-Ergebnisse. Das Mapping API-Response → Primitives findet im Service-Layer (`src/services/`) statt.
@@ -138,27 +141,25 @@ function render(state: RequestState<Recipe>) {
 Verwende die Bibliothek **`neverthrow`** für Fehlerbehandlung ohne Exceptions. Kein `try/catch` für Domänen- oder Validierungsfehler.
 
 ```typescript
-import { ok, err, Result, ResultAsync } from 'neverthrow';
-import type { ValidationError } from '../types/validationError';
+import { ResultAsync } from 'neverthrow';
+import type { ApiError } from '../types/apiError';
 
-// Factory Function gibt Result zurück – Fehlertyp ist ValidationError, nie string
-function makeIngredientName(input: string): Result<IngredientName, ValidationError> {
-  const trimmed = input?.trim();
-  if (!trimmed)
-    return err({ message: 'Name darf nicht leer sein' });
-  if (trimmed.length > 200)
-    return err({ message: 'Name darf maximal 200 Zeichen haben' });
-  return ok(trimmed as IngredientName);
+// Service gibt ResultAsync zurück statt zu werfen – Fehlertyp ist ein benannter Typ, nie string
+export function createIngredient(ingredient: NewIngredient): ResultAsync<CreateIngredientResult, ApiError> {
+  return ResultAsync.fromPromise(fetch('/api/ingredients', { /* … */ }), toUnexpectedError)
+    .andThen((response) => toCreateIngredientResult(response, ingredient)); // Verkettung, analog .Bind() in C#
 }
 
-// Verkettung (analog zu .Bind() / .Match() in C#)
-const result = makeIngredientName(rawInput)
-  .andThen(name => saveIngredient(name))  // ResultAsync
-  .match(
-    (saved) => toast.success(`${saved.name} gespeichert`),
-    (error) => toast.error(error.message),
-  );
+// Auswertung, analog .Match() in C# – beide Zweige sind Pflicht.
+// In Komponenten läuft das über useResultMutation (siehe React Query unten), nicht direkt.
+createIngredient({ name: asIngredientName(nameInput), baseUnit: asUnit(unitInput) }).match(
+  (result) => { /* Erfolg */ },
+  (error) => { /* error.kind: 'FieldErrors' | 'Unexpected' … */ },
+);
 ```
+
+Validiert wird dabei nicht – das Backend setzt die Regeln durch ([Validierung](#CGT-validierung)). Eine
+Factory mit `Result<T, ValidationError>` gibt es nur in der dort beschriebenen Offline-Ausnahme.
 
 **Exceptions** sind nur für echte technische Ausnahmezustände (Netzwerk-Ausfall, unerwarteter Server-Fehler mit 5xx) erlaubt – nicht für Validierungsfehler.
 
@@ -345,25 +346,24 @@ Zwei Problemklassen, die **nicht** vermischt werden dürfen:
 ## Pure Functions & Separation of Concerns
 
 - **API-Calls** gehören in dedizierte Service-Dateien (`src/services/`), nicht in Komponenten.
-- **Domänen-Logik** (Validierung, Transformationen) gehört in `src/domain/`, nicht in Komponenten.
+- **Domänen-Logik** (Berechnungen, Transformationen) gehört in `src/domain/`, nicht in Komponenten.
+  Regelprüfung gehört nicht dazu – die setzt das Backend durch, außer in der
+  [Offline-Ausnahme](#CGT-offline-validierung).
 - **Komponenten** sind rein presentational: empfangen Props, rendern UI, delegieren Events.
 
 ```typescript
 // src/domain/recipe.ts – Pure Domain Functions
-export function makeRecipeTitle(
-  title: string
-): Result<RecipeTitle, ValidationError> { ... }
-
 export function calculateTotalCalories(
   ingredients: ReadonlyArray<RecipeIngredient>
 ): Calories { ... }
 
 // src/services/recipesApi.ts – API-Calls
-export async function fetchRecipes(): ResultAsync<Recipe[], ApiError> { ... }
+export function fetchRecipes(): ResultAsync<readonly Recipe[], ApiError> { ... }
 
 // src/components/RecipeForm.tsx – nur UI
 function RecipeForm({ onSubmit }: Props) {
-  const result = validateRecipeTitle(titleInput);
+  // Eingaben als Brand weiterreichen, prüfen tut der Server
+  const submit = () => { onSubmit({ title: asRecipeTitle(titleInput) }) };
   // ...
 }
 ```
@@ -440,9 +440,10 @@ Diese Richtlinie gilt für Test-Code mit den folgenden Abschwächungen:
 - `try/catch` ist in Tests erlaubt – Vitest/Jest-Assertions werfen Exceptions, das ist gewollt
 
 ```typescript
-// Test-Beispiel – pragmatisch aber typsicher
-const validName = makeIngredientName('Tomaten')._unsafeUnwrap();
-// _unsafeUnwrap() ist in Tests OK, weil der Wert bekannt gültig ist
+// Test-Beispiel – Brands auch in Testdaten; die Vergabe ist nominal, nichts zu entpacken
+const name = asIngredientName('Tomaten');
+// Nur eine validierende Factory (Offline-Ausnahme) liefert ein Result – dort ist
+// ._unsafeUnwrap() in Tests OK, weil der Wert bekannt gültig ist
 ```
 
 <a id="CGT-given-when-then"></a>

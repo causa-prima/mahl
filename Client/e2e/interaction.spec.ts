@@ -1,18 +1,17 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-import type { ListEntry, ListPage, ListPageDefinition } from './pages/listPage'
-import { ingredientsPage } from './pages/ingredientsPage'
+import type { ListEntry, ListPage } from './pages/listPage'
+import { LIST_PAGES } from './pages/listPages'
 
 // Querschnitts-Suite (ADR-S112-5, Nachweis-Schicht): Verhalten, das auf JEDER Listen-Seite gleich sein
-// soll, läuft hier einmal je Seite. Eine neue Seite trägt sich in LIST_PAGES ein und liefert ihr Page
-// Object (pages/listPage.ts) – die Tests bekommt sie dazu, statt sie nachzubauen.
+// soll, läuft hier einmal je Seite. Eine neue Seite trägt sich in LIST_PAGES (pages/listPages.ts) ein
+// und liefert ihr Page Object (pages/listPage.ts) – die Tests bekommt sie dazu, statt sie nachzubauen.
 //
 // Testnamen und `// Szenario:`-Verweise zeigen noch auf US-904: Die Szenarien ziehen erst mit der
 // zweiten Seite nach features/interaction.feature um, zusammen mit dem Extrahieren der Implementierung
 // (ADR-S112-5, Migrationsreihenfolge) – so werden Testnamen nur einmal angefasst.
 // Ab der zweiten Seite trägt jeder Testname mehrere Läufe; unterscheidbar sind sie über den
 // describe-Titel mit dem Seitennamen. Ein Grep nach dem Testnamen findet daher eine Quellzeile.
-const LIST_PAGES: readonly ListPageDefinition[] = [ingredientsPage]
 
 // Verzögert die Anfragen einer Methode künstlich, damit der Pending-Zustand vor der Antwort
 // beobachtbar ist.

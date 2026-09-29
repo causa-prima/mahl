@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
+import { asETag, asIngredientId, asIngredientName, asUnit } from '../domain/ingredient'
 import { deleteIngredient, restoreIngredient } from './ingredientsApi'
 
 // ADR-S084-3 / ADR-S041-5-Addendum: Der If-Match-Header ist auf der gerenderten Komponente NICHT
@@ -24,7 +25,7 @@ describe('deleteIngredient', () => {
     )
 
     // When: die Zutat "42" mit ihrem Zeilen-ETag gelöscht wird
-    await deleteIngredient('42', ETAG)
+    await deleteIngredient(asIngredientId('42'), asETag(ETAG))
 
     // Then: das DELETE ging an genau diese Zutat und trug den ETag verbatim als If-Match
     //   (ADR-S058-1: mutierender Single-Resource-Endpoint verlangt If-Match, sonst 428)
@@ -50,7 +51,7 @@ describe('restoreIngredient', () => {
     server.use(http.post('/api/ingredients/:id/restore', () => HttpResponse.json(restored, { status: 200 })))
 
     // When: die Zutat "1" reaktiviert wird
-    const result = await restoreIngredient('1', 'Mehl', 'g')
+    const result = await restoreIngredient(asIngredientId('1'), asIngredientName('Mehl'), asUnit('g'))
 
     // Then: das Ergebnis ist eindeutig eine Reaktivierung mit dem reaktivierten Datensatz –
     //   nicht fälschlich ein Konflikt (der Frontend-Typ trägt für den Konflikt andere Felder)

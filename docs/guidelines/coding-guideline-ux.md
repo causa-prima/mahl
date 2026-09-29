@@ -2,9 +2,10 @@
 
 <!--
 wann-lesen: Bei jeder neuen oder geänderten React-Komponente — beim Schreiben und im Self-Review.
-Scope: Interaction Design (Sichtbarkeit, Feedback, Terminologie, Fehlerzustände).
-Visuelle Konsistenz (Spacing, Hierarchie, Farbe) wird in einer eigenen Guideline beschrieben,
-sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müssen.
+Scope: Interaction Design (Sichtbarkeit, Feedback, Terminologie, Fehlerzustände), dazu die bisher
+getroffenen visuellen Festlegungen (Abschnitt „Visuelle Baseline").
+Visuelle Konsistenz (Spacing, Hierarchie, Farbe) wird vollständig geregelt, sobald mehr als ~3
+Komponenten dieselben visuellen Entscheidungen treffen müssen.
 -->
 
 <a id="CGU-inhalt"></a>
@@ -21,6 +22,7 @@ sobald mehr als ~3 Komponenten dieselben visuellen Entscheidungen treffen müsse
 | [Leerer Zustand erklärt sich](#CGU-leerer-zustand) | Bei jeder Liste, Tabelle oder Ansicht, die leer sein kann |
 | [Formular-/Dialog-Baseline](#CGU-formular-baseline) | Bei jedem Formular oder Dialog (Pflichtfeld-Markierung, Fokus-Führung, Tastatur) |
 | [Erreichbarkeit / Navigation](#CGU-navigation) | Sobald mehr als eine Seite/Route existiert |
+| [Visuelle Baseline](#CGU-visuelle-baseline) | Bei jeder Komponente, die Abstände, Größen, Überschriften oder Farben festlegt |
 
 > **Voraussetzung:** Diese Guideline gilt für alle React-Komponenten.
 > `docs/guidelines/coding-guideline-typescript.md` beschreibt die technische Umsetzung.
@@ -207,3 +209,39 @@ Beides vor der Implementierung als explizite Feature-Entscheidung festhalten.
 
 ✅ Neue Seite „Rezepte" → Eintrag in der AppBar-Navigation + Szenario „Von der Zutatenliste zu den Rezepten navigieren" in `features/navigation.feature`.
 ❌ Neue Seite nur per manuell eingegebener URL erreichbar; Navigations-Szenario im `ingredients.feature` versteckt, weil es „gerade dort naheliegend war".
+
+---
+
+<a id="CGU-visuelle-baseline"></a>
+## Visuelle Baseline
+
+**Warum:** Ohne Maßstab wählt jede Komponente ihre Abstände, Größen und Farben selbst – und Mängel
+wie eine am oberen Rand klebende Überschrift, ein fehlender Abstand zwischen Leerzustand und Button,
+gegeneinander versetzte Kanten oder eine zu kontrastarme Aktion fallen erst im Screenshot auf.
+
+**Stand, nicht System:** Der Abschnitt hält die Entscheidungen fest, die mit der einzigen Seite
+(Zutaten) getroffen wurden – er ist aus einem Beispiel abgeleitet und verallgemeinert nicht. Eine
+vollständige Regelung von Abständen, Hierarchie und Farbe folgt, sobald mehr als ~3 Komponenten
+dieselben visuellen Entscheidungen treffen müssen.
+
+**Entscheidungsregel:** Ein visueller Wert kommt aus dem Theme (`Client/src/main.tsx`) oder aus einer
+der Festlegungen unten. Braucht eine Komponente einen Wert, den beides nicht hergibt, wird er hier
+ergänzt – nicht als Einzelwert in der Komponente gesetzt.
+
+- **Bedienelemente** messen mindestens 44×44px (`docs/process/nfr.md`, Accessibility) – als
+  Komponenten-Default im Theme, bisher für Button und IconButton. Ein neuer Bedienelement-Typ
+  bekommt dort seinen Default; `Client/e2e/accessibility.spec.ts` meldet ihn, solange er fehlt.
+- **Seitenrumpf:** `Container component="main" maxWidth="sm"`. Den seitlichen Rand gibt der
+  Container, den oberen und unteren das Theme (`theme.spacing(2)`). Listenzeilen tragen
+  `disableGutters`, damit ihr Text bündig mit Überschrift und Buttons steht.
+- **Hierarchie:** Genau ein Seitentitel je Seite, `Typography variant="h5" component="h1"
+  gutterBottom` – `h5` für die Größe auf dem Handy, `h1` für die Dokumentstruktur.
+- **Fließtext und Leerzustand:** `Typography` mit `gutterBottom`, damit der Abstand zum folgenden
+  Button dem einer Liste entspricht.
+- **Formularfelder im Dialog:** `fullWidth` und `margin="dense"`.
+- **Farbe:** Die Primärfarbe trägt die Hauptaktion einer Ansicht (`variant="contained"`, etwa
+  „Zutat anlegen", „Speichern"). Aktionen auf dunklem Grund (Snackbar) übernehmen dessen
+  Textfarbe (`color="inherit"`) – Primärblau erreicht dort nicht die geforderten 4,5:1.
+
+✅ Neuer Bearbeiten-Dialog: Felder `fullWidth margin="dense"`, Speichern `contained`, sonst keine eigenen Abstände.
+❌ `sx={{ mt: 3 }}` an einer Überschrift, weil es „so besser aussah" – der Wert gehört ins Theme oder in diesen Abschnitt, sonst sieht die nächste Seite anders aus.

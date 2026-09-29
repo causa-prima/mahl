@@ -91,6 +91,7 @@ PRAEFIXE = {
     "CLAUDE.md": "CLA",
     ".claude/skills/implementing-scenario/SKILL.md": "IMP",
     ".claude/skills/closing-session/SKILL.md": "CLS",
+    ".claude/skills/committing/SKILL.md": "CMT",
     ".claude/skills/gherkin-workshop/SKILL.md": "GHW",
     ".claude/skills/kaizen/SKILL.md": "KZN",
     ".claude/skills/review-code/SKILL.md": "RVC",
