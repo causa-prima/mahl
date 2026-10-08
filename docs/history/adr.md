@@ -216,6 +216,31 @@ Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und pe
 
 **Entscheidung:** Alle String-Felder werden im Request-Handler vor der Validierung getrimmt. Gespeichert wird der getrimmte Wert. Ein String der nach Trimming leer ist, verletzt die Nicht-Leer-Constraint.
 
+**Addendum (S135):** Das Trimmen ist Teil der vollständigen Text-Normalisierung nach ADR-S135-1; „getrimmt" heißt seither „normalisiert".
+
+---
+
+### ADR-S135-1: Texteingaben werden einheitlich normalisiert – vor Prüfung und Speicherung
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:validation, arch:domain-type
+
+**Entscheidung:** Jedes Textfeld (Zutat: Name, Basiseinheit; Rezept: Titel, Schritt-Anweisung, jede Zutatenzeile; jedes künftige) wird vor Prüfung und Speicherung normalisiert:
+1. Jede Folge von Leerraum – jedes Unicode-Leerzeichen einschließlich geschützter Leerzeichen, Tabulator, Zeilenumbruch – wird zu einem Leerzeichen.
+2. Unsichtbare Zeichen werden entfernt: Leerzeichen ohne Breite (U+200B), weiches Trennzeichen (U+00AD), Wortverbinder (U+2060), Byte-Order-Mark (U+FEFF).
+3. Der Text wird in die Unicode-Normalform NFC gebracht und getrimmt.
+
+Längengrenzen, Leer-Prüfung, Eindeutigkeit und die in Meldungen zitierten Werte beziehen sich auf den normalisierten Wert. Ein „Zeichen" ist eine UTF-16-Codeeinheit – wie in der bestehenden Längenprüfung und bei `maxlength` im Browser (ein Emoji zählt meist 2). Garantiert wird die Regel über einen geteilten Texttyp (ADR-S112-5), nicht je Feld. Entscheidet der Client selbst über einen Text (z. B. ob ein Schrittfeld leer ist und mitgeschickt wird, ob es Eingaben für die Nachfrage „Eingaben verwerfen?" gibt), normalisiert er gleich wie der Server. Spezifikation: `features/text-input.feature` (`@CROSS-text`).
+
+**Begründung:** Text wird beim Erfassen von Rezepten typischerweise aus Webseiten kopiert und bringt geschützte Leerzeichen, zerlegte Umlaute oder unsichtbare Trennzeichen mit. Ohne Normalisierung entstehen Werte, die gleich aussehen, aber verschieden sind: Die Eindeutigkeit von Namen und Titeln (ADR-S105-2) griffe nicht, und eine Zutatenzeile fände die Zutat nicht. Mehrfacher Leerraum im Inneren hat in keinem Feld eine Bedeutung.
+
+**Konsequenz:** Verhaltensänderung für US-904 (Zutaten): Name und Basiseinheit werden normalisiert, die Eindeutigkeit gilt für den normalisierten Wert. Bestehende Daten werden nicht migriert (SKELETON: Drop+Recreate).
+
+**Verworfen:**
+- **Nur trimmen (ADR-S051-1 allein)** – lässt die kopierten Sonderzeichen durch, s. Begründung.
+- **Unicode-Normalform NFKC** – faltet auch Zeichen mit eigener Bedeutung (z. B. „½" zu „1⁄2", hochgestellte Ziffern); NFC vereinheitlicht nur die Darstellung desselben Zeichens.
+- **Graphem-Cluster als Zähleinheit** – wiche von `maxlength` im Browser und der bestehenden Prüfung ab; Felder mit Emoji sind in dieser Domäne selten.
+
 ---
 
 ### ADR-S051-2: 422-Fehlermeldungstexte (Deutsch, spezifisch, unveränderlich)
@@ -242,6 +267,24 @@ Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und pe
 | `ingredientId` nicht gefunden/soft-deleted | `"Eine oder mehrere Zutaten wurden nicht gefunden."` |
 
 **Addendum (S111) – Zeile „Restore: bereits aktiv" gestrichen:** Die Tabelle führte für den Restore-Fall „bereits aktiv" den festen Text `"Zutat ist bereits aktiv."`. Die Zeile stammt aus S051, wurde nie implementiert und ist mit ADR-S111-1/-3 überholt – analog zur „plain text"-Klausel in ADR-S004-1, die Addendum S105 ersetzt hat. Zwei Gründe: (1) Der Fall ist kein 422-Feldfehler, sondern ein `409` mit strukturiertem Body, den der Client **logisch verarbeitet** – genau die Konsum-Art, die ADR-S090-1s Display-only-Strategie ausnimmt. (2) Ein fixer Text erklärt dem Nutzer nicht, *warum* seine Eingabe nicht gilt; die Meldung muss den gespeicherten Stand benennen und wird deshalb im Frontend aus dem 409-Body gebildet (Wortlaut in ADR-S111-3). Der Fall tritt zudem nur noch bei **abweichenden** Werten auf – bei identischen Werten gibt es keinen Fehler mehr (ADR-S111-1).
+
+**Addendum (S135) – Rezept anlegen (US-602):** Neue feste Texte. `{…}` sind die eingegebenen, normalisierten Werte (ADR-S135-1); `{basiseinheit}` ist die gespeicherte Basiseinheit der Zutat.
+
+| Feld / Kontext | Text |
+|----------------|------|
+| `title` zu lang (> 100 Zeichen) | `"Titel darf maximal 100 Zeichen lang sein."` |
+| `title` bereits vergeben | `"Ein Rezept mit dem Titel '{titel}' existiert bereits."` |
+| `instruction` zu lang (> 1000 Zeichen) | `"Schritt-Anweisung darf maximal 1000 Zeichen lang sein."` |
+| Zutatenzeile: Menge keine Zahl | `"„{zeile}“: Menge muss eine Zahl sein (z. B. 1,5)."` |
+| Zutatenzeile: Menge ≤ 0 | `"„{zeile}“: Menge muss größer als 0 sein."` |
+| Zutatenzeile: mehr als 3 Nachkommastellen | `"„{zeile}“: Menge darf maximal 3 Nachkommastellen haben."` |
+| Zutatenzeile: Menge > 9999,999 | `"„{zeile}“: Menge darf maximal 9999,999 sein."` |
+| Zutatenzeile: Zutat unbekannt oder gelöscht | `"„{zeile}“: Zutat '{name}' nicht gefunden. Neue Zutaten werden auf der Zutaten-Seite angelegt."` |
+| Zutatenzeile: Einheit ≠ Basiseinheit | `"„{zeile}“: Einheit '{einheit}' passt nicht zu '{name}' (möglich: '{basiseinheit}')."` |
+| Zutatenzeile: Menge ohne Einheit | `"„{zeile}“: Einheit fehlt (für '{name}': '{basiseinheit}')."` |
+| Zutatenzeile: Zutat doppelt | `"„{zeile}“: Zutat '{name}' steht bereits in einer früheren Zeile."` |
+
+Die Zeilen `unit` leer bei gesetzter `quantity` und `ingredientId` nicht gefunden gelten nicht für Rezepte aus Zutatenzeilen: Dort ersetzen sie „Einheit fehlt …" und „Zutat '…' nicht gefunden …", die die Zeile zitieren und den Ausweg nennen. Das Zitat steht vorn, weil ein Textfeld keine Zeilennummern zeigt. Grammatik der Zeile und Reihenfolge der Mengenprüfungen: ADR-S135-2.
 
 ---
 
@@ -469,6 +512,26 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 ---
 
+### ADR-S135-7: Löschsperre für verwendete Zutaten – Meldung an der Zeile, Toast erst nach der Antwort (MVP-Stufe von US-602)
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:ingredients, story:us-904, frontend:react, arch:error-handling
+
+**Entscheidung:**
+- Eine Zutat, die in einem Rezept verwendet wird – mit oder ohne Menge –, lässt sich nicht löschen. Der Server prüft die Verwendung beim Löschen, nicht der Client anhand der beim Laden bekannten Daten.
+- Die Meldung erscheint an der Zeile der Zutat in der Zutaten-Liste: `"Zutat '{name}' wird im Rezept '{r1}' verwendet und kann nicht gelöscht werden."`, bei mehreren `"… in den Rezepten '{r1}', '{r2}' und '{r3}' verwendet …"`. Genannt werden höchstens drei Rezepte, alphabetisch (deutsches Locale, ohne Unterschied der Groß-/Kleinschreibung); weitere nur als Anzahl („und einem weiteren", „und 2 weiteren") – nach der Regel „Länge begrenzen" der UX-Guideline.
+- Die Meldung bleibt stehen, bis auf der Seite erneut gelöscht oder die Seite verlassen wird.
+- Der Toast „{name} gelöscht" samt „Rückgängig" erscheint erst mit der erfolgreichen Antwort des Servers. Eine gesperrte Löschung ist keine Löschung: Sie lässt Toast und „Rückgängig" einer zuvor gelöschten Zutat bestehen (ADR-S108-3).
+
+**Begründung:** Ein Rezept, das auf eine gelöschte Zutat verweist, hätte kein definiertes Verhalten. Die Meldung gehört nah an das auslösende Element; als Toast würde sie den Rückgängig-Toast überdecken, und Stapeln schließt ADR-S108-3 aus. Ob eine Löschung gesperrt ist, steht erst mit der Antwort fest – ein Toast davor böte „Rückgängig" für eine Löschung, die nie stattfand. Die Prüfung im Client verfehlte Rezepte, die erst nach dem Laden der Seite angelegt wurden.
+
+**Verworfen:**
+- **Fremdschlüssel allein** – Zutaten werden soft-gelöscht (ADR-S000-6), der Fremdschlüssel greift dabei nicht.
+- **Meldung als Toast** – s. Begründung.
+- **Löschen erlauben und das Rezept die Zutat als „gelöscht" zeigen lassen** – verschiebt das Problem in jede Ansicht, die Rezept-Zutaten liest.
+
+---
+
 ### ADR-S111-1: Restore-Contract mit Pflicht-Body – idempotent bei gleichen Werten, 409 bei abweichenden
 
 **Status:** Accepted
@@ -616,6 +679,100 @@ Generierungslogik: `Unspecified` = 0 bei Aggregation; wenn alle `Unspecified` �
 **Tags:** scope:feature, resource:recipes, http:get, arch:error-handling
 
 **Entscheidung:** `GetAll` und `GetById` liefern `500` + `application/problem+json` wenn eine `SourceUrl` in der DB korrupt ist (`ToSummaryDtoOrError()` + `Sequence()`). `null` hat keinen validen semantischen Wert – "korrupte Daten ignorieren" wurde abgelehnt.
+
+---
+
+### ADR-S135-2: Rezept-Zutaten als Freitextzeilen, beim Speichern auf dem Server zerlegt
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, arch:validation
+
+**Entscheidung:** Das Formular „Rezept anlegen" (US-602) hat für die Zutaten ein mehrzeiliges Feld, eine Zutat je Zeile. Der Request trägt die Zeilen als Text; zerlegt wird beim Speichern auf dem Server. Leere Zeilen und Zeilen aus Leerraum werden übergangen, die Reihenfolge der Zeilen ist die Reihenfolge im Rezept. Jede Zeile wird normalisiert (ADR-S135-1) und dann so zerlegt:
+1. **Menge:** Beginnt die Zeile mit einer Ziffer, ist das erste Wort die Menge. Gültig ist sie nur aus Ziffern, optional mit einem Komma und weiteren Ziffern. Werte nach ADR-S020-1: größer als 0, höchstens 3 Nachkommastellen (Nullen am Ende zählen nicht), höchstens 9999,999; gerechnet wird exakt dezimal. Verletzt eine Menge mehrere Regeln, gilt die erste in der Reihenfolge Zahlform → größer als 0 → Nachkommastellen → Maximum.
+2. **Mit Menge:** Ist der Rest der Name einer aktiven Zutat, fehlt die Einheit. Sonst ist bei mehreren Wörtern das erste die Einheit und der Rest die Zutat; ein einzelnes Wort ist die Zutat. Die Einheit muss die Basiseinheit der Zutat sein.
+3. **Ohne Menge:** Die ganze Zeile ist die Zutat, Menge und Einheit sind `Unspecified` (ADR-S020-1).
+4. Namen und Einheiten werden ohne Unterschied der Groß-/Kleinschreibung verglichen. Soft-gelöschte Zutaten gelten als nicht gefunden.
+5. Jede Zutat steht höchstens einmal im Rezept. Geprüft wird das im Speicher innerhalb des Aggregats und mit den übrigen Zeilen gemeldet; ein Unique-Index (Rezept, Zutat) ist als Absicherung zulässig, trägt aber keine Meldung.
+
+Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte: ADR-S051-2, Addendum S135); alle Meldungen gehen gesammelt in Zeilenreihenfolge auf den Key `ingredients` (ADR-S090-1). Eine fehlerhafte Zeile zählt nicht als Zutat; „Rezept muss mindestens eine Zutat haben." gilt nur, wenn keine nicht leere Zeile da ist.
+
+**Begründung:** Erfasst wird beim Übertragen einer Vorlage, in der Zutaten schon als „Menge Einheit Zutat" stehen; zeilenweises Abtippen oder Einfügen ist dafür der kürzeste Weg. Die Grammatik deckt die Schreibweisen ab, die in der Rezeptsammlung des Users häufig sind (Namen aus mehreren Wörtern, Einheit mit Punkt wie „Pck.", Name ohne Menge). Eine Menge ohne Einheit („1 Zwiebel") wird ausdrücklich abgelehnt, damit sie nicht still mit Menge, aber ohne Einheit gespeichert wird – gegen ADR-S020-1. Die Zahlform ist bewusst eng: Vorzeichen, ein Komma oder Punkt am Anfang („+5", „,5") tippt niemand absichtlich ein; solche Zeilen gelten als Zutatenname und werden als „nicht gefunden" abgelehnt – falsch gespeichert wird nichts. Die Prüfung auf doppelte Zutaten betrifft nur ein Aggregat, das ein Request vollständig schreibt; anders als bei Namen über Aggregate hinweg (ADR-S105-2) gibt es kein TOCTOU-Fenster, und die Meldung braucht die Zeile.
+
+**Grenzen (vom User hingenommen):** Eine Basiseinheit aus mehreren Wörtern („kleine Dose") wird nicht erkannt. Brüche, Stückzahl ohne Einheit, Modifizierer und dieselbe Zutat mehrfach sind nicht möglich. US-607 löst das Zutatenfeld durch Zutaten je Schritt ab; diese ADR wird dann `Superseded`.
+
+**Verworfen:**
+- **Je Zutat eigene Felder für Menge, Einheit und Zutat** – beim Übertragen einer Vorlage drei Felder je Zeile statt einer Zeile; dafür ist US-607 mit Zerlegen beim Bestätigen jeder Zeile vorgesehen.
+- **Zerlegen im Client** – zweite Implementierung der Grammatik, Drift zum Server (ADR-S090-1: Validierung server-only).
+- **Breite Erkennung der Menge (auch Vorzeichen, Komma, Punkt am Anfang)** – lieferte nur passendere Meldungen für Eingaben, die niemand absichtlich macht, bei deutlich komplexerer Regel (User-Entscheidung).
+
+---
+
+### ADR-S135-3: Rezept-Feldregeln: Titel, Schritte, Prüfreihenfolge
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, arch:validation, db:constraint
+
+**Entscheidung:**
+- `title`: Pflicht, höchstens 100 Zeichen (normalisiert, ADR-S135-1). Eindeutig ohne Unterschied der Groß-/Kleinschreibung über den normalisierten Wert – durchgesetzt per funktionalem Unique-Index auf `LOWER(title)` (ADR-S105-2). Gespeichert wird die eingegebene Schreibweise (kein Auto-Capitalize, wie ADR-S051-3).
+- `steps`: mindestens ein Schritt; `instruction` je Schritt Pflicht, höchstens 1000 Zeichen. Zeilenumbrüche in einer Anweisung werden durch die Normalisierung zu Leerzeichen. Die Nummer vergibt der Server aus der Listenposition (ADR-S027-1), lückenlos.
+- Der Client schickt leere Schrittfelder nicht mit; der Server lehnt eine leere Anweisung trotzdem ab („Schritt-Anweisung darf nicht leer sein.") und hält die Regel so ohne den Client ein.
+- Alle Feldprüfungen laufen gesammelt (ADR-S000-1); die Titel-Eindeutigkeit prüft erst der Insert, also nur, wenn alle übrigen Prüfungen bestanden sind.
+- Meldungen zu Schritten keyen auf den Index in der **gesendeten** Liste; der Client ordnet sie dem Formularfeld zu, aus dem der Schritt stammt (leere Felder dazwischen werden nicht gesendet).
+
+**Begründung:** 100 Zeichen fassen jeden realen Rezepttitel, 1000 Zeichen einen langen Schritt; beides verhindert Missbrauch und UI-Überlauf. Die Eindeutigkeit des Titels ist ein Cross-Entity-Constraint und gehört nach ADR-S105-2 in die DB – daraus folgt die Prüfreihenfolge. Ein Hinweis schon beim Verlassen des Titelfelds ist ein Akzeptanzkriterium der MVP-Stufe von US-602.
+
+**Verworfen:** App-Layer-Prüfung des Titels vor den übrigen Prüfungen – TOCTOU (ADR-S105-2).
+
+---
+
+### ADR-S135-4: Rezeptformular ist eine Seite; Meldungen bleiben, Fokus und Nachfrage folgen festen Regeln
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, frontend:react
+
+**Entscheidung:**
+- „Rezept anlegen" ist eine eigene Seite mit eigener Adresse, kein Dialog. Nach dem Speichern zeigt die Anwendung die Detailansicht des neuen Rezepts.
+- Alle Meldungen kommen vom Server und bleiben stehen, bis erneut gespeichert wird – auch wenn der Nutzer das betroffene Feld schon korrigiert hat.
+- Fokus beim Öffnen: Titel. Nach „Schritt hinzufügen": das neue Schrittfeld. Nach einem Fehler: das erste fehlerhafte Feld in der Reihenfolge Titel → Zutatenfeld → Schritte.
+- Am Zutatenfeld steht dauerhaft ein Hinweis zur Eingabeform – kein Platzhalter, der beim Tippen verschwindet.
+- Abbrechen ohne Eingaben führt ohne Nachfrage zur Rezept-Liste. Mit Eingaben (ein Feld ist nach ADR-S135-1 nicht leer) erscheint die Nachfrage „Eingaben verwerfen?" mit „Verwerfen" und „Weiter bearbeiten"; beim Öffnen liegt der Fokus auf „Weiter bearbeiten". Escape und ein Klick neben die Nachfrage wirken wie „Weiter bearbeiten".
+- Während des Speicherns sind „Speichern", „Abbrechen", die Felder, „Schritt hinzufügen" und das Absenden per Enter gesperrt. Ein Speicherergebnis, das erst nach dem Verlassen des Formulars eintrifft, löst keine Weiterleitung aus.
+
+**Begründung:** Ein Rezept hat zu viele Felder für einen Dialog, am Handy erst recht; eine Seite lässt sich zudem direkt aufrufen. Die Meldungen zum Zutatenfeld betreffen mehrere Zeilen eines einzigen Feldes – verschwänden sie beim Tippen, gingen die zu noch nicht korrigierten Zeilen verloren. Der Fokus auf „Weiter bearbeiten" sorgt dafür, dass ein versehentliches Enter nichts verwirft; Escape und Klick daneben sind beiläufige Gesten und dürfen ebenso wenig Eingaben kosten.
+
+**Verworfen:**
+- **Dialog wie bei Zutaten** – zu klein für Titel, Zutatenfeld und mehrere Schritte.
+- **Meldung beim Bearbeiten des Feldes ausblenden** – s. Begründung.
+- **Escape = Verwerfen** – Datenverlust durch eine beiläufige Taste.
+
+---
+
+### ADR-S135-5: Direktlinks: Rezepte ja, Zutaten nein
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, resource:ingredients, frontend:react
+
+**Entscheidung:** Jedes Rezept hat eine eigene Adresse für seine Detailansicht, die sich direkt (Lesezeichen, neues Fenster, geteilter Link) aufrufen lässt; ebenso das Formular „Rezept anlegen". Eine unbekannte oder ungültige Kennung zeigt „Rezept nicht gefunden." mit dem Weg „Zur Rezept-Liste". Zutaten bekommen keine eigenen Adressen.
+
+**Begründung:** Rezepte werden zum Kochen am Tablet oder Handy geöffnet – oft wieder dasselbe Rezept, daher lohnt das Lesezeichen. Zutaten haben keine eigene Ansicht; sie werden in der Zutaten-Liste gepflegt, eine Adresse je Zutat hätte kein Ziel.
+
+**Verworfen:** Direktlinks für alle Entitäten – ohne Ansicht, auf die sie zeigen, nur Routing-Aufwand.
+
+---
+
+### ADR-S135-6: Verlassen des Rezeptformulars und Browserverlauf (MVP-Stufe von US-602)
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, frontend:react
+
+**Entscheidung:**
+- Wer das Formular mit Eingaben über die Navigationsleiste oder Browser-Zurück verlässt, bekommt dieselbe Nachfrage wie bei „Abbrechen". Browser-Zurück wird dafür im Formular abgefangen. Nach „Weiter bearbeiten" bleibt das Formular unter seiner eigenen Adresse geöffnet, und ein zweiter Versuch fragt wieder nach.
+- Während des Speicherns sind auch Navigationsleiste und Browser-Zurück gesperrt.
+- Verlauf: Speichern ersetzt das Formular im Verlauf durch die Detailansicht. Abbrechen ohne Eingaben und Verwerfen nach Abbrechen kehren zur Rezept-Liste zurück, ohne einen neuen Verlaufseintrag anzulegen. Wurde das Formular direkt geöffnet, ersetzt die Rezept-Liste das Formular. Zurück aus der Detailansicht oder der Liste führt damit nie ins Formular.
+
+**Begründung:** Eingaben eines Rezepts sind teuer – die Nachfrage muss jeden Weg aus dem Formular abdecken, nicht nur „Abbrechen". Ein Formular im Verlauf hinter einem gespeicherten Rezept lädt zum Doppelt-Anlegen ein. Während des Speicherns wäre eine Nachfrage mit „Verwerfen" irreführend, weil das Rezept trotzdem entsteht.
+
+**Verworfen:** `beforeunload`-Dialog des Browsers allein – greift nicht bei Navigation innerhalb der Anwendung und lässt keinen eigenen Text zu.
 
 ---
 

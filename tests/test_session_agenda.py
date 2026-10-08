@@ -298,6 +298,55 @@ def test_no_findings_yields_no_stub():
     assert anzahl == 0 and befunde == []
 
 
+# --- Nächster Lauf und Phasenstand -------------------------------------------
+# Ist die Story fertig, hat sie keine offenen Läufe mehr – das Modul schwieg dann, auch wenn
+# die Phase noch Stories ohne Feature-Datei hatte oder selbst abgeschlossen war.
+LUECKE = "(kein Lauf fällig – Stories bis Phase SKELETON ohne Feature-Datei: US-602)"
+
+
+def _next_run_ausgabe(offene_laeufe: str, phasenstand: str):
+    def ausgabe(modul, *argv):
+        assert modul == "next_run"
+        return phasenstand if "--phase-status" in argv else offene_laeufe
+    return ausgabe
+
+
+# Hermetisch: modul_next_run liest die aktuelle Story aus AGENT_MEMORY. Ohne Ersatz hingen die
+# Tests an der echten Datei – ohne Story dort schlugen zwei von ihnen fehl (Gegenprobe).
+MEMORY_MIT_STORY = "**Phase:** SKELETON\n**Aktuelle Story:** US-904 (Zutaten)\n"
+
+
+def test_offene_laeufe_der_story_beanspruchen_die_aufgabe(monkeypatch):
+    monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
+    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe("run-1 …", LUECKE))
+    block = agenda.modul_next_run()
+    assert block.beansprucht and "run-1" in block.inhalt
+    assert LUECKE not in block.inhalt  # ein fälliger Lauf geht vor
+
+
+def test_phasenstand_beansprucht_die_aufgabe_wenn_die_story_fertig_ist(monkeypatch):
+    monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
+    monkeypatch.setattr(agenda, "_modulausgabe",
+                        _next_run_ausgabe("(keine offenen Läufe)", LUECKE + "\n"))
+    block = agenda.modul_next_run()
+    assert block.beansprucht
+    assert "US-602" in block.inhalt and "US-602" in block.stub
+
+
+def test_phasenstand_greift_auch_ohne_aktuelle_story(monkeypatch):
+    monkeypatch.setattr(agenda, "_lies", lambda _pfad: "**Phase:** SKELETON\n")
+    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe("", LUECKE))
+    assert agenda.modul_next_run().beansprucht
+
+
+def test_ohne_phasenbefund_bleibt_die_aufgabe_frei(monkeypatch):
+    monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
+    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe("(keine offenen Läufe)", ""))
+    block = agenda.modul_next_run()
+    assert not block.beansprucht
+    assert "alle implementiert" in block.stub
+
+
 # --- Prioritäten: oberster voll, Rest kurz -----------------------------------
 # Neun Punkte im Volltext wären wieder die konkurrierenden Aufträge, gegen die die Rangfolge
 # gebaut ist; alle nur als Kurzform machte die Aufgabe unbearbeitbar.
@@ -447,6 +496,26 @@ def test_eine_lange_dateiliste_wird_gedeckelt(monkeypatch):
     assert "20 Datei(en) uncommitted" in inhalt
     assert "und 12 weitere" in inhalt
     assert "datei19.py" not in inhalt
+
+
+MEMORY_GERENDERT = (
+    "# Agent Memory\n\n**Phase:** SKELETON 🔄\n**Aktuelle Story:** US-602 (Rezepte)\n"
+    "**Nächster Lauf:** `run-2` „Anlegen·Success\" (Full-Stack · Singleton): „Rezept anlegen\"\n"
+    "  **Teil dieses Laufs** – Einträge, deren Fälligkeit an einem seiner Szenarien hängt. …\n"
+    "  - TD-S120-4 „Builder fehlt\" – an „Rezept anlegen\"\n"
+    "\n---\n\n<!--\n  eingerückter Kommentar, gehört nicht dazu\n-->\n"
+)
+
+
+def test_der_zustand_traegt_den_block_unter_dem_naechsten_lauf_mit(monkeypatch):
+    """Der Laufanhang von next_run ist eingerückt; ein Filter nur auf die Kopfzeilen ließe ihn
+    lautlos fallen – genau die Einträge, die der Lauf mitnehmen soll."""
+    monkeypatch.setattr(agenda, "_modulausgabe", lambda *_: MEMORY_GERENDERT)
+    inhalt = agenda.modul_memory_state().inhalt
+    assert "**Teil dieses Laufs**" in inhalt
+    assert "TD-S120-4 „Builder fehlt\"" in inhalt
+    assert "eingerückter Kommentar" not in inhalt  # nur, was direkt unter dem Lauf steht
+    assert inhalt.splitlines()[0].startswith("**Phase:")
 
 
 def test_der_repo_zustand_erzeugt_keine_stub_zeile(monkeypatch):

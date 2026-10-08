@@ -1,4 +1,8 @@
 {
+  "prozesscode._feature": {
+    "beurteilbar": 155,
+    "getoetet": 149
+  },
   "prozesscode.anchors": {
     "beurteilbar": 216,
     "getoetet": 125

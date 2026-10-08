@@ -1,6 +1,8 @@
 """Tests für next_run.py – Lauf-Resolver + Mapping-Integritäts-Guard."""
 import textwrap
 
+import pytest
+
 from prozesscode import next_run as nr  # noqa: E402
 
 
@@ -515,3 +517,384 @@ def test_render_reaches_cross_feature_when_story_done():
     done = {"Zutat anlegen", "Zutat löschen"}
     out = nr.render(memory, feature_texts=ALL_TEXTS, implemented=done)
     assert "Der Undo-Toast lässt sich manuell schließen" in out
+
+
+# --- Stories ohne Workshop und Phasen-Abschluss ---------------------------------
+# Der Resolver kennt nur Läufe. Eine Story der erreichten Phase, für die noch kein Workshop lief,
+# hat keine – und die Notiz meldete dann „kein Lauf in Phase SKELETON fällig", als sei die Phase
+# fertig. Die Fixture hat die Form von `docs/stories/szenario_*.md`: Inhaltsliste mit Phasen-Tag,
+# darunter die Detailzeile derselben Story, die nicht doppelt zählen darf.
+STORY_FILE = textwrap.dedent("""\
+    # Szenario 8 – Die Resteverwertung (Planung)
+
+    > Teil von [docs/stories/user-stories.md](../docs/stories/user-stories.md).
+
+    ## Inhalt
+
+    - Szenario-Narrativ (Rezept-Liste, Suche, Plan-Anpassung)
+    - US-801 (Rezept-Liste) [MVP]
+    - US-803 (Manuelle Plan-Anpassung) [SKELETON]
+    - US-804 (Kategorisierte Übersicht) [V2]
+    - US-805 (Reste-Idee (vage)) [PARKING]
+
+    ---
+
+    *   **US-803 (Manuelle Plan-Anpassung) [SKELETON]:** Als *Feierabend-Planer* möchte ich …
+    """)
+
+STORY_FILE_904 = textwrap.dedent("""\
+    ## Inhalt
+
+    - US-904 (Zutaten-Verwaltung) [SKELETON]
+    """)
+
+STORY_TEXTS = [STORY_FILE, STORY_FILE_904]
+SKELETON_DONE = {"Zutat anlegen", "Zutat löschen", "Der Undo-Toast lässt sich manuell schließen"}
+MEMORY = "**Phase:** SKELETON 🔄\n**Aktuelle Story:** US-904\n\n- {{NEXT_RUN}}\n"
+
+
+def test_story_of_reached_phase_without_feature_is_reported():
+    assert nr.open_story_stages(STORY_TEXTS, ALL_TEXTS, "SKELETON") == ["US-803"]
+
+
+def test_story_with_feature_is_not_reported():
+    feature_803 = STORY_FEATURE.replace("@US-904", "@US-803")
+    assert nr.open_story_stages(STORY_TEXTS, [STORY_FEATURE, feature_803], "SKELETON") == []
+
+
+def test_stories_of_earlier_phases_count_too():
+    assert nr.open_story_stages(STORY_TEXTS, ALL_TEXTS, "MVP") == ["US-801", "US-803"]
+
+
+def test_stories_outside_the_known_phases_are_never_reported():
+    # V2 und PARKING kennt der Resolver nicht als Phase – sie werden nie „erreicht".
+    assert nr.open_story_stages(STORY_TEXTS, ALL_TEXTS, "V1") == ["US-801", "US-803"]
+
+
+def test_unreadable_story_line_fails_loudly():
+    # Verschwände die Story still, meldete der Resolver am Ende eine fertige Phase.
+    text = STORY_FILE.replace("[SKELETON]\n", "[SKELETON] ← Walking Skeleton\n", 1)
+    with pytest.raises(ValueError, match="US-803"):
+        nr.open_story_stages([text], ALL_TEXTS, "SKELETON")
+
+
+def test_no_phase_means_no_story_finding():
+    assert nr.open_story_stages(STORY_TEXTS, ALL_TEXTS, None) == []
+
+
+def test_render_names_stories_without_feature_instead_of_a_finished_phase():
+    out = nr.render(MEMORY, feature_texts=ALL_TEXTS, implemented=SKELETON_DONE,
+                    story_texts=STORY_TEXTS)
+    assert "US-803" in out and "gherkin-workshop" in out
+    assert "abgeschlossen" not in out
+
+
+def test_a_due_run_comes_before_a_missing_feature():
+    out = nr.render(MEMORY, feature_texts=ALL_TEXTS, implemented=set(), story_texts=STORY_TEXTS)
+    assert "`run-1`" in out and "US-803" not in out
+
+
+def test_render_announces_the_finished_phase():
+    out = nr.render(MEMORY, feature_texts=ALL_TEXTS, implemented=SKELETON_DONE,
+                    story_texts=[STORY_FILE_904])
+    assert "Phase SKELETON abgeschlossen" in out
+    assert "Phasen-Review" in out
+    assert "Phase MVP" in out  # was danach kommt, bleibt sichtbar
+
+
+def test_phase_status_is_silent_while_a_run_is_due():
+    assert nr.phase_status(MEMORY, ALL_TEXTS, set(), STORY_TEXTS) is None
+
+
+def test_phase_status_is_silent_while_a_dependency_blocks():
+    # Ein Lauf der Phase ist offen und wartet nur auf seine Kante: kein Befund über die Phase.
+    status = nr.phase_status(MEMORY, [CROSS_FEATURE], {"Zutat anlegen"}, story_texts=[])
+    assert status is None
+
+
+def test_phase_status_reports_missing_features_and_finished_phase():
+    luecke = nr.phase_status(MEMORY, ALL_TEXTS, SKELETON_DONE, STORY_TEXTS)
+    fertig = nr.phase_status(MEMORY, ALL_TEXTS, SKELETON_DONE, [STORY_FILE_904])
+    assert "US-803" in luecke
+    assert "abgeschlossen" in fertig
+
+
+# --- Stufen einer Story ----------------------------------------------------------
+# Eine Story hat Akzeptanzkriterien je Stufe. Galt sie mit ihrer ersten Feature-Datei als
+# erledigt, waren spätere Stufen unsichtbar (bei US-904 und US-602 nur per Hand in AGENT_MEMORY
+# überbrückt). Die Fixture trägt die Kopf-Varianten des Bestands.
+STORY_FILE_STUFEN = textwrap.dedent("""\
+    ## Inhalt
+
+    - US-904 (Zutaten-Verwaltung) [SKELETON]
+    - US-602 (Manuelle Erfassung) [SKELETON]
+    - US-607 (Zutaten-Zuordnung) [MVP]
+    - US-701 (Regeln) [MVP]
+
+    ---
+
+    *   **US-904 (Zutaten-Verwaltung) [SKELETON]:** Als *Rezept-Sammler* …
+        *   **Akzeptanzkriterien (SKELETON-Version):**
+            *   Anlegen.
+        *   **Akzeptanzkriterien (MVP-Version – Bearbeiten + Modifier):**
+            *   Bearbeiten.
+        *   **Akzeptanzkriterien (V1-Version – Tags):**
+            *   Tags.
+
+    *   **US-602 (Manuelle Erfassung) [SKELETON]:** Als *Rezept-Sammler* …
+        *   **Akzeptanzkriterien (SKELETON):**
+            *   Formular.
+        *   **Akzeptanzkriterien (MVP – Bild-Upload, Basis-Portion):**
+            *   Upload.
+
+    *   **US-607 (Zutaten-Zuordnung) [MVP]:** Als *Rezept-Sammler* …
+        *   **Akzeptanzkriterien (MVP – manuelle Erfassung):**
+            *   Je Schritt.
+        *   **Akzeptanzkriterien (MVP – Zutatenzeile):**
+            *   Brüche.
+        *   **Akzeptanzkriterien (V2 – Import-Workflow):**
+            *   Import.
+
+    *   **US-701 (Regeln) [MVP]:** Als *Feierabend-Planer* …
+        *   **Akzeptanzkriterien:**
+            *   Regel.
+    """)
+
+FEATURE_602 = textwrap.dedent("""\
+    @US-602
+    Feature: Rezepte erfassen
+
+      # @phase: SKELETON
+
+      Scenario: Rezept anlegen
+        When a
+        Then b
+    """)
+FEATURE_607 = FEATURE_602.replace("@US-602", "@US-607").replace("SKELETON", "MVP")
+FEATURE_701 = FEATURE_602.replace("@US-602", "@US-701").replace("SKELETON", "MVP")
+STUFEN_FEATURES = [STORY_FEATURE, FEATURE_602, FEATURE_607, FEATURE_701]
+
+
+def test_story_stages_come_from_the_acceptance_headers():
+    stages = nr.story_stages([STORY_FILE_STUFEN])
+    assert stages["US-904"] == ("SKELETON", "MVP", "V1")
+    assert stages["US-602"] == ("SKELETON", "MVP")
+    assert stages["US-607"] == ("MVP", "V2")  # zwei MVP-Blöcke sind eine Stufe
+    assert stages["US-701"] == ("MVP",)  # Block ohne Phase: die Phase der Story
+
+
+def test_story_without_detail_section_has_its_listed_phase():
+    assert nr.story_stages(STORY_TEXTS)["US-801"] == ("MVP",)
+
+
+def test_later_stage_of_a_story_with_feature_is_reported_once_reached():
+    assert nr.open_story_stages([STORY_FILE_STUFEN], STUFEN_FEATURES, "SKELETON") == []
+    assert nr.open_story_stages([STORY_FILE_STUFEN], STUFEN_FEATURES, "MVP") == [
+        "US-602 (MVP)", "US-904 (MVP)"]
+
+
+def test_stage_named_in_stufen_counts_as_done():
+    feature = FEATURE_602.replace("# @phase: SKELETON", "# @phase: SKELETON\n  # @stufen: SKELETON, MVP")
+    features = [STORY_FEATURE, feature, FEATURE_607, FEATURE_701]
+    assert nr.open_story_stages([STORY_FILE_STUFEN], features, "MVP") == ["US-904 (MVP)"]
+
+
+def test_stufen_replaces_the_file_phase():
+    # Nennt @stufen nur MVP, ist SKELETON offen – @stufen ist die vollständige Angabe.
+    feature = FEATURE_602.replace("# @phase: SKELETON", "# @phase: SKELETON\n  # @stufen: MVP")
+    features = [STORY_FEATURE, feature, FEATURE_607, FEATURE_701]
+    assert nr.open_story_stages([STORY_FILE_STUFEN], features, "SKELETON") == ["US-602 (SKELETON)"]
+
+
+def test_story_without_feature_is_still_named_without_stage():
+    assert nr.open_story_stages([STORY_FILE_STUFEN], [STORY_FEATURE], "MVP") == [
+        "US-602", "US-607", "US-701", "US-904 (MVP)"]
+
+
+def test_stages_beyond_the_known_phases_are_never_reported():
+    assert "US-607 (V2)" not in nr.open_story_stages([STORY_FILE_STUFEN], STUFEN_FEATURES, "V1")
+
+
+def test_unreadable_acceptance_header_fails_loudly():
+    # Ein Kopf, dessen Phase nicht lesbar ist, ließe die Stufe still verschwinden.
+    text = STORY_FILE_STUFEN.replace("(MVP – Bild-Upload, Basis-Portion)", "(Erweiterung)")
+    with pytest.raises(ValueError, match="US-602"):
+        nr.story_stages([text])
+
+
+def test_real_story_files_parse():
+    # Echtes Artefakt: Jeder Akzeptanzkriterien-Kopf im Bestand muss lesbar sein.
+    stages = nr.story_stages(nr._story_texts())
+    assert stages and all(stage for stage in stages.values())
+
+
+def test_render_names_the_open_stage():
+    memory = MEMORY.replace("SKELETON", "MVP")
+    out = nr.render(memory, feature_texts=STUFEN_FEATURES,
+                    implemented=SKELETON_DONE | {"Zutat bearbeiten", "Rezept anlegen"},
+                    story_texts=[STORY_FILE_STUFEN])
+    assert "US-904 (MVP)" in out and "gherkin-workshop" in out
+
+
+def test_check_flags_stufen_the_story_does_not_have():
+    feature = FEATURE_602.replace("# @phase: SKELETON", "# @phase: SKELETON\n  # @stufen: SKELETON, V1")
+    violations = nr.check_stufen([feature], [STORY_FILE_STUFEN])
+    assert len(violations) == 1 and "US-602" in violations[0] and "V1" in violations[0]
+
+
+def test_check_accepts_stufen_the_story_has():
+    feature = FEATURE_602.replace("# @phase: SKELETON", "# @phase: SKELETON\n  # @stufen: SKELETON, MVP")
+    assert nr.check_stufen([feature], [STORY_FILE_STUFEN]) == []
+
+
+# --- Aufrufpfad: die CLI liest die Story-Dateien wirklich -------------------------
+def _bestand(tmp_path, monkeypatch, story_texts):
+    features, stories = tmp_path / "features", tmp_path / "stories"
+    features.mkdir()
+    stories.mkdir()
+    for i, text in enumerate(ALL_TEXTS):
+        (features / f"f{i}.feature").write_text(text, encoding="utf-8")
+    for i, text in enumerate(story_texts):
+        (stories / f"szenario_{i}_x.md").write_text(text, encoding="utf-8")
+    (stories / "user-stories.md").write_text("- US-999 (Index) [SKELETON]\n", encoding="utf-8")
+    memory = tmp_path / "AGENT_MEMORY.md"
+    memory.write_text(MEMORY, encoding="utf-8")
+    monkeypatch.setattr(nr, "_FEATURES_DIR", features)
+    monkeypatch.setattr(nr, "_STORIES_DIR", stories)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: SKELETON_DONE)
+    # Hermetisch: ohne diese beiden läse --render die echten Tracker des Repos.
+    monkeypatch.setattr(nr, "_TD_FILE", tmp_path / "tech-debt.md")
+    monkeypatch.setattr(nr, "_OQ_FILE", tmp_path / "open-questions.md")
+    return str(memory)
+
+
+def test_cli_render_reads_the_story_files(tmp_path, monkeypatch, capsys):
+    memory = _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    assert nr.main(["--render", memory]) == 0
+    out = capsys.readouterr().out
+    assert "US-803" in out
+    assert "US-999" not in out  # der Index ist keine Story-Datei
+
+
+def test_cli_phase_status_prints_the_finding(tmp_path, monkeypatch, capsys):
+    memory = _bestand(tmp_path, monkeypatch, [STORY_FILE_904])
+    assert nr.main(["--phase-status", memory]) == 0
+    assert "Phase SKELETON abgeschlossen" in capsys.readouterr().out
+
+
+def test_cli_phase_status_prints_nothing_while_a_run_is_due(tmp_path, monkeypatch, capsys):
+    memory = _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", set)
+    assert nr.main(["--phase-status", memory]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_cli_check_reports_wrong_stufen(tmp_path, monkeypatch, capsys):
+    features, stories, e2e = tmp_path / "features", tmp_path / "stories", tmp_path / "e2e"
+    for d in (features, stories, e2e):
+        d.mkdir()
+    feature = FEATURE_602.replace("# @phase: SKELETON", "# @phase: SKELETON\n  # @stufen: SKELETON, V1")
+    (features / "recipes.feature").write_text(feature, encoding="utf-8")
+    (stories / "szenario_6_x.md").write_text(STORY_FILE_STUFEN, encoding="utf-8")
+    monkeypatch.setattr(nr, "_FEATURES_DIR", features)
+    monkeypatch.setattr(nr, "_STORIES_DIR", stories)
+    monkeypatch.setattr(nr, "_E2E_DIR", e2e)
+    assert nr.main(["--check"]) == 1
+    assert "V1" in capsys.readouterr().err
+
+
+# --- Laufanhang: Einträge, deren Fälligkeit an einem Szenario des Laufs hängt --------
+# Fixtures in Bestandsform (tech-debt.md, open-questions.md, AGENT_MEMORY.md).
+TD_TEXT = textwrap.dedent("""\
+    ## TD-S120-4 — Kein Test-Data-Builder für `IngredientDbType`
+    **Fällig:** Szenario:„Leerer Name", Phase:MVP – die nächste Entität mit eigenen Tests.
+    **Problem:** p
+    **Behebung:** b
+
+    ## TD-S108-2 — Frontend: kein Fokus-Management nach Löschen
+    **Fällig:** Szenario:„Zutat anlegen", Phase:V1 – erster Navigationsschritt.
+    **Problem:** p
+    **Behebung:** b
+
+    ## TD-S135-1 — Ausgaben unbegrenzt lang
+    **Fällig:** Phase:MVP – Querschnitt.
+    **Problem:** p
+    **Behebung:** b
+    """)
+
+OQ_TEXT = textwrap.dedent("""\
+    ## OQ-S135-2 — Zutatenzeile zerlegen: unscharfe Zuordnung
+    **Frage:** Wie ordnet der Parser zu?
+    **Fällig:** Szenario:"Leere Einheit", Phase:MVP – im Workshop der MVP-Stufe.
+    **Hintergrund:** h
+    """)
+
+MEMORY_MIT_PRIORITAET = MEMORY + textwrap.dedent("""\
+
+    ## Nächste Prioritäten
+
+    - **Guideline erweitern** — `Fällig: Szenario:„Leerer Name", Phase:MVP` · Quelle: x · Done: y
+    - **Ohne Szenario** — `Fällig: Phase:MVP` · Quelle: x · Done: y
+    """)
+
+
+def _run(feature_text: str, number: int) -> dict:
+    return next(g for g in nr.group_runs(nr.parse_scenarios(feature_text)) if g["number"] == number)
+
+
+def test_tracker_eintraege_liest_td_oq_und_prioritaeten_in_bestandsform():
+    eintraege = nr.tracker_eintraege(TD_TEXT, OQ_TEXT, MEMORY_MIT_PRIORITAET)
+    kennungen = [e[0] for e in eintraege]
+    assert kennungen == ["TD-S120-4", "TD-S108-2", "TD-S135-1", "OQ-S135-2", "Priorität", "Priorität"]
+    assert eintraege[0][1] == "Kein Test-Data-Builder für `IngredientDbType`"
+    assert eintraege[3][1] == "Zutatenzeile zerlegen: unscharfe Zuordnung"
+    assert eintraege[4][1] == "Guideline erweitern"
+
+
+def test_laufanhang_nennt_jeden_eintrag_mit_seinem_szenario():
+    eintraege = nr.tracker_eintraege(TD_TEXT, OQ_TEXT, MEMORY_MIT_PRIORITAET)
+    block = nr.laufanhang(_run(FEATURE_WITH_RUNS, 2), eintraege)
+    assert "**Teil dieses Laufs**" in block
+    assert "TD-S120-4 „Kein Test-Data-Builder für `IngredientDbType`\" – an „Leerer Name\"" in block
+    assert "OQ-S135-2 „Zutatenzeile zerlegen: unscharfe Zuordnung\" – an „Leere Einheit\"" in block
+    assert "Priorität „Guideline erweitern\" – an „Leerer Name\"" in block
+
+
+def test_laufanhang_laesst_eintraege_anderer_laeufe_und_ohne_szenario_weg():
+    eintraege = nr.tracker_eintraege(TD_TEXT, OQ_TEXT, MEMORY_MIT_PRIORITAET)
+    block = nr.laufanhang(_run(FEATURE_WITH_RUNS, 2), eintraege)
+    assert "TD-S108-2" not in block       # hängt an „Zutat anlegen" = run-1
+    assert "TD-S135-1" not in block       # nur Phase – kommt über td-due, nicht hier
+    assert "Ohne Szenario" not in block
+
+
+def test_laufanhang_ist_leer_ohne_treffer():
+    assert nr.laufanhang(_run(FEATURE_WITH_RUNS, 3), nr.tracker_eintraege(TD_TEXT, OQ_TEXT, "")) == ""
+
+
+def test_laufanhang_ist_eingerueckt_damit_er_zur_lauf_zeile_gehoert():
+    block = nr.laufanhang(_run(FEATURE_WITH_RUNS, 1), nr.tracker_eintraege(TD_TEXT, "", ""))
+    assert block and all(zeile.startswith("  ") for zeile in block.splitlines())
+
+
+def test_render_haengt_den_block_an_den_naechsten_lauf():
+    memory = "**Aktuelle Story:** US-904\n**Nächster Lauf:** {{NEXT_RUN}}\n"
+    out = nr.render(memory, feature_texts=[FEATURE_WITH_RUNS], implemented=set(),
+                    eintraege=nr.tracker_eintraege(TD_TEXT, OQ_TEXT, ""))
+    zeilen = out.splitlines()
+    lauf = next(i for i, z in enumerate(zeilen) if z.startswith("**Nächster Lauf:** `run-1`"))
+    assert "**Teil dieses Laufs**" in zeilen[lauf + 1]
+    assert "TD-S108-2" in zeilen[lauf + 2]
+    assert "TD-S120-4" not in out          # gehört zu run-2, nicht zum nächsten Lauf
+
+
+def test_cli_render_liest_tracker_dateien(tmp_path, monkeypatch, capsys):
+    memory = _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    (tmp_path / "tech-debt.md").write_text(
+        "## TD-S120-4 — Builder fehlt\n**Fällig:** Szenario:„Zutat anlegen\", Phase:MVP – x\n"
+        "**Problem:** p\n**Behebung:** b\n", encoding="utf-8")
+    monkeypatch.setattr(nr, "_gather_implemented", set)
+    assert nr.main(["--render", memory]) == 0
+    out = capsys.readouterr().out
+    assert "**Teil dieses Laufs**" in out
+    assert "TD-S120-4 „Builder fehlt\" – an „Zutat anlegen\"" in out

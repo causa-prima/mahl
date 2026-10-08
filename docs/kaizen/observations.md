@@ -281,3 +281,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Aufschubgrund: Umfang – vor dem Umbenennen müssen alle Verweise repo-weit gesucht werden (LL-S124-1: Umbenennung ohne Verweissuche); die Session wird gerade abgeschlossen
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: LL-S124-1
+
+## OBS-S135-1 – Arbeitsnotizen eines Gherkin-Workshops überstehen eine lange Session nicht
+- Quelle: User
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Gherkin
+- Beobachtung: Im US-602-Workshop lagen die Entscheidungen der Regelentdeckung in einer Notizdatei im Scratchpad (us602-entscheidungen.md). Der Workshop lief über mehrere Tage, mit mehreren Kompaktierungen und einem Neustart des Rechners dazwischen; beim Fortsetzen war die Datei weg. Die ADRs nach der Freigabe musste ich aus dem Kopf der Feature-Datei rekonstruieren – das ging nur, weil der Kopf ausführlich war; Entscheidungen, die nicht dort landeten (z. B. verworfene Alternativen, Begründungen aus dem Dialog), sind nur noch im Session-Log. Laut User war die Länge vorher nicht absehbar, ein Gherkin-Workshop ist aber vermutlich generell öfter eine größere Sache, bei der das vorkommen kann. Der Skill sagt nicht, wo Zwischenstände (Story-Kern, Dialog-Antworten verbatim, Tiefe je Regel, Entscheidungen für ADRs) liegen sollen, damit sie Kompaktierung und Neustart überstehen.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – im Session-Abschluss zur Erfassung entschieden, Lösung über den Drain
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

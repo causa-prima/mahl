@@ -44,8 +44,8 @@ Jedes Szenario hat eine eigene Datei unter `docs/stories/`. US-ID-Präfix korrel
 | [Szenario 2 – Vorrats-Check](stories/szenario_2_vorratscheck.md) | Pantry-Check, Mengen-Delta, Fix-Einträge | US-201, US-202, US-203 |
 | [Szenario 3 – Einkauf](stories/szenario_3_einkauf.md) | Eiliger Einkauf, Non-Food, Offline | US-301 … US-307 |
 | [Szenario 4 – Familien-Einkauf](stories/szenario_4_familien-einkauf.md) | Undo, Live-Sync | US-401, US-402 |
-| [Szenario 5 – Kochen](stories/szenario_5_kochen.md) | Kochmodus, Skalierung, Bewertung | US-501 … US-517 |
-| [Szenario 6 – Rezept-Erfassung](stories/szenario_6_rezept-erfassung.md) | Import, Pflege, Sub-Rezepte | US-601 … US-617 |
+| [Szenario 5 – Kochen](stories/szenario_5_kochen.md) | Kochmodus, Skalierung, Bewertung | US-501 … US-519 |
+| [Szenario 6 – Rezept-Erfassung](stories/szenario_6_rezept-erfassung.md) | Import, Pflege, Sub-Rezepte | US-601 … US-622 |
 | [Szenario 7 – Regeln & Setup](stories/szenario_7_regeln-setup.md) | Harte/Weiche Regeln, Fallback | US-701, US-702, US-703 |
 | [Szenario 8 – Resteverwertung](stories/szenario_8_resteverwertung.md) | Rezept-Liste, Suche, Plan-Anpassung | US-801 … US-804 |
 | [Szenario 9 – Datenpflege](stories/szenario_9_datenpflege.md) | Stammdaten, Einheiten, Backup, Tag-Hierarchie | US-901 … US-910 |

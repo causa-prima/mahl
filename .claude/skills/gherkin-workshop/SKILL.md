@@ -93,6 +93,53 @@ Notiere alle Blöcke schriftlich – die [Scenario-Entdeckung](#GHW-scenario-ent
 
 ---
 
+<a id="GHW-nutzungskontext"></a>
+## Nutzungskontext & Ablauf (Dialog mit User, vor der Regelentdeckung)
+
+Der [UX-Kontext](#GHW-ux-kontext) und die [UI-Verhaltens-Checkliste](#GHW-ui-verhaltens-checkliste)
+prüfen Formular-Mechanik: Leerzustand, Feedback, Fokus, Abbrechen. Ob der Weg zum Ziel überhaupt
+passt, entscheidet sich früher – daran, wer in welcher Lage was erreichen will und wie diese
+Person über die Sache denkt. Fehlt dieser Schritt, entsteht die Eingabe entlang des Datenmodells
+statt entlang des Nutzers, und ganze Szenarien-Gruppen werden für eine Bedienung geschrieben, die
+niemand so haben will.
+
+**Beispiel:** Eine Zutatenzeile als „Zutat suchen, dann Menge in deren Einheit eintragen" folgt dem
+Datenmodell. Gedacht und gesprochen wird aber „250 g Mehl" – Menge → Einheit → Zutat → Zusatz – und
+„5 Äpfel" ganz ohne Einheit. Wer das erst nach den Szenarien bemerkt, schreibt eine Gruppe von
+Such-Szenarien für eine Eingabe, die danach einem anderen Modell weicht.
+
+**Vorgehen:** Entwirf die Punkte unten zuerst selbst – aus den Personas in
+`docs/stories/user-stories.md`, dem Szenario-Narrativ der Story und vorhandenen Beispieldaten –,
+dann lege den Entwurf dem User zur Korrektur vor. Fragen ohne eigenen Entwurf verschieben die
+Vorarbeit auf den User.
+
+- **Wer, wo, womit:** Persona, Situation (Küche, unterwegs, abends auf dem Sofa), Gerät, freie
+  Hände, Ablenkung.
+- **Auslöser und Ziel:** Was hat die Person gerade vor sich (Kochbuch, Webseite, nur den Kopf), und
+  woran merkt sie, dass sie fertig ist?
+- **Mentales Modell:** Wie würde sie die Sache in eigenen Worten sagen oder aufschreiben – in
+  welcher Reihenfolge, in welcher Form? Die Eingabe folgt dieser Form, nicht dem Datenmodell.
+  Liegen echte Beispieldaten vor (Altbestand, Import-Quellen), am Bestand prüfen, nicht schätzen.
+- **Vorbilder:** Wie lösen etablierte Apps, die der User kennt, dieselbe Aufgabe? Was davon
+  übernehmen, was bewusst nicht?
+- **Ablauf:** Schritte vom Auslöser bis zum Ziel, einschließlich der späteren Korrektur (z.B. nach
+  dem Kochen eine Menge anpassen).
+- **Bewertete Alternativen:** Für jede Darstellungs- oder Eingabeentscheidung, die Szenarien
+  entstehen oder wegfallen lässt, mindestens eine Alternative mit ihrem Tradeoff gegen die Punkte
+  oben bewerten. „Kennt man so" oder „war im alten System so" ist kein Argument, sondern der
+  Hinweis auf eine Konvention, deren Nutzen hier erst zu zeigen ist.
+
+**Abgrenzung:** Layout, Komponenten und Abstände gehören nicht hierher, sondern in den UI-Entwurf
+vor der Umsetzung (Skill `implementing-scenario`, Vorabanalyse). Hier zählt nur, was das
+**Verhalten** und damit die Szenarien ändert.
+
+**Ergebnis:** Ein schriftlicher Block „Nutzungskontext", vom User bestätigt. Er ist der Maßstab für
+die Fragen der [Regelentdeckung](#GHW-regelentdeckung), geht verbatim an die Agents der
+[Scenario-Entdeckung](#GHW-scenario-entdeckung) und landet gekürzt in der Beschreibung unter
+`Feature:` der Feature-Datei – dort liest ihn der UI-Entwurf bei der Umsetzung.
+
+---
+
 <a id="GHW-regelentdeckung"></a>
 ## Regelentdeckung (Dialog mit User)
 
@@ -150,6 +197,8 @@ Der Dialog ist abgeschlossen, wenn:
   applicable" markiert
 - Keine offenen Widersprüche bestehen – prüfe: Widerspricht Antwort X der Antwort Y
   zu derselben Entität / Operation / Zustand?
+- Keine Regel verlangt eine Bedienung, die dem bestätigten [Nutzungskontext](#GHW-nutzungskontext)
+  widerspricht (etwa eine Eingabereihenfolge gegen das mentale Modell)
 - Technische Fehler: entweder story-spezifisches Verhalten dokumentiert, oder explizit
   bestätigt dass die allgemeine Behandlung (adr.md: Querschnittliche Fehlerbehandlung)
   gilt – „keine Antwort" ist kein Abschluss
@@ -219,6 +268,77 @@ in adr.md dokumentieren, bevor Szenarien geschrieben werden.
 
 ---
 
+<a id="GHW-regel-tiefe"></a>
+## Tiefe je Regel (Dialog mit User, nach der Regelentdeckung)
+
+Die Agents und der [Review-Loop](#GHW-review-loop) prüfen jede Regel auf Vollständigkeit: jede
+Regel ein Fehlerszenario, jede Mehrdeutigkeit aufgelöst. Für eine Regel, die bald ersetzt wird, wirkt
+das wie eine Sperrklinke – jede Runde findet neue Ränder, jeder Fix bringt eine neue Regel mit neuen
+Rändern, und spezifiziert, umgesetzt und getestet wird Verhalten, das danach weicht. Dieser Schritt
+legt deshalb vor der [Scenario-Entdeckung](#GHW-scenario-entdeckung) fest, wie tief jede Regel
+spezifiziert wird.
+
+**Vorgehen:** Beantworte für jede Regel aus der [Regelentdeckung](#GHW-regelentdeckung) –
+einschließlich der [UI-Verhaltens-Checkliste](#GHW-ui-verhaltens-checkliste) – zwei Fragen. Entwirf
+die Antworten selbst und begründe jede mit der Story, auf die sie sich stützt; dann lege die Liste
+dem User zur Bestätigung vor. Wie lange eine Regel gilt, ist Fachwissen.
+
+1. **Ab wann wird sie gebraucht?** Wird sie erst in einer späteren Ausbaustufe gebraucht, wird sie
+   auch erst dort spezifiziert und umgesetzt. Einzige Ausnahme: Der Aufschub ist teurer als das
+   Umsetzen jetzt. „Einfach umzusetzen" allein ist kein Grund.
+   - **Kosten jetzt:** Code, die Tests dazu und das Risiko, dass sich erst beim Ausprobieren
+     zeigt, dass typische Fälle falsch laufen – die Korrektur kostet dann einen ganzen
+     Entwicklungsdurchlauf.
+   - **Kosten später:** bestehende Daten migrieren, fertige Teile umbauen.
+2. **Ist ihre Ablösung fest eingeplant?** Fest eingeplant heißt: Eine Story ersetzt oder ändert die
+   Regel ausdrücklich und ist einer zugesagten Ausbaustufe zugeordnet. Eine Story mit dem Vermerk
+   „kommt vielleicht" (z. B. eine geparkte Story) oder eine offene Frage zählt nicht – die Regel
+   gilt dann als stabil. Mit zu prüfen sind die Akzeptanzkriterien **späterer Stufen derselben
+   Story**: Ändert eins davon das Verhalten, ist die Regel für die frühere Stufe eine
+   Übergangsregel. Ein Szenario, das dieses Verhalten behauptet – auch dessen Abwesenheit („keine
+   Meldung am Titel") –, wird so geschrieben, dass es die spätere Stufe übersteht, oder kommt im
+   Kopf der Feature-Datei auf die Liste der Punkte für den Workshop jener Stufe.
+
+| Einstufung | Tiefe |
+|---|---|
+| Stabil | Volle Tiefe, wie in den folgenden Schritten beschrieben |
+| Übergangsregel (Ablösung fest eingeplant) | Gutfall und die typischsten Fehler – keine Grenzfälle, keine weiteren Partitionen. Verhalten außerhalb dieser Fälle darf unbestimmt bleiben, solange kein [teurer Schaden](#GHW-schaden) möglich ist |
+
+**Typisch heißt häufig:** ein Fall, der im beabsichtigten Gebrauch oft vorkommt – belegt durch seine
+Häufigkeit in echten Daten, wo es sie gibt, sonst durch den [Nutzungskontext](#GHW-nutzungskontext).
+Ein seltener Fall fällt weg, auch wenn er normal ist. Beispiel: In einer Sammlung von gut tausend
+Zutatenzeilen schreiben zehn Menge und Einheit zusammen („250g") – normal, aber selten; für eine
+Übergangslösung kein eigenes Szenario.
+
+**Eingaben, die erst die Nachfolgelösung unterstützt,** sind keine typischen Fehler, auch wenn sie
+häufig sind – sie werden mit der Ablösung gültig. Sie bekommen nur dann ein Szenario, wenn ihre
+unbestimmte Behandlung sie still falsch speichern könnte (sie sehen wohlgeformt aus, werden aber
+anders gemeint); sonst genügt der unbestimmte Pfad.
+
+<a id="GHW-schaden"></a>
+**Schaden durch unbestimmtes Verhalten:** Möglich sind falsche oder verlorene Daten und eine
+Seite, die sich nicht mehr bedienen lässt. Ein solcher Schaden braucht ein Szenario, wenn seine
+Behebung – wie oft er vorkommt mal was sie kostet – teurer ist als Szenario und Umsetzung. Daten,
+die vor der nächsten Ausbaustufe ohnehin verworfen werden, senken diese Kosten. Beispiel: Eine
+gelöschte Zutat lässt ein Rezept nicht mehr anzeigen – selten, einmalig zu beheben, und die Daten
+sind noch Wegwerfdaten; kein Szenario.
+
+**Stabiles in einer Übergangsregel:** Enthält eine Übergangsregel eine stabile Regel – etwa die
+Wertgrenzen eines gespeicherten Felds, die auch die Nachfolgelösung prüft –, behält die stabile ihre
+volle Tiefe. Benenne den stabilen Teil über seine Quelle (ADR, Akzeptanzkriterium); volle Tiefe
+bekommt nur, was diese Quelle festlegt, alles Übrige derselben Regel bleibt Übergang. Beispiel: Die
+Wertgrenzen einer Menge (größer als 0, Nachkommastellen, Maximum) stehen in einer ADR und sind
+stabil; woran der Zerleger eine Menge erkennt (Vorzeichen oder Komma am Zeilenanfang), steht dort
+nicht und gehört zum Zerleger – keine Grenzfälle dafür.
+
+**Ergebnis:** Eine Liste „Tiefe je Regel" (Regel · gebraucht ab · ablösende Story oder „keine fest
+eingeplante" · Tiefe), vom User bestätigt. Sie geht verbatim an die Agents der
+[Scenario-Entdeckung](#GHW-scenario-entdeckung) und an den Review-Agenten. Der Kopf der
+Feature-Datei nennt die Übergangsregeln mit ihrer ablösenden Story, damit Umsetzung und spätere
+Workshops sehen, welche Szenarien mit der Ablösung entfallen.
+
+---
+
 <a id="GHW-scenario-entdeckung"></a>
 ## Parallele Scenario-Entdeckung
 
@@ -233,6 +353,8 @@ Jeder Agent bekommt (jeweils aus dem gleichnamigen Block des [Kontext-Ladens](#G
 - [Constraints aus adr.md](#GHW-adr-constraints) – nur US-bezogene + allgemeine Architekturregeln
 - Bestehende Szenarien aus der [Bestandsanalyse](#GHW-bestandsanalyse) („keine" wenn neu)
 - [UX-Kontext](#GHW-ux-kontext) – welche UX-Prinzipien gelten, mit Relevanzbewertung
+- [Nutzungskontext](#GHW-nutzungskontext) – vom User bestätigt, verbatim
+- [Tiefe je Regel](#GHW-regel-tiefe) – vom User bestätigt, verbatim
 
 **Warum parallel?** Jede Technik hat blinde Flecken. Example Mapping findet Business Rules,
 State-Transition findet vergessene Zustandskombinationen, Input-Partition findet
@@ -317,6 +439,7 @@ Füge ihn zusammen mit diesen Inputs in den Agent-Aufruf ein:
 - Feature-Entwurf aus [Synthese](#GHW-synthese) (vollständig, verbatim)
 - User Story + Akzeptanzkriterien (verbatim aus [Kontext laden](#GHW-kontext-laden), nicht paraphrasiert)
 - Constraints aus adr.md (aus [Kontext laden](#GHW-kontext-laden))
+- [Tiefe je Regel](#GHW-regel-tiefe) (vom User bestätigt, verbatim)
 
 **Nach dem Review – Loop (max. 3 Iterationen):**
 
@@ -353,6 +476,11 @@ Konvention: englischer Plural des Domain-Entitätsnamens aus docs/reference/glos
 Wenn eine US mehrere Entitäten betrifft, benenne die Datei nach der primären Entität
 (der, die in der US-Überschrift dominant ist); falls unklar: User fragen.
 Datei vollständig ersetzen (oder neu anlegen) mit dem finalen Entwurf.
+
+**Stufen eintragen:** Im Header `# @stufen: <PHASE>[, <PHASE>]` – die Stufen der Story, deren
+Akzeptanzkriterien jetzt vollständig spezifiziert sind; eine nur teilweise spezifizierte Stufe
+bleibt draußen, damit sie als „ohne Workshop" wieder vorgelegt wird. Format und Wirkung:
+[Datei-Direktiven](references/scenario-clustering.md#CLU-datei-direktiven).
 
 **Entscheidungen dokumentieren:**
 Wurden im Workshop explizite Entscheidungen getroffen (z.B. Fehlermeldungstext,

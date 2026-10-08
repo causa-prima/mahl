@@ -8,6 +8,12 @@ Constraints: [aus Kontext-Laden / Regelentdeckung]
 Bestehende Szenarien: [falls vorhanden, sonst „keine"]
 Glossar-Entitäten: [aus dem Kontext-Laden]
 UX-Kontext: [aus dem Block „UX-Kontext" – welche UX-Prinzipien gelten, mit Relevanzbewertung]
+Tiefe je Regel: [aus dem Block „Tiefe je Regel", vom User bestätigt, verbatim]
+
+TIEFE: Halte dich an „Tiefe je Regel". Für eine Übergangsregel nur den Gutfall und die dort
+genannten typischsten Fehler – keine Grenzfälle, keine weiteren Partitionen oder Kombinationen.
+Eine Regel, die erst in einer späteren Ausbaustufe gebraucht wird, bekommt keine Szenarien.
+Stabile Regeln volle Tiefe.
 
 Arbeite für JEDES Eingabefeld durch:
 1. FELDTYP: (String / Zahl / Enum / Referenz / Collection)

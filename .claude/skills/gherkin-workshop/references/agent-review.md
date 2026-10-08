@@ -15,6 +15,25 @@ Resilience-Entscheidung aus der Regelentdeckung: [entweder „story-spezifisches
   oder „allgemeine Behandlung gilt, kein story-spezifisches Szenario nötig"]
 Draft-Saving-Entscheidung aus der Regelentdeckung: [entweder „nicht-trivialer Eingabeaufwand: Szenario
   eingeplant" oder „nur trivialer Eingabeaufwand"]
+Tiefe je Regel: [aus dem Block „Tiefe je Regel", vom User bestätigt, verbatim]
+
+TIEFE VOR VOLLSTÄNDIGKEIT: Die folgenden Klassen gelten für stabile Regeln. Für eine
+Übergangsregel (Ablösung fest eingeplant) sind fehlende Grenzfälle, Partitionen, Kombinationen
+oder offen gelassene Werte außerhalb des Gutfalls und der typischsten Fehler KEIN Finding.
+Findings zu einer Übergangsregel sind nur:
+- HIGH: Gutfall fehlt, oder ein in „Tiefe je Regel" genannter typischster Fehler fehlt
+- HIGH: Das unbestimmt gelassene Verhalten kann einen Schaden anrichten (falsche oder verlorene
+  Daten, Seite nicht mehr bedienbar), dessen Behebung – Häufigkeit mal Aufwand – teurer ist als
+  ein Szenario samt Umsetzung. Den Schadensfall konkret benennen und die Abwägung begründen;
+  Daten, die vor der nächsten Ausbaustufe ohnehin verworfen werden, senken die Behebungskosten
+- MEDIUM: Szenario geht über die festgelegte Tiefe hinaus – streichen
+- MEDIUM: Szenario zu einer Regel, die erst in einer späteren Ausbaustufe gebraucht wird
+- MEDIUM: Grenzfall an einem Teil einer Übergangsregel, der als „stabil" gilt, ohne dass seine
+  Quelle (ADR, Akzeptanzkriterium) genau diesen Teil festlegt – z. B. Schreibweisen am Rand einer
+  Mengen-Erkennung, wenn die ADR nur die Wertgrenzen regelt
+- HIGH: Szenario behauptet ein Verhalten (auch dessen Abwesenheit), das ein Akzeptanzkriterium
+  einer späteren Stufe derselben Story ändert, und steht weder stufenfest formuliert noch auf der
+  Liste für den Workshop jener Stufe im Kopf der Feature-Datei
 
 Klassifiziere jedes Finding:
 

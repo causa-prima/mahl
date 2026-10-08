@@ -128,6 +128,8 @@ Fragen:
 
    Macht die TD-Mitnahme **bewusst und auditierbar** statt zufällig – verhindert beide Fehler: stilles Übergehen *und* ungebremstes Mitnehmen. TD **ohne** Bezug zu den berührten Bereichen bleibt bewusst außen vor (wird erst angefasst, wenn ein Lauf real dorthin kommt).
 
+   **Teil dieses Laufs:** Was die Agenda unter „Nächster Lauf" so aufführt (TD, offene Frage oder Priorität mit `Szenario:`-Anker auf ein Szenario dieses Laufs), ist kein Fund der Sichtung, sondern dem Lauf **zugeordnet**. Für jeden dieser Einträge entscheidest du hier ausdrücklich: im Lauf erledigen (Schuld beheben, Frage mit dem User klären, Priorität abarbeiten) **oder** mit Begründung auf ein anderes Szenario bzw. eine andere Fälligkeit umhängen (`td.py set` / `oq.py set`). Stillschweigend liegen lassen ist keine Option. Bleibt er trotzdem liegen, meldet ihn die nächste Session als „beim Lauf nicht mitgenommen". Neu ausgeben lässt sich die Liste mit `python3 -m prozesscode.next_run --render docs/AGENT_MEMORY.md`.
+
    Legst du eine dieser Entscheidungen dem User vor, gilt sie **nie nur per ID**: Kurztitel und ein
    paar erklärende Sätze gehören dazu ([`principles.md`, Kommunikation](../../../docs/kaizen/principles.md#KPI-kommunikation)) – das gilt für ADR- wie für TD-Bezüge.
 
@@ -146,6 +148,17 @@ Bevor die E2E-Tests geschrieben werden, alle Szenarien des Laufs auf offene Ents
 
 Gefundene Ambiguitäten mit dem User klären, bevor der E2E-Test entsteht.
 Reine Design-Entscheidungen (CSS, Fonts, Abstände) sind kein Klärungsbedarf – diese liegen in den UX-Guidelines und brauchen keine Spec-Anpassung.
+
+<a id="IMP-ui-entwurf"></a>
+**UI-Entwurf (nur bei Läufen mit Frontend-Anteil, Haupt-Thread):** Skizziere vor dem E2E-Test, wie
+die Szenarien des Laufs auf dem Bildschirm aussehen – Elemente und Anordnung, MUI-Komponenten,
+Zustände (leer, lädt, Fehler), Mobile-First. Maßstab sind der Nutzungskontext in der Beschreibung
+unter `Feature:` (entsteht im Workshop, [Nutzungskontext & Ablauf](../gherkin-workshop/SKILL.md#GHW-nutzungskontext))
+und die UX-Guideline. Führt der Lauf ein neues sichtbares Muster ein (neue Seite, neue Eingabeform,
+neuer Komponententyp), lege die Skizze dem User vor, bevor der E2E-Test entsteht – ein ASCII-Mockup
+genügt; Selektoren und Assertions des Tests hängen daran. Nutzt der Lauf nur bestehende Muster,
+genügt ein Satz dazu. Verlangt die Skizze anderes **Verhalten**, als die Szenarien beschreiben, ist
+das kein UI-Detail mehr: zurück in den Workshop, die Spec wird nicht in der Umsetzung angepasst.
 
 **Äußerer Loop – E2E-Test(s) (Haupt-Thread):**
 

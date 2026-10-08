@@ -20,11 +20,11 @@
 *   **US-801 (Rezept-Liste) [MVP]:** Als *Feierabend-Planer* möchte ich eine Liste aller meiner Rezepte sehen, um den Überblick zu behalten.
     *   **Akzeptanzkriterien:**
         *   Liste aller Rezepte.
-        *   Klick auf ein Rezept öffnet die Detailansicht (Ansichts-Modus).
+        *   Klick auf ein Rezept öffnet die Detailansicht (bereichsweise bearbeitbar, siehe US-614).
 
 *   **US-802 (Rezept-Suche & Filter) [V1]:** Als *Feierabend-Planer* möchte ich die Rezept-Liste nach Titel, Zutaten oder Tags filtern, um bestimmte Gerichte zu finden.
     *   **Akzeptanzkriterien:**
-        *   Suchfeld (Titel).
+        *   Suchfeld (Titel). Die Suche findet Wortteile an beliebiger Stelle des Titels, z.B. findet „Spinat" auch „Nudeln mit Spinat-Mandel-Joghurt" – alphabetisch sortiert findet man ein Rezept sonst nur über sein erstes Wort.
         *   Zutaten-Filter.
         *   Tag-Filter (Mehrfachauswahl möglich).
 

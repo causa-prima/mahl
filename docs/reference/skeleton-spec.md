@@ -25,7 +25,7 @@ Minimaler technischer Durchstich (End-to-End), der alle Schichten verbindet:
 | Story | Beschreibung |
 |-------|-------------|
 | US-904 | Zutaten-Verwaltung (CRUD) |
-| US-602 | Manuelle Rezepterfassung (Titel + Zutaten + Schritte + Foto-Upload) |
+| US-602 | Manuelle Rezepterfassung (Titel + Zutaten als Freitextzeilen + Schritte; Foto-Upload erst MVP) |
 | US-803 | Rezept dem Wochen-Pool hinzufügen (flache Liste, keine Datumslogik) |
 | US-201 | Einkaufsliste anzeigen (generiert aus Pool) |
 | US-303 | Artikel abhaken (BoughtAt-Timestamp, verschiebt in "Zuletzt gekauft") |
@@ -40,7 +40,7 @@ Minimaler technischer Durchstich (End-to-End), der alle Schichten verbindet:
 | Gruppe | Methoden |
 |--------|---------|
 | `/api/ingredients` | GET, POST, GET/{id}, DELETE/{id}, POST/{id}/restore |
-| `/api/recipes` | GET, POST, GET/{id}, DELETE/{id} |
+| `/api/recipes` | GET, POST, GET/{id} (Löschen: US-616, V1) |
 | `/api/weekly-pool` | GET, POST /recipes/{recipeId}, DELETE /recipes/{recipeId} |
 | `/api/shopping-list` | GET, POST /generate, PUT /items/{id}/check, PUT /items/{id}/uncheck |
 

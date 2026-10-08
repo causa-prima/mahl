@@ -45,7 +45,8 @@
         *   Eine Zutat kann bearbeitet werden (`PUT /api/ingredients/{id}` samt Edit-UI).
         *   Pro Zutat können Modifier angelegt und verwaltet werden (z.B. "stückig", "TK", "Dose").
         *   Modifier sind optional – eine Zutat ohne Modifier bleibt gültig.
-        *   Gleiche Zutat mit unterschiedlichen Modifiern erzeugt getrennte Einträge auf der Einkaufsliste (konsistent mit US-301).
+        *   Gleiche Zutat mit unterschiedlichen **Produkt**-Modifiern erzeugt getrennte Einträge auf der Einkaufsliste (konsistent mit US-301). Ein **Zubereitungshinweis** (weich, geschmolzen, gehackt, lauwarm) trennt nicht: „Butter, weich" und „Butter" ergeben einen Eintrag.
+        *   Im Workshop zu klären: wie Produkt-Modifier und Zubereitungshinweis auseinandergehalten werden. Vorschlag: eine kleine allgemeine Liste von Zubereitungshinweisen, Produkt-Modifier je Zutat; ein unbekannter Zusatz gilt zunächst als Produkt-Modifier – eine überflüssige Trennung auf der Einkaufsliste fällt auf und ist harmlos, eine falsche Zusammenlegung („Tomaten, stückig" + „Tomaten") führt zum falschen Einkauf. Grenzfälle hängen von der Zutat ab („gerieben" bei Käse).
     *   **Akzeptanzkriterien (V1-Version – Tags):**
         *   Zutaten können Tags zugeordnet werden (Grundlage für US-907 Tag-Sortierung und US-901 Tag-Hierarchie).
 

@@ -22,7 +22,10 @@ _RUN_COMMENT_RE = re.compile(
 # Phase sonst nirgends anschreiben könnten.
 _PHASE_DIRECTIVE_RE = re.compile(r"^#\s*@phase:\s*([A-Za-z0-9_]+)\s*$")
 _NEEDS_DIRECTIVE_RE = re.compile(r"^#\s*@braucht:\s*([A-Za-z0-9_/,\-]+)\s*$")
-_DIRECTIVE_LOOSE_RE = re.compile(r"^#.*@(phase|braucht):")
+# Stufen der Story, deren Akzeptanzkriterien der Workshop vollständig spezifiziert hat – fehlt die
+# Direktive, gilt die Phase der Datei. Ausgewertet von next_run.py (Stufen ohne Workshop).
+_STUFEN_DIRECTIVE_RE = re.compile(r"^#\s*@stufen:\s*([A-Za-z0-9_]+(?:\s*,\s*[A-Za-z0-9_]+)*)\s*$")
+_DIRECTIVE_LOOSE_RE = re.compile(r"^#.*@(phase|braucht|stufen):")
 _HEADER_END_RE = re.compile(r"^(Background:|Scenario:|Scenario Outline:)")
 
 
@@ -64,6 +67,22 @@ def parse_directives(text: str) -> tuple[str | None, tuple[str, ...]]:
         if needs_match:
             needs = _split_refs(needs_match.group(1)) or ()
     return phase, needs
+
+
+def parse_stufen(text: str) -> tuple[str, ...] | None:
+    """Die `# @stufen:`-Direktive aus dem Feature-Header – None, wenn sie fehlt.
+
+    None und leer sind verschieden: Ohne Direktive gilt die Phase der Datei, damit Feature-Dateien
+    aus der Zeit vor der Direktive ihre Story weiter abdecken.
+    """
+    for line in text.splitlines():
+        stripped = line.strip()
+        if _HEADER_END_RE.match(stripped):
+            break
+        match = _STUFEN_DIRECTIVE_RE.match(stripped)
+        if match:
+            return tuple(stufe.strip().upper() for stufe in match.group(1).split(","))
+    return None
 # Lockere Erkennung für Format-Validierung: alles, was wie ein Run-Tag gemeint war (enthält
 # "@run-N"), aber nicht exakt das strikte Format oben trifft (Tippfehler bei Schicht-Bezeichnung,
 # falsches Trennzeichen o.ä.). parse_feature() ignoriert solche Zeilen stillschweigend als
@@ -106,9 +125,18 @@ def _check_directive(lineno: int, stripped: str, header_end: int) -> str | None:
         return None
     if _NEEDS_DIRECTIVE_RE.match(stripped):
         return None
+    stufen_match = _STUFEN_DIRECTIVE_RE.match(stripped)
+    if stufen_match:
+        unbekannt = [s.strip() for s in stufen_match.group(1).split(",")
+                     if s.strip().upper() not in PHASEN]
+        if unbekannt:
+            return (f"Zeile {lineno}: unbekannte Stufe {unbekannt[0]!r} in `@stufen` "
+                    f"(bekannt: {', '.join(PHASEN)}).")
+        return None
     return (
         f"Zeile {lineno}: sieht wie eine Datei-Direktive aus, matcht aber nicht das Format "
-        f"(`# @phase: <PHASE>` bzw. `# @braucht: <ref>[,<ref>]`): {stripped!r}"
+        f"(`# @phase: <PHASE>`, `# @braucht: <ref>[,<ref>]` bzw. "
+        f"`# @stufen: <PHASE>[, <PHASE>]`): {stripped!r}"
     )
 
 

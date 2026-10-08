@@ -1,7 +1,7 @@
 # Agent Memory – Mahl
 
 **Phase:** SKELETON 🔄
-**Aktuelle Story:** US-904 (Zutaten)
+**Aktuelle Story:** US-602 (Rezept-Erfassung)
 **Nächster Lauf:** {{NEXT_RUN}}
 
 ---
@@ -51,12 +51,3 @@ Auswahl. TD-Einträge mit
 
 - **Visuelle Konsistenz-Guideline erweitern** — `Fällig: Phase:MVP` · Quelle: `docs/guidelines/coding-guideline-ux.md` → Visuelle Baseline · Done: Spacing/Hierarchie/Farbe sind dort als System geregelt und im Theme verankert.
   Vor dem ersten Lauf der US-904-MVP-Stufe (Bearbeiten, Modifizierer): Ab da treffen mehr als ~3 Komponenten dieselben visuellen Entscheidungen – der Auslöser, den der Kopf der UX-Guideline nennt.
-
-- TD-S108-1 · Done: `features/resilience.feature` übt auch DELETE aus.
-  Kein Workshop nötig – beide entstehen bei der Resilience-Arbeit ohnehin.
-
-- **gherkin-workshop US-904, weitere Stufen** — `Fällig: Phase:MVP` · Quelle: `docs/stories/szenario_9_datenpflege.md` · Done: Feature-Datei trägt die MVP-Stufe (Modifier + Bearbeiten), Läufe sind geclustert.
-  V1-Stufe danach: Tags für Zutaten (Grundlage für US-907/US-901).
-
-- **Deep-Link-Anforderung klären** — `Fällig: US-602, Phase:V1` · Quelle: `docs/open-questions.md` · Done: Entschieden und als ADR festgehalten, welche Entitäten deep-linkbar sind.
-  US-602 ist zugleich die erste Story mit zweiter Seite → Navigations-Szenario nach ADR-S103-1.

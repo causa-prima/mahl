@@ -15,7 +15,7 @@ Anker-Vokabular:
     jetzt              sofort (zusätzlich: TD-ID muss in AGENT_MEMORY stehen)
     Phase:MVP          Phasenwechsel – tritt ein, wenn AGENT_MEMORY `**Phase:**` sie erreicht
     S123               Spätestens-Termin – tritt ein, wenn die laufende Session sie erreicht
-    Szenario:„Titel"   ein Gherkin-Szenario – tritt ein, wenn sein Lauf drankommt
+    Szenario:„Titel"   ein Gherkin-Szenario – gehört zu dessen Lauf (s. u. „Wo ein Szenario-Anker erscheint")
     US-602             eine Story – nur gültig, SOLANGE die Story keine Szenarien hat
     TD-S089-1          ein anderer Eintrag – tritt ein, wenn jener behoben (= entfernt) ist
 
@@ -35,6 +35,12 @@ den Workshop überlebt, behauptet eine Ungenauigkeit, die es nicht mehr gibt.
 Konsumenten: `check-td-capture.py` (Schreibzeit: existiert das Referenzierte, ist es
 terminiert?) und das `td-due`-Modul von `session-agenda.py` (Startzeit: ist es eingetreten?).
 Ein Code-Pfad, zwei Aufrufstellen – sonst driften die beiden Sichten auseinander.
+
+Wo ein Szenario-Anker erscheint (gilt für TD, OQ und die Prioritäten in AGENT_MEMORY):
+**vor** dem Lauf unter der Zeile „Nächster Lauf" als „Teil dieses Laufs"
+(`next_run.laufanhang`), **danach** – falls der Lauf ihn nicht mitgenommen hat – über
+`faellig_gruende` als „ist implementiert – beim Lauf nicht mitgenommen". Alle übrigen Anker
+(Phase, Session, Story, TD-Kette) melden weiterhin nur `faellig_gruende`.
 """
 import re
 from dataclasses import dataclass, field

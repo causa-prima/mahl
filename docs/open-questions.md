@@ -42,7 +42,8 @@ Eintrag-Format:
       jetzt              sofort vorlegen
       Phase:V1           Phasenwechsel (auch MVP/V2)
       S140               Spätestens-Termin (Session-Nummer)
-      Szenario:„…"       ein Gherkin-Szenario aus features/ (Titel exakt)
+      Szenario:„…"       ein Gherkin-Szenario aus features/ (Titel exakt) – erscheint, sobald
+                         sein Lauf der nächste ist, unter „Nächster Lauf" als „Teil dieses Laufs"
       US-602             eine Story – nur solange sie noch keine Szenarien hat
       TD-S089-1          ein Tech-Debt-Eintrag – tritt ein, wenn jener behoben ist
 
@@ -101,3 +102,35 @@ Eintrag-Format:
 **Befund S122, am Bestand geprüft (spart die Recherche beim Wiederaufgreifen):** `ValidationError` existiert im Client-**Code** nicht. `Client/src/types/` enthält allein `apiError.ts`; `grep -rn "ValidationError" Client/src` liefert null Treffer. Der Typ lebt ausschließlich in `coding-guideline-typescript.md` (Fehlertyp-Absatz in [Branded Types](guidelines/coding-guideline-typescript.md#CGT-branded-types) sowie das `neverthrow`-Beispiel in [Railway-Oriented Programming](guidelines/coding-guideline-typescript.md#CGT-rop)). Real verwendet wird `ApiError` (`Client/src/types/apiError.ts`) – bereits eine kind-getaggte Union (`FieldErrors` | `Unexpected`), also schon in der dort verlangten Form. Es ist heute folglich **nichts umzustellen**; zu entscheiden ist, ob die Guideline einen Typ für einen Fall vorschreiben soll, den ADR-S112-4 ausschließt.
 
 **Aktueller Stand:** In [Domain Modeling](reference/architecture.md#ARC-domain-modeling) ist vermerkt, dass die Regeln für C# ausformuliert sind und die TypeScript-Seite nicht nachgezogen ist – die Doku behauptet also keine Parität mehr, die es nicht gibt. Mit der Entscheidung hier ist dieser Vermerk aufzulösen.
+
+---
+
+## OQ-S135-1 — Umrechnung zwischen Einheiten: welche Stufen, wo gepflegt, wann angewendet?
+**Frage:** Welche Umrechnungen braucht mahl, und wann werden sie angewendet? Innerhalb einer Größenart (g↔kg, ml↔l, EL=15 ml, TL=5 ml) allgemein und exakt; über Größenarten hinweg (Stück↔g, Dose↔g, Löffel↔g) nur je Zutat – überhaupt nötig? Auf der Einkaufsliste bleiben gemischte Einheiten laut User eher nebeneinander stehen („200 g + 10“). Und: Welche Rolle behält die Basiseinheit einer Zutat, wenn jede Rezeptzeile ihre eigene Einheit speichert (Ziel der Summierung? Vorgabe beim Parsen?) – und was folgt dann aus dem Ändern der Basiseinheit?
+**Fällig:** Phase:MVP – im gherkin-workshop der US-904-MVP-Stufe (Bearbeiten), gemeinsam mit US-902 (Umrechnungsfaktoren) und den Einkaufslisten-Stories; vorher gibt es weder Bearbeiten einer Zutat noch Summierung.
+**Hintergrund:** Aus dem US-602-Workshop. Jede Rezeptzeile speichert Menge UND Einheit (ADR-S020-1) – das Ändern der Basiseinheit einer Zutat lässt Rezeptmengen also unberührt. Analyse der Rezeptsammlung des Users (1086 Zutatenzeilen): dieselbe Zutat erscheint oft in mehreren Größenarten (Tomaten als g/Dose/Stück, Sahne als ml/g/EL, Zwiebeln als Stück/g). Ein allgemeiner Standard über Größenarten hinweg (z. B. 1 TL = 7 g) liegt je Zutat bis Faktor 2 daneben. User zu Umrechnung beim Summieren: „In Bring! mache ich das mal so und mal so, aber vermutlich häufiger 200 g + 10.“
+**Aufschubgrund:** User – im US-602-Workshop auf den US-904-MVP-Workshop gelegt (dort entsteht das Bearbeiten der Zutat).
+
+---
+
+## OQ-S135-2 — Zutatenzeile zerlegen: unscharfe und mehrdeutige Zuordnung
+**Frage:** Wie ordnet der Parser die Teile einer Freitext-Zutatenzeile zu, wenn kein exakter Treffer existiert? Teilfragen des Users: Was, wenn mehrere Kandidaten gleich gut passen? Was, wenn zwei Teile der Eingabe beide als Zutat (oder beide als Zusatz) erkannt werden? Ergänzend: feste Regeln je Zutat ("2 Knoblauchzehen" → 2 Zehen Knoblauch), allgemeine Zusatz-Regeln über Zutaten hinweg ("gemahlene/gemahlenes X" → "X, gemahlen"), Lernen aus Korrekturen des Users (Alias speichern).
+**Fällig:** Phase:MVP – im Workshop der MVP-Stufe der Zutateneingabe (Plural, Kurzformen, Zusatz, Tippfehler-Toleranz); der SKELETON arbeitet mit harten Regeln (exakter Name, Einheit weggelassen oder = Basiseinheit).
+**Hintergrund:** Aus der Durchsicht der US-602-Szenarien: Entscheidung für Freitext je Zutatenzeile, vom Backend in Menge, Einheit, Zutat und Zusatz zerlegt (Vorbild Chefkoch). Vorschlag des Users: Kandidaten unter bekannten Zutaten und Zusätzen nach geringster Distanz (Levenshtein o. ä.) suchen, höchster Score gewinnt. Ein Test bei Chefkoch zeigte, dass dort "2 Knoblauchzehen"/"2 Zehen Knoblauch" und "Tomaten, stückig"/"stückige Tomaten" je auf verschiedene Zutaten fallen. Chefkoch ist Referenz, keine Vorgabe – Zielgruppe hier: zwei Nutzer. Nach V1 zusätzlich: "Salz und Pfeffer" beim "und" in zwei Zeilen aufteilen (offen dabei: "1 TL Salz und Pfeffer" – gilt die Menge für beide?). Testbestand: die DokuWiki-Rezeptsammlung des Users (~/rezepte, 114 Rezepte, 1086 Zutatenzeilen, u. a. Spannen, "etwas", "oder"-Alternativen, Tippfehler wie "Kreukümmel"/"Zirone", Einheit im Namen wie "Knoblauchzehen") – laut User keine eigene Story, sondern Test für den Parser bzw. einmaliger Übernahme-Auftrag an einen Agenten. Abgrenzung Zusatz: Produkt-Modifizierer vs. Zubereitungshinweis (Glossar, US-904 MVP).
+**Aufschubgrund:** User – Parser-Komfort ist laut User frühestens MVP; der SKELETON arbeitet mit harten Regeln.
+
+---
+
+## OQ-S135-3 — Zeitmodell: Arbeitszeit und Wartezeiten statt Gesamtzeit
+**Frage:** Wie bildet mahl die Zeit eines Rezepts ab? Entschieden: gemessen wird nur die Zeit, in der man arbeitet; Wartezeiten (Backen, Garen ohne Aufsicht, Gehen) werden von Hand erfasst, nicht eingerechnet, aber daneben angezeigt. Offen: (a) Begriffe – Vorschlag „Arbeitszeit“ und „Wartezeiten“ statt „Gesamtzeit“; (b) Wartezeiten MITTEN im Rezept (Teig geht 1 h, dann weiter): Vorschlag – ein Schritt mit Typ „Warten“ und Dauer (US-617) hält die Messung an, solange er der aktuelle Schritt ist; arbeitet man parallel weiter, ist man im nächsten Schritt und die Uhr läuft; (c) wie US-610 (Gesamtzeit, MVP), US-611 (vier Zeitkomponenten, V2), US-617 (Aktivitätsart je Schritt, V2) und US-108 (Zeit-Budget mit „aktiver Arbeitszeit“, V2) dazu umgeschnitten werden; (d) Zeitstempel je Schrittwechsel mitspeichern? Die Anhalte-Logik aus (b) braucht sie ohnehin, und Rohdaten lassen sich später nicht nachholen – angezeigt würde trotzdem nur die Summe.
+**Fällig:** Phase:MVP – im gherkin-workshop von US-610 (Gesamtzeit); dort entsteht das erste Zeitfeld.
+**Hintergrund:** Aus der Bestandsanalyse der Rezeptsammlung des Users: 62 von 114 Rezepten notieren die Zeit schon als „Arbeit + Warten“ (z. B. „15 + 60 + 10 Minuten“). 18 Rezepte haben parallele Schritte („In der Zwischenzeit …“) – deshalb misst US-517 nicht je Schritt, sondern je Kochvorgang. User: Wartezeiten am Ende werden nicht gemessen, weil niemand dafür die App öffnet; das Ende braucht einen gut sichtbaren „Kochen abschließen“-Knopf; starke Abweichung vom Median soll sofort eine Warnung mit Aktionen auslösen (in US-517 übernommen).
+**Aufschubgrund:** Umfang – betrifft fünf Stories über MVP bis PARKING; die Klärung gehört in den Workshop des ersten Zeitfelds (US-610), nicht in die Durchsicht von US-602.
+
+---
+
+## OQ-S135-4 — Testtiefe für Code, der sicher ersetzt wird
+**Frage:** Braucht Code einer Übergangsregel (Ablösung fest eingeplant, gherkin-workshop „Tiefe je Regel"), der mit seiner Nachfolgelösung wieder entfällt, die volle Coverage-Schwelle und volle Mutationstests – oder gilt für ihn eine Ausnahme, und wenn ja, wie wird sie markiert und wann endet sie?
+**Fällig:** Szenario:„Zutat nicht gefunden oder Einheit falsch", Phase:MVP – Lauf 11 von US-602 ist der letzte Lauf zum Zerleger der Zutatenzeilen (Übergangsregel, abgelöst durch US-607); erst dann gibt es echte Zahlen zum Testaufwand.
+**Hintergrund:** Aus der Auswertung des neuen Workshop-Schritts „Tiefe je Regel" an US-602. Der User fragte, ob „temporärer Code keine Coverage braucht"; Gegenfrage war, wie sicher die typischsten Fälle dann korrekt umgesetzt werden. Zu erheben in den Läufen 7, 10 und 11 von US-602: Wie viele Tests (Unit, Integration, Mutanten) entstehen für den Zerleger, und wie viele davon entfallen mit US-607? Die Spezifikation selbst wurde bereits verschlankt (SKELETON 63 → 46 Szenarien).
+**Aufschubgrund:** User – im Workshop vereinbart, nach dem Ausprobieren mit echten Zahlen zu entscheiden

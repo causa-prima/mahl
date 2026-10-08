@@ -94,3 +94,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: Nach dem Zusammenführen von vier Auditor-Berichten bat ich den User, über 'A1', 'FC-7 (Teil Pending/Fehlerzustand)' und 'FC-6' zu entscheiden – Kürzel aus Berichten, die nur ich gesehen hatte. Der User konnte nicht entscheiden und musste nachfragen; erst die zweite, selbsttragende Fassung jeder Frage machte die Entscheidung möglich.
   Warum: Rückfall zu LL-S133-4 (Entscheidungsfragen in Werkzeug- und Session-Jargon vorgelegt) – dessen Regel stand nur in lessons_learned.md, das Prinzip 'Eine Tracker-ID nie nackt nennen' deckte weiter nur Tracker-Einträge ab. Finding-IDs aus Review-Berichten fühlten sich wie gemeinsamer Kontext an, weil ich die Berichte im Kopf hatte. Als Maßnahme ist das Prinzip jetzt auf selbst vergebene Kürzel erweitert.
   Regel: Jede Frage an den User muss ohne den Bericht verständlich sein, aus dem sie stammt: Was ist der Einwand, was habe ich geprüft, was schlage ich vor. Ein Finding-Kürzel darf nur als Zusatz zum ausgeschriebenen Punkt stehen.
+
+## Session 135 – 2026-10-08
+
+- **[MITTEL] [PROZESS] [Gherkin] LL-S135-1 – Verstöße gegen „Tiefe je Regel“ überstanden drei Prüfrunden**
+  Quelle: User
+  Was: Im US-602-Workshop prüften fünf Beispielzeilen Grenzfälle der Mengen-Erkennung (Vorzeichen, Komma, Punkt am Zeilenanfang), obwohl diese zum Zerleger gehört, einer fest abgelösten Übergangsregel. Außerdem behauptete ein SKELETON-Szenario „keine Meldung am Titel“, was ein MVP-Akzeptanzkriterium derselben Story ändert. Weder ich noch drei Prüfrunden fanden das; der User fand beides bei der Durchsicht.
+  Warum: Der Skill ließ offen, wie weit „das Stabile in einer Übergangsregel“ reicht – die Mengenwerte (ADR-S020-1) wurden zu großzügig auf die ganze Zahlform ausgedehnt. Und die Frage „Ablösung fest eingeplant?“ kannte nur andere Stories, nicht spätere Stufen derselben Story.
+  Regel: Den stabilen Teil einer Übergangsregel über seine Quelle (ADR, Akzeptanzkriterium) benennen und nur das voll spezifizieren, was die Quelle festlegt. Bei der Ablösungsfrage auch die Akzeptanzkriterien späterer Stufen derselben Story prüfen (jetzt in GHW-regel-tiefe und agent-review.md).
+
+- **[MITTEL] [TOOLING] [Hook/Script] LL-S135-2 – Doku eines Auslösers versprach einen Zeitpunkt, den der Code nicht einhielt**
+  Quelle: User
+  Was: td_anchors.py beschrieb den Anker Szenario:„…“ mit „tritt ein, wenn sein Lauf drankommt“. Tatsächlich meldete die Agenda ihn erst, wenn das Szenario schon implementiert war. Auf dieser Grundlage hängte ich drei TDs auf Szenarien um; erst die Rückfrage des Users („wird das dann auch angezeigt?“) deckte auf, dass sie vor dem Lauf nirgends erschienen wären – ebenso wenig OQs mit diesem Anker.
+  Warum: Die Zusage im Docstring war nie gegen den Code geprüft; getestet war nur die nachträgliche Meldung („beim Lauf nicht mitgenommen“). Ich habe mich beim Umhängen auf die Beschreibung verlassen, statt den Anzeigeweg nachzuvollziehen.
+  Regel: Sagt die Doku eines Auslösers einen Zeitpunkt zu, braucht genau dieser Zeitpunkt einen Test. Bevor ich mich auf einen Anzeige- oder Auslösemechanismus verlasse, verfolge ich ihn im Code bis zur Stelle, an der er tatsächlich erscheint.
+  CM-Bezug: CM-S064-1

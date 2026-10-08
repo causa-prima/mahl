@@ -4,6 +4,7 @@ import textwrap
 from prozesscode._feature import (  # noqa: E402
     find_malformed_run_comments,
     parse_feature,
+    parse_stufen,
     phasen_rang,
 )
 
@@ -298,6 +299,36 @@ def test_phase_directive_after_first_scenario_flagged():
 
 def test_well_formed_directives_not_flagged():
     assert find_malformed_run_comments(FEATURE_WITH_DIRECTIVES) == []
+
+
+# --- Stufen-Direktive: welche Stufen der Story der Workshop vollständig spezifiziert hat -----
+STUFEN_HEADER = "@US-602\nFeature: X\n\n  # @phase: SKELETON\n  # @stufen: SKELETON, MVP\n\n  Scenario: Bar\n"
+
+
+def test_stufen_directive_is_parsed_in_order():
+    assert parse_stufen(STUFEN_HEADER) == ("SKELETON", "MVP")
+
+
+def test_stufen_is_none_without_directive():
+    # None ≠ leer: ohne Direktive gilt die Phase der Datei (Rückwärtskompatibilität).
+    assert parse_stufen(FEATURE_WITH_DIRECTIVES) is None
+
+
+def test_well_formed_stufen_directive_not_flagged():
+    assert find_malformed_run_comments(STUFEN_HEADER) == []
+
+
+def test_unknown_phase_in_stufen_flagged():
+    text = STUFEN_HEADER.replace("SKELETON, MVP", "SKELETON, BETA")
+    violations = find_malformed_run_comments(text)
+    assert len(violations) == 1 and "BETA" in violations[0]
+
+
+def test_malformed_stufen_directive_flagged():
+    # Semikolon statt Komma: würde sonst still ignoriert, die Stufe bliebe „ohne Workshop".
+    text = STUFEN_HEADER.replace("SKELETON, MVP", "SKELETON; MVP")
+    violations = find_malformed_run_comments(text)
+    assert len(violations) == 1 and "@stufen" in violations[0]
 
 
 # --- Phasen-Ordnung -----------------------------------------------------------

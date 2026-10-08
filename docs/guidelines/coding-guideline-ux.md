@@ -100,6 +100,11 @@ Format: "[Was ist falsch]." oder "[Was ist falsch] ([Constraint])."
 
 **Platzierung:** Fehlermeldungen erscheinen so nah wie möglich am betroffenen Element — nicht ausschließlich als Toast, wenn ein Formularfeld betroffen ist.
 
+**Länge begrenzen:** Eine Ausgabe – Fehlermeldung, Hinweis, Toast – wächst nicht mit den Daten. Aufzählungen nennen höchstens drei Einträge, danach „und N weitere" (z. B. die Rezepte, die das Löschen einer Zutat sperren). Zitierter eingegebener Text wird ab einer festen Länge gekürzt und endet mit „…", ohne ein Zeichen zu zerteilen. Die Regel gilt querschnittlich und wird einmal geteilt umgesetzt (ADR-S112-5); die konkrete Kürzungslänge hält die ADR fest, die mit dieser Umsetzung entsteht.
+
+✅ „Zutat 'Mehl' wird in den Rezepten 'Brot', 'Kuchen', 'Pfannkuchen' und 2 weiteren verwendet …"
+❌ Eine versehentlich eingefügte Zeile aus 10 000 Zeichen erscheint vollständig in der Meldung.
+
 ---
 
 <a id="CGU-destructive-actions"></a>

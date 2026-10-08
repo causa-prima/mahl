@@ -13,10 +13,11 @@ kritische-regeln:
 | Abschnitt | Domäne | Enthaltene Begriffe |
 |-----------|--------|---------------------|
 | [Zutaten & Einheiten](#GLO-zutaten-einheiten) | Stammdaten | Zutat, Zutaten-Modifizierer, Zutaten-Alias, Basiseinheit, Umrechnungsfaktor, Non-Food-Item |
-| [Rezepte](#GLO-domaene-rezepte) | Rezeptverwaltung | Rezept, Rezept-Variante, Zubereitungszeit, Rezept-Zutat, Sub-Rezept, Schritt, Basis-Portion, Planungs-Portion, Import-Pool, Koch-Historie, Kochmodus |
+| [Rezepte](#GLO-domaene-rezepte) | Rezeptverwaltung | Rezept, Rezept-Variante, Zubereitungszeit, Rezept-Zutat, Zutatenzeile, Sub-Rezept, Schritt (Anweisung), Basis-Portion, Planungs-Portion, Import-Pool, Koch-Historie, Kochmodus |
 | [Planung](#GLO-domaene-planung) | Wochenplanung | Planungs-Pool, Wochen-Pool, Wochenplan, Plan-Eintrag, Harte Regel, Sortier-Regel, Fallback-Strategie, Esser-Profil, Slot, Globale/Tages-/Session-Regel |
 | [Einkauf](#GLO-domaene-einkauf) | Einkaufsliste | Einkaufsliste, Einkaufslisten-Eintrag, Delta-Menge, Fix-Eintrag, Shop-Kategorie |
 | [Klassifizierung](#GLO-domaene-klassifizierung) | Taxonomie | Tag (DAG-Struktur) |
+| [Oberfläche](#GLO-oberflaeche) | Seiten & Bedienelemente | Zutaten-/Rezepte-Seite, Zutaten-/Rezept-Liste, Detailansicht, Direktlink, Navigationsleiste, Leerzustand, Zutatenfeld, Schrittfeld, Pflichtangabe, Nachfrage, Sperrmeldung |
 
 Dieses Dokument definiert die **Ubiquitäre Sprache** (Ubiquitous Language) für das Projekt "Mahl". Diese Begriffe sind in allen Anforderungen, User Stories und im Code bindend zu verwenden.
 
@@ -37,6 +38,7 @@ Die abstrakte Stammdaten-Repräsentation eines Lebensmittels.
 Eine Eigenschaft, die den Zustand oder die Verarbeitungsform einer *Zutat* konkretisiert.
 *   **Zweck:** Ermöglicht die Unterscheidung von Varianten ohne separate Stammdaten-Einträge.
 *   **Beispiel:** Zutat "Tomaten (Dose)" -> Modifizierer: "stückig", "passiert", "ganz".
+*   **Zwei Arten:** Ein *Produkt-Modifizierer* bezeichnet einen anderen Artikel im Laden ("stückig", "TK", "getrocknet") und trennt Einträge auf der *Einkaufsliste*. Ein *Zubereitungshinweis* beschreibt, wie die Zutat ins Rezept geht ("weich", "geschmolzen", "gehackt"), und trennt nicht.
 
 <a id="GLO-zutaten-alias"></a>
 ### Zutaten-Alias (Ingredient Alias)
@@ -96,6 +98,10 @@ Die Verwendung einer *Zutat* in einem spezifischen *Rezept*.
 *   **Datenstruktur:** Referenz auf *Zutat* (oder *Sub-Rezept*), *Quantity*, gewählter *Modifizierer* (optional).
 *   **Beispiel:** "500g" (*Quantity*) "Tomaten" (Zutat) "stückig" (Modifizierer).
 
+<a id="GLO-zutatenzeile"></a>
+### Zutatenzeile (Ingredient Line)
+Die Textform einer *Rezept-Zutat* beim Erfassen: eine Zeile im *Zutatenfeld* der Form „Menge Einheit Zutat" („250 g Mehl") oder nur „Zutat" („Salz"). Der Server zerlegt sie beim Speichern in eine *Rezept-Zutat*; Grammatik: ADR-S135-2.
+
 <a id="GLO-sub-rezept"></a>
 ### Sub-Rezept (Sub-Recipe)
 Ein *Rezept*, das in einem anderen Rezept als *Rezept-Zutat* referenziert wird.
@@ -104,6 +110,8 @@ Ein *Rezept*, das in einem anderen Rezept als *Rezept-Zutat* referenziert wird.
 <a id="GLO-schritt"></a>
 ### Schritt (Step)
 Ein atomarer Teil der Zubereitungsanleitung.
+*   **Anweisung (Instruction):** Der Text eines Schritts. In Meldungen heißt sie „Schritt-Anweisung", damit klar ist, welches Feld gemeint ist.
+*   **Nummer:** Ergibt sich aus der Position im Rezept, lückenlos ab 1 (ADR-S027-1).
 *   **Verknüpfung:** Kann mit einer Teilmenge der *Rezept-Zutaten* verknüpft sein (für "Kochmodus").
 
 <a id="GLO-basis-portion"></a>
@@ -236,3 +244,24 @@ Eine logische Gruppierung zur Sortierung der *Einkaufsliste* (entspricht dem Lau
 Ein hierarchisches Schlagwort.
 *   **Struktur:** Gerichteter azyklischer Graph (DAG). Ein Tag kann mehrere Eltern haben.
 *   **Beispiel:** "Kartoffel" ist Kind von "Gemüse" UND "Sättigungsbeilage".
+
+<a id="GLO-oberflaeche"></a>
+## Oberfläche: Seiten & Bedienelemente
+
+Begriffe, mit denen Gherkin-Szenarien die Oberfläche beschreiben. Sie benennen, was der Nutzer sieht – nicht die Komponente im Code.
+
+<a id="GLO-seiten"></a>
+### Seite, Liste, Detailansicht
+*   **Zutaten-Seite / Rezepte-Seite:** Die Hauptseiten, erreichbar über die *Navigationsleiste*. Die Rezepte-Seite zeigt die **Rezept-Liste**, die Zutaten-Seite die **Zutaten-Liste** – „Liste" meint immer diese Bestandsliste, nie das *Zutatenfeld* eines Rezepts.
+*   **Detailansicht:** Die Ansicht eines einzelnen Rezepts mit Zutaten und nummerierten Schritten.
+*   **Direktlink:** Die eigene Adresse einer Ansicht, die sich direkt aufrufen lässt (Lesezeichen, neues Fenster). Nur Rezepte haben einen (ADR-S135-5).
+*   **Navigationsleiste:** Die immer sichtbare Leiste mit den Hauptseiten.
+*   **Leerzustand:** Was eine Liste ohne Einträge zeigt – Erklärung und nächste Aktion (UX-Guideline „Leerer Zustand").
+
+<a id="GLO-formular"></a>
+### Formular
+*   **Zutatenfeld:** Das mehrzeilige Eingabefeld für die Zutaten eines Rezepts, eine *Zutatenzeile* je Zeile.
+*   **Schrittfeld:** Das Eingabefeld für die *Anweisung* eines Schritts; jedes zeigt seine Nummer.
+*   **Pflichtangabe:** Ein Feld oder Abschnitt, ohne den nicht gespeichert werden kann; als solche markiert, bevor etwas eingegeben ist.
+*   **Nachfrage:** Die Rückfrage „Eingaben verwerfen?" beim Verlassen eines Formulars mit Eingaben, mit „Verwerfen" und „Weiter bearbeiten" (ADR-S135-4).
+*   **Sperrmeldung:** Die Meldung an der Zeile einer Zutat, die sich nicht löschen lässt, weil Rezepte sie verwenden (ADR-S135-7).

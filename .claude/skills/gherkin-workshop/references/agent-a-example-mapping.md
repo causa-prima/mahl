@@ -8,6 +8,12 @@ Eingabefelder (mit Typen und Constraints): [aus dem Block „Eingabefelder"]
 Bestehende Szenarien: [falls vorhanden, sonst „keine"]
 Glossar-Entitäten: [aus dem Kontext-Laden]
 UX-Kontext: [aus dem Block „UX-Kontext" – welche UX-Prinzipien gelten, mit Relevanzbewertung]
+Tiefe je Regel: [aus dem Block „Tiefe je Regel", vom User bestätigt, verbatim]
+
+TIEFE: Halte dich an „Tiefe je Regel". Für eine Übergangsregel nur den Gutfall und die dort
+genannten typischsten Fehler – keine Grenzfälle, keine weiteren Partitionen oder Kombinationen.
+Eine Regel, die erst in einer späteren Ausbaustufe gebraucht wird, bekommt keine Szenarien.
+Stabile Regeln volle Tiefe.
 
 Arbeite diese Struktur durch:
 1. STORY-KERN: Was ist das Hauptziel aus Nutzersicht? (1 Satz)
@@ -23,7 +29,7 @@ Arbeite diese Struktur durch:
 4. BEISPIELE PRO REGEL:
    - Erfolgsbeispiel (konkreter Input → erwarteter Output)
    - Fehlerbeispiel (welcher Input verletzt diese Regel → welcher Fehler?)
-   - Grenzfall (Randwert der Regel – nur wenn fachlich relevant)
+   - Grenzfall (Randwert der Regel – nur wenn fachlich relevant, nie bei einer Übergangsregel)
 5. MAPPING AUF GHERKIN-TAGS:
    - Erfolgsbeispiel → @US-NNN-happy-path
    - Fehlerbeispiel → @US-NNN-error

@@ -252,10 +252,21 @@ def modul_memory_state() -> Block:
 
     Trägt bewusst KEINEN Stub: Der Block wird ungekürzt gerendert, eine Kurzfassung
     daneben wäre dieselbe Information zweimal.
+
+    Die eingerückten Zeilen direkt unter „Nächster Lauf" gehören dazu: Dort hängt next_run die
+    Einträge an, deren Fälligkeit an einem Szenario des Laufs hängt (`next_run.laufanhang`).
     """
     text = _modulausgabe("next_run", "--render", str(ROOT / "docs" / "AGENT_MEMORY.md"))
-    zeilen = [z for z in text.splitlines()
-              if z.startswith(("**Phase:", "**Aktuelle Story:", "**Nächster Lauf:"))]
+    zeilen: list[str] = []
+    unter_lauf = False
+    for z in text.splitlines():
+        if z.startswith(("**Phase:", "**Aktuelle Story:", "**Nächster Lauf:")):
+            zeilen.append(z)
+            unter_lauf = z.startswith("**Nächster Lauf:")
+        elif unter_lauf and z.startswith("  "):
+            zeilen.append(z)
+        else:
+            unter_lauf = False
     return Block(stub="", inhalt="\n".join(zeilen) or "(kein Zustand lesbar)")
 
 
@@ -378,23 +389,34 @@ def modul_priorities() -> Block:
 
 
 def modul_next_run() -> Block:
-    """Offene Läufe DER AKTUELLEN STORY.
+    """Offene Läufe DER AKTUELLEN STORY – und ohne solche der Stand der Phase.
 
     Ohne `--story` zählt `next_run.py` auch Szenarien fremder Feature-Dateien mit; ungetaggte
     Szenarien (z.B. in `interaction.feature`, Scope „nach MVP") gelten dort als eigener offener
     Einzel-Lauf. Die Aufgabe behauptete dann einen Lauf, den die laufende Story nicht hat.
+
+    Ist die Story fertig, fragt das Modul `--phase-status`: Stories ohne Feature-Datei oder
+    eine abgeschlossene Phase sind der nächste Arbeitsauftrag. Ohne diese Frage schwieg die
+    Agenda genau beim Wechsel zur nächsten Story.
     """
     from prozesscode import next_run
-    story = next_run.extract_story(_lies(ROOT / "docs" / "AGENT_MEMORY.md"))
+    memory = ROOT / "docs" / "AGENT_MEMORY.md"
+    story = next_run.extract_story(_lies(memory))
+    if story is not None:
+        text = _modulausgabe("next_run", "--open", "--story", story)
+        if not text.startswith("(keine"):
+            return Block(stub=f"Nächster Lauf ({story}): offen",
+                         inhalt=f"Offene Läufe der Story {story}:\n{text}"
+                                "\n→ Skill `implementing-scenario` (ein Szenario pro Durchlauf).",
+                         beansprucht=True)
+    befund = _modulausgabe("next_run", "--phase-status", str(memory)).strip()
+    if befund:
+        return Block(stub=f"Phasenstand: {befund}", inhalt=f"Phasenstand:\n{befund}",
+                     beansprucht=True)
     if story is None:
         return Block(stub="Nächster Lauf: keine aktuelle Story")
-    text = _modulausgabe("next_run", "--open", "--story", story)
-    offen = not text.startswith("(keine")
-    return Block(stub=f"Nächster Lauf ({story}): {'offen' if offen else 'alle implementiert'}",
-                 inhalt=f"Offene Läufe der Story {story}:\n{text}"
-                        + ("\n→ Skill `implementing-scenario` (ein Szenario pro Durchlauf)."
-                           if offen else ""),
-                 beansprucht=offen)
+    return Block(stub=f"Nächster Lauf ({story}): alle implementiert",
+                 inhalt=f"Offene Läufe der Story {story}:\n{text}")
 
 
 # --- Reine Stub-Module -------------------------------------------------------

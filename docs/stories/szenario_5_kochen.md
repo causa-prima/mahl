@@ -22,6 +22,8 @@
 - US-515 (Bewertungs-Historie & Erinnerung) [PARKING]
 - US-516 (Intelligenter Wach-Modus) [V1]
 - US-517 (Zeit-Tracking & Optimierung) [PARKING]
+- US-518 (Vorlauf-Hinweis) [PARKING]
+- US-519 (Schritt-Timer) [PARKING]
 
 ---
 
@@ -78,6 +80,7 @@
 
 *   **US-510 (Quellen-Zugriff) [MVP]:** Als *pragmatischer Koch* möchte ich die Original-Quelle eines Rezepts (URL oder angehängtes Bild) direkt öffnen können, um im Zweifel Details im Original nachzulesen.
     *   **Akzeptanzkriterien:**
+        *   Die Quelle besteht aus einem Freitext (z.B. „Blitzrezepte, S. 106", „Rezept von Marc", „Ricotta-Packung"), keiner, einer oder mehreren URLs und angehängten Bildern – jeder Teil ist optional.
         *   Link zur Quell-URL öffnet sich in einem neuen Browser-Tab.
         *   Angehängte Dateien/Bilder können in einer Vorschau geöffnet werden.
 
@@ -114,7 +117,23 @@
         *   Wake-Lock ist im Kochmodus aktiv.
         *   Dauer des Wake-Locks beschränkt auf `Vorbereitungszeit + Kochzeit` (oder `Gesamtzeit`), danach System-Timeout (Akku-Schutz).
 
-*   **US-517 (Zeit-Tracking & Optimierung) [PARKING]:** Als *pragmatischer Koch* möchte ich, dass die App misst, wie lange ich für Schritte brauche, um meine Zeitangaben im Rezept automatisch zu korrigieren.
+*   **US-517 (Zeit-Tracking & Optimierung) [PARKING]:** Als *pragmatischer Koch* möchte ich, dass die App misst, wie lange ich für ein Rezept brauche, damit die Zeitangabe stimmt, ohne dass ich sie pflege.
     *   **Akzeptanzkriterien:**
-        *   Kochmodus misst Verweildauer pro Schritt im Hintergrund.
-        *   Nach Abschluss: Vorschlag zur Aktualisierung der Metadaten (Vorbereitungszeit/Kochzeit) basierend auf gemessenen Werten (nur für aktive Schritt-Typen).
+        *   Der Kochmodus misst je Kochvorgang die Zeit, in der man arbeitet – vom Start bis zum Abschluss. Der letzte Schritt trägt statt „Weiter" gut sichtbar „Kochen abschließen", damit das Ende nicht vergessen wird.
+        *   Wartezeiten, in denen etwas ohne Aufsicht backt, gart oder geht (oft am Ende, wenn niemand mehr die App öffnet), werden nicht gemessen, sondern von Hand erfasst; sie zählen nicht zur gemessenen Zeit, stehen aber daneben.
+        *   Ab genug Messungen zeigt das Rezept die Zeit als „ca. X Minuten" (Median) samt Spanne; bis dahin gilt die von Hand erfasste Zeit (US-610).
+        *   Weicht eine neue Messung stark vom Median ab, warnt die App sofort und bietet passende Aktionen an (verwerfen, korrigieren, übernehmen), damit die Datenbasis sauber bleibt.
+        *   Eine Historie der Messungen je Rezept lässt sich bearbeiten: ein Kochvorgang mit Unterbrechung wird korrigiert oder gelöscht.
+        *   Begriffe, Zusammenspiel mit US-610/US-611/US-617 und Wartezeiten mitten im Rezept: offene Frage zum Zeitmodell in `docs/open-questions.md`, fällig im Workshop von US-610.
+        *   Bewusst nicht je Schritt gemessen: Schritte laufen oft parallel („In der Zwischenzeit …" – in 18 von 114 Rezepten der bisherigen Sammlung). Die Verweildauer eines Schritts sagt dann nichts über seine Dauer – während des Backens steht man längst beim nächsten Schritt –, die Summe aller Verweildauern ist aber genau die Gesamtdauer.
+
+*   **US-518 (Vorlauf-Hinweis) [PARKING]:** Als *Feierabend-Planer* möchte ich sehen, welche Rezepte im Pool schon am Vortag oder Stunden vorher begonnen werden müssen (Teig über Nacht, Kühlzeit), damit ich rechtzeitig anfange.
+    *   **Akzeptanzkriterien:**
+        *   Ein Rezept kann einen Vorlauf tragen (z.B. „am Vortag", „12 Stunden").
+        *   Rezepte mit Vorlauf sind im Pool hervorgehoben. Eine Erinnerung zu einem Zeitpunkt ist nicht vorgesehen – der Pool kennt keine Tages-Zuordnung.
+    *   **Anlass:** In der bisherigen Sammlung u.a. Pizzateig (24 h), Coleslaw (12 h), Cheesecake und Frankfurter Kranz (über Nacht bzw. am Vorabend).
+
+*   **US-519 (Schritt-Timer) [PARKING]:** Als *pragmatischer Koch* möchte ich bei einem Schritt mit Wartezeit („20 Minuten backen") einen Timer im Kochmodus starten, damit ich währenddessen etwas anderes tun kann.
+    *   **Akzeptanzkriterien:**
+        *   Timer startbar aus dem Kochmodus; nach Ablauf ein deutliches Signal.
+    *   **Abwägung:** Meist stellt man den Timer direkt an Herd oder Ofen – ein eigener Timer lohnt nur in manchen Fällen.

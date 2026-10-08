@@ -138,7 +138,7 @@ Format: `# @run-<N> · <Cluster-Label> · <Schicht>[ · Singleton][ · Phase:<P>
   Datei**. Über Dateigrenzen hinweg ordnet sie nichts – dafür sind `braucht:`-Kanten da.
 
 <a id="CLU-datei-direktiven"></a>
-### Datei-Direktiven: Phase und Kanten für die ganze Datei
+### Datei-Direktiven: Phase, Kanten und Stufen für die ganze Datei
 
 Im Feature-Header – vor `Background:`/dem ersten `Scenario:` – stehen zwei Direktiven, die als
 Default für **alle** Läufe der Datei gelten:
@@ -155,6 +155,20 @@ Sie sind der einzige Weg für Dateien **ohne** Run-Tags (querschnittliche Featur
 ADR-S103-1): Deren Szenarien bilden je einen Einzel-Lauf und hätten sonst nirgends eine Phase
 anzuschreiben. Unterhalb des Headers sind sie ein Verstoß – dort sähen sie lokal aus und wirkten
 global.
+
+Muss ein Lauf einer **anderen** Datei auf eine Querschnittsdatei warten, bekommt diese
+Lauf-Kommentare: Eine `braucht:`-Kante kann nur auf einen Lauf mit Nummer zeigen, nicht auf einen
+Einzel-Lauf ohne Run-Tag. Beispiel: `US-602/run-13` braucht `CROSS-navigation/run-1`, weil es die
+Navigationsleiste bedient.
+
+Eine dritte Direktive gilt nur für Story-Dateien (`@US-NNN`): `# @stufen: SKELETON, MVP` nennt
+die Stufen der Story, deren Akzeptanzkriterien der Workshop **vollständig** spezifiziert hat. Die
+Stufen einer Story sind die Köpfe ihrer Akzeptanzkriterien-Blöcke in `docs/stories/`
+(`**Akzeptanzkriterien (MVP – …):**`; ohne Klammer die Phase der Story). Jede erreichte Stufe,
+die nicht genannt ist, meldet `next_run.py` als „ohne Workshop" – sonst wären spätere Stufen einer
+Story mit Feature-Datei unsichtbar. Fehlt die Direktive, gilt die Stufe aus `# @phase:`.
+Teilweise spezifizierte Stufen werden nicht genannt; `next_run.py --check` blockt Stufen, die die
+Story gar nicht hat.
 
 ## Beispiel
 

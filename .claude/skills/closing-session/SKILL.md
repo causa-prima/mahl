@@ -98,10 +98,7 @@ user-invocable: true
      - **Lauf außer der Reihe** (Priorität überschreibt die Feature-Reihenfolge, z.B. error vor sortiert): als Anstrich **über** den Platzhalter setzen, nach Umsetzung entfernen.
      - **Vorzieh-/Prioritäts-Items eng + begründet:** Jedes Item eng fassen und mit **sichtbarem Grund + Done-Zustand** notieren (`<enge Aktion> — Grund: … — Done: <woran als fertig erkennbar>`), sonst wird ein längst erledigter Grund inertial weitergeschleppt und niemand erkennt Bestandteile/Fertigstellung.
    - **Ausgelagert (nicht in AGENT_MEMORY, eigene Datei pflegen):** Technische Schuld → `docs/tech-debt.md`; offene Fragen/geparkte Diskussionen → `docs/open-questions.md`. Beide haben eigene Eintrag-Formate (Header der jeweiligen Datei).
-   - **Bei Phasen-Abschluss (z.B. SKELETON → MVP):** Als erste Zeile unter "Nächste Prioritäten" eintragen:
-     ```
-     **Phasen-Review ausstehend:** Skill `review-code` über gesamtes Phase-Delta starten.
-     ```
+   - **Story- und Phasenwechsel nicht von Hand eintragen:** Hat die erreichte Phase Stories ohne Feature-Datei oder ist sie abgeschlossen, meldet das `{{NEXT_RUN}}` und stellt es die Agenda als nächste Aufgabe (`next_run.py --phase-status`). `**Phase:**` erst nach dem Phasen-Review umstellen – die Meldung hält sich bis dahin.
 
 6. <a id="CLS-abschluss-commit"></a>Abschluss-Commit – **Pflicht, letzter Schritt**:
    Der Commit **ist** die Session-Historie. Committet wird über den Skill `committing` –

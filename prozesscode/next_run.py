@@ -20,10 +20,24 @@ Die Auflösung geht über **alle** Feature-Dateien, nicht nur die der aktuellen 
 erreicht sie querschnittliche Dateien (`@CROSS-…`, `@NFR-…`) strukturell nie. Die aktuelle Story
 kommt in der Sortierung trotzdem zuerst, damit eine Story am Stück gebaut wird.
 
+Ist kein Lauf fällig, blickt der Resolver eine Ebene höher, auf die Phase: Stories bis zur
+erreichten Phase (Phasen-Tag in der Inhaltsliste von `docs/stories/szenario_*.md`), die noch
+keine Feature-Datei haben, brauchen einen Workshop – ebenso jede erreichte **Stufe** einer Story
+(Kopf eines Akzeptanzkriterien-Blocks, z. B. `(MVP – …)`), die ihre Feature-Datei nicht per
+`# @stufen:` als spezifiziert nennt (ohne Direktive gilt `# @phase:`). Fehlt nichts und ist kein
+Lauf der Phase offen, ist die Phase abgeschlossen. Nur Läufe zu kennen hieße, beim Wechsel zur nächsten Story
+„nichts fällig" zu melden.
+
 Modi:
   --render <memory.md>   Liest AGENT_MEMORY, ersetzt {{NEXT_RUN}} durch den aufgelösten
-                         Lauf und gibt den vollständigen Text auf stdout aus.
+                         Lauf und gibt den vollständigen Text auf stdout aus. Darunter,
+                         eingerückt als „Teil dieses Laufs": TD, OQ und Prioritäten, deren
+                         `Szenario:`-Anker auf ein Szenario dieses Laufs zeigt.
                          Bricht nie ab – bei Problemen Platzhalter→lesbare Notiz + stderr-Warnung.
+  --phase-status <memory.md>
+                         Nur der Befund über die Phase (Stories/Stufen ohne Workshop bzw.
+                         abgeschlossene Phase); leer, solange ein Lauf fällig ist oder nur
+                         eine Kante wartet. Für die Session-Agenda.
   --check                Mapping-Integritäts-Guard: jeder // Szenario:-Kommentar matcht genau
                          einen Feature-Titel, keine Duplikate; jede Run-Tag-Zeile ist syntaktisch
                          gültig; alle Szenarien derselben Run-Nummer tragen identische Metadaten
@@ -48,15 +62,42 @@ import re
 import sys
 from pathlib import Path
 
-from ._feature import PHASEN, find_malformed_run_comments, parse_feature, phasen_rang
+from ._feature import (
+    PHASEN,
+    find_malformed_run_comments,
+    parse_directives,
+    parse_feature,
+    parse_stufen,
+    phasen_rang,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _FEATURES_DIR = _REPO_ROOT / "features"
 _E2E_DIR = _REPO_ROOT / "Client" / "e2e"
+_STORIES_DIR = _REPO_ROOT / "docs" / "stories"
+_TD_FILE = _REPO_ROOT / "docs" / "tech-debt.md"
+_OQ_FILE = _REPO_ROOT / "docs" / "open-questions.md"
 
 _TOKEN = "{{NEXT_RUN}}"
 _STORY_RE = re.compile(r"Aktuelle Story:\*\*\s*(US-\d+)")
+# Inhaltsliste einer Story-Datei: `- US-803 (Manuelle Plan-Anpassung) [SKELETON]`
+_STORY_LINE_RE = re.compile(r"^- (US-\d+) \(.*\) \[([A-Z0-9]+)\]\s*$", re.MULTILINE)
+_STORY_ID_LINE_RE = re.compile(r"^- US-\d+.*$", re.MULTILINE)
+# Detailabschnitt einer Story: `*   **US-602 (Titel) [SKELETON]:** …` bis zum nächsten.
+_STORY_SECTION_RE = re.compile(r"^\*\s+\*\*(US-\d+)\b", re.MULTILINE)
+# Kopf eines Akzeptanzkriterien-Blocks. Die Stufe steht vorn in der Klammer – `(MVP – Upload)`,
+# `(SKELETON-Version)`, `(V1-Erweiterung – …)`; ohne Klammer gilt die Phase der Story.
+_AC_HEADER_LOOSE_RE = re.compile(r"\*\*Akzeptanzkriterien\b[^*\n]*\*\*")
+_AC_HEADER_RE = re.compile(r"\*\*Akzeptanzkriterien(?: \(([A-Z0-9]+)(?:[ -][^)]*)?\))?:\*\*")
+_US_TAG_RE = re.compile(r"@(US-\d+)")
 _SCENARIO_COMMENT_RE = re.compile(r"^\s*//\s*Szenario:\s*(.+?)\s*$", re.MULTILINE)
+# Punkt der „Nächsten Prioritäten" in AGENT_MEMORY: `- **Titel** — `Fällig: <Anker>` · …`
+_PRIORITAET_RE = re.compile(r"^- \*\*(.+?)\*\* — `Fällig: ([^`]+)`", re.MULTILINE)
+_LAUFANHANG_KOPF = (
+    "  **Teil dieses Laufs** – Einträge, deren Fälligkeit an einem seiner Szenarien hängt. "
+    "Im Lauf erledigen (Schuld beheben, Frage klären) oder begründet auf ein anderes Szenario "
+    "umhängen:"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +266,113 @@ def next_run_global(
     ))
 
 
+def _check_story_lines(story_texts: list[str]) -> None:
+    unreadable = [line for text in story_texts for line in _STORY_ID_LINE_RE.findall(text)
+                  if not _STORY_LINE_RE.fullmatch(line)]
+    if unreadable:
+        raise ValueError(
+            f"Story-Zeile ohne lesbares Phasen-Tag – Form `- US-NNN (Titel) [PHASE]` "
+            f"in docs/stories/ herstellen: {unreadable[0]!r}")
+
+
+def story_stages(story_texts: list[str]) -> dict[str, tuple[str, ...]]:
+    """Stufen je Story, in Dokumentreihenfolge: aus den Köpfen ihrer Akzeptanzkriterien-Blöcke.
+
+    Ein Block ohne Stufe in der Klammer und eine Story ohne Detailabschnitt haben die Phase aus der
+    Inhaltsliste. Mehrere Blöcke derselben Stufe sind eine Stufe.
+    """
+    stages: dict[str, tuple[str, ...]] = {}
+    for text in story_texts:
+        listed = dict(_STORY_LINE_RE.findall(text))
+        stages.update({story: (phase,) for story, phase in listed.items()})
+        sections = list(_STORY_SECTION_RE.finditer(text))
+        for index, section in enumerate(sections):
+            story = section.group(1)
+            end = sections[index + 1].start() if index + 1 < len(sections) else len(text)
+            found: list[str] = []
+            for header in _AC_HEADER_LOOSE_RE.findall(text[section.start():end]):
+                match = _AC_HEADER_RE.fullmatch(header)
+                if match is None:
+                    raise ValueError(
+                        f"{story}: Akzeptanzkriterien-Kopf ohne lesbare Stufe – Form "
+                        f"`**Akzeptanzkriterien (MVP – …):**` oder `**Akzeptanzkriterien:**` "
+                        f"herstellen: {header!r}")
+                found.append(match.group(1) or listed.get(story, ""))
+            if found and story in listed:
+                stages[story] = tuple(dict.fromkeys(found))
+    return stages
+
+
+def _covered_stages(feature_texts: list[str], stages: dict[str, tuple[str, ...]]) -> dict[str, set[str]]:
+    """Stufen je Story, die eine Feature-Datei abdeckt: `@stufen`, sonst `@phase`, sonst die erste."""
+    covered: dict[str, set[str]] = {}
+    for text in feature_texts:
+        stories = {m.group(1) for tag in feature_tags(text) if (m := _US_TAG_RE.fullmatch(tag))}
+        stufen = parse_stufen(text)
+        file_phase, _ = parse_directives(text)
+        for story in stories:
+            if stufen is not None:
+                abgedeckt = set(stufen)
+            elif file_phase:
+                abgedeckt = {file_phase}
+            else:
+                abgedeckt = set(stages.get(story, ())[:1])
+            covered.setdefault(story, set()).update(abgedeckt)
+    return covered
+
+
+def open_story_stages(
+    story_texts: list[str], feature_texts: list[str], phase: str | None
+) -> list[str]:
+    """Stories und Stufen bis zur erreichten Phase, für die noch kein Workshop lief.
+
+    Eine Story ohne Feature-Datei erscheint als `US-NNN`, eine spätere Stufe einer Story mit
+    Feature-Datei als `US-NNN (MVP)`. Beide hätten keine Läufe und wären für den Resolver sonst
+    unsichtbar: Er meldete „kein Lauf fällig", obwohl die Phase noch Akzeptanzkriterien offen hat.
+    Stufen außerhalb der Projekt-Phasen (V2, PARKING) werden nie erreicht.
+    """
+    if phase is None:
+        return []
+    _check_story_lines(story_texts)
+    reached = PHASEN[: phasen_rang(phase) + 1]
+    stages = story_stages(story_texts)
+    covered = _covered_stages(feature_texts, stages)
+    result: list[str] = []
+    for story in sorted(stages):
+        offen = [stufe for stufe in stages[story] if stufe in reached]
+        if not offen:
+            continue
+        if story not in covered:
+            result.append(story)
+            continue
+        fehlend = [stufe for stufe in offen if stufe not in covered[story]]
+        if fehlend:
+            result.append(f"{story} ({', '.join(fehlend)})")
+    return result
+
+
+def check_stufen(feature_texts: list[str], story_texts: list[str]) -> list[str]:
+    """`@stufen` darf nur Stufen nennen, die die Story laut ihren Akzeptanzkriterien hat."""
+    stages = story_stages(story_texts)
+    violations: list[str] = []
+    for text in feature_texts:
+        stufen = parse_stufen(text)
+        if stufen is None:
+            continue
+        for tag in sorted(feature_tags(text)):
+            match = _US_TAG_RE.fullmatch(tag)
+            if not match:
+                continue
+            story = match.group(1)
+            fremd = [stufe for stufe in stufen if stufe not in stages.get(story, ())]
+            if fremd:
+                violations.append(
+                    f"{story}: `@stufen` nennt {', '.join(fremd)}, die Story hat laut "
+                    f"docs/stories/ nur {', '.join(stages.get(story, ())) or 'keine Stufe'} – "
+                    f"`@stufen` oder den Akzeptanzkriterien-Kopf korrigieren.")
+    return violations
+
+
 def open_runs(
     scenarios: list[dict], implemented: set[str], exclude_tags: frozenset[str] = frozenset()
 ) -> list[dict]:
@@ -254,6 +402,45 @@ def format_run(group: dict) -> str:
     titles = ", ".join(f'„{s["title"]}"' for s in group["scenarios"])
     singleton_note = " · Singleton" if group["singleton"] else ""
     return f'`run-{group["number"]}` „{group["label"]}" ({group["layer"]}{singleton_note}): {titles}'
+
+
+def tracker_eintraege(td_text: str, oq_text: str, memory_text: str) -> list[tuple[str, str, str]]:
+    """(Kennung, Titel, roher `Fällig:`-Wert) aller Einträge, die eine Fälligkeit tragen.
+
+    Drei Quellen mit derselben Anker-Grammatik (`td_anchors.py`): technische Schuld, offene
+    Fragen und die „Nächsten Prioritäten" in AGENT_MEMORY.
+    """
+    from . import open_questions, td_anchors, td_entry  # lokal: td_anchors importiert next_run
+
+    eintraege = [(tid, td_entry.titel(td_text, tid) or "", faellig)
+                 for tid, faellig in td_anchors.td_faelligkeiten(td_text).items()]
+    eintraege += [(f["id"], f["title"], f["faellig"])
+                  for f in open_questions.parse(oq_text) if f["faellig"]]
+    eintraege += [("Priorität", titel, faellig)
+                  for titel, faellig in _PRIORITAET_RE.findall(memory_text)]
+    return eintraege
+
+
+def laufanhang(group: dict, eintraege: list[tuple[str, str, str]]) -> str:
+    """Block unter dem nächsten Lauf: Einträge, deren `Szenario:`-Anker auf diesen Lauf zeigt.
+
+    Gehört sichtbar zum Lauf (eingerückt unter dessen Zeile), statt neben anderen Fälligkeiten
+    zu stehen: Ohne ihn meldete die Agenda einen solchen Eintrag erst, wenn das Szenario schon
+    implementiert war (`td_anchors._szenario_gruende`) – zu spät, um ihn im Lauf mitzunehmen.
+    Andere Anker (Phase, Session, TD-Kette) laufen weiter über `td-due` bzw. die OQ-Vorlage.
+    Leer ohne Treffer, damit der Block nicht zum überlesenen Dauerrauschen wird.
+    """
+    from .td_anchors import SZENARIO, parse  # lokal: td_anchors importiert next_run seinerseits
+
+    titel = {s["title"] for s in group["scenarios"]}
+    zeilen = []
+    for kennung, name, faellig in eintraege:
+        anker, _ = parse(faellig)
+        treffer = [a.wert for a in anker if a.art == SZENARIO and a.wert in titel]
+        if treffer:
+            an = ", ".join(f"„{t}\"" for t in treffer)
+            zeilen.append(f"  - {kennung} „{name}\" – an {an}")
+    return "\n".join([_LAUFANHANG_KOPF, *zeilen]) if zeilen else ""
 
 
 def check_integrity(feature_texts: list[str], spec_texts: list[str]) -> list[str]:
@@ -365,15 +552,42 @@ def render(
     feature_texts: list[str],
     implemented: set[str],
     exclude_tags: frozenset[str] = frozenset(),
+    story_texts: list[str] = (),
+    eintraege: list[tuple[str, str, str]] = (),
 ) -> str:
-    """Ersetzt {{NEXT_RUN}} im Memory-Text. Bricht nie ab – Fallback = lesbare Notiz."""
+    """Ersetzt {{NEXT_RUN}} im Memory-Text. Bricht nie ab – Fallback = lesbare Notiz.
+
+    `eintraege` (aus `tracker_eintraege`): Was an einem Szenario des Laufs hängt, erscheint
+    als eingerückter Block unter dessen Zeile (`laufanhang`).
+    """
     if _TOKEN not in memory_text:
         return memory_text
 
-    replacement, warning = _resolve_replacement(memory_text, feature_texts, implemented, exclude_tags)
-    if warning:
-        print(f"⚠️  next_run: {warning}", file=sys.stderr)
+    replacement = _resolve_replacement(
+        memory_text, feature_texts, implemented, exclude_tags, story_texts, eintraege)
     return memory_text.replace(_TOKEN, replacement)
+
+
+def phase_status(
+    memory_text: str,
+    feature_texts: list[str],
+    implemented: set[str],
+    story_texts: list[str],
+    exclude_tags: frozenset[str] = frozenset(),
+) -> str | None:
+    """Befund über die Phase, sobald kein Lauf mehr fällig ist – sonst None.
+
+    Zwei Befunde: Stories/Stufen ohne Workshop (→ Workshop) oder die abgeschlossene Phase
+    (→ Phasen-Review). Wartet ein Lauf der Phase nur auf seine Kante, ist das keiner von beiden.
+    """
+    from .td_anchors import phase_aus_memory  # lokal: td_anchors importiert next_run seinerseits
+
+    phase = phase_aus_memory(memory_text)
+    groups = collect_runs(feature_texts)
+    if next_run_global(groups, implemented, phase, None, exclude_tags) is not None:
+        return None
+    missing = open_story_stages(story_texts, feature_texts, phase)
+    return _phase_note(groups, implemented, phase, missing, exclude_tags)
 
 
 def _resolve_replacement(
@@ -381,7 +595,9 @@ def _resolve_replacement(
     feature_texts: list[str],
     implemented: set[str],
     exclude_tags: frozenset[str],
-) -> tuple[str, str | None]:
+    story_texts: list[str],
+    eintraege: list[tuple[str, str, str]] = (),
+) -> str:
     from .td_anchors import phase_aus_memory  # lokal: td_anchors importiert next_run seinerseits
 
     story = extract_story(memory_text)
@@ -389,35 +605,60 @@ def _resolve_replacement(
     groups = collect_runs(feature_texts)
 
     group = next_run_global(groups, implemented, phase, story, exclude_tags)
-    if group is None:
-        return (_blocked_note(groups, implemented, phase, exclude_tags), None)
-    return (format_run(group), None)
+    if group is not None:
+        anhang = laufanhang(group, eintraege)
+        return format_run(group) + (f"\n{anhang}" if anhang else "")
+    missing = open_story_stages(story_texts, feature_texts, phase)
+    return (_phase_note(groups, implemented, phase, missing, exclude_tags)
+            or _blocked_note(groups, implemented, exclude_tags))
 
 
-def _blocked_note(
-    groups: list[dict], implemented: set[str], phase: str | None, exclude_tags: frozenset[str]
-) -> str:
-    """Notiz, wenn kein Lauf fällig ist – mit dem **Grund**, nicht mit einem Befehl.
+def _phase_note(
+    groups: list[dict],
+    implemented: set[str],
+    phase: str | None,
+    missing_stories: list[str],
+    exclude_tags: frozenset[str],
+) -> str | None:
+    """Notiz auf Phasen-Ebene, wenn kein Lauf fällig ist – None, solange die Phase offene Läufe hat.
 
-    Ein Verweis auf `--check` wäre hier irreführend: Ein Lauf, den seine Phase oder eine erfüllte
-    Kante korrekt zurückhält, ist kein Verstoß, der Guard bliebe also grün.
+    Setzt voraus, dass der Aufrufer schon festgestellt hat, dass kein Lauf fällig ist.
+    """
+    if phase is None:
+        return None
+    if missing_stories:
+        return (
+            f"(kein Lauf fällig – Stories/Stufen bis Phase {phase} ohne Workshop: "
+            f"{', '.join(missing_stories)} → Skill `gherkin-workshop`, "
+            f"danach `**Aktuelle Story:**` umstellen)"
+        )
+    offen = [g for g in groups if _group_is_open(g, implemented, exclude_tags)]
+    if any(not g["phase"] or phasen_rang(g["phase"]) <= phasen_rang(phase) for g in offen):
+        return None
+    spaeter = ""
+    if offen:
+        naechste = min((g["phase"] for g in offen), key=phasen_rang)
+        spaeter = f"; {len(offen)} Läufe offen, frühester ab Phase {naechste}"
+    return (
+        f"(Phase {phase} abgeschlossen – jede Stufe hat einen Workshop, kein Lauf der Phase "
+        f"offen{spaeter} → Phasen-Review nach `docs/process/nfr.md#NFR-periodisches-review` "
+        f"(Skill `review-code` über das Phasen-Delta), dann `**Phase:**` umstellen)"
+    )
+
+
+def _blocked_note(groups: list[dict], implemented: set[str], exclude_tags: frozenset[str]) -> str:
+    """Notiz, wenn kein Lauf fällig ist und die Phase nichts meldet – mit dem **Grund**, nicht
+    mit einem Befehl.
+
+    Ein Verweis auf `--check` wäre hier irreführend: Ein Lauf, den eine erfüllte Kante korrekt
+    zurückhält, ist kein Verstoß, der Guard bliebe also grün.
     """
     offen = [g for g in groups if _group_is_open(g, implemented, exclude_tags)]
     if not offen:
         return "(alle Läufe implementiert)"
-
-    max_rang = phasen_rang(phase) if phase else len(PHASEN)
-    zu_frueh = [g for g in offen if g["phase"] and phasen_rang(g["phase"]) > max_rang]
-    if len(zu_frueh) == len(offen):
-        naechste = min((g["phase"] for g in zu_frueh), key=phasen_rang)
-        return (
-            f"(kein Lauf in Phase {phase} fällig – {len(offen)} offen, "
-            f"frühester ab Phase {naechste})"
-        )
-    wartend = [g for g in offen if g not in zu_frueh]
-    kanten = sorted({ref for g in wartend for ref in g["needs"]})
+    kanten = sorted({ref for g in offen for ref in g["needs"]})
     return (
-        f"(kein Lauf fällig – {len(offen)} offen; {len(wartend)} warten auf "
+        f"(kein Lauf fällig – {len(offen)} offen, warten auf "
         f"`braucht:{','.join(kanten)}`)"
     )
 
@@ -428,6 +669,11 @@ def _blocked_note(
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _read_optional(path: Path) -> str:
+    """Inhalt oder "" – ein fehlender Tracker heißt „keine Einträge", nicht Abbruch."""
+    return _read(path) if path.is_file() else ""
 
 
 def _feature_files() -> list[Path]:
@@ -444,6 +690,11 @@ def _spec_texts() -> list[str]:
     if not _E2E_DIR.exists():
         return []
     return [_read(p) for p in sorted(_E2E_DIR.glob("**/*.spec.ts"))]
+
+
+def _story_texts() -> list[str]:
+    # Nur die Story-Dateien: der Index `user-stories.md` trägt keine Inhaltsliste im Story-Format.
+    return [_read(p) for p in sorted(_STORIES_DIR.glob("szenario_*.md"))]
 
 
 def _gather_implemented() -> set[str]:
@@ -465,11 +716,22 @@ def _cmd_render(memory_path: str) -> int:
         print(f"WARNUNG: AGENT_MEMORY ({memory_path}) nicht lesbar: {exc}", file=sys.stderr)
         return 1
     try:
-        out = render(memory_text, _feature_texts(), _gather_implemented())
+        out = render(memory_text, _feature_texts(), _gather_implemented(),
+                     story_texts=_story_texts(),
+                     eintraege=tracker_eintraege(
+                         _read_optional(_TD_FILE), _read_optional(_OQ_FILE), memory_text))
     except Exception as exc:  # noqa: BLE001 – Memory darf nie wegen Resolver wegbrechen
         print(f"⚠️  next_run: unerwarteter Fehler ({exc}); Memory unverändert.", file=sys.stderr)
         out = memory_text
     sys.stdout.write(out)
+    return 0
+
+
+def _cmd_phase_status(memory_path: str) -> int:
+    status = phase_status(
+        _read(Path(memory_path)), _feature_texts(), _gather_implemented(), _story_texts())
+    if status:
+        print(status)
     return 0
 
 
@@ -518,6 +780,7 @@ def _cmd_check() -> int:
         for v in check_run_consistency(parse_scenarios(text)):
             run_violations.append(f"{path.name}: {v}")
     run_violations.extend(check_dependencies(collect_runs(_feature_texts())))
+    run_violations.extend(check_stufen(_feature_texts(), _story_texts()))
 
     if violations or run_violations:
         print("❌  E2E-Szenario-Mapping verletzt:", file=sys.stderr)
@@ -536,6 +799,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--render", metavar="MEMORY_MD", help="Platzhalter im Memory-Text auflösen")
+    group.add_argument("--phase-status", metavar="MEMORY_MD",
+                       help="Befund über die Phase, wenn kein Lauf fällig ist")
     group.add_argument("--check", action="store_true", help="Mapping-Integritäts-Guard")
     group.add_argument("--open", action="store_true", help="offene Läufe je Feature listen")
     group.add_argument("--done", action="store_true", help="erledigte Läufe je Feature listen")
@@ -544,6 +809,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.render:
         return _cmd_render(args.render)
+    if args.phase_status:
+        return _cmd_phase_status(args.phase_status)
     if args.open:
         return _cmd_list(only_open=True, story=args.story)
     if args.done:

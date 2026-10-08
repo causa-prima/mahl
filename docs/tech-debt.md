@@ -41,7 +41,9 @@ Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
        jetzt              sofort
        Phase:MVP          Phasenwechsel (auch V1/V2) – tritt ein, wenn AGENT_MEMORY sie erreicht
        S130               Spätestens-Termin (Session-Nummer)
-       Szenario:„…"       ein Gherkin-Szenario aus features/ (Titel exakt, muss existieren)
+       Szenario:„…"       ein Gherkin-Szenario aus features/ (Titel exakt, muss existieren) –
+                          erscheint, sobald sein Lauf der nächste ist, unter „Nächster Lauf"
+                          als „Teil dieses Laufs"
        US-602             eine Story – nur gültig, SOLANGE sie keine Szenarien hat
        TD-S089-1          ein anderer Eintrag – tritt ein, wenn jener behoben (entfernt) ist
 
@@ -76,7 +78,7 @@ Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
 -->
 
 ## TD-S044-1 — STJ/Deserialisierung
-**Fällig:** US-602, Phase:V1 – URI-Felder. Der Story-Anker gilt nur, solange US-602 keine Szenarien hat; danach auf das tragende Szenario umhängen.
+**Fällig:** Phase:V1 – URI-Felder. US-602 trägt keine (die Quell-URL gehört nicht zum Scope seiner Szenarien).
 **Problem:** 400 vs. 500 bei ungültigem URI; STJ via `OriginalString` unverifiziert.
 **Behebung:** STJ-Pfad verifizieren und 400 statt 500 erzwingen.
 
@@ -161,7 +163,7 @@ Beide Tests gehören zu dieser Behebung: Sie werden sinnvoll, sobald ein fremder
 ---
 
 ## TD-S108-1 — Frontend Delete/Restore-Pfad: optimistischer Undo-Toast + kein Status-Check
-**Fällig:** Phase:MVP – die `@NFR-resilience`-Szenarien und das dort mitzuschreibende **Delete-Fehler-Szenario**. Kein `Szenario:`-Anker möglich: Die vorhandenen Szenarien üben GET und POST aus, **nicht DELETE**; das treibende Szenario existiert noch nicht und ist in `docs/AGENT_MEMORY.md` als aufzunehmen vermerkt.
+**Fällig:** Szenario:„Während eine Löschung läuft, erscheint noch kein Toast", Szenario:„Eine Zutat, die in Rezepten verwendet wird, lässt sich nicht löschen", Phase:MVP – die ersten UI-Szenarien, in denen DELETE scheitert (Löschsperre aus US-602, recipes.feature): Das erste beobachtet den Toast vor der Antwort (a), das zweite den fehlenden Status-Check. Spätestens mit den @NFR-resilience-Szenarien (MVP).
 **Problem:** Zwei zusammenhängende Lücken im Löschen-/Undo-Pfad (`useDeleteIngredientWithUndo.ts`, `ingredientsApi.ts`):
 (a) **Optimistischer Toast.** `requestDelete` setzt `deleted` **synchron vor** dem Mutation-Call – der Toast „X gelöscht" erscheint also, bevor der DELETE-Request überhaupt beantwortet ist, während die Liste erst nach Server-Antwort + `invalidateQueries` aktualisiert wird. Folgen: bei spürbarer Latenz zeigt die UI gleichzeitig „X gelöscht" **und** X unverändert in der Liste (inkl. klickbarem Löschen-Button); bei einem Netzwerkfehler bleibt eine **falsche Erfolgsmeldung** samt Undo-Button für eine Löschung stehen, die nie stattfand. Der Restore-Pfad macht es bereits richtig (`setDeleted(null)` + `onChanged()` gemeinsam im `onSuccess`).
 (b) **Kein ausreichender Status-Check.** `deleteIngredient` wertet `response.status` **überhaupt nicht** aus (`ResultAsync.fromPromise(fetch(...))`) – ein 404/412/428 gilt als Erfolg. `restoreIngredient` wertet über `toRestoreOutcome` ausschließlich den `409` aus; jeder andere Status fällt in den Erfolgszweig und wird als `Ingredient` geparst. Bei einem `404` entsteht so ein `Restored`-Outcome mit einem ProblemDetails-Objekt als vermeintlicher Zutat, ohne dass irgendwo ein Fehler sichtbar würde. Der Restore-Endpoint kann zudem mit `422` antworten (Namenskollision mit einer anderen Zeile, ADR-S111-1-Addendum) – ein Statuscode, den der Client nicht kennt; über die aktuelle UI nicht auslösbar, weil pro LOWER-Name nur eine Zeile existieren kann, aber der Pfad besteht. Derselbe Defekt wie in TD-S083-1 für den GET-Pfad.
@@ -173,7 +175,7 @@ Alle drei Punkte sind im Erfolgsfall bei schnellem Netz unbeobachtbar – deshal
 ---
 
 ## TD-S108-2 — Frontend: kein Fokus-Management nach Löschen und nach Undo
-**Fällig:** US-602, Phase:V1 – erster Navigations-/Mehrseiten-Schritt; dann liegt ein realistischer Tab-Kontext zur Bewertung vor. Der Story-Anker gilt nur, solange US-602 keine Szenarien hat.
+**Fällig:** Szenario:„Von der Zutaten-Seite zur Rezepte-Seite navigieren", Phase:V1 – erster Navigations-/Mehrseiten-Schritt; dann liegt ein realistischer Tab-Kontext zur Bewertung vor.
 **Problem:** Nach dem Löschen einer Zutat unmountet das fokussierte Element (der Löschen-`IconButton` bzw. bei der letzten Zutat die ganze Liste), ohne dass der Fokus gezielt weitergeführt wird – der Browser setzt ihn auf `<body>` zurück. Dasselbe passiert nach einem Undo-Klick, wenn die Snackbar unmountet. Tastatur- und Screenreader-Nutzer müssen den „Rückgängig"-Weg danach per Tab suchen. Entschärfend: `SnackbarContent` setzt `role="alert"` (MUI-Default), die Meldung samt Undo-Möglichkeit wird also **angesagt**; MUI pausiert zudem den Auto-Hide-Timer, sobald der Button Fokus erhält – wer ihn erreicht, verliert die Zeit nicht. Heute sind es 1–2 Tab-Stopps, das wächst aber mit jeder weiteren Seite. Quelle: ux-ui-auditor (Review run-8, Runde 2).
 **Früher noch als beim Unmount:** Weil der Löschen-Button während des laufenden DELETE `disabled` wird (`IngredientsPage.tsx`), verliert er den Fokus bereits **beim Disable** – also unmittelbar nach dem Tastendruck und **vor** jedem Ergebnis, nicht erst beim Unmount nach Abschluss. Ein `disabled`-Element kann den Fokus per HTML-Semantik nicht halten; der Browser setzt ihn auf `<body>`. Anders als im Anlege-Dialog fängt hier keine MUI-Fokusfalle den Rücksprung ab, weil die Liste kein Modal ist. Ein Tastatur-/Screenreader-Nutzer verliert damit die DOM-Orientierung, während die Aktion noch läuft. Quelle: ux-ui-auditor (Review run-9).
 **Behebung:** Als bewusste Fokus-Strategie entscheiden, nicht als Schnellfix – die naheliegende Lösung (Autofokus auf „Rückgängig") hat echte Nebenwirkungen: Fokus-Stealing in ein selbstschließendes Element reißt den Nutzer aus dem Arbeitsfluss, und weil MUI bei Fokus den Timer pausiert, bliebe der Toast für Tastaturnutzer stehen, bis er aktiv weggedrückt wird. Strukturelle Nav-Vorgabe: UX-Guideline „Erreichbarkeit / Navigation".
@@ -189,7 +191,7 @@ Alle drei Punkte sind im Erfolgsfall bei schnellem Netz unbeobachtbar – deshal
 ---
 
 ## TD-S110-1 — Frontend: Sperr-States im Löschen-/Undo-Pfad decken nur den Erfolgspfad ab
-**Fällig:** TD-S108-1, Szenario:„Zwei gleichzeitige Löschvorgänge sperren beide Zeilen", Szenario:„Rückgängig ist während des Wiederherstellens deaktiviert", Phase:MVP – (a) und (b) mit TD-S108-1 (dessen Fehler-Union bringt den Fehler-Zweig ohnehin mit); (c) und (d) je mit ihrem Szenario, beide inzwischen in `features/interaction.feature` geschrieben, aber keinem Lauf zugeordnet. Alle spätestens ab MVP.
+**Fällig:** TD-S108-1, Szenario:„Eine Zutat, die in Rezepten verwendet wird, lässt sich nicht löschen", Szenario:„Zwei gleichzeitige Löschvorgänge sperren beide Zeilen", Szenario:„Rückgängig ist während des Wiederherstellens deaktiviert", Phase:MVP – (a) und (b) mit TD-S108-1; die Löschsperre aus US-602 verlangt, dass „Löschen" nach der Sperrmeldung wieder bedienbar ist (deletingId wird bisher nur im Erfolgspfad zurückgesetzt); (c) und (d) je mit ihrem Szenario in features/interaction.feature. Alle spätestens ab MVP.
 **Problem:** `useDeleteIngredientWithUndo.ts` führt seit run-9 einen `deletingId: string | null`-State, der die gerade löschende Zeile sperrt (`disabled={ingredient.id === deletingId}` in `IngredientsPage.tsx`). Er wird ausschließlich in `requestDelete` gesetzt und ausschließlich im `onSuccess` von `deleteMutate` zurückgesetzt. Daraus folgen drei Lücken – gemeinsam erfasst, weil sie denselben State, dieselbe Datei und denselben Fix-Ort betreffen:
 (a) **Kein Reset im Fehlerpfad.** `useResultMutation`s `onSuccess` feuert nur bei `Ok`. Ein Netzwerkfehler (`Err`) lässt `deletingId` für immer stehen → der Löschen-Button dieser Zeile ist **dauerhaft** deaktiviert, ohne Fehlermeldung und ohne Retry-Weg; nur ein Reload hilft. Quelle: ux-ui-auditor (Review run-9).
 (b) **Kein Reset im Restore-Pfad.** `restoreMutate`s `onSuccess` setzt `deleted` zurück, aber nicht `deletingId`. Klickt der Nutzer „Rückgängig", während der DELETE noch läuft (das Fenster aus TD-S108-1(c)), erscheint die Zeile durch das Refetch wieder – mit weiterhin gesperrtem Löschen-Button und ohne Toast, also ohne jeden sichtbaren Grund für die Sperre. Quelle: functional-correctness-auditor (Review run-9). **Hinweis:** Die in TD-S108-1 beschriebene Behebung (`setDeleted` in den Erfolgs-Callback verschieben) schließt dieses Fenster als Nebeneffekt mit, weil „Rückgängig" dann erst klickbar ist, wenn `deletingId` bereits `null` ist – beim Umsetzen von TD-S108-1 verifizieren, statt es separat zu fixen.
@@ -239,7 +241,7 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 ---
 
 ## TD-S120-4 — Kein Test-Data-Builder für `IngredientDbType`
-**Fällig:** US-602, Phase:MVP – die nächste Entität mit eigenen Tests macht den Aufwand sichtbar; spätestens ab MVP, weil die Zahl der Berührungspunkte sonst weiter wächst.
+**Fällig:** Szenario:„Rezept anlegen", Phase:MVP – die nächste Entität mit eigenen Tests macht den Aufwand sichtbar; spätestens ab MVP, weil die Zahl der Berührungspunkte sonst weiter wächst.
 **Problem:** `IngredientDbType` wird in jedem Test inline per Objekt-Initializer gebaut; `EndpointsTestsBase` enthält keinen `AnIngredient(...)`-Helper. `docs/process/tdd-process.md` (Sektion „Test-Data-Builder") sieht solche Builder ausdrücklich als Schutz vor Schemaänderungen vor. Die Kosten wurden in S120 messbar: Die Umbenennung eines einzigen Feldes berührte 67 Stellen in einer Testdatei – mit Builder wären es wenige gewesen.
 **Behebung:** Builder-Methode in `EndpointsTestsBase` nach dem Muster in `tdd-process.md`. Gemeldet vom Implementer während des S120-Renames, bewusst außerhalb des damaligen Scopes gehalten.
 
@@ -277,3 +279,11 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Fällig:** Phase:MVP – bis dahin nur eine Build-Warnung und Patch-Abstand; mit MVP kommen weitere EF-Features, deren Laufzeitverhalten im Test dann gegen eine ältere Relational-Version liefe
 **Problem:** `Server` zieht über `Microsoft.EntityFrameworkCore.Design` 10.0.5 `Microsoft.EntityFrameworkCore.Relational` 10.0.5, `Infrastructure` über `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.1 nur 10.0.4 (Untergrenze `[10.0.4, 11.0.0)`). `Server.Tests` löst 10.0.4 auf, `mahl.Server.dll` ist gegen 10.0.5 gebaut → Build-Warnung MSB3277 bei jedem Backend-Lauf; die Tests laufen gegen eine ältere Relational-Version als die, gegen die der Server kompiliert ist. Bestand schon vor S132, sichtbar wurde sie erst, als `dotnet-test.py` die Build-Ausgabe nicht mehr wegfilterte. Ein Npgsql-Update löst es nicht: auch 10.0.3 nennt nur die Untergrenze 10.0.4.
 **Behebung:** Versionen angleichen: entweder `Microsoft.EntityFrameworkCore.Relational` 10.0.5 explizit in `Infrastructure` referenzieren (Allowlist-Erweiterung, User-Freigabe nach `dependencies.md`) oder `Microsoft.EntityFrameworkCore.Design` auf die Relational-Version der Npgsql-Kette ausrichten. Erledigt, wenn ein Backend-Build ohne MSB3277 durchläuft.
+
+---
+
+## TD-S135-1 — Ausgaben unbegrenzt lang – Querschnitt „Länge begrenzen" fehlt
+**Fällig:** Phase:MVP – dann ersetzt der MVP-Zerleger (US-607) den SKELETON-Zerleger, und die Löschsperre aus US-602 (Aufzählung der Rezepte) kommt hinzu.
+**Problem:** Die UX-Guideline verlangt, dass Ausgaben nicht mit den Daten wachsen (CGU-fehlermeldungen, „Länge begrenzen"): Aufzählungen höchstens drei Einträge + „und N weitere", zitierter eingegebener Text gekürzt mit „…". Es gibt dafür weder Szenarien noch eine geteilte Umsetzung. Im SKELETON zitiert die Meldung zu einer Zutatenzeile (recipes.feature) die Zeile unbegrenzt – eine versehentlich eingefügte Riesenzeile erscheint vollständig.
+**Behebung:** Querschnittsdatei mit Szenarien (eine Seite als Vertreter), geteilte Umsetzung nach ADR-S112-5 für beide Formen, ADR mit der Kürzungslänge; Zitat der Zutatenzeile und Löschsperre-Meldung darüber führen.
+**Aufschubgrund:** User – Regel gilt, Umsetzung erst im MVP; der SKELETON-Zerleger, der das unbegrenzte Zitat erzeugt, wird dort ohnehin ersetzt.
