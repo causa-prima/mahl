@@ -1,4 +1,4 @@
-# CLAUDE.md – Navigationszentrale
+# AGENTS.md – Navigationszentrale
 
 ## WSL-native Toolchain
 
@@ -11,7 +11,8 @@
 | Aufgabe | Lies |
 |---------|------|
 | Session starten / Status prüfen | `docs/AGENT_MEMORY.md` |
-| Szenario implementieren | Skill `implementing-scenario` verwenden (ein Szenario pro Durchlauf, Double-Loop TDD) |
+| User Story spezifizieren / Szenarien finden oder ergänzen | Skill `gherkin-workshop` verwenden (Feature-File samt Lauf-Clustering – Voraussetzung für `implementing-scenario`) |
+| Szenario implementieren | Skill `implementing-scenario` verwenden (ein Lauf – ein Szenario-Cluster – pro Durchlauf, Double-Loop TDD) |
 | Backend-Endpoint schreiben | `docs/reference/architecture.md` (inkl. [Hexagonal Architecture](docs/reference/architecture.md#ARC-hexagonal)) → `docs/reference/skeleton-spec.md` ([API-Sektion](docs/reference/skeleton-spec.md#SKE-api-routen)) |
 | E2E Testing / BDD/Gherkin / Outside-In ATDD | `docs/process/e2e-testing.md` |
 | C#-Code schreiben (Backend, Tests) | `docs/guidelines/coding-guideline-general.md` → `docs/guidelines/coding-guideline-csharp.md` (enthält Verweise auf ROP/SumTypes/Stryker-Ergänzungen) |
@@ -31,21 +32,19 @@
 | Learnings dokumentieren | `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/process.md`) |
 | Tracker-Eintrag lesen/schreiben (OBS, LL, TD, OQ, ADR) | `python3 -m prozesscode.tracker` zeigt, welches Werkzeug welchen Tracker pflegt und welche Befehle es kennt – dann `obs.py` / `lessons.py` / `td.py` / `oq.py` / `decisions.py`, statt Read/Edit auf der ganzen Datei |
 | Wohin geht das Read-/Token-Budget? | `python3 -m prozesscode.read-breakdown` (nach Session-Art), `tool-usage.py` |
-| Hat ein Guard/Hook je angeschlagen – oder fällt er lautlos aus? | `python3 -m prozesscode.guard-stats` (Teil der Retro) |
-| Wo fehlen Tests im Prozess-Code? | `python3 -m prozesscode.coverage-run` (Metrik, kein Gate – Teil der Retro) |
-| Prüft ein Guard überhaupt noch, was er prüfen soll? | `python3 -m prozesscode.mutmut-run --mutate prozesscode.hooks.<hook>` – überlebt ein Mutant, merkt kein Test die Änderung (Sichtung, kein Gate) |
-| Ist die Testgüte eines Moduls schlechter als beim letzten Mal? | dasselbe mit `--ratchet` – hält den Score je Modul in `prozesscode/mutation-baseline.json` fest und meldet einen Rückschritt |
+| Güte des Prozess-Codes messen (Guard-Auslösungen, Testabdeckung, Mutation) | Skill `kaizen` (Retro-Schritte dazu), Skill `write-code` → Prozess-Code (`mutmut-run`) |
+| Skill schreiben oder ändern | `.claude/agents/workflow-auditor.md`, Abschnitt [Ressourceneffizienz](.claude/agents/workflow-auditor.md#WFA-ressourceneffizienz) – deterministische Schritte als Script |
 | Abschnitt einer Doku lesen (statt Volldatei) | `python3 -m prozesscode.doc toc <datei>` zeigt die Abschnitte, `doc.py get <ANKER>` holt einen davon |
 | Abschnitt referenzieren / Anker prüfen | `python3 -m prozesscode.anchors list\|check\|refs <ANKER>`; Nummern statt Namen findet `ordinale.py` |
 | Was steht schon in einer Testdatei? | `python3 -m prozesscode.test-inventory <datei>` – Testnamen mit Zeilenbereich |
 | Verhaltensprinzipien (immer gültig) | `docs/kaizen/principles.md` |
 | Maßnahmen-Tracking | `docs/kaizen/countermeasures.md` |
 | Retro durchführen | Skill `kaizen` verwenden |
+| Offene Beobachtungen (OBS) abarbeiten | Skill `draining-observations` verwenden |
 | Technische Schuld tracken | `docs/tech-debt.md` |
 | Offene Fragen / geparkte Diskussionen | `docs/open-questions.md` |
 | Wohin gehört dieser Eintrag – ADR, TD, OQ oder OBS/CM/LL? | Sektion "[Ablage: in welchen Tracker gehört dieser Eintrag?](#CLA-ablage)" (unten in dieser Datei) |
-| Langsame Befehle dokumentieren | `docs/process/slow-commands.md` |
-| Befehl ausführen (Timeout / Auswahl) | `docs/process/dev-workflow.md` (Sektion "[Befehlsauswahl & Timeouts](docs/process/dev-workflow.md#DEV-befehlsauswahl)") |
+| Befehl wird geblockt / welcher Befehl ist erlaubt? | `docs/process/dev-workflow.md` (Sektion "[Befehlsauswahl](docs/process/dev-workflow.md#DEV-befehlsauswahl)") |
 | Warum wurde X so entschieden? | `docs/history/adr.md` (via `python3 -m prozesscode.decisions`) |
 | Was passierte in Session X? | `git log --grep='^Session-Ende: X$'` – die Commit-Nachricht **ist** die Session-Historie (Zwischen-Commits stehen davor, bis zur vorigen Marke). Wörtlicher Verlauf: Skill `recall-session` |
 | Neuen Agenten beauftragen | `.claude/agents/` (bestehende Definitionen als Vorlage) + Skill `review-code` |
@@ -97,25 +96,14 @@ bei **neu** erfassten Einträgen blockt `prozesscode/hooks/check-adr-capture.py`
 (Escape für bewusste Einzelfälle: `adr-ok`-Marker im Eintrag). Bestehende Einträge bleiben
 frei änderbar, sonst wäre Aufräumen unmöglich.
 
-**Lifecycle – bewusste Abweichung von der Lehrmeinung.** Der Mainstream kennt kein Löschen von
-ADRs (immutable, nur `Superseded`). Hier gilt: Eine ADR, die je **gegolten** hat, bleibt als
-`Superseded` stehen, weil sie Projekthistorie erklärt – auch wenn keine Anwendungsstelle mehr
-existiert. Eine ADR, die **nie** angewendet wurde, erklärt nichts und wird gelöscht (Präzedenz
-S108: ADR-S000-3). Im Zweifel behalten. Kein `Rejected`-Archiv.
-
-**Ort der Regel – verworfene Alternativen (S118).** Die Übersicht steht hier, weil `CLAUDE.md` das
-einzige Dokument mit garantiertem Lese-Trigger und ohnehin Routing-Zentrale ist; die
-Aufnahmebedingung je Tracker steht zusätzlich in dessen Datei-Header. Verworfen: die Übersicht in
-`docs/kaizen/process.md` – die dortige Tabelle ist die Kaizen-Taxonomie und dort vollständig, die
-zunächst vermutete Lücke war ein Fehlschluss. Ebenfalls verworfen: eine eigene Datei – sie hätte
-keinen Lese-Trigger.
+**Lifecycle** (wann eine ADR `Superseded` wird und wann sie gelöscht wird): Kopf von `docs/history/adr.md`.
 
 ---
 
 ## Globale Skills: Vorrang lokaler Regeln
 
-Globale Skills (z.B. `tdd`) gelten als Baseline. Lokale Skills und Docs ergänzen sie und gewinnen bei Konflikten – insbesondere:
-- TDD-Prozess: Skill `write-code` **ergänzt** den globalen `tdd`-Skill um Guideline-Pflichten, PFLICHT-OUTPUT und Selbst-Review; TDD läuft als Schritt [Implementieren via TDD](.claude/skills/write-code/SKILL.md#WRC-tdd) von `write-code`. Bei Konflikten gelten `write-code` und `docs/process/tdd-process.md`.
+Lokale Skills und Docs gewinnen bei Konflikten mit globalen Skills – insbesondere:
+- TDD-Prozess: Den Rahmen bilden `write-code` und `docs/process/tdd-process.md`; der globale `tdd`-Skill wird in diesem Projekt nicht gebraucht. Wo `tdd-process.md` bewusst von der Lehrmeinung abweicht (Batch-RED, Full State Assertion), steht das dort mit Begründung.
 
 ---
 

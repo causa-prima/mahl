@@ -25,7 +25,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Datei, Modul, wofür sie da ist (Aufnahmebedingung in einem Satz), Lebensende eines
-# Eintrags. Die Abgrenzung untereinander steht kanonisch in CLAUDE.md.
+# Eintrags. Die Abgrenzung untereinander steht kanonisch in AGENTS.md.
 TRACKER = [
     ("docs/kaizen/observations.md", "obs",
      "Vorausschauende Beobachtung: wie das System besser wäre (Prozess)",
@@ -89,8 +89,8 @@ def main() -> int:
     print("  remove <ID>      Eintrag löschen – nur bei Trackern, aus denen Erledigtes "
           "verschwindet")
     print()
-    print("Wohin gehört ein Eintrag? → CLAUDE.md, Sektion „Ablage: in welchen Tracker "
-          "gehört dieser Eintrag?“")
+    print("Wohin gehört ein Eintrag? → AGENTS.md#CLA-ablage („Ablage: in welchen Tracker "
+          "gehört dieser Eintrag?“; Abruf: doc.py get CLA-ablage)")
     print("Prozess-Taxonomie (OBS/CM/LL) → docs/kaizen/process.md, „Wann gehört etwas "
           "wohin?“")
     print()

@@ -2,7 +2,7 @@
 """session-agenda.py – was verlangt zum Session-Start eine Entscheidung?
 
 Einstiegspunkt des SessionStart-Hooks (ersetzt `session-start.sh`; Rangfolge und Begründung
-kanonisch in `docs/kaizen/process.md`, Abschnitt „Session-Agenda").
+kanonisch in `docs/kaizen/process.md#KPR-session-agenda`).
 
 Die Ausgabe zerfällt in fünf **Injektionsblöcke** (`INJEKTIONS_BLOECKE`), von denen jeder
 EINZELN als SessionStart-Hook registriert ist – drei aus `principles.md`, die Allow-Liste
@@ -388,6 +388,18 @@ def modul_priorities() -> Block:
     )
 
 
+def _kurzfassung_offene_laeufe(text: str, story: str) -> str:
+    """Erster offener Lauf + Anzahl statt der ganzen Liste.
+
+    Die Liste kam sonst in jede Session (bei US-602: 19 Läufe, ~5 KB), obwohl der nächste Lauf
+    schon im Zustandskopf steht; die Geschwister holt `implementing-scenario` selbst.
+    """
+    laeufe = [zeile.strip() for zeile in text.splitlines() if zeile.startswith("  ")]
+    erster = laeufe[0] if laeufe else text.strip()
+    return (f"Offene Läufe der Story {story}: {len(laeufe)} offene Läufe, als erster:\n  {erster}\n"
+            f"Vollständige Liste: `python3 -m prozesscode.next_run --open --story {story}`")
+
+
 def modul_next_run() -> Block:
     """Offene Läufe DER AKTUELLEN STORY – und ohne solche der Stand der Phase.
 
@@ -406,8 +418,8 @@ def modul_next_run() -> Block:
         text = _modulausgabe("next_run", "--open", "--story", story)
         if not text.startswith("(keine"):
             return Block(stub=f"Nächster Lauf ({story}): offen",
-                         inhalt=f"Offene Läufe der Story {story}:\n{text}"
-                                "\n→ Skill `implementing-scenario` (ein Szenario pro Durchlauf).",
+                         inhalt=_kurzfassung_offene_laeufe(text, story)
+                                + "\n→ Skill `implementing-scenario` (ein Lauf pro Durchlauf).",
                          beansprucht=True)
     befund = _modulausgabe("next_run", "--phase-status", str(memory)).strip()
     if befund:

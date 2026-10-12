@@ -119,7 +119,7 @@ Beim Aufgreifen ist die Zusammengehörigkeit am Volltext zu prüfen und ein nich
 
 **Drei Ausgänge je Item:** umsetzen / **verwerfen** (mit Grund → Archiv) / **aufschieben** → `IN BEOBACHTUNG bis S<NNN>` (mit Grund + **Pflicht-Wiedervorlage**: ab dieser Session kommt das Item automatisch zurück in den Drain). Geparkte Items fallen bis dahin aus dem Pool; zum Termin injiziert `obs-drain.py` sie als fällige Wiedervorlage. Fehlt das `bis S<NNN>`, gilt das Item **sofort** als fällig (+ Warnung) – so kann ein geparktes Item nie still liegenbleiben. Für event-basierte Reaktivierung („wieder aktiv wenn X") zusätzlich eine Re-Trigger-Notiz; der Termin bleibt der verlässliche Backstop.
 
-**Bias-Auslöschung (Relevanz wird zweimal beurteilt):** heiß bei der Erfassung (Bias *für* Aufnahme), kalt bei der Behandlung (Bias *zur* Abwertung) – entgegengesetzt, daher kalibrierter zusammen. Damit die kalte Abwertung nichts Wertvolles killt, wendet der Drain (Skill `draining-observations`, Schritt „**Entscheiden**") den **Kalt-Abwertungs-Prüfsatz** an.
+**Bias-Auslöschung (Relevanz wird zweimal beurteilt):** heiß bei der Erfassung (Bias *für* Aufnahme), kalt bei der Behandlung (Bias *zur* Abwertung) – entgegengesetzt, daher kalibrierter zusammen. Damit die kalte Abwertung nichts Wertvolles killt, wendet der Drain (Skill `draining-observations`, Schritt [„**Vorentscheidung**"](../../.claude/skills/draining-observations/SKILL.md#DRN-vorentscheidung)) den **Kalt-Abwertungs-Prüfsatz** an.
 
 **Vorprägung (Anker-Bias, getrennt vom Obigen):** Schon genanntes Lösungswissen – vom User geäußerte Maßnahmen, vermutete Ursachen, Analogieschlüsse – wird nicht getilgt (Informationsverlust) und nicht in die Beobachtung gemischt, sondern steht im optionalen Feld `- Vorprägung:`. Es wird beim normalen `obs.py get` **nicht mitgelesen**, nur als Hinweis angekündigt; Abruf per `--vorprägung`, und zwar erst **nach** eigener Kandidatenbildung. Begründung (S115): Eine Verifikationspflicht *nach* dem Lesen kommt zu spät – wer den Volltext gesehen hat, ist geprägt, unabhängig davon, was die Regel danach fordert. Umgekehrt wäre stilles Verbergen so schädlich wie Tilgen, deshalb sind Hinweis im `get` und `+Vorprägung`-Marker im Drain-Satz Pflicht. Der Inhalt ist zudem **agentenformuliert** und daher beim Drain gegen das tatsächliche Ziel des Users zu verifizieren, nicht als Auftrag zu lesen – genau daran ist der S115-Drain zunächst gescheitert.
 
@@ -345,6 +345,18 @@ Keine verallgemeinerbare Klasse darunter → **keine CM** (sie wäre sofort obso
 
 **Messwerkzeug bei CM-Definition (gilt für alle Maßnahmen):** Beim Festlegen einer Maßnahme zugleich bestimmen, **woran** ihre Wirksamkeit später beurteilt wird (sonst lässt sich BEWÄHRT/Rückfall nie belegen). Default-Kanal: lessons_learned + Session-Dateien – reicht für **selbst-berichtbare** Probleme. Adressiert die Maßnahme ein Verhalten, das der Agent **nicht** selbst als Problem loggt (z.B. Bash-Permission), muss schon jetzt eine **harte Datenquelle** benannt oder geschaffen werden (z.B. ein Log). Der Check ist leichtgewichtig: Default genügt meistens; nur die Lücke „nicht selbst-berichtet" erzwingt eine explizite Datenquelle.
 
+<a id="KPR-bruchstellen"></a>
+### Fälle einer Bruchstelle zuordnen
+
+Vier Prinzipien in [„Kommunikation & Argumentation"](principles.md#KPI-kommunikation) sichern
+dieselbe Kette „Frage → Erhebung → Aussage" an je einer Bruchstelle; jede trägt eine eigene
+Maßnahme in `countermeasures.md`. Wer einen Fall einer Maßnahme zuordnet (`--cm-bezug` beim
+Erfassen eines Learnings, CM-Review in der Retro), bestimmt **zuerst die Bruchstelle**: gar nichts
+erhoben, am untauglichen Aufbau erhoben, nur über einen Teil des Raums erhoben, oder korrekt
+erhoben und in einer anderen Größe berichtet. Die vier überschneiden sich inhaltlich stark – ohne
+diesen Schritt landet ein Fall beliebig bei einer von ihnen, und die Rückfallzählung der Maßnahmen
+ist nur bei eindeutiger Zuordnung etwas wert.
+
 ---
 
 <a id="KPR-retro-trigger"></a>
@@ -411,7 +423,7 @@ Der Jenga-Score startet automatisch neu – `jenga_score.py` liest immer nur die
 
 Falls inhaltlich zutreffend zusätzlich als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`). Ablauf: `kaizen`-Skill, Schritt [„Änderungen umsetzen"](../../.claude/skills/kaizen/SKILL.md#KZN-aenderungen-umsetzen).
 
-**Eskalation:** Eine Maßnahme die nach 2 Retros noch OFFEN ist, wird in der nächsten Retro als ESKALIERT präsentiert – im Skill-Schritt [„Findings präsentieren & Freigabe einholen"](../../.claude/skills/kaizen/SKILL.md#KZN-findings-praesentieren), Abschnitt F (gespeist aus dem Abschnitt „Eskalierte Maßnahmen" des `retro_report.py`-Outputs). Der User entscheidet dann: Umsetzung priorisieren oder bewusst verwerfen (Begründung in der Maßnahme notieren).
+**Eskalation:** Eine Maßnahme die nach 2 Retros noch OFFEN ist, wird in der nächsten Retro als ESKALIERT präsentiert – im Skill-Schritt [„Findings präsentieren & Freigabe einholen"](../../.claude/skills/kaizen/SKILL.md#KZN-findings-praesentieren), Template-Abschnitt „Eskalierte Maßnahmen" (gespeist aus dem Abschnitt „Eskalierte Maßnahmen" des `retro_report.py`-Outputs). Der User entscheidet dann: Umsetzung priorisieren oder bewusst verwerfen (Begründung in der Maßnahme notieren).
 
 ---
 

@@ -3,7 +3,7 @@
 <!--
 wann-lesen: Beim Schreiben von Feature-Specs und E2E-Tests, beim Verstehen der Outside-In ATDD Reihenfolge, beim Setup des Spec-driven Quality Gates
 kritische-regeln:
-  - Reihenfolge immer: Gherkin (rot) → Frontend-Test (rot) → Backend-Test (rot) → Code (grün)
+  - Reihenfolge immer: Gherkin (rot) → E2E-Test (rot) → je Schicht Test (rot) → Code (grün); Schicht-Reihenfolge legt implementing-scenario fest
   - Kein Backend- oder E2E-Test ohne darüberliegendes Gherkin-Szenario
   - Jedes Szenario trägt @US-ID-Tag (z.B. @US-101)
   - Spec darf nicht nachträglich angepasst werden, um die Implementierung zu bestätigen
@@ -93,7 +93,7 @@ Ein Feature gilt erst als „Done", wenn sein Gherkin-Szenario grün ist.
 ### Metriken & Gates
 
 - **Branch/Line-Coverage**: 100% projektübergreifend (alle Schichten: Backend + Frontend + Infrastructure)
-- **Mutation Score**: 100% (Stryker.NET / Stryker-JS) – kein Survivor ohne begründete Suppression
+- **Mutation Score**: 100% (Stryker.NET / Stryker-JS) – Umgang mit Survivors: [Welcher Survivor bekommt welche Reaktion?](tdd-process.md#TDD-survivor-entscheidung)
 - **Kein separater Coverage-Gate für E2E allein** – der E2E-Gate ist die Spec-Traceability (alle @US-ID-Szenarien grün)
 
 ---

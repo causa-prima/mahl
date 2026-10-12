@@ -32,10 +32,6 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Der häufigste Fehlerursprung ist nicht fehlendes Wissen, sondern fehlendes Anwenden.
   Hooks und Pflicht-Schritte in Skills sind zuverlässiger als Lese-Disziplin.
 
-- **Deterministische Skill-Schritte mechanisieren.** Beim Schreiben/Ändern eines Skills prüfen, ob
-  ein deterministischer Schritt (Session-Nummer bestimmen, Status setzen, archivieren …) statt
-  freihändig besser als Script liefe (Token↓, Varianz↓). Details: [`workflow-auditor.md`, Ressourceneffizienz](../../.claude/agents/workflow-auditor.md#WFA-ressourceneffizienz).
-
 <a id="KPI-doku-referenzen"></a>
 ## Doku & Referenzen
 
@@ -55,32 +51,22 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
       ## Result-Typen
       … siehe [CGT-result](../guidelines/coding-guideline-typescript.md#CGT-result) …
 
-  Präfix = Dokument, Rest ein Slug in Kleinbuchstaben. So bleibt der Verweis **klickbar**
-  (GitHub, IDE) und zugleich stabil: Weil der Anker die Identität trägt, dürfen Titel geändert
-  und Abschnitte umsortiert werden, ohne dass etwas bricht – der Zwang zu Einschüben wie
-  „4b/4c" entfällt. GitHubs Auto-Anchors leisten das nicht, sie hängen am Titeltext.
-  Drei Richtungen sind mechanisch abgesichert (`check-anchors.py`): Verweis ohne Ziel, Link
-  auf die falsche Datei, und ein gelöschter Anker, auf den noch verwiesen wird. Bestand und
-  Vollprüfung: `python3 -m prozesscode.anchors list|check`. Einzelfall-Escape:
-  `anchor-ok` in der Zeile. Tracker-IDs (TD-/OBS-/ADR-) sind keine Anker.
+  Präfix = Dokument, Rest ein Slug in Kleinbuchstaben. So bleibt der Verweis **klickbar** und
+  zugleich stabil: Titel dürfen sich ändern, Abschnitte umsortiert werden. Kaputte Verweise blockt
+  `check-anchors.py` (Bestand: `python3 -m prozesscode.anchors list|check`, Escape: `anchor-ok`).
+  Tracker-IDs (TD-/OBS-/ADR-) sind keine Anker.
 
 - **Ein Anker ist eine Abrufeinheit – was zu ihm gehört, muss aus der Gliederung folgen.**
-  Seit `doc.py get <ANKER>` existiert, liest ein Agent nicht mehr die Volldatei, sondern genau
-  den Abschnitt: bei einem Überschriften-Anker bis zur nächsten gleichrangigen oder
-  höherrangigen Überschrift (Unterabschnitte gehören dazu), bei einem Absatz-Anker nur dessen
-  Block. Damit wird die Gliederung **maschinell wirksam** – ein Nachsatz hinter dem Block, der
-  inhaltlich dazugehört, fehlt beim Abruf, und zwar unbemerkt. Beim Schreiben gilt deshalb:
-  Braucht ein Gedanke mehr als seinen Absatz, bekommt er eine Überschrift, keinen zweiten
-  Absatz. Bestand sichten: `python3 -m prozesscode.doc audit` (Teil von `review-docs`).
-  Nicht behoben wird das je durch eine großzügigere Abrufregel – eine Heuristik, die schlechte
-  Gliederung glattbügelt, verbirgt sie auch vor dem menschlichen Leser.
+  `doc.py get <ANKER>` liefert bei einem Überschriften-Anker alles bis zur nächsten gleich- oder
+  höherrangigen Überschrift, bei einem Absatz-Anker nur dessen Block. Ein Nachsatz hinter dem
+  Block, der inhaltlich dazugehört, fehlt beim Abruf unbemerkt. Deshalb: Braucht ein Gedanke mehr
+  als seinen Absatz, bekommt er eine Überschrift, keinen zweiten Absatz. Bestand sichten:
+  `python3 -m prozesscode.doc audit`.
 
 - **Abschnitte, Regeln und Schritte bekommen Namen, keine Nummern.**
   Eine selbstvergebene Nummer ist eine *zweite Adresse* neben dem Anker – und nur der Anker
-  wird geprüft. Sie wird bei jeder Umsortierung still falsch; in S124 lagen zwei solche
-  Verweise bereits tot im Bestand („kaizen Schritt 5" für einen Schritt 7, „Script-Output
-  Abschnitt 9" ohne Entsprechung). Der Name leistet zudem mehr: „REFACTOR" sagt, wohin man
-  springt, „Phase 3" nur, wie weit. Gilt für Überschriften (`## Findings präsentieren`),
+  wird geprüft; sie wird bei jeder Umsortierung still falsch. Der Name sagt zudem, wohin man
+  springt, nicht nur, wie weit. Gilt für Überschriften (`## Findings präsentieren`),
   Verweistexte (`[Findings präsentieren](#KZN-…)`) und fette Absatz-Leads (`**Rolle ≠ Typ**`).
   **Legitim bleibt allein fremdbestimmte Nummerierung** – von einer externen Autorität
   vergeben (RFC-Abschnitt, Gesetzesparagraph, fremde Spec). *Nicht* legitim ist „steht in
@@ -91,10 +77,8 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   `ordinal-ok` in der Zeile.
 
 - **Ein Filter findet nur, woran beim Bauen gedacht wurde – Bestände werden gesichtet, nicht gefiltert.**
-  In S124 versagten vier aufeinander aufbauende Suchnetze am selben Punkt: Jedes kodierte die
-  Wortliste, die gerade im Kopf war („Gate" fehlte, dann „Dimension", dann „Agent", zuletzt
-  „Migrationsschritt"). Jede Runde meldete sauber, und jede folgende Sichtung fand neue Fälle
-  – zuletzt im Prüfwerkzeug selbst. Konsequenz, zweigeteilt: Für den **Neuzugang** ist ein
+  Ein Suchnetz kodiert die Wortliste, die beim Bauen im Kopf war, meldet sauber und übersieht
+  alles andere. Konsequenz, zweigeteilt: Für den **Neuzugang** ist ein
   Filter richtig (er läuft bei jedem Edit, Lücken fallen mit der Zeit auf). Für einen
   **bestehenden Bestand** ist er es nicht – dort trägt nur vollständiges Sichten, notfalls
   klassenweise: alles aufnehmen, Klassen mit Stichprobenbeleg abziehen, den Rest ansehen.
@@ -106,8 +90,7 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
   Die volatile Stelle referenziert die stabile; relevante Informationen leben (auch) in der stabilen Quelle.
   Mechanisch abgesichert in beide Richtungen: `check-ref-direction.py` blockt volatile IDs in stabilen
   Dokumenten (Einzelfall-Escape: `ref-ok`), `check-dangling-refs.py` blockt das Löschen eines TD-/OQ-Eintrags,
-  auf den noch verwiesen wird (Escape: `dangling-ok`). Der zweite schließt die Lücke, dass `ref-ok` sonst
-  ein stummes Opt-out bliebe – einmal gesetzt, nie wieder geprüft.
+  auf den noch verwiesen wird (Escape: `dangling-ok`).
 
 - **Zustandsdokumente tragen nur den offenen/aktuellen Zustand – kein Erledigtes.**
   Ein Zustandsdokument (z.B. `AGENT_MEMORY.md` „Nächste Prioritäten", `tech-debt.md`, `open-questions.md`,
@@ -122,13 +105,10 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
 ## Kommunikation & Argumentation
 
 **Vier der folgenden Regeln sichern dieselbe Kette – von der Frage über die Erhebung zur
-Aussage – an je einer Bruchstelle, und stehen unten in dieser Reihenfolge:** gar nichts erhoben
-(„Unterstützt ≠ beweist"), am untauglichen Aufbau erhoben („Die Gegenprobe"), nur über einen Teil
-des Raums erhoben („Vollständige Zerlegung"), korrekt erhoben und in einer anderen Größe berichtet
-(„Die berichtete Größe ist die gemessene"). Wer einen Fall einordnet, bestimmt **zuerst die
-Bruchstelle** – die vier überschneiden sich inhaltlich stark, und ohne diesen Schritt landet ein
-Fall beliebig bei einer von ihnen. Jede trägt im Tracker eine eigene Maßnahme, deren
-Rückfallzählung nur bei eindeutiger Zuordnung etwas wert ist.
+Aussage – an je einer Bruchstelle, in dieser Reihenfolge:** gar nichts erhoben („Unterstützt ≠
+beweist"), am untauglichen Aufbau erhoben („Die Gegenprobe"), nur über einen Teil des Raums erhoben
+(„Vollständige Zerlegung"), korrekt erhoben und in einer anderen Größe berichtet („Die berichtete
+Größe ist die gemessene"). Wie ein Fall einer davon zugeordnet wird: [Fälle einer Bruchstelle zuordnen](process.md#KPR-bruchstellen).
 
 - **Eine Tracker-ID nie nackt nennen.**
   Wer den Volltext hat, ist der Agent – der User müsste ihn heraussuchen. Erstnennung eines

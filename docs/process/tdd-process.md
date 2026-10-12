@@ -18,13 +18,13 @@ kritische-regeln:
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| [Outside-In ATDD](#TDD-outside-in) | Three-Loop TDD: äußer (Gherkin/E2E), mittler (Integration), inner (Unit je Schicht); Regeln | Vor dem Start jeder User Story |
+| [Outside-In ATDD](#TDD-outside-in) | Double-Loop TDD: außen Gherkin/E2E, innen Test-Batch je Schicht; Test-Tier-Regel | Vor dem Start jeder User Story |
 | [RED](#TDD-red) | Test-Batch schreiben, kollektiven Fehlschlag bestätigen, Business-Entscheidungen dokumentieren | Vor jeder neuen Implementierung |
 | [GREEN](#TDD-green) | Kleinstmögliche Implementierung, Gold-Plating-Check, alle Tests grün | Während der Implementierung |
 | [REFACTOR](#TDD-refactor) | Checkliste: Minimalität, Duplikate, Lesbarkeit, Guideline-Compliance | Nach jedem GREEN |
 | [Test-Setup](#TDD-test-setup) | Unit Tests / Integration Tests / Test-Utilities, Test-Namen-Format | Beim Einrichten neuer Test-Projekte |
 | [Test-Data-Builder](#TDD-test-data-builder) | Builder-Methoden in EndpointsTestsBase, Schutz vor Schemaänderungen | Beim Anlegen neuer Entities |
-| [Parametrisierte Tests](#TDD-parametrisierte-tests) | TestCase / TestCaseSource, TDD-Kompatibilität, wann NICHT parametrisieren | Beim Testen gleichartiger Eingaben |
+| [Parametrisierte Tests](#TDD-parametrisierte-tests) | Theory / InlineData / MemberData, TDD-Kompatibilität, wann NICHT parametrisieren | Beim Testen gleichartiger Eingaben |
 | [Full State Assertion](#TDD-full-state-assertion) | BeEquivalentTo-Pflicht, Excluding-Regeln, API-Response vs. DB-State | Bei allen mutierenden Operationen (POST/PUT/DELETE) |
 | [Mutation Testing](#TDD-mutation-testing) | Stryker-Konfiguration, Ziel 100%, Ausnahmen, Stryker-Kategorien für Defensive Guards | Am Ende jeder Phase und während Entwicklung |
 | [Branch Coverage](#TDD-branch-coverage) | Coverlet (C#) / V8 (TS), Ziel 100%, Suppressionen | Nach jedem vollständigen Test-Lauf |
@@ -49,22 +49,26 @@ Beim Implementieren einer User Story gilt immer diese Reihenfolge:
 
 ```
 1. Gherkin-Szenario schreiben         →  rot (noch kein Step-Code)
-2. Frontend E2E-Test schreiben        →  rot (Backend nicht implementiert)
-3. Backend Integration-Test schreiben →  rot (Endpoint nicht implementiert)
-4. Implementierung je Schicht         →  pro Schicht: Test-Batch der Schicht → kollektiv rot → grün → Refactor
-5. Refactor (Integration-Ebene)
+2. E2E-Test schreiben                 →  rot (Verhalten nicht implementiert)
+3. Implementierung je Schicht         →  pro Schicht: Test-Batch der Schicht → kollektiv rot → grün → Refactor
+4. Refactor (Integration-Ebene)
 ```
 
-Es gibt drei Loop-Ebenen. Der äußere Loop treibt den mittleren, der mittlere treibt den inneren:
+Welche Schichten ein Lauf hat und in welcher Reihenfolge (Full-Stack: Frontend vor Backend;
+Frontend-only: kein Backend), legt `implementing-scenario` fest
+([Schicht-Reihenfolge](../../.claude/skills/implementing-scenario/SKILL.md#IMP-tdd-zyklus)).
+
+Es gibt zwei Loop-Ebenen. Der äußere Loop treibt den inneren:
 
 ```
 äußere Schleife:  Gherkin → E2E-Test → rot
-  mittlere Schleife:  Integration-Test → rot → (Schichten implementieren) → grün → Refactor
-    innere Schleife:  Test-Batch der Schicht → kollektiv rot → minimale Implementierung → grün → Refactor
-    innere Schleife:  nächste Schicht → ...
-  → mittlere Schleife: Integration-Test grün? → weiter; sonst nächste Schicht
-→ äußere Schleife fortsetzen bis Gherkin grün
+  innere Schleife:  Test-Batch der Schicht → kollektiv rot → minimale Implementierung → grün → Refactor
+  innere Schleife:  nächste Schicht → ...
+→ äußere Schleife: E2E-Test grün? → fertig; sonst nächste Schicht
 ```
+
+Der Test-Batch einer Schicht ist ihr einziger Test-Tier (siehe Test-Tier-Regel unten) – beim C#-Backend
+also der HTTP-Integrationstest. Eine eigene mittlere Schleife mit zusätzlichem Integrationstest gibt es nicht.
 
 **Test-Tier-Regel (Single-Tier als Standard):**
 
@@ -79,12 +83,11 @@ Ein Unit Test auf isolierte Domänenlogik (Value Types, Berechnungen, Multi-Cond
 
 Langsame Stryker-Läufe durch eine wachsende Integration-Test-Suite sind ein akzeptierter Trade-off des Single-Tier-Ansatzes. Sie rechtfertigen keine Unit-Test-Ausnahmen.
 
-**Pflicht:** Den Unit Test schreibt der **Haupt-Thread** (Orchestrator) oder ein separater Test-Agent, der ausschließlich Spec (Gherkin) + Stryker-Survivor-Report erhält – keinen Produktionscode. Der Coding-Subagent erhält den fertigen Test und macht ihn grün. **Jede Unit-Test-Ausnahme erfordert einen schriftlichen Survivor-Report als Begründung.**
+**Pflicht:** Jede Unit-Test-Ausnahme braucht die Freigabe des Users ([Welcher Survivor bekommt welche Reaktion?](#TDD-survivor-entscheidung)). Den Unit Test schreibt der **Haupt-Thread** (Orchestrator) oder ein separater Test-Agent, der ausschließlich Spec (Gherkin) + Stryker-Survivor-Report erhält – keinen Produktionscode. Der Coding-Subagent erhält den fertigen Test und macht ihn grün. **Jede Unit-Test-Ausnahme erfordert einen schriftlichen Survivor-Report als Begründung.**
 
 **Regeln:**
 - Backend- und E2E-Tests erst nach darüberliegendem Gherkin-Szenario anlegen
 - Produktionscode für eine Schicht erst nach einem fehlschlagenden Test auf dieser Schicht schreiben
-- Produktionscode erst nach fehlschlagendem Backend-Test schreiben
 - Das Gherkin-Szenario ist die Spec – nachträgliche Anpassungen zur Implementierungsbestätigung sind unzulässig
 - Coding-Subagenten schreiben keine Unit Tests (außer MSW-Komponenten-Tests für React). Jede Unit-Test-Ausnahme erfordert einen schriftlichen Stryker-Survivor-Report.
 
@@ -104,7 +107,7 @@ Langsame Stryker-Läufe durch eine wachsende Integration-Test-Suite sind ein akz
 
 1. Schreibe den **Test-Batch** für die Verhaltenseinheit – alle Tests, die das Szenario auf dieser Schicht fordert. Jeder Test beschreibt konkretes, vom Gherkin gefordertes Verhalten.
 2. **Vor dem Schreiben jedes Tests prüfen:**
-   - Kodiert er eine Business-Entscheidung (Konfliktstrategie, fachliche Fehlerbehandlung)? → Per CLAUDE.md-Regel prüfen ob selbst entscheidbar oder nachfragen nötig. Selbst getroffene Entscheidungen in `docs/history/adr.md` dokumentieren.
+   - Kodiert er eine Business-Entscheidung (Konfliktstrategie, fachliche Fehlerbehandlung)? → Per AGENTS.md-Regel prüfen ob selbst entscheidbar oder nachfragen nötig. Selbst getroffene Entscheidungen in `docs/history/adr.md` dokumentieren.
    - Mappt jede Assertion + jedes signifikante Given/When auf ein Gherkin-Kriterium? Falls nicht → Gold-Plating, nicht schreiben.
 3. Führe den Batch aus und bestätige den **kollektiven** Fehlschlag.
 4. **PFLICHT-OUTPUT:** Bestätige explizit: *"Test-Batch [Testnamen] schlägt fehl mit: [je Test die Fehlermeldung]"*
@@ -126,10 +129,10 @@ Die einfachste grüne Implementierung DARF eine hardcodierte Rückgabe sein. Wen
 ```csharp
 // Erster Test: Get_EmptyList_Returns200WithEmptyLists
 // Korrekte minimale Implementierung:
-group.MapGet("/", () => Results.Ok(new ShoppingListResponseDto([], [])));
+group.MapGet("", () => Results.Ok(new ShoppingListResponseDto([], [])));
 
 // FALSCH (Gold-Plating im GREEN-Schritt – echte DB-Logik noch nicht erzwungen):
-group.MapGet("/", async (MahlDbContext db) => {
+group.MapGet("", async (MahlDbContext db) => {
     var items = await db.ShoppingListItems.Select(...).ToListAsync();
     // ...
 });
@@ -165,7 +168,7 @@ Führe diese Checkliste explizit durch und dokumentiere das Ergebnis:
   **PFLICHT-OUTPUT:** *"Stryker: [Score] | Branch Coverage: [Score] | Suppression-Report: [Neue Suppressionen mit Datei:Zeile und Begründung]"* oder *"Kein Survivor, keine Suppression"*. Beide Scores werden vom Orchestrator geprüft.
 
 - [ ] **Linter- und Duplikat-Gate:**
-  - TypeScript: `npm run lint` (ESLint inkl. Complexity ≤ 10, Funktionslänge ≤ 20 Zeilen) – muss 0 Errors haben
+  - TypeScript: `python3 -m prozesscode.eslint-run` (ESLint inkl. Complexity ≤ 10, Funktionslänge ≤ 20 Zeilen) – muss 0 Errors haben
   - C#: `dotnet build` – SonarAnalyzer (S3776 Cognitive Complexity, S138 Methodenlänge) ist Teil des Builds; kein Fehler erlaubt
   - Duplikate: `python3 -m prozesscode.jscpd-run` (jscpd über TypeScript, C# und Python) – gemeldet wird nur der **Zuwachs** gegenüber dem bekannten Bestand; kein hartes Gate, aber jeder neue Fund muss adressiert oder mit Begründung in die Baseline aufgenommen werden (`BEKANNTE_KLONE` im Wrapper, Politik: [CGP-duplikate](../guidelines/coding-guideline-python.md#CGP-duplikate))
 
@@ -193,16 +196,16 @@ Führe die Tests nochmals aus und bestätige grün.
 <a id="TDD-test-ausfuehrung"></a>
 ## Test-Ausführung
 
-Ausführungsbefehle (`dotnet-test.py`, `dotnet-stryker.py`, Timeouts): `docs/process/dev-workflow.md` – Sektionen "[Tests](dev-workflow.md#DEV-tests)" und "[Mutation Testing](dev-workflow.md#DEV-mutation-testing)".
+Ausführungsbefehle (`dotnet-test.py`, `dotnet-stryker.py`): `docs/process/dev-workflow.md` – Sektionen "[Tests](dev-workflow.md#DEV-tests)" und "[Mutation Testing](dev-workflow.md#DEV-mutation-testing)".
 
 <a id="TDD-test-setup"></a>
 ## Test-Setup
 
-- **Alle Tests:** `Server.Tests/` – Domain Logic + API Endpoints (xunit.v3 + AwesomeAssertions + Microsoft.AspNetCore.Mvc.Testing + EF InMemory; MTP-Runner via `UseMicrosoftTestingPlatformRunner`)
+- **Alle Tests:** `Server.Tests/` – Domain Logic + API Endpoints (xunit.v3 + AwesomeAssertions + Microsoft.AspNetCore.Mvc.Testing + Testcontainers.PostgreSql; MTP-Runner via `UseMicrosoftTestingPlatformRunner`)
 
-> **Hinweis:** Production nutzt PostgreSQL – die Testinfrastruktur verwendet bewusst EF InMemory. Jeder Test läuft gegen eine isolierte, frische In-Memory-DB (xunit erzeugt pro Testmethode eine neue Testklassen-Instanz; `EndpointsTestsBase : IDisposable` legt via `EnsureCreated` im Ctor + `EnsureDeleted` in `Dispose` pro Test eine frische DB an).
+> **Datenbank im Test:** echtes Postgres in einem geteilten Testcontainer (`PostgresContainerFixture`), Schema einmalig per `MigrateAsync` – dieselben Migrations wie E2E und Produktion. Vor jedem Test leert `EndpointsTestsBase.InitializeAsync` alle Tabellen (`TruncateAllTablesAsync`), der Initialzustand ist also immer leer. Begründung und Trade-offs: ADR-S105-1.
 >
-> **Bekannte Einschränkung:** EF InMemory erzwingt keine DB-Constraints (UNIQUE, FK). Tests für Constraint-Verletzungen (z.B. Duplicate-Name-409) müssen über explizite Endpoint-Logik abgesichert sein – nicht durch DB-Constraints. Das ist gewollt: Constraint-Logik gehört in den Endpoint-Layer, nicht in die DB. Wer PostgreSQL-spezifisches Verhalten testen will (z.B. Transaktionsisolation), braucht Testcontainers – das ist im SKELETON nicht vorgesehen.
+> **Folge für Constraints:** Unique-Indizes, FKs und funktionale Indizes greifen im Test genau wie in Produktion. Eine Integritätsregel, die die DB durchsetzen kann (z.B. case-insensitive Namens-Eindeutigkeit, ADR-S105-2), gehört als Constraint in die DB und wird über den Endpoint-Test geprüft.
 
 Test-Namen-Format: `USxxx_ScenarioType_MethodName_Szenario_ErwartetesErgebnis`
 
@@ -240,32 +243,33 @@ Für jede neue Entity-Art eine entsprechende Builder-Methode ergänzen.
 <a id="TDD-parametrisierte-tests"></a>
 ## Parametrisierte Tests
 
-**Vor jedem neuen Test prüfen: eigener Test oder weiterer `[TestCase]`?**
+**Vor jedem neuen Test prüfen: eigener Test oder weitere `[InlineData]`-Zeile?**
 
 Bevor ein neuer Test geschrieben wird, zunächst fragen: *Ist das ein neues Szenario oder nur eine weitere Variation desselben Verhaltens?*
 
-| Kriterium | Eigener Test | Weiterer `[TestCase]` |
+| Kriterium | Eigener Test | Weitere `[InlineData]`-Zeile |
 |---|---|---|
 | Setup-Logik | Unterschiedlich | Identisch |
 | Assertion-Logik | Unterschiedlich | Identisch |
 | Fachliche Bedeutung | Eigene Invariante / eigener Fehlerpfad | Gleiche Invariante, nur Input variiert |
 
 Beispiele:
-- `""`, `"   "`, `"\t"` für einen ungültigen Namen → alle testen dieselbe Invariante „leer oder nur Whitespace ist ungültig" → **`[TestCase]`**
+- `""`, `"   "`, `"\t"` für einen ungültigen Namen → alle testen dieselbe Invariante „leer oder nur Whitespace ist ungültig" → **`[InlineData]`**
 - „Name leer" vs. „Name bereits vorhanden" → unterschiedliche fachliche Fehlerpfade → **eigene Tests**
-- 1 ungültige Zutat vs. 2 Zutaten von denen eine ungültig ist → dieselbe Validierungsinvariante, nur Kontext variiert → **`[TestCase]`**
+- 1 ungültige Zutat vs. 2 Zutaten von denen eine ungültig ist → dieselbe Validierungsinvariante, nur Kontext variiert → **`[InlineData]`**
 
-Gleichartige Testlogik mit variierenden Inputs/Outputs wird als ein parametrisierter Test geschrieben.
-`[TestCase]` für einfache Werte, `[TestCaseSource]` für komplexe Objekte.
+Gleichartige Testlogik mit variierenden Inputs/Outputs wird als ein parametrisierter Test geschrieben
+(xUnit `[Theory]`). `[InlineData]` für einfache Werte, `[MemberData]` mit `TheoryData<…>` für komplexe Objekte.
 
 ```csharp
-[TestCase("",      "g",  "Name darf nicht leer sein")]
-[TestCase("   ",   "g",  "Name darf nicht leer sein")]
-[TestCase("Butter","",   "Einheit darf nicht leer sein")]
+[Theory]
+[InlineData("",       "g", "Name darf nicht leer sein.")]
+[InlineData("   ",    "g", "Name darf nicht leer sein.")]
+[InlineData("Butter", "",  "Einheit darf nicht leer sein.")]
 public async Task Create_InvalidInput_Returns422(string name, string unit, string expectedMessage) { ... }
 ```
 
-**Batch-Kompatibilität:** Alle `[TestCase]`-Varianten desselben Verhaltens gehören in den
+**Batch-Kompatibilität:** Alle `[InlineData]`-Varianten desselben Verhaltens gehören in den
 Test-Batch und werden gemeinsam rot bestätigt – kein getrennter RED-Zyklus pro Variante.
 
 **Nicht parametrisieren** wenn die Setup-Logik zwischen Fällen unterschiedlich ist oder der
@@ -276,7 +280,9 @@ ExpectedState dynamisch vom InitialState abhängt – dort eigene Testmethoden.
 
 Endpoint-Tests, die Daten **anlegen, ändern oder löschen**, prüfen nach dem HTTP-Call den **vollständigen** DB-Zustand ("Full State Assertion") – nicht nur ob ein bestimmtes Item vorhanden ist. Nur so werden unerwartete Seiteneffekte (Extra-Rows, veränderte bestehende Einträge) sicher erkannt.
 
-Da jeder Test in einer isolierten, frischen DB läuft (`InstancePerTestCase` + `EnsureDeletedAsync`), ist der Initialzustand immer bekannt – Full State Assertions sind daher einfach zu schreiben und zu lesen.
+Da vor jedem Test alle Tabellen geleert werden ([Test-Setup](#TDD-test-setup)), ist der Initialzustand immer bekannt – Full State Assertions sind daher einfach zu schreiben und zu lesen.
+
+**Bewusste Abweichung von der Lehrmeinung „nur über die öffentliche Schnittstelle prüfen"** (so auch der globale `tdd`-Skill): Die DB wird hier direkt abgefragt. Ein Rundgang über einen GET-Endpoint sähe nur, was dieser Endpoint ausliefert – Extra-Rows oder veränderte Nachbar-Einträge blieben unentdeckt. Ein Reviewer meldet die direkte DB-Abfrage daher nicht als Implementierungskopplung.
 
 ```csharp
 // FALSCH: Nur Response geprüft
@@ -379,17 +385,44 @@ Die richtige Frage bei einem Survivor ist nie „Wie töte ich diesen Mutanten?"
 4. **Code neu schreiben → GREEN bestätigen.**
 5. **Stryker auf die Datei ausführen → Survivor darf nicht mehr erscheinen.**
 
-**`// Stryker disable`** ist ausschließlich für echte äquivalente Mutanten erlaubt – d. h. wenn es beobachtbar keinen Unterschied macht, ob der Mutant überlebt (z. B. Route-String `"/"` vs. `""` in ASP.NET Core = identisches Routing-Verhalten). Jede Suppression muss in `docs/history/adr.md` begründet werden. Als Erstreaktion auf einen Survivor zuerst Spec-Check durchführen: fehlenden Test schreiben oder Gold-Plating entfernen.
+<a id="TDD-survivor-entscheidung"></a>
+#### Welcher Survivor bekommt welche Reaktion?
+
+Diese Tabelle ist die **einzige** Regel dafür; Agent-Definitionen, Skills und Checklisten verweisen
+hierher. Eine Suppression (`// Stryker disable`) ist das **letzte Mittel** – erst prüfen, ob ein Test
+oder das Löschen greift.
+
+| Survivor | Woran erkennbar | Reaktion | Wer | Freigabe |
+|---|---|---|---|---|
+| Fehlender Test | Der Mutant ändert Verhalten, das an der Schichtgrenze sichtbar ist (Backend: HTTP-Response oder DB-Zustand; Frontend: Komponenten-API), und die Spec fordert dieses Verhalten | Vorgehen oben: löschen → RED → GREEN | Schicht-Subagent | – |
+| Gold-Plating | Keine Spec-Anforderung erzwingt die Logik | Code löschen | Schicht-Subagent | – (unsicher → nachfragen) |
+| Äquivalent oder strukturell unerreichbar, **Klasse durch eine bestehende ADR erlaubt** | Kein beobachtbarer Unterschied, und eine ADR deckt genau diese Klasse (z.B. die Tabelle „Defensive Guards" unten: ADR-S041-9 für Guards, ADR-S040-1 für den Sum-Type-Arm) | Suppression; die Begründung **nennt die erlaubende ADR** | Schicht-Subagent; der Orchestrator prüft, ob die ADR den Fall wirklich deckt | – |
+| Äquivalent oder strukturell unerreichbar, **ohne passende ADR** | wie oben, aber keine ADR deckt die Klasse | Nicht selbst suppressen: an den Orchestrator melden. Er legt dem User vor: **wiederkehrende Klasse** → neue ADR, dann Suppression mit Verweis darauf; **Einzelfall** → Suppression mit Vermerk `(Einzelfall, vom User freigegeben S<NNN>)` im Kommentar, keine ADR; oder Code löschen (Gold-Plating) | Orchestrator | **User** |
+| Erreichbar, an der Schichtgrenze **nicht** beobachtbar | Der Mutant ändert ein Ergebnis, das die Grenze nicht zeigt (interne Konstante, gerundete Zwischenrechnung) | Nicht selbst suppressen: an den Orchestrator melden. Er legt dem User vor: Unit-Test-Ausnahme nach [Quellen-Trennung](#TDD-outside-in) oder Code löschen (Gold-Plating) | Orchestrator | **User** |
+
+**Survivor-Test nach der Test-Freigabe – die Ausnahme vom Einfrieren.** Survivors fallen in REFACTOR
+auf, also nach der Freigabe des Test-Batches. Ein **zusätzlicher** Test für einen „Fehlenden Test"
+ist dann erlaubt, ohne neue Freigabe abzuwarten: Der Subagent schließt die Arbeit ab und weist den
+Test im Return **gesondert** aus (Testname, getöteter Mutant, warum der Batch ihn nicht enthielt);
+der Orchestrator prüft ihn im [Orchestrator-Check](../../.claude/skills/implementing-scenario/SKILL.md#IMP-orchestrator-check)
+wie im Test-Review. Bestehende Assertions bleiben unangetastet. Das soll die Ausnahme bleiben: Ein
+fehlender Test heißt, der freigegebene Batch war unvollständig.
+
+Neue ADRs zu Suppressionen entstehen nur nach Abstimmung mit dem User und nur für Klassen, die
+wiederkehren – keine ADR je Einzelfall. Eine gültige Suppression nennt also entweder die erlaubende
+ADR oder die Einzelfall-Freigabe des Users. Bleibt der Score nach einer Korrekturrunde unter 100 %: **STOP, User
+fragen**.
 
 **Bekannte äquivalente Mutanten – Defensive Guards:**
 
 | Guard | Stryker-Kategorien | Begründung |
 |-------|-------------------|------------|
-| Parameterless-Ctor (`public T() => throw ...`) | `Statement,String` | Unerreichbar via normale Konstruktion (Factory Methods) |
-| `default(T)`-Equality-Guard (`_id == default ? throw ...`) | `Equality,String` | Unerreichbar via normale Konstruktion |
-| `Match`-Wildcard (`_ => throw new InvalidOperationException(...)`) | `Statement,String` | Unerreichbar durch privaten Konstruktor (externe Subtypen ausgeschlossen) |
+| Parameterless-Ctor (`public T() => throw ...`) | `Statement,String` | Unerreichbar via normale Konstruktion (Factory Methods), ADR-S041-9 |
+| `default(T)`-Equality-Guard als Ternär (`_id == default ? throw ... : _id`) | `Equality,String,Conditional` | Unerreichbar via normale Konstruktion, ADR-S041-9 |
+| `default(T)`-NullCoalescing-Guard (`_value ?? throw ...`) | `NullCoalescing,String` | Unerreichbar via normale Konstruktion, ADR-S041-9 |
+| `Match`-Wildcard (`_ => SumType.Unreachable<T>()`) | – (einmal zentral in `SumType.cs`, ADR-S040-1/ADR-S018-2) | Unerreichbar durch privaten Konstruktor; keine eigene Suppression je Sum-Type |
 
-Syntax und vollständige Kategorienliste: `docs/guidelines/csharp-stryker.md`.
+Syntax und Kategoriennamen: [Stryker-Inline-Suppressions](../guidelines/csharp-stryker.md#STK-suppressions).
 
 Stryker-Bezüge (Zeilennummern, Mutantentypen) gehören **nicht** in Test-Namen oder Kommentare.
 
@@ -398,4 +431,4 @@ Stryker-Bezüge (Zeilennummern, Mutantentypen) gehören **nicht** in Test-Namen 
 
 - **C# Backend:** `coverlet.MTP` – automatisch bei vollem Test-Lauf (`dotnet-test.py` ohne `--filter`), Messumfang und Ausschlüsse siehe ADR-S089-1. Threshold: 100% Branch + Line.
 - **TypeScript Frontend:** Vitest mit V8-Provider – `npm run test:coverage`. Threshold: 100% Branches, Functions, Lines, Statements.
-- **Suppressionen:** C# via `[ExcludeFromCoverageGate("…")]` + Begründung in `docs/history/adr.md` (nicht `[ExcludeFromCodeCoverage]` – das nimmt Stryker den Code mit weg, ADR-S041-9); TS via `/* v8 ignore next */` + Begründung. Jede Suppression muss begründet sein.
+- **Suppressionen:** C# via `[ExcludeFromCoverageGate("…")]` (nicht `[ExcludeFromCodeCoverage]` – das nimmt Stryker den Code mit weg, ADR-S041-9); TS via `/* v8 ignore next */`. Jede Suppression nennt in ihrer Begründung die erlaubende ADR oder die Einzelfall-Freigabe des Users – dieselbe Regel wie für Stryker ([Welcher Survivor bekommt welche Reaktion?](#TDD-survivor-entscheidung)).

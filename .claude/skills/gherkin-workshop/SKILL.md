@@ -25,9 +25,9 @@ Beispiel: `/gherkin-workshop US-904`
 ## Pflicht-Lektüre
 
 Lies vor dem Start – **abschnittsweise, nicht als Volldatei**, soweit das Projekt einen Weg dafür
-anbietet (Navigationstabelle in `CLAUDE.md`). Ganz lesen nur, wenn du fast alles brauchst.
+anbietet (Navigationstabelle in `AGENTS.md`). Ganz lesen nur, wenn du fast alles brauchst.
 
-- `docs/stories/user-stories.md` (Index) → `docs/stories/szenario_N_*.md` – Akzeptanzkriterien der Ziel-US (US-Präfix = Szenario-Nummer, oder `Grep "US-NNN" docs/stories/`)
+- `docs/stories/user-stories.md` (Index) → `docs/stories/szenario_N_*.md` – Akzeptanzkriterien der Ziel-US (US-Präfix = Szenario-Nummer, oder `grep -l "US-NNN" docs/stories/`)
 - `docs/reference/glossary.md` – Ubiquitäre Sprache (nur Begriffe daraus in Szenarien)
 - `docs/process/e2e-testing.md` – Gherkin-Konventionen, Tag-Schema, Traceability-Regeln
 - `docs/history/adr.md` – Explizite Entwurfsentscheidungen (Constraints für Szenarien)
@@ -64,7 +64,8 @@ Notiere schriftlich:
 
 <a id="GHW-bestandsanalyse"></a>
 **Bestandsanalyse:**
-Existiert bereits eine Feature-Datei für diese US?
+Existiert bereits eine Feature-Datei für diese US? Gesucht wird über das Feature-Tag, nicht über
+den Dateinamen – mehrere Stories teilen sich eine Entität (`grep -l '@US-NNN' features/`).
 - **JA:** vollständig lesen und notiere:
   - Vorhandene Szenarien und Tags
   - Offensichtliche Lücken
@@ -263,7 +264,7 @@ Notiere das Ergebnis der Checkliste schriftlich — für jeden Aspekt entweder:
 
 **Achtung:** Offenbart der Dialog eine Architekturentscheidung, die nicht in adr.md
 steht (z.B. eine neue Verhaltenssemantik oder ein neues Zustandsmodell)? → Stopp.
-Per CLAUDE.md-Regel: Business-Logik-Entscheidungen beim User nachfragen und erst dann
+Per AGENTS.md-Regel: Business-Logik-Entscheidungen beim User nachfragen und erst dann
 in adr.md dokumentieren, bevor Szenarien geschrieben werden.
 
 ---
@@ -316,14 +317,19 @@ unbestimmte Behandlung sie still falsch speichern könnte (sie sehen wohlgeformt
 anders gemeint); sonst genügt der unbestimmte Pfad.
 
 <a id="GHW-schaden"></a>
-**Schaden durch unbestimmtes Verhalten:** Möglich sind falsche oder verlorene Daten und eine
+### Schaden durch unbestimmtes Verhalten
+
+Möglich sind falsche oder verlorene Daten und eine
 Seite, die sich nicht mehr bedienen lässt. Ein solcher Schaden braucht ein Szenario, wenn seine
 Behebung – wie oft er vorkommt mal was sie kostet – teurer ist als Szenario und Umsetzung. Daten,
 die vor der nächsten Ausbaustufe ohnehin verworfen werden, senken diese Kosten. Beispiel: Eine
 gelöschte Zutat lässt ein Rezept nicht mehr anzeigen – selten, einmalig zu beheben, und die Daten
 sind noch Wegwerfdaten; kein Szenario.
 
-**Stabiles in einer Übergangsregel:** Enthält eine Übergangsregel eine stabile Regel – etwa die
+<a id="GHW-stabiles-in-uebergang"></a>
+### Stabiles in einer Übergangsregel
+
+Enthält eine Übergangsregel eine stabile Regel – etwa die
 Wertgrenzen eines gespeicherten Felds, die auch die Nachfolgelösung prüft –, behält die stabile ihre
 volle Tiefe. Benenne den stabilen Teil über seine Quelle (ADR, Akzeptanzkriterium); volle Tiefe
 bekommt nur, was diese Quelle festlegt, alles Übrige derselben Regel bleibt Übergang. Beispiel: Die
@@ -331,7 +337,10 @@ Wertgrenzen einer Menge (größer als 0, Nachkommastellen, Maximum) stehen in ei
 stabil; woran der Zerleger eine Menge erkennt (Vorzeichen oder Komma am Zeilenanfang), steht dort
 nicht und gehört zum Zerleger – keine Grenzfälle dafür.
 
-**Ergebnis:** Eine Liste „Tiefe je Regel" (Regel · gebraucht ab · ablösende Story oder „keine fest
+<a id="GHW-regel-tiefe-ergebnis"></a>
+### Ergebnis der Tiefe je Regel
+
+Eine Liste „Tiefe je Regel" (Regel · gebraucht ab · ablösende Story oder „keine fest
 eingeplante" · Tiefe), vom User bestätigt. Sie geht verbatim an die Agents der
 [Scenario-Entdeckung](#GHW-scenario-entdeckung) und an den Review-Agenten. Der Kopf der
 Feature-Datei nennt die Übergangsregeln mit ihrer ablösenden Story, damit Umsetzung und spätere
@@ -440,6 +449,7 @@ Füge ihn zusammen mit diesen Inputs in den Agent-Aufruf ein:
 - User Story + Akzeptanzkriterien (verbatim aus [Kontext laden](#GHW-kontext-laden), nicht paraphrasiert)
 - Constraints aus adr.md (aus [Kontext laden](#GHW-kontext-laden))
 - [Tiefe je Regel](#GHW-regel-tiefe) (vom User bestätigt, verbatim)
+- [UX-Kontext](#GHW-ux-kontext) (die notierten Blöcke, verbatim – wie für die Discovery-Agents)
 
 **Nach dem Review – Loop (max. 3 Iterationen):**
 
@@ -475,7 +485,10 @@ Konvention: englischer Plural des Domain-Entitätsnamens aus docs/reference/glos
 (z.B. `features/ingredients.feature` für Zutat, `features/recipes.feature` für Rezept).
 Wenn eine US mehrere Entitäten betrifft, benenne die Datei nach der primären Entität
 (der, die in der US-Überschrift dominant ist); falls unklar: User fragen.
-Datei vollständig ersetzen (oder neu anlegen) mit dem finalen Entwurf.
+Eine Feature-Datei gehört genau einer Story (`@US-NNN` auf Feature-Ebene). Ist der Name schon von
+der Datei einer **anderen** Story belegt, bekommt die neue Datei die Story-ID angehängt:
+`features/<entity-plural-english>-us-nnn.feature` (z.B. `features/recipes-us-614.feature`).
+Vollständig ersetzen nur eine Datei, die **dieselbe** Story trägt; sonst neu anlegen.
 
 **Stufen eintragen:** Im Header `# @stufen: <PHASE>[, <PHASE>]` – die Stufen der Story, deren
 Akzeptanzkriterien jetzt vollständig spezifiziert sind; eine nur teilweise spezifizierte Stufe
@@ -501,7 +514,7 @@ Warte auf explizite Freigabe. Bei Anpassungsbedarf: überarbeiten und erneut vor
 Falls User-Feedback ein Szenario fordert, das einer Regel in adr.md oder dem docs/reference/glossary.md
 widerspricht: Konflikt explizit benennen, Regel zitieren, fragen ob das Szenario angepasst
 oder die Regel aktualisiert werden soll. Business-Logic-Entscheidungen gehören dem User
-(CLAUDE.md-Regel: Business-Impact → nachfragen).
+(AGENTS.md-Regel: Business-Impact → nachfragen).
 
 ---
 

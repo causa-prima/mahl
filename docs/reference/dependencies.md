@@ -77,7 +77,7 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 | `Serilog.Sinks.Console` | Server |
 | `Serilog.Sinks.File` | Server |
 | `Microsoft.AspNetCore.Mvc.Testing` | Server.Tests |
-| `Microsoft.EntityFrameworkCore.InMemory` | Server.Tests |
+| `Microsoft.EntityFrameworkCore.Relational` | Infrastructure (Versions-Pin, Grund als Kommentar in der .csproj) |
 | `Microsoft.NET.Test.Sdk` | Server.Tests |
 | `xunit.v3.mtp-v2` | Server.Tests |
 | `xunit.runner.visualstudio` | Server.Tests |

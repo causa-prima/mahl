@@ -4,7 +4,7 @@
 wann-lesen: Nach jedem Feature und vor einem Phasen-Abschluss (Definition of Done), bei Fragen zu Performance/Security/Accessibility
 kritische-regeln:
   - Alle Gates der Definition of Done sind Pflicht – kein Gate darf übersprungen werden
-  - Mutation Testing 100% ist Teil des [Implementierungs-Gates](#NFR-gate-implementierung) (Suppressions für strukturell unerreichbaren Code erlaubt)
+  - Mutation Testing 100% ist Teil des [Implementierungs-Gates](#NFR-gate-implementierung) (Umgang mit Survivors: [Welcher Survivor bekommt welche Reaktion?](tdd-process.md#TDD-survivor-entscheidung))
   - Das Gate [Learnings & Dokumentation](#NFR-gate-learnings) ist kein optionaler Nachklapp – es ist Pflicht
 -->
 
@@ -38,7 +38,7 @@ Ein Feature gilt als "Done" wenn **alle** Punkte abgehakt sind. Kein Punkt darf 
 - [ ] **TDD [GREEN](tdd-process.md#TDD-green):** Minimale Implementierung, Tests grün bestätigt
 - [ ] **TDD [REFACTOR](tdd-process.md#TDD-refactor):** Refactoring-Checkliste durchgegangen, Ergebnis dokumentiert
 - [ ] Unit Tests grün, Integration Tests grün (falls API-Endpoint)
-- [ ] Mutation Testing durchgeführt (Ziel: 100%; Suppressions für strukturell unerreichbaren Code mit Begründung erlaubt)
+- [ ] Mutation Testing durchgeführt (Ziel: 100%; Survivors nach [Welcher Survivor bekommt welche Reaktion?](tdd-process.md#TDD-survivor-entscheidung))
 - [ ] API in Swagger dokumentiert (falls Endpoint)
 - [ ] Frontend-UI implementiert (falls relevant)
 - [ ] Manueller Smoke-Test
@@ -46,28 +46,25 @@ Ein Feature gilt als "Done" wenn **alle** Punkte abgehakt sind. Kein Punkt darf 
 <a id="NFR-gate-autor-review"></a>
 ### Gate: Autor-Review (vor Review-Agent)
 
-- [ ] Autor-Checkliste aus `docs/process/review-checklist.md` (Teil A) vollständig durchgegangen
+- [ ] Autor-Checkliste aus `docs/process/review-checklist.md` durchgegangen (alle Abschnitte, deren „Wann lesen" zutrifft)
 - [ ] Alle ❌-Findings sofort gefixt
 
 <a id="NFR-gate-review-agenten"></a>
 ### Gate: Review-Agenten (PFLICHT, kein Überspringen)
 
-Immer laufen: `code-quality-auditor`, `functional-correctness-auditor`, `test-quality-auditor`.
-Nur bei Frontend: `ux-ui-auditor`. Nur bei Auth/Sicherheit: `security-auditor`.
-Begründung angeben, wenn ein Agent ausgelassen wird.
+Welche Agenten bei welchem Scope laufen, regelt allein die Scope-Matrix im Skill `review-code`.
 
-- [ ] Alle relevanten Agenten beauftragt (welche bei welchem Scope: Skill `review-code`)
+- [ ] Alle Agenten laut Scope-Matrix beauftragt (Begründung, wenn einer ausgelassen wird)
 - [ ] Nach jeder Code-Änderung: betroffene Agenten erneut ausgeführt (mit Begründung für ausgelassene)
 - [ ] Wiederholung bis kein Agent mehr ❌-Findings hat
-- [ ] ⚠️-Findings: gefixt ODER als technische Schuld in `docs/tech-debt.md` eingetragen
+- [ ] Review-Findings (❌ und ⚠️) umgesetzt; solche einer späteren Phase vom User entschieden (`implementing-scenario` → Abschluss)
 
 <a id="NFR-gate-learnings"></a>
 ### Gate: Learnings & Dokumentation (PFLICHT)
 
 - [ ] Eintrag in `docs/kaizen/lessons_learned.md` erstellt ("keine Learnings" nur mit Begründung akzeptabel)
 - [ ] **Dokumentations-Änderungsvorschläge:** Für jede Kern-Dokument-Datei explizit geprüft: Anpassung nötig? Falls ja: Änderung dem User **vorschlagen** und auf Bestätigung warten – nicht eigenständig anpassen.
-- [ ] Projekt-Status aktualisiert: `docs/AGENT_MEMORY.md` (Phase/Story/Nächstes Szenario/Prioritäten), technische Schuld → `docs/tech-debt.md`, offene Fragen → `docs/open-questions.md`
-- [ ] Commit mit aussagekräftiger Message (`US-XXX: ...`)
+- [ ] Projekt-Status und Commit über den Skill `closing-session` (dort: was in `AGENT_MEMORY.md` von Hand gepflegt wird und was nicht, Form des Abschluss-Commits)
 - [ ] Migrations erstellt (falls DB-Änderungen)
 
 <a id="NFR-periodisches-review"></a>

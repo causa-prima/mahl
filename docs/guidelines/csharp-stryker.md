@@ -12,22 +12,28 @@ stehen bereits in docs/guidelines/coding-guideline-csharp.md [Illegal States Unr
 Äquivalente Mutanten (beobachtbar kein Unterschied, z. B. unerreichbarer Code durch private Ctor) werden mit einem Inline-Kommentar auf der Zeile **vor** dem Mutanten unterdrückt:
 
 ```csharp
-// Stryker disable once <Kategorie> : <Begründung>
-_ => throw new InvalidOperationException("Unreachable.")
+// Stryker disable once <Kategorie> : <Begründung> (<erlaubende ADR> | Einzelfall, vom User freigegeben S<NNN>)
+// Stryker disable once Statement,String : parameterless ctor unreachable via normal construction (ADR-S041-9)
+public Ingredient() => throw new InvalidOperationException("Uninitialized");
 ```
 
-**Wann ist eine Suppression berechtigt?** Ausschließlich bei echten äquivalenten Mutanten – d. h. wenn es beobachtbar keinen Unterschied macht, ob der Mutant überlebt oder nicht (z. B. unerreichbarer Code durch private Ctor). Eine Suppression ist **kein Ersatz für einen fehlenden Test**.
+**Wann ist eine Suppression berechtigt?** Das regelt allein [Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung). Eine Suppression ist **kein Ersatz für einen fehlenden Test**. Der `_`-Arm einer Sum-Type-Fallunterscheidung braucht keine eigene: Er ist `SumType.Unreachable<T>()`, die Suppression sitzt einmal zentral ([csharp-sumtypes](csharp-sumtypes.md)).
 
 **Kategoriename** (Stryker.NET 4.x): ohne Suffix „Mutation" schreiben.
 
 | Kategoriename | Beispiel-Mutant |
 |---------------|----------------|
-| `String` | `"text"` → `""` |
+| `String` | `"text"` → `""`, `""` → `"Stryker was here!"` |
 | `Equality` | `==` → `!=` |
 | `Logical` | `&&` → `\|\|` |
 | `Linq` | `OrderBy` → `OrderByDescending` |
-| `Statement` | Block-Entfernung |
+| `Statement` | einzelne Anweisung entfernt |
+| `Block` | ganzer Block entfernt (z.B. ein `catch`-Rumpf) |
+| `NullCoalescing` | `a ?? b` → `a` bzw. `b` |
 | `Conditional` | `true`/`false` Ersatz |
+
+Die Tabelle nennt die im Projekt genutzten Kategorien (alle in Suppressionen im Code belegt), nicht alle
+von Stryker.NET – weitere stehen in der Stryker.NET-Doku unter „Mutations".
 
 **Syntaxregel:** Beschreibungstext zwingend nach Doppelpunkt – ohne Doppelpunkt wird die Suppression von Stryker ignoriert:
 ```csharp
@@ -41,4 +47,4 @@ _ => throw new InvalidOperationException("Unreachable.")
 // Stryker disable once String Statement : ...                                             ❌ (Leerzeichen → nur erste Kategorie wirkt)
 ```
 
-**Pflicht:** Jede Suppression in `docs/history/adr.md` begründen.
+**Pflicht:** Die Begründung nennt die ADR, die diese Klasse von Suppression erlaubt – oder, bei einem Einzelfall, die Freigabe des Users. Wann suppressed werden darf und wann der User entscheidet: [Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung).

@@ -3,9 +3,13 @@
 ```
 Du reviewst einen Gherkin-Feature-Entwurf auf Vollständigkeit und Qualität.
 
-Lies zuerst (Read-Tool verwenden):
-- `docs/process/e2e-testing.md` – verbindliche Tag-Konventionen, Namenskonventionen, Traceability-Regeln
-- `docs/guidelines/coding-guideline-ux.md` – Interaction-Design-Prinzipien („Sichtbares Feedback", „Fehlermeldungen als Hilfe", „Leerer Zustand" sind für Gherkin relevant)
+Lies zuerst – abschnittsweise, nicht die ganzen Dateien:
+- `python3 -m prozesscode.doc get E2E-bdd-gherkin` – verbindliche Tag- und Namenskonventionen
+- `python3 -m prozesscode.doc get E2E-traceability` – Traceability-Regeln
+- Die UX-Prinzipien („Leerer Zustand", „Sichtbares Feedback", „Fehlermeldungen als Hilfe",
+  „Pflichtfeld-Affordance") stehen ausgewertet im UX-Kontext unten. Brauchst du den Wortlaut eines
+  Prinzips: `python3 -m prozesscode.doc get CGU-leerer-zustand` (bzw. `CGU-feedback`,
+  `CGU-fehlermeldungen`, `CGU-formular-baseline`).
 
 Feature-Entwurf: [vollständiger Entwurf aus der Synthese, verbatim]
 User Story + Akzeptanzkriterien: [aus dem Kontext-Laden, verbatim – nicht paraphrasiert; Paraphrasen
@@ -16,6 +20,7 @@ Resilience-Entscheidung aus der Regelentdeckung: [entweder „story-spezifisches
 Draft-Saving-Entscheidung aus der Regelentdeckung: [entweder „nicht-trivialer Eingabeaufwand: Szenario
   eingeplant" oder „nur trivialer Eingabeaufwand"]
 Tiefe je Regel: [aus dem Block „Tiefe je Regel", vom User bestätigt, verbatim]
+UX-Kontext: [die notierten Blöcke aus „UX-Kontext", verbatim]
 
 TIEFE VOR VOLLSTÄNDIGKEIT: Die folgenden Klassen gelten für stabile Regeln. Für eine
 Übergangsregel (Ablösung fest eingeplant) sind fehlende Grenzfälle, Partitionen, Kombinationen

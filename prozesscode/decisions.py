@@ -14,10 +14,10 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 def find_repo_root() -> Path:
-    """Find the repository root by looking for CLAUDE.md or .git."""
+    """Find the repository root by looking for AGENTS.md or .git."""
     current = Path(__file__).resolve().parent
     for parent in [current, *current.parents]:
-        if (parent / ".git").exists() or (parent / "CLAUDE.md").exists():
+        if (parent / ".git").exists() or (parent / "AGENTS.md").exists():
             return parent
     # Fallback to cwd
     return Path.cwd()

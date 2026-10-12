@@ -17,12 +17,14 @@ Definitionen für [Impact](../../../docs/kaizen/process.md#KPR-impact-kategorien
 1. [Noise-Review](#KZN-noise-review) – lessons_learned + Archiv bereinigen
 2. [User-/Meta-Beobachtungen abfragen](#KZN-user-beobachtungen)
 3. [Retro-Report](#KZN-retro-report) – `retro_report.py` ausführen
-4. [CM-Review](#KZN-countermeasures-review) – countermeasures.md reviewen
-5. [OBS-Retro-Berührung](#KZN-obs-beruehrung)
-6. [Findings präsentieren](#KZN-findings-praesentieren) – **einziger Schritt mit Freigabe-Wartepunkt**
-7. [Änderungen umsetzen](#KZN-aenderungen-umsetzen)
-8. [Archivieren](#KZN-archivieren) – lessons_learned.md
-9. [Session-Abschluss anbieten](#KZN-session-abschluss)
+4. [Guard-Auslösungen sichten](#KZN-guard-stats) – `guard-stats`
+5. [Testabdeckung des Prozess-Codes sichten](#KZN-coverage) – `coverage-run`
+6. [CM-Review](#KZN-countermeasures-review) – countermeasures.md reviewen
+7. [OBS-Retro-Berührung](#KZN-obs-beruehrung)
+8. [Findings präsentieren](#KZN-findings-praesentieren) – Freigabe aller Änderungen einholen (weitere Rückfragen stehen in den einzelnen Schritten)
+9. [Änderungen umsetzen](#KZN-aenderungen-umsetzen)
+10. [Archivieren](#KZN-archivieren) – lessons_learned.md
+11. [Session-Abschluss anbieten](#KZN-session-abschluss)
 
 ---
 
@@ -252,6 +254,10 @@ Präsentiere dem User folgende strukturierte Übersicht und **warte auf Freigabe
 |---------|-----------|--------------|
 | ...     | S...      | Priorisieren oder verwerfen? |
 
+## Prozess-Code-Gesundheit (aus Guard-Auslösungen und Testabdeckung)
+- Guards ohne Auslösung: … (kaputt oder überflüssig? – Vorschlag je Guard)
+- Module mit Abdeckungslücke: …
+
 ## Beobachtungs-Backlog (aus der OBS-Retro-Berührung)
 Hinter einem LL-Muster neu angelegte OBS, mit ihrem LL-Bezug. Entscheidungen, Status-Änderungen
 und Archivierung fallen im Drain, nicht in der Retro – hier steht nur, was neu entstanden ist.
@@ -260,7 +266,7 @@ und Archivierung fallen im Drain, nicht in der Retro – hier steht nur, was neu
 | ... | ...   | ...      |
 ```
 
-**Leere Abschnitte nicht still weglassen** – jeden Abschnitt (A–G) nennen und in einem Satz sagen, was er enthalten hätte und warum er leer ist (z.B. „B) Neue Prinzipien: keine – kein querschnittliches Muster in dieser Periode."). Sonst ist intransparent, ob ein Abschnitt geprüft-und-leer oder vergessen wurde.
+**Leere Abschnitte nicht still weglassen** – jeden Abschnitt des Templates mit seiner Überschrift nennen und in einem Satz sagen, was er enthalten hätte und warum er leer ist (z.B. „Neue Prinzipien: keine – kein querschnittliches Muster in dieser Periode."). Sonst ist intransparent, ob ein Abschnitt geprüft-und-leer oder vergessen wurde.
 
 ---
 
@@ -268,7 +274,10 @@ und Archivierung fallen im Drain, nicht in der Retro – hier steht nur, was neu
 ## Änderungen umsetzen
 
 Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: countermeasures.md verweist auf Ziele die bereits existieren müssen):
-1. `docs/kaizen/principles.md` aktualisieren
+1. `docs/kaizen/principles.md` aktualisieren – jeder neue oder erweiterte Eintrag muss das
+   Aufnahmekriterium im Kopf der Datei erfüllen: **in jeder Session handlungsrelevant**. Die Datei
+   wird bei jedem Session-Start injiziert; was nur für Retro, CM-Zuordnung oder das Schreiben von
+   Skills gilt, gehört in den Skill oder in `docs/kaizen/process.md`, nicht hierher.
 2. Guidelines / Skills anpassen – Entscheidungshilfe: [„Wann gehört etwas wohin?"](../../../docs/kaizen/process.md#KPR-wohin)
    Bei echter Überschneidung: mit User absprechen
 3. `docs/kaizen/countermeasures.md` aktualisieren (Verweise auf principles.md oder Guideline-Änderungen aus den vorangegangenen Schritten ergänzen)
@@ -301,6 +310,6 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
 
 Die Retro ist durch – `lessons_learned.md` ist archiviert, der Jenga-Score resettet, der Trigger erscheint am nächsten Session-Start nicht mehr (kein manuelles Entfernen nötig). Dem User die **Wahl** anbieten:
 
-- **Session abschließen** (empfohlen): Skill `closing-session` starten – pflegt AGENT_MEMORY voll und legt die Session-Datei an.
+- **Session abschließen** (empfohlen): Skill `closing-session` starten – pflegt AGENT_MEMORY und schreibt den Abschluss-Commit.
 - **Weiterarbeiten:** Retro abgeschlossen, Session-Abschluss später via `closing-session`.
 - **Etwas anderes** – nach User-Wunsch.

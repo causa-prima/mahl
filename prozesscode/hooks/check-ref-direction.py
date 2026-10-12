@@ -7,7 +7,7 @@ syntaktisch durch: Eine **stabile** Datei darf kein **volatiles** ID-Schema
 und lassen den Verweis dangeln. `ADR-S…` ist stabil und daher erlaubt.
 
 Datei-Scope (default-protected + explizite Ausnahmen, robust gegen neue Dateien):
-- **Geschützt:** alles unter `docs/`, `.claude/skills/`, `.claude/agents/` + Root-`CLAUDE.md`.
+- **Geschützt:** alles unter `docs/`, `.claude/skills/`, `.claude/agents/` + Root-`AGENTS.md`.
 - **Ausgenommen** (selbst volatil oder verwalten das ID-System): die kaizen-Bookkeeping-Dateien
   (`observations`/`countermeasures`/`lessons_learned`/`process`.md), `docs/kaizen/archive/**`,
   die volatilen Tracker (`tech-debt`/`open-questions`/`AGENT_MEMORY`.md)
@@ -28,7 +28,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Geschützte Wurzeln (relativer POSIX-Pfad-Präfix) + einzelne geschützte Dateien.
 _PROTECTED_ROOTS = ("docs/", ".claude/skills/", ".claude/agents/")
-_PROTECTED_FILES = ("CLAUDE.md",)
+_PROTECTED_FILES = ("AGENTS.md",)
 
 # Ausnahmen: ganze Dateien bzw. Präfixe, die volatile IDs tragen dürfen.
 _EXEMPT_FILES = frozenset({

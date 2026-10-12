@@ -6,15 +6,14 @@ description: >
   `git commit`, `git commit --amend` und `git push`, auch wenn der Commit trivial wirkt: Er
   enthält die Gesamtprüfung, die ohne ihn ausfällt. Greift auch bei beiläufiger Formulierung
   ohne das Wort „Commit" – „sichere den Stand", „ins Repo damit", „push das", „nimm das noch
-  in den letzten Commit". closing-session und implementing-scenario rufen ihn für ihren
-  Commit auf.
+  in den letzten Commit". closing-session ruft ihn für den Abschluss-Commit auf.
 user-invocable: true
 ---
 
 # Commit und Push
 
 Der aufrufende Workflow bestimmt, **was** in der Nachricht steht (`closing-session`: Inhaltsregel
-und Session-Marke; `implementing-scenario`: Lauf-Betreff). Dieser Skill regelt, **wie** committet
+und Session-Marke). Dieser Skill regelt, **wie** committet
 wird – und dass vorher der ganze Stand geprüft ist.
 
 <a id="CMT-gesamtpruefung"></a>
@@ -37,7 +36,7 @@ Datei für Datei aus dem Gedächtnis. Drei Fragen, Befunde sofort beheben und ne
   verweisen ([Single Source of Truth](../../../docs/kaizen/principles.md#KPI-doku-referenzen)).
   Wiederholt ein Kommentar eine Begründung, die schon woanders steht? Lässt sich etwas kürzen, ohne
   an Präzision oder Wirkung zu verlieren?
-- **An der richtigen Stelle?** Tracker nach der [Ablage-Tabelle](../../../CLAUDE.md#CLA-ablage);
+- **An der richtigen Stelle?** Tracker nach der [Ablage-Tabelle](../../../AGENTS.md#CLA-ablage);
   Verweise laufen von volatil nach stabil; ein neuer LL/OBS ist womöglich der Rückfall oder die
   Dublette eines bestehenden. Stimmt jede Behauptung in Doku und Kommentar mit dem, was
   ausgeführt oder gemessen wurde?

@@ -29,7 +29,7 @@ def test_impact_range_averaged():
 
 
 # --- Score-Skala (S122) -------------------------------------------------------
-# Kanonisch: docs/kaizen/process.md, Abschnitt "Backlog-Abbau" → Unterabschnitt "Score".
+# Kanonisch: docs/kaizen/process.md#KPR-score ("Score und Behandlungswürdigkeit").
 # Die Skala ist NICHT frei gewählt: GERING = 0, weil die Rubrik GERING als "keine
 # Qualitäts- oder Prozessfolge" definiert. Was folgenlos ist, bleibt es auch gehäuft –
 # und darf in einer Cluster-Summe nichts beitragen.

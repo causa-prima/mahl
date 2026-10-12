@@ -28,7 +28,7 @@ eigener, kurzer Pfad: [Prozess-Code](#WRC-prozess-code) statt der Produktcode-Pf
 ### Richtige Guidelines lesen
 
 **Abschnittsweise lesen, nicht die ganze Datei** – soweit das Projekt einen Weg dafür anbietet
-(Navigationstabelle in `CLAUDE.md`). Eine Coding-Guideline ist typischerweise um ein Vielfaches
+(Navigationstabelle in `AGENTS.md`). Eine Coding-Guideline ist typischerweise um ein Vielfaches
 größer als der Abschnitt, den eine konkrete Aufgabe braucht. Verschaff dir zuerst das
 Inhaltsverzeichnis, dann hol gezielt. Im Zweifel die Datei ganz lesen: Zu eng zu schneiden ist
 der teurere Fehler.
@@ -44,6 +44,16 @@ der teurere Fehler.
 - TypeScript/React (Frontend) → `docs/guidelines/coding-guideline-typescript.md`
   - React-Komponenten (`src/components/`, `src/pages/`) → zusätzlich `docs/guidelines/coding-guideline-ux.md`
 - Python (`prozesscode/`) → `docs/guidelines/coding-guideline-python.md`, dann [Prozess-Code](#WRC-prozess-code)
+
+<a id="WRC-pflicht-output"></a>
+### Pflicht-Output nach dem Lesen (Produktcode: C#, TypeScript)
+
+Beantworte aufgabenspezifisch:
+- **YAGNI:** Was implementiere ich explizit NICHT? (Nennung konkreter Nicht-Ziele)
+  Für jede neue Property und jede neue Methode: „Welcher aktuell rote Test fordert genau das?"
+  Kein Test → nicht schreiben – auch wenn die Property „offensichtlich bald gebraucht wird".
+- **KISS:** Wie halte ich die Lösung minimal? (keine vorzeitigen Abstraktionen)
+- **Fehlerbehandlung:** Welches Pattern nutze ich? (ROP/OneOf/Result – kein `throw` für Business-Fehler)
 
 <a id="WRC-prozess-code"></a>
 ### Prozess-Code: der kurze Pfad
@@ -67,8 +77,10 @@ Was stattdessen gilt – vier Dinge:
    `python3 -m prozesscode.mutmut-run --mutate prozesscode.hooks.<name> --ratchet`.
    Die Handprobe belegt, dass **ein** Fall anspringt; die Sperrklinke fragt, ob **jede**
    Bedingung des Guards von einem Test gehalten wird – und ob das schlechter geworden ist
-   als beim letzten Mal. Grün heißt fertig, rot nennt die Stellen. Rechne mit ein bis zwei
-   Minuten je Modul; nur für Guards, nicht für jedes Werkzeug.
+   als beim letzten Mal. Grün heißt fertig, rot nennt die Stellen; `⚠ ohne Aussage` heißt,
+   der Lauf kam nicht durch – einmal wiederholen, bleibt es dabei, dem User melden statt als
+   belegt zu behandeln. Rechne mit ein bis zwei Minuten je Modul; nur für Guards, nicht für
+   jedes Werkzeug.
 3. **Verdikt statt Rohausgabe.** Werkzeuge laufen über ihre Wrapper in `prozesscode`, und
    eine Meldung nennt den Ausweg, nicht nur den Befund.
 4. **Review nach eigenen Stufen.** Selbstcheck gegen
@@ -79,13 +91,6 @@ Was stattdessen gilt – vier Dinge:
 
 Damit ist der Pfad zu Ende – die Produktcode-Schritte und der allgemeine
 [Selbst-Review](#WRC-selbst-review) entfallen.
-
-**PFLICHT-OUTPUT nach dem Lesen** – beantworte aufgabenspezifisch:
-- **YAGNI:** Was implementiere ich explizit NICHT? (Nennung konkreter Nicht-Ziele)
-  Für jede neue Property und jede neue Methode: „Welcher aktuell rote Test fordert genau das?"
-  Kein Test → nicht schreiben – auch wenn die Property „offensichtlich bald gebraucht wird".
-- **KISS:** Wie halte ich die Lösung minimal? (keine vorzeitigen Abstraktionen)
-- **Fehlerbehandlung:** Welches Pattern nutze ich? (ROP/OneOf/Result – kein `throw` für Business-Fehler)
 
 <a id="WRC-tdd"></a>
 ### Implementieren via TDD
@@ -107,7 +112,7 @@ Damit ist der Pfad zu Ende – die Produktcode-Schritte und der allgemeine
 | Statt | Verwende |
 |---|---|
 | `.IsT0`, `.IsT1`, `.AsT0` | `.Match()` |
-| `throw` für Business-Fehler | `OneOf`/`Error<string>` |
+| `throw` für Business-Fehler | `OneOf<T, TError>` mit typisiertem Fehlerfall |
 | `new` für Domain-Entities | Factory Method |
 | `public set;` (außer EF-Entities) | `init;` |
 

@@ -617,7 +617,10 @@ def main() -> None:
     if stryker_gate_failed or metrics["score"] < 100.0:
         sys.stdout.flush()  # Checks zuerst, damit die Warnung danach erscheint (stderr ist ungepuffert)
         print(f"\n⚠️  ACHTUNG: Mutation-Score {format_score(metrics)} < 100 % – dieser Lauf ist KEINE "
-              f"gültige Übergabe. Survivors/NoCoverage oben klären, bevor übergeben wird.",
+              f"gültige Übergabe. Survivors/NoCoverage oben klären, bevor übergeben wird – "
+              f"außer solche, die laut „Welcher Survivor bekommt welche Reaktion?“ "
+              f"(docs/process/tdd-process.md#TDD-survivor-entscheidung) an den Orchestrator "
+              f"gemeldet werden: dann übergeben und jeden einzeln im Return aufführen.",
               file=sys.stderr)
         sys.exit(1)
 

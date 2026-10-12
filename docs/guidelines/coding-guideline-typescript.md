@@ -489,24 +489,24 @@ expect(result).toMatchObject({ name: 'Tomaten' });
 <a id="CGT-stryker-survivor-default"></a>
 ### Stryker-Survivor: `= []` Default-Wert in useQuery
 
-Ein `?? []`-Default (z.B. `data ?? []`) erzeugt einen Stryker-Survivor, weil MSW in Tests immer Daten liefert und der Default nie aktiv ist. Dieser Survivor darf mit einem erklärenden Kommentar supprimiert werden:
+Ein `?? []`-Default (z.B. `data ?? []`) erzeugt einen Stryker-Survivor, weil MSW in Tests immer Daten liefert und der Default nie aktiv ist. Dieser Survivor darf supprimiert werden, solange kein Szenario den Ladezustand fordert (ADR-S136-2); die Begründung nennt die ADR:
 
 **Syntax (StrykerJS):** Das Direktiv muss `next-line` (mit Bindestrich) heißen und in **einer** Kommentarzeile stehen, **unmittelbar** über der betroffenen Zeile (Regex: `Stryker (disable|restore)(?: (next-line))? <Mutatoren>(?::<Reason>)?`). Mehrzeilige Begründung also **über** das Direktiv setzen, nicht dazwischen:
 
 ```typescript
 // data ist während Tests nie undefined (MSW liefert immer); Default [] nie aktiv.
 // Entfällt wenn Loading-State-Szenario implementiert ist.
-// Stryker disable next-line ArrayDeclaration: Default [] nie aktiv (s. o.)
+// Stryker disable next-line ArrayDeclaration: Default [] nie aktiv (s. o.; ADR-S136-2)
 const items = data ?? [];
 ```
 
 <a id="CGT-stryker-survivor-classname"></a>
 ### Stryker-Survivor: CSS-className-Strings
 
-String-Literale in `className`-Props erzeugen Stryker-StringLiteral-Mutanten, die kein Test killt, weil Tests nicht auf CSS-Klassen assertieren. Diese dürfen supprimiert werden:
+String-Literale in `className`-Props erzeugen Stryker-StringLiteral-Mutanten, die kein Test killt, weil Tests nicht auf CSS-Klassen assertieren. Diese dürfen supprimiert werden (ADR-S136-2); die Begründung nennt die ADR:
 
 ```typescript
-// Stryker disable next-line StringLiteral: CSS-only, kein Verhalten
+// Stryker disable next-line StringLiteral: CSS-only, kein Verhalten (ADR-S136-2)
 <div className="flex gap-4">
 ```
 

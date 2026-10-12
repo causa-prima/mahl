@@ -3,7 +3,7 @@
 <!--
 wann-lesen: Bei jeder neuen oder geänderten React-Komponente — beim Schreiben und im Self-Review.
 Scope: Interaction Design (Sichtbarkeit, Feedback, Terminologie, Fehlerzustände), dazu die bisher
-getroffenen visuellen Festlegungen (Abschnitt „Visuelle Baseline").
+getroffenen visuellen Festlegungen ([Visuelle Baseline](#CGU-visuelle-baseline)).
 Visuelle Konsistenz (Spacing, Hierarchie, Farbe) wird vollständig geregelt, sobald mehr als ~3
 Komponenten dieselben visuellen Entscheidungen treffen müssen.
 -->

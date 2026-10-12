@@ -834,6 +834,20 @@ def test_segment_expansion() -> int:
         ("eval \"git status\"", "deny", "GEGENPROBE: eval"),
         ("bash -c 'ls -la'", "deny", "GEGENPROBE: bash -c"),
 
+        # --- Backticks und $(…) als Text -------------------------------------------
+        # In Single-Quotes führt Bash nichts aus, ein escapter Backtick ist auch in
+        # Double-Quotes Text. Wer in Markdown nach `code` sucht, braucht genau das (vor der
+        # Korrektur dreimal abgelehnt, die Meldung nannte den Grund nicht).
+        ("grep -n '`tdd`' AGENTS.md", "allow", "Backticks in Single-Quotes sind Text"),
+        ('grep -n "\\`tdd\\`" AGENTS.md', "allow", "escapte Backticks in Double-Quotes sind Text"),
+        ("grep -n '$(rm -rf /tmp/x)' AGENTS.md", "allow", "$(…) in Single-Quotes ist Text"),
+        ('grep -n "`rm -rf /tmp/x`" AGENTS.md', "deny",
+         "GEGENPROBE: Backtick-Substitution in Double-Quotes wird ausgeführt"),
+        ("grep -n 'a' `rm -rf /tmp/x`", "deny",
+         "GEGENPROBE: Backticks hinter einem Single-Quote-Argument"),
+        ('grep -n "it\'s" `rm -rf /tmp/x`', "deny",
+         "GEGENPROBE: Apostroph in Double-Quotes öffnet keinen Single-Quote"),
+
         # --- Heredoc -------------------------------------------------------------
         ("cat <<'EOF'\nfoo | bar; baz && qux\nEOF", "allow",
          "Heredoc-Body ist Text, kein Befehl"),
@@ -1026,6 +1040,17 @@ def test_deny_text_werkzeugfrage() -> int:
     if not assert_decision(empfohlen, "ask", "empfohlener Weg blockiert nicht"):
         failures += 1
 
+    # Der empfohlene Suchweg muss existieren. Die Werkzeuge Grep/Glob fehlen unter Linux/WSL
+    # jeder Session mit Bash (gemessen mit Claude Code 2.1.295) – und nur dort erscheint dieser Text.
+    if "Grep, Glob" in text or "Grep/Glob" in text:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [text        ] empfiehlt nicht verfügbare Werkzeuge Grep/Glob")
+        failures += 1
+    else:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [text        ] empfiehlt keine nicht verfügbaren Werkzeuge")
+    for suche in ("grep -rn muster docs/", "find docs -name '*.md'"):
+        if not assert_decision(suche, "allow", "empfohlener Suchweg blockiert nicht"):
+            failures += 1
+
     # stdin-Python ist die häufigste geblockte Klasse (S130: 11 Treffer/30 Tage) und braucht
     # deshalb einen eigenen Hinweis statt des generischen Textes.
     hint = hook._get_smart_hint("python3 - <<'EOF'\nprint(1)\nEOF")
@@ -1057,6 +1082,7 @@ def test_allow_list_text() -> int:
             all(hook.ONE_TIME_MARKER in z for z in scratchpad_zeilen),
             "jede Scratchpad-Aufrufzeile trägt den Einmal-Marker (sonst führt sie ins Deny)",
         ),
+        ("Grep/Glob" not in text, "empfiehlt keine Werkzeuge, die Sessions mit Bash fehlen"),
     ]
     for ok, desc in checks:
         if ok:

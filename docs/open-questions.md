@@ -17,8 +17,8 @@ aufnahmebedingung: Hier steht eine **noch nicht entschiedene** Frage am Produkt 
             seitige, also wie gearbeitet wird (`prozesscode/`, `.claude/**`, `docs/process/`, `docs/kaizen/`) –
             das läuft über `docs/kaizen/observations.md`; (c) eine Aufgabe, der nur die
             Priorisierung fehlt (das ist `docs/AGENT_MEMORY.md`).
-            Abgrenzung ADR/TD/OQ kanonisch: `CLAUDE.md`, Sektion „Ablage: ADR, TD oder
-            offene Frage?"
+            Abgrenzung ADR/TD/OQ kanonisch: [„Ablage: in welchen Tracker gehört dieser
+            Eintrag?"](../AGENTS.md#CLA-ablage)
 
 Sortierung: nach ID (Session) aufsteigend – neue Einträge unten anfügen.
 

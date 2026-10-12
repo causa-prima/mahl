@@ -37,7 +37,7 @@ Globben statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
 - **Die Enforcement-Mechanismen** – `prozesscode/hooks/` (Glob nach `*.py`/`*.sh`) und
   `.claude/settings.json` / `settings.local.json`: Welche Gates/Hooks greifen *wirklich*, welche
   nur advisory? Zentral für die Dimensionen „Qualitätssicherung" und „Robustheit & Fehlerresistenz".
-- **Die Prozess-Docs** – in `docs/`: insbesondere `CLAUDE.md` (Navigation), `docs/process/tdd-process.md`,
+- **Die Prozess-Docs** – in `docs/`: insbesondere `AGENTS.md` (Navigation), `docs/process/tdd-process.md`,
   `docs/process/dev-workflow.md`, `docs/process/review-checklist.md`, `docs/process/nfr.md` sowie die *lebenden*
   `docs/kaizen/`-Dateien (lessons_learned, principles, countermeasures, PROCESS).
 - **Die normativen Entwicklungs-Guidelines** – `docs/guidelines/coding-guideline-*`, `docs/reference/architecture.md`,
@@ -93,8 +93,8 @@ Bewerte jeden Aspekt mit **✅ gut / ⚠️ verbesserungswürdig / ❌ Problem**
 - Führt ein Skill einen **deterministischen** Schritt freihändig aus (eindeutig aus dem Zustand
   ableitbar – z.B. nächste Session-/Run-Nummer bestimmen, Status setzen, Eintrag archivieren,
   Metadaten filtern/listen), der zuverlässiger und token-ärmer per **Script** liefe? Bestehende
-  Vorbilder: `obs-archive.py`, `next_run.py`, `decisions.py`. (Prinzip:
-  [„Deterministische Skill-Schritte mechanisieren"](../../docs/kaizen/principles.md#KPI-prozess-disziplin).)
+  Vorbilder: `obs-archive.py`, `next_run.py`, `decisions.py`. Dieselbe Frage gilt beim Schreiben
+  oder Ändern jedes Skills (Token↓, Varianz↓).
 
 ### Robustheit & Fehlerresistenz
 - Was passiert, wenn ein Agent einen Schritt überspringt oder falsch interpretiert?

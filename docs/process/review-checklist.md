@@ -4,7 +4,7 @@
 wann-lesen: Nach jedem TDD-REFACTOR-Schritt, vor dem Aufruf der Review-Agenten ([Gate „Autor-Review"](nfr.md#NFR-gate-autor-review) der Definition of Done)
 kritische-regeln:
   - Jeden Punkt explizit durchgehen – nicht überfliegen
-  - Findings sofort fixen, bevor Review-Agenten gestartet werden
+  - Als Autor: Findings sofort fixen, bevor Review-Agenten gestartet werden
 -->
 
 <a id="RCL-inhalt"></a>
@@ -15,8 +15,11 @@ kritische-regeln:
 | [Allgemeine Prinzipien](#RCL-allgemeine-prinzipien) | KISS, Naming nach Glossar | Immer |
 | [Architecture Layer](#RCL-architecture-layer) | Typ-Deklarationen internal, kein InternalsVisibleTo, Testcode greift nur auf Ports zu | Bei neuen Typen, Projektreferenzen oder Tests |
 | [Domain Modeling](#RCL-domain-modeling) | Value Types statt Primitives, Factory Methods, keine DTOs in Create(), keine nullable als Zustand | Bei neuen oder geänderten Typen, Endpoints oder Parametern |
+| [Endpoints](#RCL-endpoints) | ETag/304 bei GET, If-Match bei PUT/PATCH/DELETE, Frontend: UI-Übergang vor Folge-Interaktion per Assertion prüfen | Bei neuen oder geänderten Endpoints und bei Frontend-Tests mit Folge-Interaktionen |
+| [Minimalität](#RCL-minimalitaet) | Mutation Testing gelaufen, kein Survivor stillschweigend ignoriert | Bei jeder Änderung an Produktionscode |
 | [Komplexität & Refactoring](#RCL-komplexitaet) | Methodenlänge, Verschachtelung, Duplikate | Immer |
 | [Tests](#RCL-tests) | Verhalten statt Implementierung, Fehlerpfade, Full State Assertion, kein shared mutable State | Bei neuen oder geänderten Tests |
+| [UI/UX](#RCL-ui-ux) | Punkte aus der UX-Guideline | Bei jeder Frontend-Änderung |
 | [Test-Audit](#RCL-test-audit) | US-Tag im Testnamen, Traceability Spec↔Test, kein Gold-Plating in Tests | Bei jedem neuen Test |
 | [Prozess-Code](#RCL-prozess-code) | Wirkung statt Lauffähigkeit: Gegenprobe, Auslösestelle, Meldungsqualität, fail-open | Bei jeder Änderung an Python unter `prozesscode/` – und dann **statt** der Abschnitte darüber |
 
@@ -25,7 +28,9 @@ kritische-regeln:
 >
 > **Vollständige Regeln:** `docs/guidelines/coding-guideline-general.md` + `docs/guidelines/coding-guideline-csharp.md` / `docs/guidelines/coding-guideline-typescript.md` / `docs/guidelines/coding-guideline-python.md`. Diese Checkliste ist der retrospektive Review-Modus dazu – sie prüft, ob die Guidelines eingehalten wurden.
 
-Gehe jeden Punkt durch. Findings sofort fixen – erst dann Review-Agenten starten.
+Gehe jeden Punkt durch. Als **Autor** Findings sofort fixen – erst dann Review-Agenten starten.
+Wer die Checkliste als Reviewer eines fremden Laufs durchgeht (Skill `review-code`), sammelt die
+Findings; wer sie umsetzt, regelt dort die Scope-Prüfung.
 
 ---
 
@@ -95,7 +100,7 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 ## Minimalität
 
 - [ ] Wurde Mutation Testing auf alle geänderten Dateien ausgeführt und kein Survivor stillschweigend ignoriert?
-  → Survivor = entweder Gold-Plating (Code löschen) oder äquivalenter Mutant (begründen + Exclusion).
+  → Reaktion je Survivor-Art: [Welcher Survivor bekommt welche Reaktion?](tdd-process.md#TDD-survivor-entscheidung). Eine Suppression, die weder eine erlaubende ADR noch eine Einzelfall-Freigabe des Users nennt, ist ❌.
   → Befehle: `docs/process/dev-workflow.md` – Sektion "[Mutation Testing](dev-workflow.md#DEV-mutation-testing)".
 
 <a id="RCL-komplexitaet"></a>
@@ -112,7 +117,7 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 - [ ] Fehlerpfade fehlen (ungültige Eingaben, Not Found, Konflikte)?
 - [ ] Testcode ist schwer verständlich – ein anderer Entwickler würde nicht schnell verstehen, was getestet wird?
 - [ ] Tests hängen voneinander ab oder teilen mutable State?
-- [ ] Gibt es Unit Tests auf Value Types, Domain-Typen oder Service-Klassen die **keine** HTTP-Integrationstests und keine MSW-Komponenten-Tests sind? → **Kritisch prüfen:** Liegt ein Stryker-Survivor-Report vor, der diesen Test erzwingt (Survivor strukturell nicht via HTTP beobachtbar)? Wenn nein → Gold-Plating (Test und ggf. zugehöriger Code löschen). Wenn ja → Begründung im Survivor-Report vollständig und nachvollziehbar?
+- [ ] Gibt es Unit Tests auf Value Types, Domain-Typen oder Service-Klassen die **keine** HTTP-Integrationstests und keine MSW-Komponenten-Tests sind? → **Kritisch prüfen:** Liegt ein Stryker-Survivor-Report vor, der diesen Test erzwingt (Survivor strukturell nicht via HTTP beobachtbar)? Wenn nein → Gold-Plating (Test und ggf. zugehöriger Code löschen). Wenn ja → Begründung im Survivor-Report vollständig und nachvollziehbar, **und** liegt die Freigabe des Users vor ([Welcher Survivor bekommt welche Reaktion?](tdd-process.md#TDD-survivor-entscheidung))? Ohne Freigabe → ❌.
 - [ ] Mutierender Endpoint-Test (POST/PUT/PATCH/DELETE): Wird der DB-Zustand nach der Aktion mit **Full State Assertion** (`GetAllXxx()` + `BeEquivalentTo`) geprüft – nicht nur die HTTP-Response? Damit wird sichergestellt, dass genau die erwarteten Änderungen in der DB gelandet sind und keine unerwarteten Seiteneffekte aufgetreten sind (weder fehlende Änderungen noch ungewollte Mutationen anderer Einträge).
   → Auch Fehlerpfade: Zustand nach einem Fehler muss dem Ausgangszustand entsprechen (`BeEquivalentTo(stateBeforeAction)`).
 - [ ] (Frontend) Werden HTTP-Calls in Tests auf falscher Ebene gemockt (`vi.mock` auf Service-Modulen, `vi.stubGlobal('fetch', ...)` o.ä.)? → Ausschließlich MSW verwenden. Service-Funktionen sind Implementierungsdetails – sie werden durch den Komponenten-Test via MSW abgedeckt, nicht direkt getestet. Siehe `docs/guidelines/coding-guideline-typescript.md` [Test-Architektur](../guidelines/coding-guideline-typescript.md#CGT-msw).

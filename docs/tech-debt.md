@@ -7,13 +7,13 @@ wann-schreiben: Sobald eine bewusst aufgeschobene Schuld entsteht (⚠️-Findin
             bewusste Vereinfachung, vertagte Härtung).
 aufnahmebedingung: Hier steht eine **entschiedene** Sache am Produkt (Code + Build-/Test-Kette),
             die mit ihrer Behebung **ersatzlos verschwindet** – nichts bleibt zu erklären übrig.
-            Operativer Test (Kurzfassung; kanonischer Wortlaut in `CLAUDE.md`): „Ist die Sache
+            Operativer Test (Kurzfassung; kanonischer Wortlaut in `AGENTS.md`): „Ist die Sache
             erledigt – bleibt dann etwas zu erklären übrig?"
             Nein → hierher (der Eintrag wird gelöscht). Ja → `docs/history/adr.md` (bleibt als
             `Superseded` stehen). Noch nicht entschieden → `docs/open-questions.md`. Hierher
             gehört auch der **Aufschub-Teil** einer Entscheidung, deren terminaler Rest als ADR
             abgelegt ist – eine ADR trägt keinen Aufschub. Abgrenzung ADR/TD/OQ kanonisch:
-            [„Ablage: in welchen Tracker gehört dieser Eintrag?"](../CLAUDE.md#CLA-ablage)
+            [„Ablage: in welchen Tracker gehört dieser Eintrag?"](../AGENTS.md#CLA-ablage)
 
 Sortierung: nach ID (Session) aufsteigend – neue Einträge unten anfügen (kein Umsortieren).
 
@@ -64,8 +64,8 @@ Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
      Ausnahme per ADR festschreiben. Im zweiten Fall ist die Sache entschieden und dieser
      Eintrag **entfällt** – es gibt dann keine Schuld mehr, nur eine begründete Ausnahme.
      Was es nicht gibt: eine ADR, die dem Eintrag lediglich erlaubt zu warten. Das ist der
-     Hybrid, den die Ablage-Taxonomie ausschließt (`CLAUDE.md`, „Ablage: ADR, TD oder offene
-     Frage?"): Der Aufschub gehört hierher, die ADR behält nur den terminalen Rest.
+     Hybrid, den die Ablage-Taxonomie ausschließt ([„Ablage: in welchen Tracker gehört dieser
+     Eintrag?"](../AGENTS.md#CLA-ablage)): Der Aufschub gehört hierher, die ADR behält nur den terminalen Rest.
      Ein ungeprüfter Verdacht ist keine Verletzung – dann ist die Prüfung die Behebung und
      bekommt eine eigene Fälligkeit.
 
@@ -242,7 +242,7 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 
 ## TD-S120-4 — Kein Test-Data-Builder für `IngredientDbType`
 **Fällig:** Szenario:„Rezept anlegen", Phase:MVP – die nächste Entität mit eigenen Tests macht den Aufwand sichtbar; spätestens ab MVP, weil die Zahl der Berührungspunkte sonst weiter wächst.
-**Problem:** `IngredientDbType` wird in jedem Test inline per Objekt-Initializer gebaut; `EndpointsTestsBase` enthält keinen `AnIngredient(...)`-Helper. `docs/process/tdd-process.md` (Sektion „Test-Data-Builder") sieht solche Builder ausdrücklich als Schutz vor Schemaänderungen vor. Die Kosten wurden in S120 messbar: Die Umbenennung eines einzigen Feldes berührte 67 Stellen in einer Testdatei – mit Builder wären es wenige gewesen.
+**Problem:** `IngredientDbType` wird in jedem Test inline per Objekt-Initializer gebaut; `EndpointsTestsBase` enthält keinen `AnIngredient(...)`-Helper. [Test-Data-Builder](process/tdd-process.md#TDD-test-data-builder) sieht solche Builder ausdrücklich als Schutz vor Schemaänderungen vor. Die Kosten wurden in S120 messbar: Die Umbenennung eines einzigen Feldes berührte 67 Stellen in einer Testdatei – mit Builder wären es wenige gewesen.
 **Behebung:** Builder-Methode in `EndpointsTestsBase` nach dem Muster in `tdd-process.md`. Gemeldet vom Implementer während des S120-Renames, bewusst außerhalb des damaligen Scopes gehalten.
 
 ---
@@ -287,3 +287,11 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** Die UX-Guideline verlangt, dass Ausgaben nicht mit den Daten wachsen (CGU-fehlermeldungen, „Länge begrenzen"): Aufzählungen höchstens drei Einträge + „und N weitere", zitierter eingegebener Text gekürzt mit „…". Es gibt dafür weder Szenarien noch eine geteilte Umsetzung. Im SKELETON zitiert die Meldung zu einer Zutatenzeile (recipes.feature) die Zeile unbegrenzt – eine versehentlich eingefügte Riesenzeile erscheint vollständig.
 **Behebung:** Querschnittsdatei mit Szenarien (eine Seite als Vertreter), geteilte Umsetzung nach ADR-S112-5 für beide Formen, ADR mit der Kürzungslänge; Zitat der Zutatenzeile und Löschsperre-Meldung darüber führen.
 **Aufschubgrund:** User – Regel gilt, Umsetzung erst im MVP; der SKELETON-Zerleger, der das unbegrenzte Zitat erzeugt, wird dort ohnehin ersetzt.
+
+---
+
+## TD-S136-1 — Build: Abhängigkeiten projektübergreifend explizit machen
+**Fällig:** jetzt – der User will keine impliziten Abhängigkeiten; die Schalter liegen auskommentiert in Directory.Build.props
+**Problem:** Projekte nutzen Typen aus Paketen, die sie nicht selbst referenzieren: Server verwendet EF Core (Microsoft.EntityFrameworkCore in Program.cs, IngredientsEndpoints.cs, E2ETestSupport.cs) und Npgsql (PostgresException), bekommt beides aber nur indirekt über Infrastructure. Solche impliziten Abhängigkeiten verbargen bereits eine Versionsschere (EF Core 10.0.4, von Npgsql in Infrastructure mitgebracht, gegen 10.0.5, gegen das Server kompiliert; Pin samt Begründung als Kommentar in Infrastructure/mahl.Infrastructure.csproj). In Directory.Build.props liegen DisableTransitiveProjectReferences=true und ein ItemDefinitionGroup mit PrivateAssets=compile für alle PackageReference auskommentiert bereit; eingeschaltet scheitert der Build von Server mit 4 Fehlern (CS0234/CS0246 für Microsoft.EntityFrameworkCore und Npgsql). Server.Tests ist danach vermutlich ebenfalls betroffen (Db.Ingredients.ToListAsync ist eine EF-Core-Erweiterung), sichtbar erst, wenn Server wieder baut.
+**Behebung:** 1. Gegen die NuGet-Doku verifizieren (in S136 nur aus dem Gedächtnis): DisableTransitiveProjectReferences betrifft nur Projekt-Referenzen; PrivateAssets ersetzt den Standardwert contentfiles;analyzers;build, statt ihn zu ergänzen – daher compile;contentfiles;analyzers;build setzen, sonst fließen Analyzer und Build-Targets der Pakete neu an referenzierende Projekte; Paket-zu-Paket-Abhängigkeiten innerhalb eines Projekts bleiben auch mit beiden Schaltern implizit. 2. Beide Schalter einschalten. 3. Die fehlenden direkten Referenzen (zuerst Server: EF Core, Npgsql; dann Server.Tests) über den Paketprozess in docs/reference/dependencies.md ergänzen – der User trägt sie ein. 4. Build und Backend-Tests grün.
+**Aufschubgrund:** User – der User hat entschieden, die Schalter auszukommentieren und es gesondert anzugehen

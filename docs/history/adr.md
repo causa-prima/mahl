@@ -8,14 +8,19 @@ wann-lesen: Bevor eine Entscheidung getroffen wird die bereits getroffene Entsch
 aufnahmebedingung: Hier steht eine **entschiedene** Sache am Produkt (Code + Build-/Test-Kette),
             von der nach Behebung oder Ablösung ein **terminaler Rest** bleibt – etwas, das ohne
             diesen Eintrag unverständlich wäre. Operativer Test (Kurzfassung; kanonischer Wortlaut
-            in `CLAUDE.md`): „Ist die Sache erledigt – bleibt dann etwas zu erklären übrig?"
+            in `AGENTS.md`): „Ist die Sache erledigt – bleibt dann etwas zu erklären übrig?"
             Ja → hierher (der Eintrag wird `Superseded` und bleibt stehen).
             Nein → `docs/tech-debt.md`. Noch nicht entschieden → `docs/open-questions.md`.
             Trägt eine Entscheidung einen Aufschub, gehört der Aufschub-Teil als eigener Eintrag
             nach `docs/tech-debt.md` – eine ADR trägt keinen Aufschub. Bei **neu** erfassten
             Einträgen mechanisch geprüft: `prozesscode/hooks/check-adr-capture.py` blockt
             Aufschub-Vokabular (Escape für bewusste Einzelfälle: `adr-ok`-Marker im Eintrag).
-            Abgrenzung ADR/TD/OQ kanonisch: `CLAUDE.md`, Sektion „Ablage: in welchen Tracker gehört dieser Eintrag?"
+            Abgrenzung ADR/TD/OQ kanonisch: [„Ablage: in welchen Tracker gehört dieser Eintrag?"](../../AGENTS.md#CLA-ablage)
+lifecycle:  Bewusste Abweichung von der Lehrmeinung (dort: ADRs nie löschen, nur `Superseded`).
+            Eine ADR, die je **gegolten** hat, bleibt als `Superseded` stehen, weil sie
+            Projekthistorie erklärt – auch ohne verbliebene Anwendungsstelle. Eine ADR, die **nie**
+            angewendet wurde, erklärt nichts und wird gelöscht (Präzedenz S108: ADR-S000-3). Im
+            Zweifel behalten. Kein `Rejected`-Archiv.
 kritische-regeln:
   - Jede selbst getroffene technische Entscheidung hier dokumentieren
   - Format: Status + Tags + Entscheidung + Begründung + Verworfen
@@ -867,9 +872,9 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 **Status:** Accepted
 **Tags:** scope:cross-cutting, arch:sum-type, testing:stryker
 
-**Entscheidung:** Der `_ => throw new InvalidOperationException("Unreachable.")` Zweig in Sum-Type `Match`-Methoden ist strukturell nie erreichbar. Stryker-String-Mutation auf diesem String ist ein äquivalenter Mutant. Exclusion per `// Stryker disable once StringMutation` direkt über der Zeile.
+**Entscheidung:** Der `"Unreachable."`-Zweig in Sum-Type `Match`-Methoden ist strukturell nie erreichbar. Stryker-String-Mutation auf diesem String ist ein äquivalenter Mutant. Exclusion per `// Stryker disable once String` direkt über der Zeile (Stryker.NET 4.x: Kategorie ohne Suffix „Mutation").
 
-**Gilt für:** Alle `_ => throw new InvalidOperationException("Unreachable.")` Zeilen in Sum-Type `Match`-Implementierungen (`RecipeSource.cs`, `Quantity.cs`, und zukünftige Sum-Types).
+**Gilt für:** Seit ADR-S040-1 genau eine Stelle – `SumType.Unreachable<T>()` in `Server/Types/SumType.cs`, die alle `Match`-Implementierungen als `_`-Arm aufrufen. Eigene `throw`-Arme mit eigener Suppression in einzelnen Sum-Types gibt es nicht mehr.
 
 ---
 
@@ -1258,6 +1263,30 @@ Das gilt auch für ADR-S040-1 Punkt 3: `Match<T>` bekommt, sobald es einen gibt,
 
 ---
 
+### ADR-S136-1: Endpoint-Metadaten: Stryker disable statt Test; Gruppen-Routen als `""`
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:stryker
+
+**Entscheidung:**
+- **Metadaten ohne Verhaltenswirkung** an Endpoint-Definitionen (z.B. `group.WithTags("…")`) werden
+  unterdrückt: `Statement,String`, die Begründung im Kommentar nennt diese ADR.
+- **Die Route des Gruppen-Stamms wird als `""` geschrieben, nicht als `"/"`** (`group.MapGet("", …)`).
+  Für Aufrufe ohne abschließenden Schrägstrich sind beide gleich. `"/"` mutiert Stryker zu `""` – ein
+  äquivalenter Mutant, der eine Suppression erzwang. `""` mutiert es zu `"Stryker was here!"`, und den
+  tötet jeder Test des Endpoints. Gemessen S136 an `IngredientsEndpoints.cs`: beide Mutanten getötet,
+  65 → 67 geprüfte Mutanten, 100 %, alle Backend-Tests grün; zwei Suppressionen entfallen.
+
+**Begründung:** Metadaten haben über HTTP keinen beobachtbaren Unterschied, ein Test könnte nur sie
+selbst prüfen. Die Klasse kehrt mit jeder neuen Endpoint-Gruppe wieder – eine Freigabe je Einzelfall
+wäre Verwaltung ohne Erkenntnis. Einzelfälle außerhalb solcher Klassen brauchen keine ADR, sondern die
+Freigabe des Users mit Vermerk im Kommentar ([Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung)).
+
+**Verworfen:** Tests gegen das OpenAPI-Dokument – prüfen Metadaten, kein Nutzerverhalten, und wären
+Code ohne treibendes Szenario. Route `"/"` mit Suppression – unnötig, seit `""` den Mutanten tötbar macht.
+
+---
+
 ### ADR-S000-9: Stryker `additional-timeout`: 15000ms (statt Default 5000ms)
 
 **Status:** Accepted
@@ -1282,7 +1311,7 @@ Das gilt auch für ADR-S040-1 Punkt 3: `Match<T>` bekommt, sobald es einen gibt,
 
 ### ADR-S000-11: TestWebApplicationFactory: InMemoryDatabaseRoot für DB-Sichtbarkeit über Context-Grenzen
 
-**Status:** Accepted
+**Status:** Superseded by ADR-S105-1 (Integrationstests laufen gegen Testcontainers-Postgres, der InMemory-Provider entfällt)
 **Tags:** scope:cross-cutting, testing:integration-test, db:ef-core
 
 **Entscheidung:** `TestWebApplicationFactory` verwendet `InMemoryDatabaseRoot _dbRoot = new()` und übergibt es als zweites Argument an `UseInMemoryDatabase(_dbName, _dbRoot)`. `_dbName` ist eine per-Instanz eindeutige GUID (statt Guid.NewGuid() im Lambda).
@@ -1601,7 +1630,7 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 - **Schema pro Lauf:** In der E2E-Umgebung führt `Program.cs` beim Start `MigrateAsync()` aus (provisioniert `mahl_e2e` bei Bedarf) und mappt einen **nur dann existierenden** Test-Support-Endpoint `POST /api/test/reset` (`E2ETestSupport.cs`). Außerhalb E2E existieren beide nicht → kein dev/prod-Runtime-Risiko.
 - **Per-Test-Isolation:** Ein Playwright-`beforeEach` ruft den Reset vor **jedem** Test. Der Reset **TRUNCATEt alle Tabellen generisch aus dem EF-Modell** (`db.Model` – kein Pflegeaufwand bei neuen Entitäten). TRUNCATE statt DROP+Recreate, weil die laufende App eine offene Verbindung zu `mahl_e2e` hält (DROP scheitert an aktiven Connections) und TRUNCATE keinen Schema-Rebuild pro Test braucht. `RESTART IDENTITY` ist bei UUIDv7-PKs (ADR-S030-1) folgenlos, aber future-proof; `CASCADE` löst die FK-Reihenfolge.
 
-**Warum echtes Postgres statt EF-InMemory (Kontrast zu ADR-S000-11):** Die Backend-Integrationstests dürfen EF-InMemory nutzen (In-Process-Logikprüfung, ADR-S000-11). E2E lebt dagegen von Produktions-Fidelity: EF-InMemory ist keine relationale DB und würde Unique-Constraints (US-904 „Name-Eindeutigkeit"), `xmin`-basierte ETags (ADR-S058-3), `maxlength` und die Migrations-Korrektheit **nicht** abdecken. Der Reset läuft bewusst über einen HTTP-Port (ADR-S041-1: Tests sprechen die App über ihre Ports an), nicht über einen direkten DB-Client.
+**Warum echtes Postgres statt EF-InMemory:** E2E lebt von Produktions-Fidelity (dieselbe Abwägung führte später auch die Backend-Integrationstests auf Postgres, ADR-S105-1): EF-InMemory ist keine relationale DB und würde Unique-Constraints (US-904 „Name-Eindeutigkeit"), `xmin`-basierte ETags (ADR-S058-3), `maxlength` und die Migrations-Korrektheit **nicht** abdecken. Der Reset läuft bewusst über einen HTTP-Port (ADR-S041-1: Tests sprechen die App über ihre Ports an), nicht über einen direkten DB-Client.
 
 **Mutation-Testing:** `E2ETestSupport.cs` ist aus der Backend-Stryker-`mutate`-Liste ausgeschlossen (analog `Program.cs`-Bootstrap) – E2E-only-Scaffolding, das von den Backend-Unit-Tests nicht ausgeführt wird und keine Domänen-/Applikationslogik trägt; seine Korrektheit wird von der E2E-Suite selbst belegt (die loud `expect(status).toBe(204)`-Reset-Assertion im `beforeEach`).
 
@@ -1747,3 +1776,20 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 **Verworfen:** Fokus-Steal-Guard (`if (document.activeElement?.tagName === 'INPUT') return`) — in Session 100 testweise gebaut und wieder entfernt: unerreichbarer `TEXTAREA`-Arm + deterministisch überlebender „Guard-aus"-Mutant. Wer ihn „hilfreich" wieder einbaut, bricht die 100%-Mutation-Disziplin.
 
 **Testfolge:** Damit der verzögerte Autofokus die keystroke-basierten Komponenten-Tests nicht stört, warten diese vor dem ersten `user.type` auf den abgeschlossenen Autofokus (Helper `awaitDialogAutofocus` in `IngredientsPage.test.tsx`).
+
+---
+
+### ADR-S136-2: Frontend-Suppressionen: Daten-Default ohne Szenario, CSS-Klassennamen
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:stryker, frontend:react
+
+**Entscheidung:** Zwei wiederkehrende Mutanten-Klassen im Frontend werden unterdrückt; die Begründung im Kommentar nennt diese ADR.
+- **Daten-Default, den kein Szenario fordert** (`data ?? []` hinter `useQuery`): `ArrayDeclaration`. In Tests liefert MSW immer Daten, der Default greift nur im Ladezustand. Fordert ein Szenario den Ladezustand, wird er dort getestet und die Suppression entfällt.
+- **CSS-Klassennamen** (`className="…"`): `StringLiteral`. Tests prüfen Verhalten, keine Gestaltung; ein Test auf Klassennamen wäre Code ohne treibendes Szenario.
+
+Syntax und Beispiele: [Stryker-Survivor: `= []` Default-Wert](../guidelines/coding-guideline-typescript.md#CGT-stryker-survivor-default), [CSS-className-Strings](../guidelines/coding-guideline-typescript.md#CGT-stryker-survivor-classname).
+
+**Begründung:** Beide Klassen entstehen mit fast jeder neuen Seite (git: f1ff899, 834ad19) – eine Einzelfreigabe je Fall wäre Verwaltung ohne Erkenntnis ([Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung)).
+
+**Verworfen:** Tests auf Klassennamen oder auf den Ladezustand ohne Szenario – prüfen nichts, was ein Nutzer fordert.

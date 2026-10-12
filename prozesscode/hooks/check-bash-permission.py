@@ -693,7 +693,8 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
 _WERKZEUGFRAGE = (
     "Erst die Werkzeugfrage – ein Deny heißt nicht, dass ein Script fällig ist:\n"
     "  Datei ändern → Edit · Abschnitt lesen → Read / doc.py get\n"
-    "  suchen → Grep, Glob · Tracker/Doku → prozesscode-Werkzeug (tracker zeigt welches)\n"
+    "  suchen → grep / find (erlaubt; Muster mit ` oder $( in '…') · Tracker/Doku →\n"
+    "  prozesscode-Werkzeug (tracker zeigt welches)\n"
     "Ein eigenes Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist als\n"
     "diese Werkzeuge – nicht deshalb, weil Bash gerade geblockt hat. Oft ist es das\n"
     "riskantere Werkzeug: Ein Edit-Mismatch schlägt fehl, blindes Slicing schneidet still.\n"
@@ -1025,6 +1026,32 @@ def _split_exec_argument(segment: str) -> tuple[str, str | None]:
     return segment, None
 
 
+def _woertliche_bereiche(text: str) -> list[tuple[int, int]]:
+    """Positionen, an denen Bash `…` und $(…) NICHT ausführt: in '…' und nach einem `\\`.
+
+    Ohne diese Unterscheidung galt eine Suche nach Markdown-Code wie grep '`tdd`' als
+    Ausführung des Befehls `tdd` und wurde abgelehnt. Ein ' in "…" öffnet nichts.
+    """
+    bereiche: list[tuple[int, int]] = []
+    in_double = False
+    i = 0
+    while i < len(text):
+        zeichen = text[i]
+        if zeichen == '\\':
+            bereiche.append((i, i + 2))
+            i += 2
+            continue
+        if zeichen == '"':
+            in_double = not in_double
+        elif zeichen == "'" and not in_double:
+            ende = text.find("'", i + 1)
+            ende = len(text) if ende == -1 else ende
+            bereiche.append((i, ende + 1))
+            i = ende
+        i += 1
+    return bereiche
+
+
 def expand_segment(segment: str) -> list[tuple[str, bool]]:
     """Zerlegt ein Segment in die tatsächlich ausgeführten Kommandos.
 
@@ -1049,7 +1076,11 @@ def expand_segment(segment: str) -> list[tuple[str, bool]]:
     # Eingebettete Substitutionen zuerst einsammeln – sie werden ausgeführt,
     # egal an welcher Stelle sie stehen.
     def collect_substitutions(text: str) -> str:
+        woertlich = _woertliche_bereiche(text)
+
         def repl(m: re.Match[str]) -> str:
+            if any(start <= m.start() < ende for start, ende in woertlich):
+                return m.group(0)
             inner = next((g for g in m.groups() if g is not None), '')
             if inner.strip():
                 out.extend(expand_segment(inner))
@@ -1317,7 +1348,7 @@ _PROJECT_TASK_SCRIPTS: list[str] = [
 # Direktaufruf hier nicht geblockt – ein `Read` auf die Volldatei bleibt erlaubt und ist
 # manchmal richtig. Sie stehen trotzdem hier, weil genau das die Wirksamkeitsfrage ist:
 # `docs/guidelines` und `docs/process` sind zusammen 20,4 % des Read-Volumens bei 6 %
-# gezielten Zugriffen (OBS-S114-2), und eine Anleitung, die nur in CLAUDE.md steht, erreicht
+# gezielten Zugriffen (OBS-S114-2), und eine Anleitung, die nur in AGENTS.md steht, erreicht
 # einen kalt gestarteten Subagenten nicht. Gegenbeleg im selben Datensatz: `docs/history`
 # liegt bei 72 % gezielt – dort war der Abrufweg schon da.
 _TARGETED_READ_SCRIPTS: list[str] = [
@@ -1359,8 +1390,9 @@ def allow_list_text() -> str:
         "PreToolUse-Hook automatisch geblockt (deny) – nicht nur \"unerwünscht\", sondern\n"
         "hart blockiert. '# --allow-once' anhängen erzwingt eine einmalige User-Freigabe\n"
         "(nur für echte Einzelfälle ohne regulären Weg).\n"
-        "Tool-Vorrang: für Datei-Lesen/-Ändern/-Suchen sind Read/Edit/Grep/Glob meist\n"
-        "besser als cat/sed/grep – Bash nur wenn kein Tool passt.\n"
+        "Tool-Vorrang: für Datei-Lesen/-Ändern sind Read/Edit meist besser als cat/sed.\n"
+        "Gesucht wird per Bash mit grep / find – die Werkzeuge Grep und Glob fehlen unter\n"
+        "Linux/WSL jeder Session mit Bash.\n"
     )
 
     schreib("Häufige Projekt-Tasks – immer via Wrapper-Script (Direktaufruf wird geblockt):")
@@ -1421,7 +1453,7 @@ def allow_list_text() -> str:
         schreib("  Ablegen ist frei (Redirect, Write-Tool); .claude/tmp/ ist KEIN Schreibziel mehr.")
         schreib("  AUSFÜHREN braucht eine Freigabe: python3 <scratchpad>/<name>.py " + ONE_TIME_MARKER)
         schreib("  – ein Script führt beliebigen Code aus und umginge sonst diese Prüfung.")
-        schreib("  Vorher die Werkzeugfrage: Edit/Read/Grep/Glob und die prozesscode-Werkzeuge")
+        schreib("  Vorher die Werkzeugfrage: Edit/Read, grep/find und die prozesscode-Werkzeuge")
         schreib("  zuerst; ein Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist.")
         schreib()
     schreib("Schreiben in Projektdokumente (User-Freigabe nötig, kein Marker):")

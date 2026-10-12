@@ -235,7 +235,7 @@ function ReactivationConflictToast({ conflict, onDismiss }: Readonly<Reactivatio
       // herstellbar (kein Fake-Timer-Muster wie bei UndoToast, weil der zweite Konflikt
       // selbst einen Restore-Roundtrip braucht statt eines einzelnen Klicks). Analog zum
       // bereits etablierten `key={deleted.id}` bei UndoToast, dort mit Test.
-      // Stryker disable next-line StringLiteral: kein Test für den Remount-key (s. o.)
+      // Stryker disable next-line StringLiteral: kein Test für den Remount-key (s. o.; Einzelfall, vom User freigegeben S136)
       key={`${conflict.requestedName}|${conflict.savedName}|${conflict.savedUnit}`}
       open
       autoHideDuration={10000}
@@ -300,7 +300,7 @@ export default function IngredientsPage() {
     // Äquivalenter Mutant: Die App hat nur eine Query-Art (['ingredients']), daher ist
     // invalidateQueries({}) (alle) ≡ invalidateQueries({ queryKey: ingredientsKey }).
     // Deterministisch tötbar erst mit einer zweiten Query-Art.
-    // Stryker disable next-line ObjectLiteral: aequivalent, nur eine Query-Art (s. o.)
+    // Stryker disable next-line ObjectLiteral: aequivalent, nur eine Query-Art (s. o.; Einzelfall, vom User freigegeben S136)
     void queryClient.invalidateQueries({ queryKey: ingredientsKey })
   }
 

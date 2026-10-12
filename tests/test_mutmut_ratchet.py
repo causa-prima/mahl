@@ -227,6 +227,49 @@ def test_vollstaendiger_lauf_meldet_die_verschlechterung_weiterhin():
     assert schlechter is True
 
 
+def test_unvollstaendiger_lauf_ist_kein_gruenes_verdikt():
+    """Real passiert: dreimal 266 von 672 Mutanten, gemeldet als „✓ Sperrklinke gehalten", Exit 0.
+
+    Nicht verglichen ist nicht gehalten: Das grüne Verdikt las sich als Beleg, dass der
+    geänderte Guard von Tests gehalten wird – über den nicht gelaufenen Teil sagte es nichts.
+    """
+    verdikt, code = mr.klinken_verdikt(_BEFUND, schlechter=False, nachgezogen=False,
+                                       ohne_aussage=["prozesscode.a"])
+    assert not verdikt.startswith("✓") and code == 1
+    assert "ohne Aussage" in verdikt and "prozesscode.a" in verdikt
+
+
+def test_die_gerissene_klinke_geht_dem_teillauf_vor():
+    """Ein echter Rückschritt in einem vollständigen Modul darf nicht hinter ⚠ verschwinden."""
+    verdikt, code = mr.klinken_verdikt(_BEFUND, schlechter=True, nachgezogen=False,
+                                       ohne_aussage=["prozesscode.b"])
+    assert verdikt.startswith("✗") and code == 1
+
+
+def test_vollstaendiger_lauf_bleibt_gruen():
+    """GEGENPROBE: Ohne Teillauf hält die Klinke wie bisher."""
+    verdikt, code = mr.klinken_verdikt(_BEFUND, schlechter=False, nachgezogen=False,
+                                       ohne_aussage=[])
+    assert verdikt.startswith("✓") and code == 0
+
+
+def test_der_aufrufpfad_meldet_den_teillauf(tmp_path, monkeypatch, capsys):
+    """Über `main`: Ein Modul mit nicht bewerteten Mutanten führt zu Exit 1, nicht zu ✓."""
+    import subprocess
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    monkeypatch.setattr(mr, "BASELINE", tmp_path / "b.json")
+    mr.schreibe_baseline({"prozesscode.a": {"getoetet": 1, "beurteilbar": 2}})
+    monkeypatch.setattr(mr, "_laufe", lambda *argv: subprocess.CompletedProcess(argv, 0, "", ""))
+    monkeypatch.setattr(mr, "lies_ergebnisse", lambda _a=None: [
+        ("prozesscode.a.x_f__mutmut_1", "killed"),
+        ("prozesscode.a.x_f__mutmut_2", mr.NICHT_BEWERTET)])
+    monkeypatch.setattr(mr, "string_mutanten", lambda _m: set())
+    assert mr.main(["--mutate", "prozesscode.a", "--ratchet"]) == 1
+    assert "ohne Aussage" in capsys.readouterr().out
+
+
 def test_offene_mutanten_werden_je_modul_gezaehlt():
     """Ein Teillauf in Modul a darf die Aussage über Modul b nicht entwerten."""
     eintr = [("prozesscode.a.x_f__mutmut_1", mr.NICHT_BEWERTET),

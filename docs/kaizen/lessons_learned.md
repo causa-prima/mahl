@@ -109,3 +109,17 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Die Zusage im Docstring war nie gegen den Code geprüft; getestet war nur die nachträgliche Meldung („beim Lauf nicht mitgenommen“). Ich habe mich beim Umhängen auf die Beschreibung verlassen, statt den Anzeigeweg nachzuvollziehen.
   Regel: Sagt die Doku eines Auslösers einen Zeitpunkt zu, braucht genau dieser Zeitpunkt einen Test. Bevor ich mich auf einen Anzeige- oder Auslösemechanismus verlasse, verfolge ich ihn im Code bis zur Stelle, an der er tatsächlich erscheint.
   CM-Bezug: CM-S064-1
+
+## Session 136 – 2026-10-12
+
+- **[MITTEL] [PROZESS] [Doku] LL-S136-1 – Regeländerung an einer Stelle, ihre Wiedergaben an anderen Stellen nicht mitgezogen**
+  Quelle: Orchestrator
+  Was: Im Doku-Review S136 habe ich Regeln an ihrer Hauptstelle geändert (Survivor-/Suppressionsregel, Seed-Abschnitt, Timeout-Tabelle, Gruppen-Route "" statt "/", Frontend-Teststrategie), ohne vorher alle Stellen zu suchen, die dieselbe Regel wiedergeben oder als Beispiel zeigen. Ein großer Teil der Befunde der Review-Läufe 2 und 3 waren Reste genau dieser Änderungen, darunter ein HOCH-Befund (Frontend-Implementer: „kein MSW-Test“). Das kostete zwei zusätzliche Review-Runden mit je vier Agenten.
+  Warum: Die Änderung fühlte sich als redaktionelle Arbeit an einer Datei an; dass Beispiele, Agent-Definitionen, Checklisten und Kurzfassungen dieselbe Regel tragen, war nicht im Blick. Anker-Prüfung und Doku-Audit finden nur kaputte Verweise, keine inhaltlich veralteten Wiedergaben. Verwandt mit LL-S124-1 (Umbenennung ohne Verweissuche).
+  Regel: Wer eine Regel ändert, sucht vorher repo-weit nach allen Stellen, die sie wiedergeben, verkürzen oder als Beispiel zeigen (Schlüsselbegriffe, Beispielcode, Agent-Definitionen, Checklisten) und zieht sie im selben Zug nach.
+
+- **[MITTEL] [QUALITÄT] [Sonstiges] LL-S136-2 – Paket als ungenutzt entfernt, ohne die Tests ohne es laufen zu lassen**
+  Quelle: Orchestrator
+  Was: In S136 habe ich Microsoft.EntityFrameworkCore.InMemory in Server.Tests als tot eingestuft, weil der Code es nicht mehr verwendete. Nach dem Entfernen scheiterten 54 von 56 Backend-Tests zur Laufzeit: Das Paket hatte transitiv EF Core 10.0.5 in den Test-Build gezogen und so eine Versionsschere zu Infrastructure (10.0.4) kaschiert. Behoben durch einen expliziten Pin in Infrastructure.
+  Warum: Die Einstufung stützte sich auf die Suche nach Verwendungen im Code. Ein Paket wirkt aber auch über die Versionsauflösung im Abhängigkeitsgraphen – das zeigt keine Codesuche, nur ein Lauf.
+  Regel: Ob ein Paket entfernbar ist, belegt erst ein Build- und Testlauf ohne das Paket, nicht die Suche nach Verwendungen im Code. Bis dahin als Vermutung kennzeichnen.

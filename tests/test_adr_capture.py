@@ -81,7 +81,7 @@ def test_reports_each_phrase_once_in_order():
 
 def test_zunaechst_is_not_a_deferral_marker():
     # `zunächst` erzählt meist Vorgeschichte („X erzwang zunächst Y, dann entfernt") –
-    # die Bauform der „Verworfen:"-Abschnitte. CLAUDE.mds Katalog nennt es nicht.
+    # die Bauform der „Verworfen:"-Abschnitte. AGENTS.md-Katalog nennt es nicht.
     assert hook.deferral_hits("Der Override erzwang zunächst --locale=C und wurde entfernt.") == []
 
 

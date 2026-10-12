@@ -5,7 +5,7 @@ Rein mechanisch: schneidet die Blöcke aufgelöster Einträge aus der Live-Datei
 Archiv an – spart dem Agenten das fehleranfällige Hand-Cut/Paste (Token-Ersparnis). Aufruf EXPLIZIT
 durch das Skill `draining-observations` (Hygiene-Schritt) oder von Hand; NICHT vom Session-Start-Hook
 (der bleibt read-only/advisory – obs-drain.py erinnert nur per Hygiene-Reminder).
-Mechanismus & Begründung: docs/kaizen/process.md, Abschnitt "Backlog-Abbau".
+Mechanismus & Begründung: docs/kaizen/process.md#KPR-drain ("Backlog-Abbau").
 """
 import argparse
 import re

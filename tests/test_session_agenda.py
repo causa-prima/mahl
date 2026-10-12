@@ -324,6 +324,27 @@ def test_offene_laeufe_der_story_beanspruchen_die_aufgabe(monkeypatch):
     assert LUECKE not in block.inhalt  # ein fälliger Lauf geht vor
 
 
+# Form des Bestands: `next_run --open` liefert eine Kopfzeile je Feature-Datei und eine Zeile je
+# Lauf. Die volle Liste (19 Läufe, ~5 KB in US-602) kam in jede Session, obwohl der nächste Lauf
+# schon im Zustandskopf steht – und eine größere Story hätte das Budget des Blocks gesprengt.
+OFFENE_LAEUFE = (
+    "=== recipes.feature (@US-904) ===\n"
+    "  `run-1` „Liste·Leerzustand\" (Full-Stack · Singleton): „Liste ist leer\"\n"
+    "  `run-2` „Anlegen·Success\" (Full-Stack · Singleton): „Anlegen\"\n"
+    "  `run-3` „Liste·Sortierung\" (Full-Stack · Singleton): „Sortiert\"\n"
+)
+
+
+def test_offene_laeufe_zeigen_nur_den_ersten_und_die_anzahl(monkeypatch):
+    monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
+    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe(OFFENE_LAEUFE, LUECKE))
+    block = agenda.modul_next_run()
+    assert "`run-1`" in block.inhalt
+    assert "`run-2`" not in block.inhalt and "`run-3`" not in block.inhalt
+    assert "3 offene Läufe" in block.inhalt
+    assert "next_run --open --story US-904" in block.inhalt
+
+
 def test_phasenstand_beansprucht_die_aufgabe_wenn_die_story_fertig_ist(monkeypatch):
     monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
     monkeypatch.setattr(agenda, "_modulausgabe",

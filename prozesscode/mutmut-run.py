@@ -367,18 +367,27 @@ def ratchet(gemessen: dict[str, tuple[int, int]],
     return zeilen, verschlechtert, neu
 
 
-def klinken_verdikt(befund: str, *, schlechter: bool, nachgezogen: bool) -> tuple[str, int]:
+def klinken_verdikt(befund: str, *, schlechter: bool, nachgezogen: bool,
+                    ohne_aussage: list[str] | None = None) -> tuple[str, int]:
     """Bei `--ratchet` entscheidet die Klinke über ✓/✗, nicht die Zahl der Befunde.
 
     Ein Modul mit 31 überlebenden Mutanten ist ein bekannter Zustand, kein neuer Fehler –
     die Klinke fragt, ob er SCHLECHTER geworden ist. Bliebe das Befund-✗ stehen, meldete
     `--ratchet` auf jedem Modul mit Altlast dauerhaft rot und gäbe kein Signal mehr, das
     sich vom Rauschen abhebt. Der Befund selbst bleibt als Zeile darunter sichtbar.
+
+    **Nicht verglichen ist nicht gehalten** (`ohne_aussage`): Kam der Lauf in einem
+    Modul nicht durch, wird es nicht verglichen (siehe `ratchet`) – ein ✓ läse sich dann als
+    Beleg für Tests, die nie gegen den fehlenden Teil liefen. Ein Rückschritt in einem
+    vollständigen Modul geht trotzdem vor: Er ist ein Befund, der Teillauf nur keiner.
     """
     nackt = befund.lstrip("✓✗ ")
     if schlechter:
         return (f"✗ Sperrklinke gerissen – die Testgüte ist unter den festgehaltenen "
                 f"Stand gefallen\n  {nackt}"), 1
+    if ohne_aussage:
+        return (f"⚠ Sperrklinke ohne Aussage – Lauf unvollständig für "
+                f"{', '.join(ohne_aussage)} (Einzelheiten oben)\n  {nackt}"), 1
     nachsatz = " (Baseline nachgezogen)" if nachgezogen else ""
     return f"✓ Sperrklinke gehalten{nachsatz}\n  {nackt}", 0
 
@@ -482,14 +491,16 @@ def main(argv: list[str] | None = None) -> int:
     code = 1 if verdikt.startswith("✗") else 0
 
     if args.ratchet:
-        zeilen, schlechter, fortschreibung = ratchet(
-            nach_modul(eintraege, an_texten), lies_baseline(),
-            offene_je_modul(eintraege))
+        gemessen, offen = nach_modul(eintraege, an_texten), offene_je_modul(eintraege)
+        zeilen, schlechter, fortschreibung = ratchet(gemessen, lies_baseline(), offen)
         if fortschreibung is not None:
             schreibe_baseline(fortschreibung)
         details = (details or []) + [""] + zeilen
+        ohne_aussage = sorted(m for m, (_g, beurteilbar) in gemessen.items()
+                              if beurteilbar and offen.get(m))
         verdikt, code = klinken_verdikt(verdikt, schlechter=schlechter,
-                                        nachgezogen=fortschreibung is not None)
+                                        nachgezogen=fortschreibung is not None,
+                                        ohne_aussage=ohne_aussage)
 
     if args.mutate:
         verdikt += f"\n  (Ausschnitt: {args.mutate})"

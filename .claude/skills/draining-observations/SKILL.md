@@ -42,7 +42,7 @@ einer Zeile nennt offene OBS an derselben Datei (Kandidaten für Same-Artefakt-M
 gemeinsam bearbeitet werden – dazu der [Schritt „**Cluster kritisch prüfen**"](#DRN-cluster-pruefen).
 
 **Offene Fragen sind kein Drain-Item.** Erscheint die Sektion „Offene Fragen", leg die Einträge dem **User
-zur Klärung** vor (Volltext: `docs/open-questions.md`) – sie werden nicht wie OBS selbst entschieden, denn
+zur Klärung** vor (Volltext: `docs/open-questions.md`) – anders als bei OBS trifft der Agent hier keine Vorentscheidung, denn
 sie haben Business-/Architektur-Impact. Ergebnis: Frage geklärt → Eintrag entfernen und das Ergebnis am
 stabilen Ort festhalten (ADR, Guideline, `tech-debt.md`); noch nicht klärbar → `Fällig: S<NNN>` setzen, damit
 sie zum passenden Zeitpunkt statt nach Alter wiederkommt.
@@ -64,16 +64,46 @@ Volltext hast du, der User hätte ihn zu suchen. Für jedes Item:
    `adr.md`, `open-questions.md` oder in die passende Guideline, wenn er reines Wissen ist („diese Falle
    gibt es"). Keine Kandidatenbildung; Status `VERWORFEN (umgezogen nach …)`, der Inhalt lebt am neuen
    Ort weiter. Grund für den Vorrang: Nur dieser Pool ist ratenbegrenzt – ein Produkt-Thema hier kostet
-   Kapazität, die es an seinem Ort nie gebraucht hätte. Taxonomie: `CLAUDE.md`, Sektion „Ablage: in
-   welchen Tracker gehört dieser Eintrag?".
+   Kapazität, die es an seinem Ort nie gebraucht hätte. Taxonomie: [„Ablage: in
+   welchen Tracker gehört dieser Eintrag?"](../../../AGENTS.md#CLA-ablage).
 
 1. **Verstehen zuerst.** Sorge dafür, dass Ziel/Problem der Beobachtung wirklich klar ist. Bei Unklarheit
    nutze `grill-me`, bevor Kandidaten entstehen – eine falsch verstandene OBS produziert plausible, aber
    falsche Lösungen.
 
-2. **Kandidaten frisch generieren.** OBS werden ohne vorab notierte Kandidaten erfasst (sonst nudgt die
-   Erfassung die Lösung vor und schwächt die Discovery). Erarbeite die Kandidaten jetzt gemeinsam und
-   schlage sie dem User vor – Orchestrator schlägt vor, User entscheidet.
+2. <a id="DRN-cluster-pruefen"></a>**Cluster kritisch prüfen, bevor er gemeinsam bearbeitet wird.** Eine `Einheit [Σ …]` im Drain-Satz
+   ist eine **Behauptung der Erfassung**, keine geprüfte Tatsache – gemacht, als der spätere Partner noch
+   gar nicht existierte. Volltexte der Mitglieder lesen und je Mitglied fragen: *Wird es beim Bearbeiten
+   der anderen wirklich mit erledigt – oder ist es nur dasselbe Themenfeld?* Wer danebensteht, wird
+   **herausgelöst** und behält seinen Einzel-Score (bei Zweifel Rücksprache); dann die Kante entfernen
+   (`obs.py set <ID> --zusammen-erledigen …`) – **auf beiden Seiten prüfen**, denn eine einzige
+   verbliebene Kante hält die Einheit zusammen, egal in welcher Richtung sie steht. Welche Einträge auf
+   den vorliegenden zeigen, blendet `obs.py get` als eingehende Kanten mit ein. Der typische Fehltreffer ist die **Vorfrage**, die vor den anderen zu entscheiden wäre –
+   eine Reihenfolge-Abhängigkeit macht nichts billiger. Erst danach folgt die Vorentscheidung – je
+   Mitglied, das herausgelöst wurde, eigenständig.
+
+3. <a id="DRN-vorentscheidung"></a>**Vorentscheidung – bevor Kandidaten entstehen.** Du triffst je Item eine Vorentscheidung in zwei Fragen:
+   - *Ist der Punkt noch handlungswürdig?* Nein → verwerfen (mit Grund). Trägt eine Faktenbehauptung des
+     Eintrags diese Antwort, erst am Code prüfen (Begründung im nächsten Schritt unter „Behauptete Fakten").
+   - *Ja – warum kann oder sollte ich ihn nicht jetzt erledigen?* Gibt es keinen tragfähigen Grund →
+     umsetzen (welche Lösung, entscheidet der User im nächsten Schritt). Gibt es einen → aufschieben,
+     und der Grund wird mitgenannt.
+
+   Jedes Aufschieben legst du dem User mit diesem Grund vor; er kann per Veto stattdessen umsetzen oder
+   verwerfen lassen. Verwerfen nennst du beim Item mit Grund, ohne vorher zu fragen – aber vor
+   `obs-archive`, damit ein Einwand des Users noch greift.
+
+   Wägst du *verwerfen* ab, prüfe zuerst den **Kalt-Abwertungs-Bias**: Du liest die OBS
+   lange nach der Beobachtung und bist strukturell versucht, sie als „nicht mehr dringend" einzustufen.
+   Gegenprobe: **„Wäre dieser Punkt noch wertvoll, wenn er gerade jetzt erst beobachtet worden wäre?"** –
+   wenn ja, halte ihn (nicht wegen Zeitablauf verwerfen). Ist sein **Gegenstand objektiv entfallen** (z.B.
+   der betroffene Code existiert nicht mehr), darf er normal als `VERWORFEN (Grund)` raus – das schützt der
+   Prüfsatz nicht.
+
+4. **Kandidaten frisch generieren** – nur für Items mit der Vorentscheidung *umsetzen*. OBS werden ohne
+   vorab notierte Kandidaten erfasst (sonst nudgt die Erfassung die Lösung vor und schwächt die
+   Discovery). Erarbeite die Kandidaten jetzt gemeinsam und schlage sie dem User vor – Orchestrator
+   schlägt vor, User entscheidet.
 
    **Trägt der Eintrag eine `Vorprägung` (Marker `+Vorprägung` im Drain-Satz, Hinweis im `get`), dann in
    dieser Reihenfolge:** erst eigene Kandidaten bilden und **dem User vorlegen**, danach
@@ -92,17 +122,7 @@ Volltext hast du, der User hätte ihn zu suchen. Für jedes Item:
    verifizieren, bevor sie eine Empfehlung stützt. Eine auf veralteten Angaben gefällte Verwerfung
    schließt den Punkt *und* hinterlässt die falsche Begründung als Präzedenz im Archiv.
 
-3. <a id="DRN-cluster-pruefen"></a>**Cluster kritisch prüfen, bevor er gemeinsam bearbeitet wird.** Eine `Einheit [Σ …]` im Drain-Satz
-   ist eine **Behauptung der Erfassung**, keine geprüfte Tatsache – gemacht, als der spätere Partner noch
-   gar nicht existierte. Volltexte der Mitglieder lesen und je Mitglied fragen: *Wird es beim Bearbeiten
-   der anderen wirklich mit erledigt – oder ist es nur dasselbe Themenfeld?* Wer danebensteht, wird
-   **herausgelöst** und behält seinen Einzel-Score (bei Zweifel Rücksprache); dann die Kante entfernen
-   (`obs.py set <ID> --zusammen-erledigen …`) – **auf beiden Seiten prüfen**, denn eine einzige
-   verbliebene Kante hält die Einheit zusammen, egal in welcher Richtung sie steht. Welche Einträge auf
-   den vorliegenden zeigen, blendet `obs.py get` als eingehende Kanten mit ein. Der typische Fehltreffer ist die **Vorfrage**, die vor den anderen zu entscheiden wäre –
-   eine Reihenfolge-Abhängigkeit macht nichts billiger.
-
-4. <a id="DRN-kolokation"></a>**Kolokation & Konsolidierung erwägen** (zwei getrennte Fälle):
+5. <a id="DRN-kolokation"></a>**Kolokation & Konsolidierung erwägen** (zwei getrennte Fälle):
    - **Same-Artefakt-Kolokation** (gemeinsam *lösen*): Berührt ein Kandidat dieselbe Datei wie ein anderes
      offenes OBS, erwäge die Mitnahme (auch bei verschiedenen Problemen; Begründung:
      [„Lanes und Trigger"](../../../docs/kaizen/process.md#KPR-lanes-trigger)). Nur bei
@@ -114,17 +134,10 @@ Volltext hast du, der User hätte ihn zu suchen. Für jedes Item:
      und Drain-Last. (Die teure „ist das dasselbe Problem?"-Beurteilung gehört hierher in den Drain, nicht in
      die billige Erfassung – [„Erfassung ist billig, Klassifikation ist teuer"](../../../docs/kaizen/process.md#KPR-zwei-brillen).)
 
-5. **Gefahr & CM-Gate** (s. [„Gefahr & Kandidaten-Bewertung"](../../../docs/kaizen/process.md#KPR-gefahr) + [„Wann gehört etwas wohin?"](../../../docs/kaizen/process.md#KPR-wohin)): Bei
+6. **Gefahr & CM-Gate** (s. [„Gefahr & Kandidaten-Bewertung"](../../../docs/kaizen/process.md#KPR-gefahr) + [„Wann gehört etwas wohin?"](../../../docs/kaizen/process.md#KPR-wohin)): Bei
    höher-Gefahr/nicht-trivialen Items erst absichern/belegen, dann umsetzen – Sorgfalt und Beweisbarkeit
    skalieren mit der Gefahr. Steht eine *stehende, wiederkehrende* Leitplanke dahinter, lege eine CM an; bei
    einer Einmal-Änderung halte sie inline als `Maßnahme:` fest.
-
-6. **Entscheiden.** Wägst du *verwerfen* ab, prüfe zuerst den **Kalt-Abwertungs-Bias**: Du liest die OBS
-   lange nach der Beobachtung und bist strukturell versucht, sie als „nicht mehr dringend" einzustufen.
-   Gegenprobe: **„Wäre dieser Punkt noch wertvoll, wenn er gerade jetzt erst beobachtet worden wäre?"** –
-   wenn ja, halte ihn (nicht wegen Zeitablauf verwerfen). Ist sein **Gegenstand objektiv entfallen** (z.B.
-   der betroffene Code existiert nicht mehr), darf er normal als `VERWORFEN (Grund)` raus – das schützt der
-   Prüfsatz nicht.
 
 <a id="DRN-ausgang-festhalten"></a>
 ## Ausgang festhalten
@@ -143,8 +156,9 @@ python3 -m prozesscode.obs set OBS-SNNN-N --status "UMGESETZT (S<NNN>)" --entsch
 - **aufschieben** → Status auf `IN BEOBACHTUNG bis S<NNN>`; das **`bis S<NNN>` ist Pflicht**
   (Wiedervorlage-Termin; sinnvoll wählen, nicht beliebig weit – Mechanik: `process.md`). Grund ins Feld
   `Entscheidung/Maßnahme:`. Wird ein Item als **fällige Wiedervorlage erneut** aufgeschoben, ist das ein
-  Signal – prüf explizit, ob es nicht besser **verworfen** gehört (der Kalt-Abwertungs-Bias gilt hier
-  doppelt). Für event-basierte
+  Signal – prüf explizit, ob es nicht besser **verworfen** gehört, mit der Gegenprobe aus der
+  [Vorentscheidung](#DRN-vorentscheidung) („wäre er jetzt frisch beobachtet noch wertvoll?"). Wiederholtes
+  Aufschieben allein ist kein Verwerfungsgrund – das wäre genau die Abwertung nach Zeitablauf. Für event-basierte
   Reaktivierung zusätzlich eine **Re-Trigger-Notiz** („wieder aktiv wenn …"); kein Script wertet sie aus, der
   Termin ist der verlässliche Backstop. Ein **blockiertes** Item (wartet auf X) ist genau dieser Fall: Grund =
   der Blocker, Termin = Spätestens-Wiedervorlage, Re-Trigger = dessen Auflösung.

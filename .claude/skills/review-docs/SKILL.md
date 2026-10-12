@@ -1,6 +1,6 @@
 ---
 name: review-docs
-description: Vollständige Qualitätsprüfung der Projektdokumentation: Guidelines, Skills, Agenten, CLAUDE.md und globale ~/.claude-Dateien. Analysiert Konsistenz, Progressive Disclosure, Verständlichkeit, Vollständigkeit und Minimalität mithilfe paralleler Sub-Agenten. Liefert priorisierte Verbesserungsvorschläge und arbeitet Findings interaktiv ab. Prüft die Qualität der Doku-TEXTE, nicht das Prozess-/Workflow-Design (das macht review-workflow). Nur manuell aufrufen via /review-docs oder expliziter Erwähnung – nicht auto-triggern.
+description: Vollständige Qualitätsprüfung der Projektdokumentation: Guidelines, Skills, Agenten, AGENTS.md und globale ~/.claude-Dateien. Analysiert Konsistenz, Progressive Disclosure, Verständlichkeit, Vollständigkeit und Minimalität mithilfe paralleler Sub-Agenten. Liefert priorisierte Verbesserungsvorschläge und arbeitet Findings interaktiv ab. Prüft die Qualität der Doku-TEXTE, nicht das Prozess-/Workflow-Design (das macht review-workflow). Nur manuell aufrufen via /review-docs oder expliziter Erwähnung – nicht auto-triggern.
 ---
 
 # Dokumentations-Review
@@ -12,16 +12,16 @@ Ziel: Strukturierte, priorisierte Verbesserungsvorschläge für alle Dokumentati
 
 | Datei/Typ | Grenzwert | Art |
 |-----------|-----------|-----|
-| CLAUDE.md | < 200 Zeilen empfohlen | Soft (Befolgungsrate sinkt darüber) |
+| AGENTS.md | < 200 Zeilen empfohlen | Soft (Befolgungsrate sinkt darüber) |
 | MEMORY.md | 200 Zeilen / 25 KB | Hard Truncation beim Session-Start |
 | Diskrete Instruktionen | ~150–200 gesamt; ~50 davon verbraucht Claude Code selbst | Forschungsbasiert |
-| CLAUDE.md Dateigröße | < 40 KB | Soft (claudelint warnt ab hier) |
+| AGENTS.md Dateigröße | < 40 KB | Soft (claudelint warnt ab hier) |
 
 <a id="RVD-scope"></a>
 ## Scope
 
 **Projekt-Level** (Arbeitsverzeichnis):
-- `CLAUDE.md` (Projekt-Root)
+- `AGENTS.md` (Projekt-Root)
 - `docs/AGENT_MEMORY.md`
 - `docs/` – alle Markdown-Dateien
 - `docs/history/adr.md`, `docs/kaizen/lessons_learned.md`, `docs/kaizen/principles.md`, `docs/kaizen/countermeasures.md` (explizit einschließen)
@@ -88,7 +88,7 @@ Lies die relevante Stelle in der Zieldatei und zitiere sie – entweder als Bewe
 
 **Kein "könnte" ohne Szenario.** "Könnte missverstanden werden" ohne konkretes Fehlverhaltensszenario ist kein Finding. Entweder: konkretes Szenario beschreiben → Finding. Oder: als Beobachtung ohne Impact vermerken (erscheint NICHT in der Finding-Liste).
 
-**Abstraktionsebenen unterscheiden.** Vor dem Flaggen von Duplikation/Inkonsistenz prüfen: Beschreiben beide Stellen tatsächlich denselben Sachverhalt auf derselben Abstraktionsebene? Projekt-Visibility ≠ Typ-Sichtbarkeit. Konzept-Erklärung ≠ Implementierungsregel. Kurzer Verweis in CLAUDE.md ≠ vollständige Regeldefinition in einem Doc.
+**Abstraktionsebenen unterscheiden.** Vor dem Flaggen von Duplikation/Inkonsistenz prüfen: Beschreiben beide Stellen tatsächlich denselben Sachverhalt auf derselben Abstraktionsebene? Projekt-Visibility ≠ Typ-Sichtbarkeit. Konzept-Erklärung ≠ Implementierungsregel. Kurzer Verweis in AGENTS.md ≠ vollständige Regeldefinition in einem Doc.
 
 ---
 
@@ -124,8 +124,8 @@ Lies alle Projekt- und globalen Docs. Suche nach:
 - Dokumenten oder Abschnitten, die für die meisten Aufgaben irrelevant sind, aber trotzdem im Kontext landen
 - Redundanten Inhalten, die an mehreren Stellen stehen und den Kontext unnötig aufblähen
 - Möglichkeiten, Inhalte in **Skills** auszulagern (primäres Mittel – laden nur bei Trigger, echte Progressive Disclosure)
-- Ob das **Navigation-Table-Pattern** in CLAUDE.md genutzt wird: Verweis "lies X wenn du Y tust" statt Inhalt direkt einzubetten (lädt nichts automatisch, aber setzt diszipliniertes Abrufen voraus)
-- Ob **Subdirectory-CLAUDE.md**-Dateien sinnvoll wären – aber als letztes Mittel einordnen: Sie erzwingen das Laden für *alle* Arbeit in diesem Pfad, sind also nicht wirklich lazy; sinnvoll nur wenn ein gesamtes Unterverzeichnis dauerhaft eigene Instruktionen braucht
+- Ob das **Navigation-Table-Pattern** in AGENTS.md genutzt wird: Verweis "lies X wenn du Y tust" statt Inhalt direkt einzubetten (lädt nichts automatisch, aber setzt diszipliniertes Abrufen voraus)
+- Ob **Subdirectory-AGENTS.md**-Dateien sinnvoll wären – aber als letztes Mittel einordnen: Sie erzwingen das Laden für *alle* Arbeit in diesem Pfad, sind also nicht wirklich lazy; sinnvoll nur wenn ein gesamtes Unterverzeichnis dauerhaft eigene Instruktionen braucht
 - Dokumente, die zusammengeführt werden könnten ohne Informationsverlust
 - **Low-Value-Content** (anderer Winkel als Redundanz/Länge): Regeln/Inhalte, die *korrekt und knapp* sind, gegen die aber praktisch **nie verstoßen würde** – der adressierte Fehler tritt nie auf → Lese-/Token-Kosten ohne realen Nutzen. Als **Prüf-Linse** behandeln (Streichung *erwägen*, nicht automatisch): die Beurteilung „wird nie verletzt" ist selbst unsicher, daher nur flaggen + begründen, nicht blind entfernen.
 
@@ -144,7 +144,7 @@ Lies alle Projekt- und globalen Docs. Suche nach:
 - Terminologie-Inkonsistenzen: gleicher Begriff, verschiedene Bedeutungen; oder verschiedene Begriffe für dasselbe Konzept
 - Fehlenden Verlinkungen: Doc A setzt Wissen aus Doc B voraus, verweist aber nicht auf B
 - Szenarien, für die kein Dokument klare Anweisungen gibt (Lücken)
-- CLAUDE.md-Navigation: Deckt die Tabelle alle realen Aufgaben ab?
+- AGENTS.md-Navigation: Deckt die Tabelle alle realen Aufgaben ab?
 
 ---
 
@@ -195,6 +195,7 @@ Gehe jedes gemeldete Finding durch und prüfe es gegen den [Validierungsstandard
 2. **Alle Verweise verfolgt?** Falls das Finding lautet "X fehlt in Datei A": Wurden auch alle Dateien geprüft, auf die Datei A verweist? Falls nicht: jetzt prüfen. Findet sich X dort → Finding verwerfen.
 3. **Konkretes Fehlverhalten?** Falls das Finding nur "könnte missverstanden werden" ohne Szenario beschreibt → Finding verwerfen.
 4. **Richtige Abstraktionsebene?** Falls das Finding Duplikation meldet: sind es wirklich identische Regeln auf derselben Ebene? Falls nein → Finding verwerfen.
+5. **Tritt der Fall überhaupt ein?** Behauptet das Finding, dass ein Skill, Werkzeug oder Ablauf in einer bestimmten Situation anspringt oder fehlschlägt, und ist das am Bestand messbar (Session-Logs unter `~/.claude/projects/`, `git log`, Zählung im Repo): jetzt messen. Nie eingetreten und nicht absehbar → verwerfen oder auf NIEDRIG setzen; das Ergebnis der Messung gehört in den Befund.
 
 Verworfene Findings werden nicht ausgegeben. Es ist kein Fehler, wenn nach dem Pre-Filter weniger Findings übrig bleiben – das ist das Ziel.
 
@@ -239,9 +240,12 @@ Zeige dem User **nur**:
 
 ```
 ## CEO-Übersicht
-| # | Impact | Was ist das Problem? | Wo? |
-|---|--------|----------------------|-----|
-| 1 | HOCH   | [kurze, schnell scanbare Beschreibung – lieber 2 kurze Sätze als 1 langer] | Dateiname |
+
+**#1 · HOCH · [Kurztitel]** – `datei.md`
+Problem: [Situation → Mechanismus → Folge, höchstens 3 kurze Sätze]
+Lösung: [konkrete Änderung, 1–2 Sätze; ggf. „Entscheidung nötig: …"]
+
+**#2 · …**
 ...
 
 ## Dateigrößen-Check
@@ -256,9 +260,21 @@ Zeige dem User **nur**:
 Vollständige Analyse: `<scratchpad>/doc-review.md`
 ```
 
-**Hinweise zur CEO-Übersicht:**
-- Jedes Finding ist eine Zeile. "Was ist das Problem?" muss schnell verständlich sein – kurze Sätze, maximal 3, kein Schachtelsatz.
-- Sortierung: Hoch → Mittel → Niedrig.
+**Hinweise zur CEO-Übersicht:** Der User sieht die Ausgaben der Sub-Agenten nicht und soll für keinen
+Befund ein anderes Dokument öffnen müssen. Jeder Block muss deshalb für sich verständlich sein – und
+trotzdem kurz bleiben (kurze Sätze, kein Schachtelsatz):
+- **Problem** nennt drei Dinge: die *Situation* (wer tut wann was), den *Mechanismus* (warum es dort
+  schiefgeht) und die *Folge* (was konkret falsch herauskommt). Ohne Mechanismus fragt der User
+  zurück, was das Problem ist.
+- **Widersprüche** zeigen beide Seiten in Kurzform: „A sagt X – B sagt Y".
+- **Jeder interne Begriff** (Werkzeug-, Skill-, Komponenten-, Abschnittsname) bekommt beim ersten
+  Auftreten eine Erklärung in wenigen Wörtern; jedes Verb sein Objekt („Verwerfen einer
+  Beobachtung", nicht „Verwerfen").
+- **Lösung** ist die konkrete Änderung. Braucht sie eine Entscheidung des Users, steht das sichtbar
+  im Block, mit der Empfehlung.
+- Gemessenes und Gefolgertes unterscheiden („gemessen: …", „vermutlich …").
+- Sortierung: Hoch → Mittel → Niedrig. Gruppen für [Findings abarbeiten](#RVD-findings-abarbeiten)
+  stehen im Anschluss als kurze Liste.
 
 **Priorisierung nach Impact:**
 - **Hoch:** Führt wahrscheinlich zu falschem Agentenverhalten, ignoriertem Kontext oder widersprüchlichen Anweisungen

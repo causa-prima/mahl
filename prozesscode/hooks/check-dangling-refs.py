@@ -5,7 +5,7 @@
 und lässt bewusste Einzelfälle über den `ref-ok`-Marker durch. Damit war `ref-ok` bisher ein
 **stummes Opt-out**: einmal gesetzt, nie wieder geprüft. Verschwindet der Zieleintrag, dangelt
 der Verweis still. Ebenso ungeprüft blieben Referenzen aus Produktionscode – der Datei-Scope
-jenes Hooks endet bei `docs/`, `.claude/skills|agents/` und `CLAUDE.md`.
+jenes Hooks endet bei `docs/`, `.claude/skills|agents/` und `AGENTS.md`.
 
 Dieser Hook schließt die Gegenrichtung: Verschwindet beim Edit eine TD-/OQ-ID aus ihrem
 Tracker, wird das Repo nach Referenzen darauf durchsucht. Gibt es welche, wird der Edit

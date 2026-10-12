@@ -33,7 +33,7 @@ Subtypen sind `private sealed record` innerhalb des Basistyps. Transitionen, die
 
 ```csharp
 // Server/Domain/RecipeSource.cs
-public abstract record RecipeSource
+internal abstract record RecipeSource
 {
     private RecipeSource() { }  // verhindert externe Subtypen (stärkste Kapselung)
 
@@ -50,7 +50,7 @@ public abstract record RecipeSource
     {
         UrlCase u    => onUrl(u.Url),
         NoSourceCase => onNone(),
-        _ => throw new InvalidOperationException("Unreachable.") // private ctor prevents external subtypes
+        _ => SumType.Unreachable<T>() // ADR-S040-1: private ctor verhindert externe Subtypen
     };
 
     // explicit: Konvertierung nach string? verliert die Fallunterscheidung – nicht reversibel.
@@ -69,7 +69,7 @@ Wenn alle Operationen inklusive Transitionen als Extension Methods geführt werd
 file sealed record EmptyCase : ShoppingList;
 file sealed record PopulatedCase(ImmutableList<ShoppingListItem> Items) : ShoppingList;
 
-public abstract record ShoppingList
+internal abstract record ShoppingList
 {
     // private protected: externe Assemblies können nicht subtypen;
     // innerhalb des Assembly gilt Konvention + Code-Review
@@ -82,7 +82,7 @@ public abstract record ShoppingList
         {
             EmptyCase     => onEmpty(),
             PopulatedCase p => onPopulated(p.Items),
-            _ => throw new InvalidOperationException("Unreachable.")
+            _ => SumType.Unreachable<T>()
         };
 }
 
@@ -103,7 +103,8 @@ public static class ShoppingListExtensions
 - Methoden auf dem Basistyp und Extension Methods nutzen **`Match<T>`** intern statt direktem `this switch` – so ist Exhaustiveness an einer Stelle zentriert. Ein neuer Subtyp bricht die `Match`-Signatur → alle Aufrufer bekommen Compile-Fehler.
 - `Match<T>` ist **public** für Wert-Träger-Sum-Types (reine Zustands-Container, Mapping-Layer benötigt Zugriff). `Match<T>` ist **internal** für operationale Sum-Types.
 - Konvertierungsoperatoren: **`implicit`** wenn verlustfrei und reversibel. **`explicit`** wenn Information verloren geht oder die Konvertierung nicht umkehrbar ist.
-- **Ausnahme:** `OneOf<T, Error<string>>` als Rückgabewert für Fehlertypen – ad-hoc Union ohne benannten Basistyp.
+- Der `_`-Arm in `Match<T>` ist immer `SumType.Unreachable<T>()` (ADR-S040-1) – kein eigenes `throw`, keine eigene Stryker-Suppression; beides sitzt einmal in `Server/Types/SumType.cs`.
+- **Ausnahme:** `OneOf<T, <Konzept>Error>` als Rückgabewert einer Operation, die fehlschlagen kann (`Create`, Zustandsübergang) – ad-hoc Union ohne benannten Basistyp ([Regeln in den Domänentyp, Meldungen an die Grenze](coding-guideline-csharp.md#CGC-regel-meldungen-an-die-grenze)).
 
 Wenn ein Typ mehr als einen konzeptuell unterschiedlichen Zustand repräsentieren kann, ist ein Sum Type die richtige Modellierung.
 

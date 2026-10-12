@@ -41,7 +41,7 @@ Pro Runde eine Status-Zeile ausgeben: „→ Runde N: M grobe Schnitzer".
 #### Frischen Auditor spawnen
 
 Agent-Tool mit `subagent_type: "workflow-auditor"`, ohne Kontext aus
-früheren Runden, **kein** `run_in_background` (sonst werden Berechtigungsanfragen des Agenten abgelehnt).
+früheren Runden.
 Der Agent liest die Workflow-Dateien selbst und kennt seine Prüf-Dimensionen – seine Definition in
 `.claude/agents/workflow-auditor.md` ist die Quelle, hier nicht duplizieren.
 **Modellwahl vor Spawn:** Default ist `model: sonnet` (Frontmatter); nur bei besonders subtilem Workflow-Design den `model`-Parameter gezielt auf `opus` setzen. Rückgabe: Bewertung pro

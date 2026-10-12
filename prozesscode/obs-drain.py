@@ -2,10 +2,10 @@
 """obs-drain.py – berechnet den Session-Start-Drain-Satz.
 
 Konsumenten: der SessionStart-Hook (Injektion des Vorschlags) und der Skill `draining-observations`
-(autoritativer Satz beim Abarbeiten). Mechanismus & Begründung: docs/kaizen/process.md, Abschnitt
-"Backlog-Abbau: kontinuierlicher Drain".
+(autoritativer Satz beim Abarbeiten). Mechanismus & Begründung: docs/kaizen/process.md#KPR-drain
+("Backlog-Abbau: kontinuierlicher Drain").
 
-Drei Lanes + zwei Zusatz-Marker (Begriffe kanonisch in process.md, Abschnitt "Backlog-Abbau"):
+Drei Lanes + zwei Zusatz-Marker (Begriffe kanonisch in docs/kaizen/process.md#KPR-drain):
   - Wert-Lane: behandlungswürdige Einheiten (Score ≥ WUERDIG_AB) nach Score, bis KAPAZITAET Einträge.
   - Alters-Lane: alle NEU-Items älter als ALT_AB, sonst das älteste (Entscheidung erzwungen).
   - Wiedervorlage-Lane: fällige geparkte Items (IN BEOBACHTUNG bis S<NNN>, Termin erreicht)
@@ -25,8 +25,8 @@ from .repo_kontext import current_session, repo_root  # noqa: E402
 
 FAR_PARK = 20  # Soft-Cap: Wiedervorlage > ~2 Retro-Perioden voraus (Schnitt ~8, jüngste ~10 Sessions/Periode → großzügig aufgerundet) → Vertipp-/Vanish-Schutz.
 
-# Steuergrößen des Drains (S122). Herleitung kanonisch in docs/kaizen/process.md,
-# Abschnitt "Backlog-Abbau: kontinuierlicher Drain".
+# Steuergrößen des Drains (S122). Herleitung kanonisch in docs/kaizen/process.md#KPR-drain
+# ("Backlog-Abbau: kontinuierlicher Drain").
 ALT_AB = 15        # Sessions bis zur Alters-Lane. Steuert NICHT den Durchsatz (der entspricht im
                    # Gleichgewicht dem Zufluss), sondern den stehenden Bestand ≈ Zufluss × ALT_AB.
 TOP_N = 5          # Einheiten in der Trigger-Summe – die gemessene Kapazität einer Drain-Session

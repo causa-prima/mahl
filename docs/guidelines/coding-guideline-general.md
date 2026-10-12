@@ -107,6 +107,6 @@ Diese Prinzipien gelten für den gesamten Produktionscode. Die sprachspezifische
 | Immutability | `readonly record struct`, `init;` | `readonly`, `as const`, Spreading |
 | Keine Primitive Obsession | Value Objects (`NonEmptyTrimmedString` etc.) | Branded Types |
 | Make Illegal States Unrepresentable | Private Konstruktoren + `Create()` Factory | Discriminated Unions |
-| Railway-Oriented Programming | `OneOf<T, Error<string>>` + `.Match()` | `neverthrow` `Result<T, E>` + `.match()` |
+| Railway-Oriented Programming | `OneOf<T, TError>` + `.Match()` | `neverthrow` `Result<T, E>` + `.match()` |
 | Pure Functions | Extension Methods, keine Seiteneffekte | `src/domain/`, `src/services/` |
 

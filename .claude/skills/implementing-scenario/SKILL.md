@@ -3,7 +3,7 @@ name: implementing-scenario
 description: >
   Implementiert einen freigegebenen Szenario-Lauf (ein oder mehrere Gherkin-Szenarien desselben
   Clusters) end-to-end: Architektur-Check, Double-Loop TDD mit Subagenten pro Schicht,
-  Orchestrator-Check, Review-Loop und Commit. Voraussetzung: der Lauf muss bereits via
+  Orchestrator-Check, Review-Loop und Abschluss-Triage. Voraussetzung: der Lauf muss bereits via
   /gherkin-workshop (Szenario-Clustering) freigegeben sein – fehlt er in features/,
   stoppt der Skill sofort. Verwende diesen Skill immer wenn ein @US-NNN-Lauf implementiert werden
   soll. Typische Trigger: „implementiere Lauf X", „fang mit dem ersten Lauf an", „nächster Lauf",
@@ -35,10 +35,10 @@ an Subagenten, damit er selbst keine Coding-Guidelines laden muss und den Überb
 2. [TDD-Zyklus](#IMP-tdd-zyklus) (Double-Loop, je Schicht ein Subagent)
 3. [Orchestrator-Check](#IMP-orchestrator-check)
 4. [Review-Loop](#IMP-review-loop)
-5. [Abschluss](#IMP-abschluss) (Session-Abschluss & Commit)
+5. [Abschluss](#IMP-abschluss) (Triage, dann Session-Abschluss oder nächster Lauf)
 
 Zwei Ausführungsregeln gelten für den gesamten Ablauf:
-- Dateien > 100 Zeilen in der Regel nicht komplett lesen: TOC zuerst (Read mit `limit: 30`), dann gezielt per Grep oder `Read offset/limit`. Ausnahme: muss ein spezifischer, abgrenzbarer Abschnitt vollständig erfasst werden (z.B. ein einzelnes Gherkin-Szenario), darf dieser komplett gelesen werden.
+- Dateien > 100 Zeilen in der Regel nicht komplett lesen: TOC zuerst (Read mit `limit: 30`), dann gezielt per `grep` oder `Read offset/limit`. Ausnahme: muss ein spezifischer, abgrenzbarer Abschnitt vollständig erfasst werden (z.B. ein einzelnes Gherkin-Szenario), darf dieser komplett gelesen werden.
 - Implementierungsarbeit ([TDD-Zyklus](#IMP-tdd-zyklus)) und Reviews ([Review-Loop](#IMP-review-loop)) an Subagenten delegieren – der Haupt-Thread orchestriert.
 
 GRUNDSATZ: Die Regeln sind starke Guidelines, keine absoluten Gesetze. Gibt es sehr gute Gründe
@@ -55,11 +55,11 @@ einmal Code da, ist die Versuchung groß, die Entscheidung an den Code anzupasse
 Er ist reine Analyse – noch kein Produktionscode schreiben. Domain-Typen und
 Implementierungsdetails entstehen im TDD-Zyklus, wenn Tests sie erzwingen.
 
-**Gezielt lesen, nicht full-read** (Abrufwege: Navigationstabelle in `CLAUDE.md`):
+**Gezielt lesen, nicht full-read** (Abrufwege: Navigationstabelle in `AGENTS.md`):
 - Akzeptanzkriterien: `docs/stories/szenario_N_*.md` (N = US-Präfix, z.B. US-904 → szenario_9_datenpflege.md; Mapping-Tabelle: `docs/stories/user-stories.md`)
 - Architektur-Patterns: `docs/reference/architecture.md` – Abschnittsliste holen, dann nur die relevanten Abschnitte
 - Phasen-Spec: Phase aus `docs/AGENT_MEMORY.md` → `docs/reference/skeleton-spec.md` oder `docs/reference/mvp-spec.md` (nur API+DB-Sektion der Story)
-- Feature-Datei: `features/<story>.feature` – nur die Szenarien des Laufs `$ARGUMENTS` vollständig lesen
+- Feature-Datei: die Datei mit dem Feature-Tag der Story (`grep -l '@US-NNN' features/`) – nur die Szenarien des Laufs `$ARGUMENTS` vollständig lesen
 
 Fragen:
 
@@ -122,7 +122,7 @@ Fragen:
 
    Falls neue Architekturentscheidung nötig: User fragen. Selbst Entschiedenes in `docs/history/adr.md` dokumentieren.
 
-5. <a id="IMP-td-sichtung"></a>**TD-Sichtung & -Entscheidung:** Sieh in `docs/tech-debt.md` nach technischer Schuld, die die von diesem Lauf berührten Code-Bereiche/Dateien betrifft (aus der bisherigen Analyse: welcher Endpoint/welche UI-Fläche/welche Domain-Typen). Für **jeden** so getroffenen TD-Eintrag *vor* der Umsetzung entscheiden **und schriftlich begründen**:
+5. <a id="IMP-td-sichtung"></a>**TD-Sichtung & -Entscheidung:** Überfliege `python3 -m prozesscode.td list` (Titel nennen den Bereich) und hol Kandidaten mit `td get <ID>` – nicht die ganze `docs/tech-debt.md` lesen. Gesucht ist technische Schuld, die die von diesem Lauf berührten Code-Bereiche/Dateien betrifft (aus der bisherigen Analyse: welcher Endpoint/welche UI-Fläche/welche Domain-Typen). Für **jeden** so getroffenen TD-Eintrag *vor* der Umsetzung entscheiden **und schriftlich begründen**:
    - **Mit-erledigen** – nur wenn der Lauf den Code ohnehin anfasst *und* die Behebung kohäsiv + günstig ist (Boy-Scout-Regel, **kein** Gold-Plating; steht im Spannungsfeld zu [YAGNI/KISS-Scope](#IMP-yagni-scope) – im Zweifel aufschieben). Dann Scope + betroffene TD-ID notieren und im TDD-Zyklus mit umsetzen.
    - **Aufschieben** – mit **Grund** (außerhalb des berührten Codes / zu groß / eigener fokussierter Schritt nötig).
 
@@ -140,7 +140,7 @@ Fragen:
 
 Ziel: genau die Szenarien des Laufs aus $ARGUMENTS vollständig grün bekommen – nicht mehr, nicht weniger.
 
-**Vorabanalyse: Spec-Ambiguitäten klären (Haupt-Thread):**
+### Vorabanalyse: Spec-Ambiguitäten klären (Haupt-Thread)
 
 Bevor die E2E-Tests geschrieben werden, alle Szenarien des Laufs auf offene Entscheidungen scannen – schichtübergreifend:
 - **Verhaltensentscheidungen:** Was passiert nach einer Aktion? Dialog-Verhalten nach Erfolg/Fehler, Feldinitialisierung, Reihenfolge von Elementen, exakter Fehlermeldungstext.
@@ -150,7 +150,9 @@ Gefundene Ambiguitäten mit dem User klären, bevor der E2E-Test entsteht.
 Reine Design-Entscheidungen (CSS, Fonts, Abstände) sind kein Klärungsbedarf – diese liegen in den UX-Guidelines und brauchen keine Spec-Anpassung.
 
 <a id="IMP-ui-entwurf"></a>
-**UI-Entwurf (nur bei Läufen mit Frontend-Anteil, Haupt-Thread):** Skizziere vor dem E2E-Test, wie
+### UI-Entwurf (nur bei Läufen mit Frontend-Anteil, Haupt-Thread)
+
+Skizziere vor dem E2E-Test, wie
 die Szenarien des Laufs auf dem Bildschirm aussehen – Elemente und Anordnung, MUI-Komponenten,
 Zustände (leer, lädt, Fehler), Mobile-First. Maßstab sind der Nutzungskontext in der Beschreibung
 unter `Feature:` (entsteht im Workshop, [Nutzungskontext & Ablauf](../gherkin-workshop/SKILL.md#GHW-nutzungskontext))
@@ -160,15 +162,17 @@ genügt; Selektoren und Assertions des Tests hängen daran. Nutzt der Lauf nur b
 genügt ein Satz dazu. Verlangt die Skizze anderes **Verhalten**, als die Szenarien beschreiben, ist
 das kein UI-Detail mehr: zurück in den Workshop, die Spec wird nicht in der Umsetzung angepasst.
 
-**Äußerer Loop – E2E-Test(s) (Haupt-Thread):**
+<a id="IMP-aeusserer-loop"></a>
+### Äußerer Loop – E2E-Test(s) (Haupt-Thread)
 
 Schreibe selbst die Playwright-Test(s) für **alle** Szenarien des Laufs (je Szenario Given/When/Then 1:1) – bevor der erste Subagent gespawnt wird. Ein homogener Cluster (gleiches Setup, gleiche Assertion-Form, nur der Input variiert – das ist per Definition des Clustering-Algorithmus der Regelfall) kollabiert dabei zu **einem** parametrisierten Test (`[TestCase]`/`test.each` o.ä.), jede Zeile = ein Szenario. Führe die Test(s) aus und zeige die Fehlermeldung(en). Das beweist, dass sie echtes Verhalten messen und noch nicht durch bestehende Implementierung zufällig grün werden können. Referenz: `docs/process/e2e-testing.md` (TOC zuerst).
 
 Diese Tests bleiben rot, bis alle inneren Loops abgeschlossen sind – das ist gewollt. Der Haupt-Thread ändert sie während der inneren Loops nicht.
 
-**Innerer Loop – Subagent pro Schicht (Delegation ist Pflicht):**
+<a id="IMP-innerer-loop"></a>
+### Innerer Loop – Subagent pro Schicht (Delegation ist Pflicht)
 
-> **Voraussetzung:** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` muss in den globalen Settings aktiv sein. Ohne dieses Feature schlägt `SendMessage` still fehl – der Prozess hängt ohne Fehlermeldung.
+> **Getestet mit** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in den globalen Settings (Harness-Test 2026-10-09, Claude Code 2.1.295). Laut Doku braucht `SendMessage` das Flag nicht; ohne Flag ist der Ablauf aber ungetestet – nicht abschalten, ohne den Test zu wiederholen.
 
 Für jede Schicht einen Subagenten spawnen. Haupt-Thread lädt KEINE Coding-Guidelines – der
 Subagent tut das selbst.
@@ -177,10 +181,10 @@ Subagent tut das selbst.
 (Ausgabe von `check-atdd-gate.py` in [Architektur-Check](#IMP-architektur-check)) – kein erneutes Beurteilen pro Szenario nötig,
 alle Szenarien eines Laufs teilen dieselbe Schicht (Konsequenz des Clustering-Algorithmus,
 Achse „Schicht" im [Schicht-Split](../gherkin-workshop/references/scenario-clustering.md#CLU-schicht-split)).
-- **Full-Stack:** ein Frontend-Subagent implementiert beide Frontend-Schichten sequenziell (Komponente mit Service-Mock zuerst, dann Service-Client mit MSW) → danach ein Backend-Subagent *(Frontend zuerst: implementiert gegen MSW-Mocks; Backend ersetzt diese Mocks danach)*.
-- **Frontend-only:** nur der Frontend-Subagent (Komponente mit Service-Mock, ohne Service-Client-Schicht) – **kein Backend-Subagent**. Backend-only-Läufe sind aktuell nicht vorgesehen.
+- **Full-Stack:** ein Frontend-Subagent implementiert Komponente und Service-Client, getestet über die Komponente mit MSW-Handlern → danach ein Backend-Subagent *(Frontend zuerst: implementiert gegen MSW; das Backend liefert danach das echte Verhalten)*.
+- **Frontend-only:** nur der Frontend-Subagent (Komponente, kein neuer Service-Client) – **kein Backend-Subagent**. Backend-only-Läufe sind aktuell nicht vorgesehen.
 
-**Schicht-Subagenten (EINE Schicht pro Aufruf, alle Szenarien des Laufs in einem Batch):**
+**Schicht-Subagenten (eine Schicht pro Aufruf – Frontend zählt als eine –, alle Szenarien des Laufs in einem Batch):**
 
 - Backend-Schicht: `subagent_type: "backend-layer-implementer"`
 - Frontend-Schicht: `subagent_type: "frontend-layer-implementer"`
@@ -221,21 +225,22 @@ der Weg zur unabhängigen Gegenprobe: Eine zweite Meinung, die nur die Auswahl d
 sieht, ist keine.
 
 Spawn-Regeln:
-- EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin). Ausnahme: der Frontend-Subagent implementiert Komponente und Service-Client sequenziell in einem Aufruf (siehe Schicht-Reihenfolge oben).
+- EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin). Der Frontend-Subagent implementiert Komponente und Service-Client in einem Aufruf, weil beide vom selben Komponenten-Test getrieben werden (siehe Schicht-Reihenfolge oben).
 - **Modellwahl vor Spawn:** Die im Architektur-Check unter [Modell-Eignung](#IMP-modell-eignung) festgehaltene Einschätzung bestätigen. Default ist `sonnet` (Frontmatter); nur eine klar überdurchschnittlich anspruchsvolle Schicht per `model`-Parameter auf Opus eskalieren. Im Zweifel beim `sonnet`-Default bleiben.
 - **Subagent benennen:** `name: "backend-<schicht>"` bzw. `"frontend-<schicht>"` – nötig damit der Haupt-Thread via `SendMessage` für das Test-Review antworten kann.
-- **KEIN `run_in_background: true`** – andernfalls werden Berechtigungsanfragen des Subagenten automatisch abgelehnt; er kann keine Dateien schreiben oder Befehle ausführen.
-- **Subagent-Lebenszyklus:** Subagenten terminieren nach ihrer Ausgabe nicht – sie schlafen und bleiben via `SendMessage` erreichbar. Das ist das Kernverhalten von `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`. `permissionMode: acceptEdits` in den Subagenten-Definitionen stellt sicher, dass Datei-Edits nicht geblockt werden.
-- **Arbeitende Subagenten nicht pollen:** Ein Subagent läuft im Hintergrund; der Harness meldet seinen *inhaltlichen* Abschluss automatisch (Test-Review-Signal, Verifikations-Hash-Block, Return). Idle-/„available"-Zwischensignale während der Arbeit (typisch während eines laufenden ~2-min-Stryker-Laufs) bedeuten **nicht** „fertig". Reagiere darauf **nicht** mit einer Status-Nachfrage per `SendMessage` („bist du fertig?", „wie ist der Stand?") – das pollt einen arbeitenden Subagenten, verschwendet Tokens und stört ihn. Warte auf den inhaltlichen Return; `SendMessage` dient der Beantwortung von PLANUNG-Rückfragen und der Findings-Übergabe, nicht dem Status-Abfragen. **Abschluss ≠ idle:** Ein „finished"/Completion-Status ist ein *anderes* Signal als idle/„available" – meldet der Harness einen Subagenten als **fertig**, du hast seinen inhaltlichen Report (Findings, Verifikations-Hash) aber nicht als Return erhalten, dann fordere ihn per `SendMessage` aktiv an, statt endlos passiv zu warten. Grund: Ein Subagent kann abschließen, ohne dass sein Report ankommt – etwa wenn er ihn als **plain text** statt per `SendMessage` ausgibt (Text-Output eines Team-Subagenten ist für den Orchestrator **nicht sichtbar**). „idle ignorieren" gilt nur für Zwischensignale, nicht für einen echten Abschluss. **Dritter Fall – gar kein Signal:** Kommt über mehrere idle-Zwischensignale hinweg **weder** ein Abschluss **noch** ein inhaltlicher Return, greift keine der beiden Regeln oben – Weiterwarten ist dann formal regelkonform und trotzdem endlos (der Subagent kann durch Absturz oder Session-Limit stumm geendet sein). Prüfe den Fortschritt in diesem Fall **mechanisch am Arbeitsbaum** (`git status`, `git diff`, gezieltes `grep` auf die erwartete Änderung) statt weiter passiv zu warten; ist die Arbeit erkennbar abgeschlossen, fahre den Verifikationslauf (`qa-check.py`) selbst, statt ihn nachzufordern.
+- **Subagent-Lebenszyklus:** Subagenten laufen im Hintergrund. Rückfragen (PLANUNG), das Test-Review-Signal und den Return liefert ein Subagent, indem er seinen Lauf mit dieser Ausgabe beendet – sie kommt automatisch beim Orchestrator an. Der Orchestrator antwortet per `SendMessage`, und der Subagent macht mit vollem Kontext weiter. Seine Berechtigungsabfragen erscheinen beim User und werden nicht automatisch abgelehnt. `permissionMode: acceptEdits` in den Subagenten-Definitionen stellt sicher, dass Datei-Edits nicht geblockt werden. (Alles belegt im Harness-Test 2026-10-09.)
+- **Wiederaufnehmen oder neu starten:** Lässt sich eine Folgeaufgabe gut ohne den bisherigen Kontext des Subagenten erledigen (z.B. ein eng umrissener Fix nach dem Review), starte einen **neuen** Subagenten mit knapper Übergabe (Szenario, freigegebene Tests samt Blob-Anker, Befund), statt den alten wieder aufzunehmen. Grund: Subagenten haben nur 5 Minuten Cache-Lebensdauer; nach einer längeren Pause wird ihr gesamtes Transkript neu in den Cache geschrieben (bis 2026-10 knapp die Hälfte aller Cache-Writes der Layer-Implementer, je 100–340k Tokens). Mitten im TDD-Ablauf (nach PLANUNG oder TEST-REVIEW) trägt der Kontext den Zustand – dort wieder aufnehmen.
+- **Arbeitende Subagenten nicht pollen:** Auf den Bericht warten, keine Status-Nachfragen per `SendMessage` („bist du fertig?") – das verschwendet Tokens und stört. Kommt über längere Zeit kein Bericht (Absturz, Session-Limit), den Fortschritt **mechanisch am Arbeitsbaum** prüfen (`git status`, `git diff`, gezieltes `grep` auf die erwartete Änderung); ist die Arbeit erkennbar abgeschlossen, den Verifikationslauf (`qa-check.py`) selbst fahren, statt ihn nachzufordern.
 - **PLANUNG-Phase beachten:** Der Subagent beginnt mit einem PLANUNG-Schritt, stellt Rückfragen und berichtet seine eigenständig gefundenen ADRs. Auf diese Ausgabe antworten:
   - **Rückfragen:** Alle Rückfragen in einer Antwort beantworten. Für jede Frage prüfen, ob sie bereits im [Architektur-Check](#IMP-architektur-check) geklärt wurde – bekannte Antworten direkt einschließen (kurz vermerken: „aus dem Architektur-Check bekannt: [Antwort]"), offene Fragen gebündelt an den User weitergeben. Max. 2 Runden; danach dem Nutzer die Situation erklären (offene Fragen auflisten) und fragen wie weiter verfahren werden soll.
   - **ADR-Abgleich:** Findet der Subagent ADRs, die du nicht als relevant eingestuft hast (oder umgekehrt), kritisch prüfen ob sie tatsächlich anwendbar sind. Im Zweifelsfall mit dem Subagenten klären – dessen Begründungen aber ebenfalls kritisch hinterfragen, nicht blind übernehmen. Kein Konflikt: kein weiterer Austausch nötig.
   Erst nach dieser Antwort beginnt der Batch-RED-Zyklus.
 - Haupt-Thread reviewt Diff und Test-Run-Output nach jedem Subagent-Return.
-- **Suppressions-Politik korrekt formulieren:** Dem Subagenten nie „Ziel: NULL neue Suppressions" vorgeben – die Regel ist „keine *unbegründeten* Suppressions". Begründete (äquivalenter Mutant, strukturell unerreichbar, Fehlerpfad bewusst aufs treibende Szenario verschoben) sind erlaubt und werden in [Orchestrator-Check](#IMP-orchestrator-check) validiert. Eine „null"-Vorgabe drängt den Subagenten, korrekten/guideline-vorgeschriebenen Code zu entfernen statt ihn begründet zu suppressen.
+- **Suppressions-Politik korrekt formulieren:** Dem Subagenten nie „Ziel: NULL neue Suppressions" vorgeben – eine „null"-Vorgabe drängt ihn, korrekten/guideline-vorgeschriebenen Code zu entfernen. Es gilt [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung): Suppressionen mit Verweis auf eine erlaubende ADR (oder eine Einzelfall-Freigabe des Users) sind zulässig und werden in [Orchestrator-Check](#IMP-orchestrator-check) validiert.
 - Weicht der Subagent von TDD ab → an denselben Subagenten korrigieren (er wartet noch auf Test-Review). Max. 2 Iterationen; nach jeder Korrektur fordert der Subagent erneut Review an, bevor er zu GREEN übergeht. Nach 2 Iterationen ohne Verbesserung: Abbruch + Meldung an User.
 
-**Batch-Test-Review nach RED im Inneren Loop (Haupt-Thread):**
+<a id="IMP-test-review"></a>
+### Batch-Test-Review nach RED im Inneren Loop (Haupt-Thread)
 
 Der Subagent schreibt den **gesamten Test-Batch der Schicht** (alle Tests, die die Szenarien des Laufs auf dieser Schicht fordern – bei einem homogenen Cluster typischerweise ein einziger parametrisierter Test), bestätigt den **kollektiven** Fehlschlag und sendet **einmal** das Signal `TEST-REVIEW: <Testname1, Testname2, ...>` mit allen Tests des Batches. Der Haupt-Thread liest den Test-Code via `git diff` (die Tests sind **nicht** gestaged; neue Dateien via `git diff --no-index /dev/null <datei>` oder direktes Lesen) und prüft den **ganzen Batch** anhand der folgenden Kriterien.
 
@@ -259,7 +264,7 @@ Gegen diesen Anker prüft [Orchestrator-Check](#IMP-orchestrator-check), dass na
 <a id="IMP-orchestrator-check"></a>
 ## Orchestrator-Check
 
-**E2E-Loop schließen:**
+### E2E-Loop schließen
 
 Playwright-Test erneut ausführen. Noch rot? Ursache identifizieren (Routing? API-Integration? Fehlende Verbindung zwischen Schichten):
 - Ursache in bereits implementierter Schicht → an bestehenden Schicht-Subagenten übergeben.
@@ -274,7 +279,11 @@ python3 -m prozesscode.qa-check --layer frontend --verify <hash-aus-return> --ap
 ```
 
 - `✅` (Exit 0) → Hash stimmt überein UND Score == 100 % → frischer, gültiger Übergabe-Lauf, mechanische Findings vertrauenswürdig.
-- `❌` (Exit 1) → entweder Hash-Mismatch (kein frischer Lauf / Zustand geändert) oder Score < 100 %. In beiden Fällen Subagent auffordern, das Problem zu beheben und `qa-check.py` erneut auszuführen. Bleibt es nach einem Retry rot → STOP, User fragen.
+- `❌` (Exit 1) → zwei Fälle, unterscheidbar am `=== VERIFY ===`-Block:
+  - **Hash-Mismatch** (kein frischer Lauf / Zustand geändert) → Subagent auffordern, `qa-check.py` erneut auszuführen.
+  - **Hash ✅, aber Score < 100 %** → Hat der Subagent jeden verbleibenden Survivor im Return nach [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung) gemeldet (Datei:Zeile, Mutant, Tabellenzeile), ist das eine gültige Übergabe: weiter mit der Inhaltlichen Bewertung, dort Punkt „Stryker-Score & Survivor-Fix". Sonst Subagent auffordern, die Survivors zu behandeln.
+
+  Bleibt es nach einem Retry aus anderem Grund rot → STOP, User fragen.
 
 > **Wichtig:** Der Subagent muss `qa-check.py` zur Übergabe **ohne** `--skip-stryker` laufen lassen – nur ein frischer Lauf erzeugt einen gültigen Übergabe-Hash (mit `--skip-stryker` wird kein Hash ausgegeben). `--skip-stryker` ist reiner Diagnose-Modus für den Orchestrator, nie die Übergabe. Den Subagenten NICHT anweisen, `--skip-stryker` zu nutzen.
 
@@ -289,23 +298,24 @@ dazu Stryker-Score sowie den **TEST-FREIGABE-AUDIT**.
 1. **Test-Freigabe-Audit:** Der `=== TEST-FREIGABE-AUDIT ===`-Block vergleicht jede geänderte
    Test-Datei gegen ihren Freigabe-Anker. `✅ unverändert` → ok. Meldet er eine Datei als
    `GEÄNDERT` (mit Diff freigegeben→aktuell) oder `KEINE Freigabe-SHA`, den gezeigten Diff prüfen:
-   nur Setup (Mock-Handler, Testdaten) → erlaubt; Assertion-Änderung oder nie freigegebene
-   Test-Datei → ❌ zurück an den Schicht-Subagenten. (Kein Exit-Gate – nur der Haupt-Thread kann
+   nur Setup (Mock-Handler, Testdaten) → erlaubt; ein **zusätzlicher** Test, den der Return als
+   Survivor-Test nach der Freigabe ausweist ([Regel](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung)) → inhaltlich prüfen wie im [Test-Review](#IMP-test-review); Änderung bestehender
+   Assertions, nicht ausgewiesener neuer Test oder nie freigegebene Test-Datei → ❌ zurück an den
+   Schicht-Subagenten. (Kein Exit-Gate – nur der Haupt-Thread kann
    Setup ≠ Assertion entscheiden.)
 
-2. **Suppression-Validität:** Für jede Suppression aus dem Check „Neue Suppressionen": Beweist die Begründung
-   echte Äquivalenz / Nichttestbarkeit, oder klingt sie nur plausibel? (Maßstab:
-   `docs/kaizen/principles.md`).
+2. **Suppression-Validität:** Für jede Suppression aus dem Check „Neue Suppressionen": Nennt die
+   Begründung eine ADR, und deckt diese genau die Klasse des Falls – oder eine Einzelfall-Freigabe des
+   Users aus diesem Lauf? Sonst ❌ bzw. dem User vorlegen, nach
+   [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung).
 
-3. **Stryker-Score & Survivor-Fix:** Score aus Script-Output lesen. Score < 100 % → je Survivor:
-   - Äquivalenter Mutant → als Suppression anlegen (Begründung Pflicht).
-   - Gold-Plating (kein Gherkin-Kriterium erzwingt die Logik) → Produktionscode löschen.
-   - Fehlender Test (Survivor beobachtbar – Backend: via HTTP, Frontend: via Komponenten-API) → an bestehenden Schicht-Subagenten.
-   - Survivor **nicht** beobachtbar (Backend: nicht via HTTP, Frontend: nicht via Komponenten-API) – typisch für technisch erzwungene Zweige die nie ausgelöst werden können (z.B. exhaustiver `default`-Case über ein geschlossenes Sum-Type) → an bestehenden Schicht-Subagenten: Suppression anlegen lassen (Begründung Pflicht). Der Subagent hätte das bereits vor der Übergabe beheben müssen; 100 %-Score ist Voraussetzung für den Return.
-   Score nach Fix immer noch < 100 % → als `lessons_learned` dokumentieren.
+3. **Stryker-Score & Survivor-Fix:** Score aus Script-Output lesen. Score < 100 % oder vom Subagenten
+   gemeldete Survivors → je Survivor nach [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung)
+   (dort auch, welche Fälle der User entscheidet). Bleibt der Score nach einer Korrekturrunde unter
+   100 % → STOP, User fragen; zusätzlich als `lessons_learned` dokumentieren.
 
 4. **Unit-Test-Autorisierung:** Für jeden Treffer aus dem Check „Unit-Test-Muster": Wurde dieser Test explizit
-   vom Orchestrator beauftragt (Stryker-Survivor-Check, Survivor nicht via Schicht-Grenze beobachtbar)?
+   vom Orchestrator beauftragt, nach Freigabe durch den User (Survivor nicht via Schicht-Grenze beobachtbar)?
    Nein → ❌ Gold-Plating.
 
 **Findings übergeben:** Alle Findings werden **gesammelt** an den jeweiligen Schicht-Subagenten
@@ -328,12 +338,11 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
    Die von review-code gespawnten spezialisierten Agenten erhalten **kein Iterations-Wissen** –
    weder Findings aus früheren Runden noch Hinweise auf bereits abgelehnte false positives.
 
-2. Findings im **Haupt-Thread** auswerten:
-   - ❌ Must Fix → neuen Schicht-Subagenten spawnen (mit Coding-Guidelines + TDD-Pflicht).
-     Diesem können auch ⚠️-Improvements aus dieser Runde mitgegeben werden, damit er sie
-     optional mit adressiert. Nach Fixes → nächste Runde.
-   - ⚠️ Improvement → notieren; nach einer 0-❌-Runde Entscheidung dem User vorlegen.
-   - Suppression-Findings → direkt entscheiden: Begründung ausreichend oder Schicht-Subagent.
+2. Findings im **Haupt-Thread** umsetzen – ❌ und ⚠️ gleichermaßen, nach der Scope-Prüfung in
+   `review-code` (spätere Phase → Abschluss-Triage; trivial → selbst, danach `qa-check`; alles andere →
+   Schicht-Subagent mit Coding-Guidelines + TDD-Pflicht, Tendenz zu einem neuen). Mehrere Findings
+   derselben Schicht gehen gebündelt an einen Subagenten. Nach Fixes → nächste Runde.
+   - Suppression-Findings → nach [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung).
 
    **Vor jedem Fix-Auftrag – Szenario-Frage (gilt für ❌ und ⚠️ gleichermaßen):** Ändert der Fix
    **beobachtbares Nutzerverhalten** (neue Reaktion auf eine Eingabe, geändertes Timing, ein
@@ -347,17 +356,18 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
    Lauf, ist der Fix zurückzustellen, nicht ungedeckt umzusetzen.
 
 3. **Terminierung:**
-   - a) 0 ❌ in einer Runde → [Review-Loop](#IMP-review-loop) abgeschlossen.
-   - b) Nach 3 Runden ohne 0-❌-Runde → STOP, User fragen.
+   - a) 0 ❌ und 0 ⚠️ in einer Runde → [Review-Loop](#IMP-review-loop) abgeschlossen.
+   - b) 0 ❌, aber ⚠️ → umsetzen wie in Schritt 2. Waren alle Fixes trivial (Beleg: `qa-check`),
+     ist der Loop abgeschlossen; hat ein Schicht-Subagent etwas geändert, folgt eine weitere Runde.
+   - c) Nach 3 Runden ohne Abschluss → STOP, User fragen.
 
-Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor [Abschluss](#IMP-abschluss).
 
 <a id="IMP-abschluss"></a>
-## Abschluss (Session-Abschluss & Commit)
+## Abschluss
 
-1. **Offene Punkte mit dem User triagieren (bevor committed wird):** Sammle aus dem gesamten Ablauf alles, was nicht in den Szenario-Code eingeflossen ist – nichts darf nur in der Konversation hängen bleiben oder ungefragt irgendwo eingetragen werden:
+1. **Offene Punkte mit dem User triagieren:** Sammle aus dem gesamten Ablauf alles, was nicht in den Szenario-Code eingeflossen ist – nichts darf nur in der Konversation hängen bleiben oder ungefragt irgendwo eingetragen werden:
    - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return durchsehen und **pro Subagent explizit ausweisen**, ob er Feedback gab (Inhalt) oder nicht („keine"). Wird daraus ein OBS/LL erfasst, die **Quelle präzise** eintragen (`Subagent` vs. `Orchestrator`), damit später beobachtbar bleibt, woher das Feedback stammt.
-   - **Zurückgestellte ⚠️-Findings** aus dem Review-Loop ([Review-Loop](#IMP-review-loop)).
+   - **Review-Findings einer späteren Phase** aus dem [Review-Loop](#IMP-review-loop) (nicht gebaut, Vorschlag: Schuld mit Phasen-Auslöser).
    - **Während des Ablaufs entdeckte technische Schuld / Tooling-Reibung.**
    - **TD-Abgleich (mechanisch, nicht aus dem Gedächtnis):**
      ```
@@ -369,27 +379,15 @@ Haupt-Thread entscheidet über verbleibende ⚠️-Findings vor [Abschluss](#IMP
 
    Lege dem User **jeden** Punkt vor – mit genug **Kontext** zum Entscheiden und einer **begründeten Empfehlung**. Der User entscheidet pro Punkt:
    1. **Direkt umsetzen** → jetzt erledigen (ggf. eigener TDD-Zyklus / Schicht-Subagent).
-   2. **Vermerken** → in das passende Dokument bzw. die passenden Dokumente eintragen. Welches Dokument wofür zuständig ist, steht in der `CLAUDE.md`-Navigationstabelle (single source of truth – hier bewusst NICHT dupliziert, damit nichts driftet).
+   2. **Vermerken** → in das passende Dokument bzw. die passenden Dokumente eintragen. Welches Dokument wofür zuständig ist, steht in der `AGENTS.md`-Navigationstabelle (single source of truth – hier bewusst NICHT dupliziert, damit nichts driftet).
    3. **Ignorieren** → bewusst verwerfen.
 
    Erst eintragen/umsetzen, NACHDEM der User entschieden hat. Kein stilles Eintragen, kein stilles Vergessen.
 
-   **Doppel-Erfassung vermeiden:** Folgt direkt ein [Session-Abschluss](#IMP-session-abschluss) (→ `closing-session`), besitzt dieser die *Aufnahme* der Beobachtungen/Learnings (dort beim [Umsetzen der Doku-Änderungen](../closing-session/SKILL.md#CLS-doku-umsetzen) für OBS, beim [Schreiben der Learnings](../closing-session/SKILL.md#CLS-lessons) für LL). Dann hier nur **surfacen + triagieren** und „direkt umsetzen"-Punkte **vor dem Commit** erledigen; die als „vermerken" entschiedenen LL/OBS **im `closing-session`-Lauf gebündelt schreiben** – nicht jetzt schreiben und dort erneut abfragen. Läuft die Session **ohne** Abschluss weiter (Szenario fertig, kein `closing-session`), hier vermerken.
+   Wann die als „vermerken" entschiedenen Punkte geschrieben werden, hängt am nächsten Schritt –
+   deshalb hier nur entscheiden; „direkt umsetzen"-Punkte jetzt erledigen.
 
-2. **Vorgehen mit dem User klären** – frage per `AskUserQuestion`, was als nächstes passieren soll, damit der Commit i.d.R. die Session-Abschluss-Dateien mit enthält. Optionen:
-   - **Session-Abschluss, dann Commit** (Empfehlung) → erst `closing-session` ausführen, dann committen, sodass die Session-Abschluss-Dateien (Session-Log, AGENT_MEMORY-Phasenzeile, `lessons_learned`, Index) im **selben** Commit liegen.
-   - **Nur Session-Abschluss** → `closing-session` ausführen, **kein** Commit.
-   - **Nur Commit** → jetzt committen, ohne Session-Abschluss; davor `docs/AGENT_MEMORY.md` selbst aktualisieren (Phase/Story/**Nächster Lauf**: erledigten Lauf markieren, nächsten benennen); technische Schuld → `docs/tech-debt.md`, offene Fragen → `docs/open-questions.md`.
+2. **Vorgehen mit dem User klären** – frage per `AskUserQuestion`, was als nächstes passieren soll. Optionen:
+   - <a id="IMP-session-abschluss"></a>**Session abschließen** (Empfehlung) → `closing-session`-Skill laden und ausführen. Er schreibt die als „vermerken" entschiedenen LL/OBS gebündelt (dort beim [Umsetzen der Doku-Änderungen](../closing-session/SKILL.md#CLS-doku-umsetzen) für OBS, beim [Schreiben der Learnings](../closing-session/SKILL.md#CLS-lessons) für LL – nicht erneut abfragen) und besitzt den [Abschluss-Commit](../closing-session/SKILL.md#CLS-abschluss-commit), der auch den Code dieses Laufs enthält. Dieser Skill committet nicht selbst.
+   - **Nächster Lauf** → die als „vermerken" entschiedenen Punkte **jetzt** in ihre Tracker schreiben (welcher wofür: `python3 -m prozesscode.tracker`) – bis zum Session-Abschluss liegen weitere Läufe dazwischen, und was nur in der Konversation steht, geht verloren. Kein Commit, `docs/AGENT_MEMORY.md` nicht anfassen (der nächste Lauf löst sich über `{{NEXT_RUN}}` selbst auf). Dann diesen Skill für den nächsten Lauf neu starten.
    - **Etwas anderes** (Freitext) → der Anweisung des Users folgen.
-
-3. <a id="IMP-session-abschluss"></a>**Session-Abschluss** (falls gewählt): `closing-session`-Skill laden und ausführen. Die dort entstandenen/geänderten Dateien fließen in den nachfolgenden Commit ein.
-
-4. **Commit erstellen** (falls gewählt; kein Amend): Der Agent committet selbst, über den Skill
-   `committing` (Gesamtprüfung, Befehl, Freigabe) – **inklusive** der Dateien aus dem
-   Session-Abschluss. Betreff:
-   ```
-   US-XXX: Lauf N – [Cluster-Label]
-   ```
-   Mapping: Story-Tag ohne `@`, Lauf-Nummer und Cluster-Label aus dem `check-atdd-gate.py`-Output
-   von [Architektur-Check](#IMP-architektur-check) übernehmen.
-   Beispiel: `$ARGUMENTS = @US-904 run-3` (Label „Anlegen·Name-Validierung") → `"US-904: Lauf 3 – Anlegen·Name-Validierung"`

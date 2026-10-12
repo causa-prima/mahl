@@ -35,6 +35,11 @@ user-invocable: true
    - **Lief unmittelbar zuvor die [Offene-Punkte-Triage aus `implementing-scenario`](../implementing-scenario/SKILL.md#IMP-abschluss)** (Szenario → direkter Abschluss): Die offenen Punkte wurden dort schon mit dem User surfacet + triagiert. Dann die als „vermerken" entschiedenen LL/OBS **hier** schreiben (gebündelt) und den obigen Prompt nur **ergänzend** stellen (was die Triage nicht abdeckte) – nicht dieselbe Frage voll wiederholen.
 
    - Falls Doku-Vorschläge oder Beobachtungen vorliegen: konkret formulieren und dem User **JETZT** präsentieren. **Warten auf Antwort.**
+     **Jede vorgeschlagene Beobachtung nennt ihren Aufschubgrund** (Wert und konkreter Grund, wie ihn
+     `obs add --aufschubgrund` verlangt) – nicht erst beim Erfassen. Ohne Aufschubgrund ist es keine
+     Beobachtung, sondern eine Behebung: dann jetzt beheben und das so vorschlagen. Zerfällt ein Punkt
+     in einen behebbaren und einen aufzuschiebenden Teil, den behebbaren jetzt erledigen und nur den
+     Rest erfassen.
    - Falls nichts anzupassen / keine Beobachtung: direkt mit dem [Schreiben der Learnings](#CLS-lessons) weitermachen.
 
 3. <a id="CLS-doku-umsetzen"></a>Dokumentations-Änderungen umsetzen (falls User zugestimmt hat):
@@ -42,10 +47,12 @@ user-invocable: true
    - **Neue Beobachtungen** (aus dem Beobachtungs-Prompt) → **per Script erfassen**, nicht per Edit:
      ```
      python3 -m prozesscode.obs list-offen        # erst die offenen Titel ansehen – für --zusammen-erledigen
-     python3 -m prozesscode.obs add --titel "…" --quelle User --impact MITTEL \
+     python3 -m prozesscode.obs add --titel "…" --quelle <User|Orchestrator> --impact MITTEL \
          --haeufigkeit dauerhaft --kategorie PROZESS --kontext Doku --beobachtung "…" \
-         --zusammen-erledigen keiner
+         --zusammen-erledigen keiner --aufschubgrund "<Wert> – <konkreter Grund>"
      ```
+     `--aufschubgrund` ist Pflicht: warum erfasst statt sofort behoben (erlaubte Werte: `obs add --help`).
+     Trifft keiner zu, wird nicht erfasst, sondern jetzt behoben.
      Das vergibt die ID, hängt den Eintrag an und setzt das Entscheidungsfeld auf den einzigen bei
      der Erfassung zulässigen Wert – ein Eintrag kann so nicht in der Form entstehen, die
      `check-obs-capture.py` blocken müsste. Nebeneffekt: Die Datei muss dafür nicht gelesen werden.
@@ -73,6 +80,10 @@ user-invocable: true
    einen Bezug, gern eintragen; sonst weglassen. Zulässig ist eine in `countermeasures.md`
    existierende CM-ID oder `neu`, falls keine bestehende Maßnahme passt. Der Anschluss entsteht
    damit hier, solange der Kontext frisch ist; die Retro überträgt ihn.
+   **Passende Maßnahme finden, ohne die Datei (>100 KB) ganz zu lesen:** erst alle Titel listen –
+   `grep -n "^### CM-S" docs/kaizen/countermeasures.md` –, daraus 1–3 Kandidaten wählen und nur
+   deren Abschnitt per `Read` mit `offset`/`limit` ab der gelisteten Zeile lesen; erst der Volltext
+   (Abgrenzung) entscheidet, ob sie wirklich passt.
 
    Eintrag-Format + Erfassungs-Test + Beispiel: **Header von `docs/kaizen/lessons_learned.md`**. Impact/Kategorie-Definitionen + Reaktionsregeln: `docs/kaizen/process.md`
 
@@ -94,9 +105,8 @@ user-invocable: true
 
 5. <a id="CLS-projekt-status"></a>Projekt-Status aktualisieren:
    - **`docs/AGENT_MEMORY.md` schlank halten** – wird bei jedem Session-Start voll injiziert (jede Zeile kostet Token). Leitfrage: „Welche Info braucht JEDER Agent beim Start, um den Projektstatus einzuordnen?" Nur: **Phase**, **Aktuelle Story**, **Nächste Prioritäten**.
-     - **Nächsten Lauf nicht von Hand pflegen:** Der Platzhalter `{{NEXT_RUN}}` in der Prioritätenliste wird beim Session-Start automatisch zum nächsten offenen Lauf aufgelöst (`next_run.py`; Mechanik: ADR-S041-7) – stehen lassen.
-     - **Lauf außer der Reihe** (Priorität überschreibt die Feature-Reihenfolge, z.B. error vor sortiert): als Anstrich **über** den Platzhalter setzen, nach Umsetzung entfernen.
-     - **Vorzieh-/Prioritäts-Items eng + begründet:** Jedes Item eng fassen und mit **sichtbarem Grund + Done-Zustand** notieren (`<enge Aktion> — Grund: … — Done: <woran als fertig erkennbar>`), sonst wird ein längst erledigter Grund inertial weitergeschleppt und niemand erkennt Bestandteile/Fertigstellung.
+     - **Nächsten Lauf nicht von Hand pflegen:** Der Platzhalter `{{NEXT_RUN}}` in der Kopfzeile `**Nächster Lauf:**` wird beim Session-Start automatisch zum nächsten offenen Lauf aufgelöst (`next_run.py`; Mechanik: ADR-S041-7) – stehen lassen.
+     - **Prioritäten im Format der Datei:** Jeder Punkt unter „Nächste Prioritäten" folgt dem Format-Kommentar am Kopf von `AGENT_MEMORY.md` (Titel · `Fällig:` · Quelle · Done) – `session-agenda.py` liest daraus Kurzform und Fälligkeit. Ein Punkt, der vor allem anderen dran ist (auch ein Lauf außer der Reihe), trägt `Fällig: jetzt`; nach Umsetzung entfernen.
    - **Ausgelagert (nicht in AGENT_MEMORY, eigene Datei pflegen):** Technische Schuld → `docs/tech-debt.md`; offene Fragen/geparkte Diskussionen → `docs/open-questions.md`. Beide haben eigene Eintrag-Formate (Header der jeweiligen Datei).
    - **Story- und Phasenwechsel nicht von Hand eintragen:** Hat die erreichte Phase Stories ohne Feature-Datei oder ist sie abgeschlossen, meldet das `{{NEXT_RUN}}` und stellt es die Agenda als nächste Aufgabe (`next_run.py --phase-status`). `**Phase:**` erst nach dem Phasen-Review umstellen – die Meldung hält sich bis dahin.
 
@@ -129,7 +139,7 @@ user-invocable: true
    rückblickend zeigt, was wichtig war, läuft der Filter über das, was sicher **nicht**
    hineingehört:
 
-   - Inhalt, der einen Ort in der [Ablage-Tabelle](../../../CLAUDE.md#CLA-ablage) hat – ADR, OBS,
+   - Inhalt, der einen Ort in der [Ablage-Tabelle](../../../AGENTS.md#CLA-ablage) hat – ADR, OBS,
      TD, OQ, Guideline, Docstring. Eine ID im Fließtext ist in Ordnung, wenn der Satz sie
      braucht; eine Aufzählung erzeugter IDs nie – welche Einträge wann entstanden, sagt die ID
    - Was der Diff zeigt: Dateilisten, Zeilen- und Testzahlen, Umbenennungen

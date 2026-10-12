@@ -1,6 +1,6 @@
 """Tests für check-ref-direction.py – PreToolUse-Poka-Yoke gegen volatil→stabil-Referenzen.
 
-Regel: Eine stabile Datei (docs/**, .claude/skills/**, .claude/agents/**, CLAUDE.md) darf
+Regel: Eine stabile Datei (docs/**, .claude/skills/**, .claude/agents/**, AGENTS.md) darf
 kein volatiles ID-Schema (OBS-/OQ-/LL-/TD-S…) referenzieren. Ausnahmen: die kaizen-Bookkeeping-
 Dateien, Archive/Session-Logs, volatile Tracker (tech-debt/open-questions/AGENT_MEMORY),
 der kaizen-Skill – sowie einzelne Zeilen mit `ref-ok`-Marker.
@@ -24,10 +24,10 @@ def test_protects_principles_despite_kaizen_folder():
     assert hook.is_protected("docs/kaizen/principles.md")
 
 
-def test_protects_skills_agents_and_root_claudemd():
+def test_protects_skills_agents_and_root_agentsmd():
     assert hook.is_protected(".claude/skills/review-code/SKILL.md")
     assert hook.is_protected(".claude/agents/code-quality-auditor.md")
-    assert hook.is_protected("CLAUDE.md")
+    assert hook.is_protected("AGENTS.md")
 
 
 def test_exempts_kaizen_bookkeeping_files():

@@ -216,8 +216,8 @@ def check(data: dict) -> str | None:
         "doch warten, ist das eine Entscheidung über die Regel: Regel ändern, oder die "
         "Abweichung als **dauerhafte** Ausnahme per ADR festschreiben – dann ist sie "
         "entschieden und der Eintrag entfällt. Was es nicht gibt: eine ADR, die dem Eintrag "
-        "nur erlaubt zu warten (Hybrid – s. `CLAUDE.md`, „Ablage: ADR, TD oder offene "
-        "Frage?\"). Ein ungeprüfter Verdacht ist keine Verletzung – dann ist die Prüfung die "
+        "nur erlaubt zu warten (Hybrid – s. `AGENTS.md#CLA-ablage`, „Ablage: in welchen "
+        "Tracker gehört dieser Eintrag?\"). Ein ungeprüfter Verdacht ist keine Verletzung – dann ist die Prüfung die "
         "Behebung und bekommt eine eigene Fälligkeit."
     )
 

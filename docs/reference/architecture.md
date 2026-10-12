@@ -45,7 +45,7 @@ Dieser Codebase folgt vier übergreifenden Paradigmen, die für **alle** Code-Eb
 Primitive Typen (`string`, `int`, `number`) tragen keine Domänen-Semantik. Jedes Domänen-Konzept bekommt einen eigenen Typ (Value Object / Branded Type), der seine Invarianten selbst durchsetzt. Ein Wert, der diesen Typ hat, ist garantiert gültig – der Compiler erzwingt das.
 
 **Railway-Oriented Programming (ROP)**
-Fehler sind Rückgabewerte, keine Exceptions. Validierungsfehler und erwartbare Fehlerzustände werden über typisierte Ergebnis-Typen kommuniziert (`OneOf<T, Error<string>>` in C#, `Result<T, E>` via `neverthrow` in TypeScript). `try/catch` ist nur für echte technische Ausnahmezustände (Datenbank nicht erreichbar, Netzwerk-Ausfall) erlaubt.
+Fehler sind Rückgabewerte, keine Exceptions. Validierungsfehler und erwartbare Fehlerzustände werden über typisierte Ergebnis-Typen kommuniziert (`OneOf<T, <Konzept>Error>` in C# – benannter Fehlerfall, den Meldungstext erzeugt erst die API-Grenze, siehe [Regeln in den Domänentyp, Meldungen an die Grenze](../guidelines/coding-guideline-csharp.md#CGC-regel-meldungen-an-die-grenze); `Result<T, E>` via `neverthrow` in TypeScript). `try/catch` ist nur für echte technische Ausnahmezustände (Datenbank nicht erreichbar, Netzwerk-Ausfall) erlaubt.
 
 **Layer-Isolation**
 Jeder Layer schützt sich aktiv gegen fehlerhafte Daten aus benachbarten Layern. Die Domäne vertraut weder Request-Daten noch DB-Daten – `Create()` ist in beiden Pfaden (Write und Read) die einzige Einstiegsmethode. DB-Inkonsistenzen (z. B. durch manuelle Eingriffe oder Migrations-Fehler) werden im Read-Pfad als `Results.Problem()` (strukturiertes `application/problem+json`) zurückgegeben, nicht als unbehandeltes `throw`.

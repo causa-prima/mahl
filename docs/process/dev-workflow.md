@@ -6,7 +6,6 @@ kritische-regeln:
   - Toolchain ist WSL-nativ (.NET + Node) – dotnet/npm/npx direkt aufrufen
   - Test- und Stryker-Aufrufe: immer Python-Wrapper aus prozesscode/ verwenden – Hook erzwingt das und zeigt den richtigen Befehl
   - .NET-Tools (dotnet-ef, dotnet-stryker) sind lokal gepinnt (.config/dotnet-tools.json) – nach Clone: dotnet tool restore
-  - Timeouts immer setzen – Richtwerte in der Tabelle unten
   - Stryker --mutate: Pfad ist projektrelativ (ohne Server/-Präfix für Backend, ohne Client/-Präfix für Frontend); mehrere Ziele als Kommaliste, keine Brace-Globs; ein Muster ohne Treffer bricht ab
 -->
 
@@ -15,14 +14,14 @@ kritische-regeln:
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| [Befehlsauswahl & Timeouts](#DEV-befehlsauswahl) | Auto-deny/allow-once-Mechanismus, Timeout-Richtwerte für alle relevanten Kommandos | Vor jedem lang laufenden Befehl |
+| [Befehlsauswahl](#DEV-befehlsauswahl) | Auto-deny/allow-once-Mechanismus, Scratchpad, zusammengesetzte Befehle | Wenn ein Befehl geblockt wird |
 | [Tool-Call-Failure-Analyse](#DEV-failure-analyse) | Root Cause → korrektes Muster ableiten → dokumentieren → wiederholen | Bei fehlgeschlagenen Befehlen |
 | [WSL-native Toolchain](#DEV-wsl-toolchain) | .NET + Node nativ; lokale Tool-Manifest; Test/Stryker via Wrapper | Beim Aufrufen von dotnet/npm |
 | [Datenbank starten](#DEV-datenbank-starten) | Docker Compose, Connection String | Beim Starten der lokalen Umgebung |
-| [Backend](#DEV-backend) | Build, Run, Seed-Daten | Beim Starten / Bauen des Backends |
+| [Backend](#DEV-backend) | Build, Run | Beim Starten / Bauen des Backends |
 | [Frontend](#DEV-frontend) | npm install, dev-Server, Produktions-Build, Vite-Proxy | Beim Starten / Bauen des Frontends |
 | [Tests](#DEV-tests) | Alle Tests / einzelnes Projekt / einzelner Test / Frontend-Tests | Beim Ausführen von Tests |
-| [Datenbank-Workflow](#DEV-datenbank-workflow) | Drop+Recreate (Entwicklung) vs. Migrations (ab V1), Seed-Daten | Bei Schema-Änderungen |
+| [Datenbank-Workflow](#DEV-datenbank-workflow) | Drop+Recreate (Entwicklung) vs. Migrations (ab V1) | Bei Schema-Änderungen |
 | [Mutation Testing](#DEV-mutation-testing) | Stryker gezielt (eine Datei) und vollständig, --mutate-Pfad-Konvention | Nach jeder Phase oder gezielt nach Änderungen |
 | [Hook-Entwicklung](#DEV-hook-entwicklung) | Exit-Code-Semantik, $CLAUDE_PROJECT_DIR in settings.json | Beim Schreiben oder Debuggen von Hooks |
 | [Hook-Tests](#DEV-hook-tests) | pytest-Aufruf, Subshell-Pflicht, Edit-vs-Write-Delta-Verhalten | Nach Änderungen an Hook-Dateien |
@@ -32,7 +31,7 @@ kritische-regeln:
 ---
 
 <a id="DEV-befehlsauswahl"></a>
-## Befehlsauswahl & Timeouts (für Agenten)
+## Befehlsauswahl (für Agenten)
 
 **Befehlsauswahl:** Der Bash-Permission-Hook (`check-bash-permission.py`) entscheidet automatisch:
 - **Allow-Liste**: Befehle werden ohne Nachfrage ausgeführt.
@@ -43,37 +42,11 @@ kritische-regeln:
 
 **Wegwerf-Artefakte gehören ins Session-Scratchpad**, nicht ins Repo: Analyse-Scripte, Zwischenergebnisse, Diffs, Redirect-Ziele. Es liegt außerhalb des Repos, wird nicht committet und verschwindet mit der Session – nichts muss aufgeräumt werden. Redirects dorthin sind erlaubt; den konkreten Pfad zeigt `check-bash-permission.py --list`. In `.claude/tmp/` leben nur die beiden Permission-Logs.
 
-Das **Ausführen** eines dort liegenden Scripts ist dagegen freigabepflichtig (`python3 <scratchpad>/<name>.py # --allow-once`): Ein Script führt beliebigen Code aus und umginge sonst genau die Prüfung, für die der Hook existiert – der Ablageort ändert daran nichts. Davor steht ohnehin die Werkzeugfrage: Edit, Read, Grep/Glob und die `prozesscode`-Werkzeuge zuerst; ein eigenes Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist als diese – nicht deshalb, weil Bash gerade geblockt hat.
+Das **Ausführen** eines dort liegenden Scripts ist dagegen freigabepflichtig (`python3 <scratchpad>/<name>.py # --allow-once`): Ein Script führt beliebigen Code aus und umginge sonst genau die Prüfung, für die der Hook existiert – der Ablageort ändert daran nichts. Davor steht ohnehin die Werkzeugfrage: Edit, Read, `grep`/`find` und die `prozesscode`-Werkzeuge zuerst; ein eigenes Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist als diese – nicht deshalb, weil Bash gerade geblockt hat.
 
 **Zusammengesetzte Befehle** sind erlaubt, solange jedes Teilstück erlaubt ist – Verkettung, Zeilenumbruch, Variablenzuweisung, Substitution, Heredoc, Schleifen (im Rumpf nur lesende Befehle) und Sub-Befehle aus `find -exec`/`xargs`. Nicht erlaubt ist indirekte Ausführung (`$CMD`, `eval`, `bash -c`), weil sie jede Prüfung aushebelt.
 
 **Vollständige Liste:** `python3 -m prozesscode.hooks.check-bash-permission --list` zeigt alle erlaubten Befehle, die Projekt-Task-Wrapper (Tests/Lint/Mutation) und die Deny-Mechanik. Wird am Session-Start automatisch in den Kontext geladen.
-
-**Timeouts:** Vor jedem lang laufenden Prozess überlegen: *Wann sollte ich abbrechen?* Das Bash-Tool akzeptiert einen `timeout`-Parameter (Millisekunden). Richtwerte:
-
-| Befehl | Erwartete Dauer | Empfohlener Timeout |
-|--------|----------------|---------------------|
-| `dotnet build` | 15–45 s | 90 000 ms |
-| `dotnet test` (alle, mit Coverage) | 8–25 s | 50 000 ms |
-| `dotnet test` (einzeln) | 5–20 s | 40 000 ms |
-| `dotnet stryker` (eine Datei) | ~1 min | 120 000 ms |
-| `dotnet stryker` (vollständig) | ~2–3 min | 360 000 ms |
-| `npm install` | 30–120 s | 180 000 ms |
-| `npm run build` | 10–30 s | 60 000 ms |
-| `npm run lint` | 5–15 s | 30 000 ms |
-| `npm run lint:duplicates` | 5–15 s | 30 000 ms |
-| `vitest-run.py` | 5–15 s | 30 000 ms |
-| `playwright-test.py` | 10–30 s | 60 000 ms |
-| `stryker-frontend.py` (eine Datei) | 1–3 min | 180 000 ms |
-| `stryker-frontend.py` (vollständig) | 2–5 min | 360 000 ms |
-| `docker compose up -d` | 5–30 s | 60 000 ms |
-
-Wenn ein Prozess den Timeout überschreitet:
-- Warum könnte das sein? Falsches Kommando? Hängender Prozess?
-- Waren Annahmen über die Umgebung falsch?
-- Abbrechen oder noch warten? Begründung kommunizieren.
-
-**Unerwartet langsame Befehle** → Zeile in `docs/process/slow-commands.md` aktualisieren (keine neuen Zeilen anlegen – bestehende Einträge updaten).
 
 ---
 
@@ -163,7 +136,9 @@ gesamten Prozess-Code – Stunden, also eine Sichtung für die Retro, kein Gate.
 
 Mit `--ratchet` hält es den Score je Modul in `prozesscode/mutation-baseline.json` fest und
 meldet einen Rückschritt als `✗`; Gleichstand geht durch, eine Verbesserung zieht die
-Baseline nach. Auch das ist **kein Gate**: Ein Modul mittlerer Größe braucht gemessen 84 s,
+Baseline nach. Kommt mutmut in einem Modul nicht durch alle Mutanten, wird es nicht verglichen,
+und das Verdikt lautet `⚠ Sperrklinke ohne Aussage` (Exit 1) – kein Beleg für die Tests.
+Auch das ist **kein Gate**: Ein Modul mittlerer Größe braucht gemessen 84 s,
 die großen deutlich mehr – ein Zwang in dieser Größenordnung erzeugt den Druck, unter dem er
 umgangen wird. `--frisch` wirft `mutants/` weg; nötig nach geänderten **Tests**, weil mutmut
 die Test-zu-Funktion-Zuordnung nur ergänzt und nie bereinigt.
@@ -211,9 +186,6 @@ dotnet build
 # Run (Backend API – Dev-Server)
 dotnet run --project Server
 # → http://localhost:5059 (Port via Server/Properties/launchSettings.json; HTTP-only; OpenAPI JSON unter /openapi/v1.json)
-
-# Seed-Daten laden (10 Rezepte + 45 Zutaten)
-dotnet run --project Server -- --seed-data
 ```
 
 ---
@@ -327,12 +299,7 @@ dotnet ef database drop --force --project Infrastructure --startup-project Serve
 dotnet ef migrations remove --project Infrastructure --startup-project Server
 dotnet ef migrations add InitialCreate --project Infrastructure --startup-project Server
 dotnet ef database update --project Infrastructure --startup-project Server
-
-# Danach Seed-Daten laden:
-dotnet run --project Server -- --seed-data
 ```
-
-**Seed-Daten:** `Server/Data/SeedDataExtensions.cs` – implementiert als C# Extension Method `app.SeedDatabase()`.
 
 <a id="DEV-migrations"></a>
 ### Ab Production-Release (V1/V2): Normale Migrations
@@ -391,25 +358,24 @@ python3 -m prozesscode.dotnet-stryker --verbose
 > Mutanten), nicht nur den Score – der Übergabe-Hash bindet den Report-*Inhalt*, nicht dessen
 > Umfang, ein zu eng gelaufener Report muss also am Umfang auffallen.
 
-**Ziel:** 100% Mutation Score. Ausnahmen (äquivalente Mutanten) dokumentieren in `docs/history/adr.md`.
+**Ziel:** 100% Mutation Score. Umgang mit Survivors und Suppressionen: [Welcher Survivor bekommt welche Reaktion?](tdd-process.md#TDD-survivor-entscheidung).
 
-**Äquivalente Mutanten supprimieren** – Syntax und Kategorienamen: siehe `docs/guidelines/csharp-stryker.md`. Kurzform:
-```csharp
-// Stryker disable once String : <Begründung>   // Doppelpunkt vor Beschreibung ist Pflicht
-```
+**Äquivalente Mutanten supprimieren** – Syntax, Kategorienamen und Pflichtangabe (ADR oder Einzelfall-Freigabe): [Stryker-Inline-Suppressions](../guidelines/csharp-stryker.md#STK-suppressions).
 
 > **⚠️ Scope von `disable once`:** Der Kommentar deaktiviert **alle Mutations des angegebenen Typs im nächsten syntaktischen Statement** – nicht nur die nächste Zeile.
-> Bei Lambda-Aufrufen wie `group.MapPost("/", async (...) => { ... })` ist das gesamte `MapPost(...)`-Statement das Ziel, nicht nur `"/"`.
+> Bei Lambda-Aufrufen wie `group.MapPost("", async (...) => { ... })` ist das gesamte `MapPost(...)`-Statement das Ziel, nicht nur das erste Argument.
 > Das bedeutet: ein `// Stryker disable once String` vor `MapPost(` deaktiviert auch alle String-Mutations im Lambda-Body (Fehlermeldungen, Location-URLs etc.).
 >
 > **Korrekte Platzierung:** Kommentar auf einer eigenen Zeile **direkt vor dem Ziel-String-Literal** innerhalb der Argumentliste, und kein weiterer Disable-Kommentar auf äußerer Statement-Ebene:
 > ```csharp
-> group.MapPost(
->     // Stryker disable once String : Route patterns "/" and "" are treated equivalently
->     "/",                         // ← nur diese Mutation wird deaktiviert
+> SomeCall(
+>     // Stryker disable once String : <Begründung> (<erlaubende ADR>)
+>     "<literal>",                 // ← nur diese Mutation wird deaktiviert
 >     async (dto, db) => { ... }  // ← String-Mutations hier bleiben aktiv
 > );
 > ```
+> (Die Route des Gruppen-Stamms braucht keine Suppression: sie wird als `""` geschrieben, ADR-S136-1.)
+>
 > Wenn der Lambda-Body keine eigenen String-Literals enthält (z.B. `MapGet`), ist die Platzierung vor dem gesamten Aufruf unproblematisch.
 
 **Frontend (Stryker-JS):**

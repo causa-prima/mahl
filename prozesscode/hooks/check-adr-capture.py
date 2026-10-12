@@ -12,7 +12,7 @@ Union **aufgeschoben**") waren beide Hybride ohne terminalen Rest und mussten in
 `tech-debt.md` umgehängt werden – ADR-S083-2 hatte sich bis dahin über zwei Addenda
 weiterentwickelt und war aus dem TD-Header heraus sogar als Vorbild zitiert worden.
 
-Die Regel ist kanonisch in `CLAUDE.md`, Sektion „Ablage: in welchen Tracker gehört dieser Eintrag?"
+Die Regel ist kanonisch in `AGENTS.md#CLA-ablage` („Ablage: in welchen Tracker gehört dieser Eintrag?")
 (Hybrid-Regel) und in der Aufnahmebedingung im Header von `docs/history/adr.md`.
 
 Scope:
@@ -49,7 +49,7 @@ _ADR_OK = "adr-ok"
 
 # Aufschub-Vokabular: explizite Zeitaussagen „nicht jetzt, aber später".
 # Jeder Eintrag ist eine Wendung, die im Bestand tatsächlich einen Hybrid markiert hat
-# oder die Hybrid-Regel in CLAUDE.md wörtlich nennt.
+# oder die Hybrid-Regel in AGENTS.md wörtlich nennt.
 #
 # `re.IGNORECASE`, weil deutsche Sätze satzinitial großschreiben: „Zunächst wird X verschoben."
 # hätte die rein kleingeschriebenen Muster sonst passiert – genau die Formulierung, in der ein
@@ -59,7 +59,7 @@ _ADR_OK = "adr-ok"
 #   - `YAGNI`, `minimal` – begründen häufig eine **dauerhafte** Entscheidung („wir bauen X nicht").
 #   - `zunächst` – trägt keine Zeitaussage über die Zukunft, sondern erzählt oft Vorgeschichte
 #     („X erzwang zunächst Y, dann wurde es entfernt", `adr.md`). Genau die Bauform der
-#     „Verworfen:"-Abschnitte, die jede ADR hier trägt. Der Katalog in `CLAUDE.md` nennt es
+#     „Verworfen:"-Abschnitte, die jede ADR hier trägt. Der Katalog in `AGENTS.md` nennt es
 #     ebenfalls nicht; es war eine Ausweitung ohne Deckung.
 _DEFERRAL_PATTERNS = (
     r"aufgeschoben|aufzuschieben|aufschieben|Aufschub",
@@ -187,7 +187,7 @@ def check(data: dict) -> str | None:
         "  Ist die Entscheidung teils terminal, teils aufgeschoben, wird der Aufschub-Teil ein "
         "eigener TD-Eintrag; die ADR behält nur den terminalen Rest. Bleibt kein terminaler "
         "Rest, war es nie eine ADR.\n"
-        "  Kanonisch: `CLAUDE.md`, Sektion „Ablage: in welchen Tracker gehört dieser Eintrag?“. Präzedenz: "
+        "  Kanonisch: `AGENTS.md#CLA-ablage` („Ablage: in welchen Tracker gehört dieser Eintrag?“). Präzedenz: "
         "ADR-S083-1 und ADR-S083-2 waren genau solche Hybride und wurden in S119 nach "
         "`tech-debt.md` umgehängt.\n"
         "  Bewusster Einzelfall (z.B. eine ADR, die den Aufschub eines anderen Artefakts nur "

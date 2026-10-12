@@ -22,12 +22,11 @@ internal static class IngredientsEndpoints
     internal static void MapIngredientsEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/ingredients");
-        // Stryker disable once Statement,String : Tag name has no routing or behavioral impact
+        // Stryker disable once Statement,String : Tag name has no routing or behavioral impact (ADR-S136-1)
         group.WithTags("Ingredients");
 
         group.MapGet(
-            // Stryker disable once String : Route patterns "/" and "" are treated equivalently by ASP.NET Core routing
-            "/",
+            "",
             // ADR-S000-6: soft-deleted Zeilen werden ausgeblendet.
             // ADR-S084-1: deterministische Sortierung (OrderBy(Name)) ist Voraussetzung für einen
             // stabilen Collection-Content-Hash-ETag (die Middleware hasht den serialisierten Body).
@@ -40,8 +39,7 @@ internal static class IngredientsEndpoints
                     .ToListAsync()));
 
         group.MapPost(
-            // Stryker disable once String : Route patterns "/" and "" are treated equivalently by ASP.NET Core routing
-            "/",
+            "",
             // Handler-Logik ausgelagert (IngredientMappings.CreateIngredient) statt inline lambda – hält
             // die Cognitive Complexity von MapIngredientsEndpoints niedrig und diese Methode eine
             // Routentabelle (docs/guidelines/coding-guideline-general.md); analog RestoreIngredient.
@@ -332,7 +330,7 @@ file static class IngredientMappings
         // interleaving-abhängig und damit flaky. Begründete Suppression statt Test, analog ADR-S041-9
         // (Defensive Guards ohne Test, mit begründeter Unterdrückung) – dieselbe Kategorie: strukturell
         // erreichbarer, aber von außen nicht kontrollierbarer Zweig.
-        // Stryker disable once Block,Statement : DbUpdateConcurrencyException-Zweig nicht deterministisch über HTTP auslösbar (kein If-Match am Restore, Race liegt innerhalb eines einzelnen Requests)
+        // Stryker disable once Block,Statement : DbUpdateConcurrencyException-Zweig nicht deterministisch über HTTP auslösbar (kein If-Match am Restore, Race liegt innerhalb eines einzelnen Requests; ADR-S041-9 Addendum S132, ADR-S111-1)
         catch (DbUpdateConcurrencyException)
         {
             await db.Entry(row).ReloadAsync();

@@ -157,22 +157,25 @@ Ein geteilter Domänentyp wie `Unit` ([Rolle ≠ Typ](#CGC-regel-rolle-typ)) bau
 
 **Defensive Guards und Stryker-Suppressionen:**
 
-Parameterless-Ctor-Guards und `default(T)`-Guards sind in der Hexagonal Architecture nicht testbar: Domain-Typen sind `internal`, kein `InternalsVisibleTo` – Testcode kann `new T()` und `default(T)` nicht aufrufen. Stryker markiert sie daher immer als Survivors. Pflicht-Unterdrückung direkt vor der betroffenen Zeile:
+Parameterless-Ctor-Guards und `default(T)`-Guards sind in der Hexagonal Architecture nicht testbar: Domain-Typen sind `internal`, kein `InternalsVisibleTo` – Testcode kann `new T()` und `default(T)` nicht aufrufen. Stryker markiert sie daher immer als Survivors, und das 100-%-Branch-Gate zählt sie als ungedeckt. Pflicht direkt am Member: Stryker-Unterdrückung **und** Coverage-Ausschluss, beide mit Verweis auf die erlaubende ADR-S041-9:
 
 ```csharp
-// Stryker disable once Statement,String : parameterless ctor unreachable via normal construction
+// Stryker disable once Statement,String : parameterless ctor unreachable via normal construction (ADR-S041-9)
+[ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
 public Ingredient() => throw new InvalidOperationException("Uninitialized");
 
-// Stryker disable once Equality,String,Conditional : default(T) guard unreachable via normal construction
+// Stryker disable once Equality,String,Conditional : default(T) guard unreachable via normal construction (ADR-S041-9)
+[ExcludeFromCoverageGate("default(T) guard unreachable via normal construction (ADR-S041-9)")]
 public Guid Id => _id == default ? throw new InvalidOperationException("Uninitialized") : _id;
 ```
 
-Jede Suppression zusätzlich in `docs/history/adr.md` begründen (einmalig pro Typ-Kategorie genügt).
+Kategorien je Guard-Form: ADR-S041-9. Keine eigene ADR je Typ – welche Survivor-Klasse eine
+Suppression bekommt, regelt [Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung).
 
 <a id="CGC-pure-functions"></a>
 ## Reine Funktionen (Pure Functions) & Extension Methods
 
-- Geschäftslogik, die den Zustand eines Objekts "verändert", wird oft als statische Klasse mit Extension Methods implementiert, die den alten Zustand aufnimmt und ein OneOf<NeuerZustand, Error<string>> zurückgibt.
+- Geschäftslogik, die den Zustand eines Objekts "verändert", wird oft als statische Klasse mit Extension Methods implementiert, die den alten Zustand aufnimmt und ein `OneOf<NeuerZustand, <Konzept>Error>` zurückgibt – ein benannter Fehlerfall, kein Meldungstext ([Regeln in den Domänentyp, Meldungen an die Grenze](#CGC-regel-meldungen-an-die-grenze)).
 
 <a id="CGC-code-beispiel"></a>
 ## Code-Beispiel als Referenz-Stil:
@@ -275,7 +278,7 @@ Domain-Typ    DbType    DTO
 
 - `readonly record struct` – Compiler-generierte Equality, parameterlosen Konstruktor public lassen und mit `throw new InvalidOperationException("Uninitialized")` absichern
 - Ausnahme: `readonly struct` (statt `readonly record struct`) wenn ein **privater** parameterloser Konstruktor benötigt wird – z.B. `NonEmptyList<T>`. `record struct` erzwingt einen `public` parameterlosen Ctor (nur Runtime-Guard möglich). `readonly struct` erlaubt `private T() {}` → `new NonEmptyList<T>()` wird **Compile-Fehler**. (Hinweis: `record struct` unterstützt Generics problemlos – das ist nicht der Grund.)
-- `Create(...)` → `OneOf<DomainType, Error<string>>` für User-Input und für Validierung beim Lesen aus der DB
+- `Create(...)` → `OneOf<DomainType, <Konzept>Error>`, wenn der Typ eine Regel prüft (Fehlerfall statt Meldungstext, [Regeln in den Domänentyp, Meldungen an die Grenze](#CGC-regel-meldungen-an-die-grenze)); nimmt er nur bereits validierte Domänentypen entgegen, gibt er den Typ direkt zurück. `Error<string>` nur für die Rekonstruktion beim Lesen aus der DB (`ToDomain()` im Mapping-Layer)
 - Keine `ToDto()`/`ToDbType()`-Methoden am Domain-Typ selbst
 
 <a id="CGC-ort"></a>

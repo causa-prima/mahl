@@ -5,6 +5,7 @@
 		<WarningsAsErrors>Nullable</WarningsAsErrors>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<AnalysisMode>All</AnalysisMode>
+		<!-- <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences> -->
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -17,4 +18,10 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 	</ItemGroup>
+
+	<!-- <ItemDefinitionGroup>
+		<PackageReference>
+			<PrivateAssets>compile</PrivateAssets>
+		</PackageReference>
+	</ItemDefinitionGroup> -->
 </Project>
