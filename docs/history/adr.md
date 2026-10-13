@@ -1303,10 +1303,9 @@ Code ohne treibendes Szenario. Route `"/"` mit Suppression – unnötig, seit `"
 **Status:** Accepted
 **Tags:** scope:cross-cutting, testing:stryker, testing:integration-test
 
-**Entscheidung:** `coverage-analysis: "off"` in `stryker.conf.json`.
+**Entscheidung:** `coverage-analysis: "off"` in `stryker-config.json`.
 
-**Begründung:** `coverage-analysis` instrumentiert den Code um festzustellen welche Tests welche Mutanten abdecken. Für Tests mit `WebApplicationFactory` funktioniert das nicht – die Instrumentierung überlebt den Out-of-Process-Start nicht.
-
+**Begründung (gemessen mit Stryker.NET 5.0.0, MTP-Runner):** `perTest` funktioniert, lohnt aber nicht. Gesamtlauf Backend (86 Mutanten, 56 Tests), je drei Läufe abwechselnd: `off` 116–121 s, `perTest` 181–188 s. Die Abdeckungserfassung kostet 64–70 s, die Mutantenphase bleibt in beiden Modi bei 96–106 s – obwohl die meisten Mutanten laut Report nur von 1–13 Tests erreicht werden. Zudem meldete einer der drei `perTest`-Läufe 4 Timeouts statt Kills (Score unverändert, unter `off` nie beobachtet). Ein Lauf mit `verbosity: trace` belegt, dass `perTest` unter MTP wirklich filtert: je Mutant liefen genau die geplanten Tests, zusammen 1499 statt 86 × 56 = 4816. Die Laufzeit hängt trotzdem an festen Kosten je Mutant: Mutanten mit 1–5 Tests brauchten im Schnitt 9,1 s, mit 31–54 Tests 12,9 s. Vermutete Quelle (nicht gemessen): Jeder Mutantenlauf ist ein neuer Testlauf und startet damit die Collection-Fixture neu – Postgres-Testcontainer samt `MigrateAsync`. Neu zu messen, wenn die Testsuite deutlich wächst oder die Fixture-Kosten sinken.
 ---
 
 ### ADR-S000-11: TestWebApplicationFactory: InMemoryDatabaseRoot für DB-Sichtbarkeit über Context-Grenzen
@@ -1426,9 +1425,33 @@ Code ohne treibendes Szenario. Route `"/"` mit Suppression – unnötig, seit `"
 **Status:** Accepted
 **Tags:** scope:cross-cutting, tooling:dependencies
 
-**Entscheidung:** Die Allowlist (`DEPENDENCIES.md`) enthält nur Package-Namen, keine Versionen. Versionen gehören ausschließlich in `.csproj`/`package.json`. Die Allowlist ist ein Zugangskontroll-Mechanismus, kein Versionsmanagement-Tool – Pinning erzeugt eine dritte Quelle die zwangsläufig divergiert und den Dependency-Hook bei legitimen Updates blockiert.
+**Entscheidung:** Die Allowlist (`DEPENDENCIES.md`) enthält nur Package-Namen, keine Versionen. Versionen gehören ausschließlich in `Directory.Packages.props` (NuGet, siehe ADR-S137-1) bzw. `package.json`. Die Allowlist ist ein Zugangskontroll-Mechanismus, kein Versionsmanagement-Tool – Pinning erzeugt eine dritte Quelle die zwangsläufig divergiert und den Dependency-Hook bei legitimen Updates blockiert.
 
 **Verworfen:** Versionen in Allowlist – Divergenzrisiko, unklare Semantik, Wartungsaufwand ohne Sicherheitsgewinn (CVEs besser via `dotnet list package --vulnerable` / `npm audit`).
+
+---
+
+### ADR-S137-1: Backend-Abhängigkeiten explizit, Paketversionen zentral
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, tooling:build, tooling:dependencies
+
+**Entscheidung:** Ein Backend-Projekt kompiliert nur gegen das, was es selbst referenziert. Vier Bausteine, alle in den `Directory.*`-Dateien im Repo-Root:
+- **Projekt-Referenzen:** `DisableTransitiveProjectReferences=true` – referenziert Server.Tests Server, sieht es Infrastructure nur, wenn es Infrastructure selbst referenziert.
+- **Pakete anderer Projekte:** `PrivateAssets=compile;contentfiles;analyzers;build` für alle `PackageReference`. Laufzeit-DLLs fließen weiter, der Compiler sieht sie nicht. Der Wert ist vollständig ausgeschrieben, weil er den NuGet-Standard `contentfiles;analyzers;build` ersetzt statt ergänzt.
+- **Paket-zu-Paket:** Target `CompileOnlyAgainstDirectPackages` entzieht dem Compiler jedes Paket, das nicht direkt referenziert ist (Kennung `NuGetSourceType=Package` am `ReferencePath`, Framework-Referenzen bleiben). Ausnahmen trägt die `.csproj` als `IndirectCompileReference` mit Pflichtfeld `Reason` – für Fälle, in denen der Compiler B verlangt, obwohl der eigene Code nur A benutzt: A erbt öffentlich von Typen aus B (CS0012), oder A ist ein Sammelpaket (`xunit.v3.mtp-v2`, dessen beim Build generierter Code gegen die Bausteine kompiliert).
+- **Versionen:** Central Package Management (`Directory.Packages.props`). EF Core, Relational und Design teilen sich die Property `EntityFrameworkCoreVersion`. Die Analyzer (SonarAnalyzer, Meziantou) sind `GlobalPackageReference`.
+
+Zwei Befunde, die die Gestalt erklären:
+- **Analyzer fließen über Projekt-Referenzen trotz `PrivateAssets=analyzers` weiter** (SDK 10.0.301): `project.assets.json` führt keine Analyzer-Assets, das SDK liest sie aus dem Paketordner. Der OpenAPI-Source-Generator aus `Microsoft.AspNetCore.OpenApi` lief so in Server.Tests und erzeugte Code gegen `Microsoft.OpenApi`, das dort nicht mehr sichtbar ist. Target `RemoveOpenApiGeneratorOutsideWebProjects` entfernt ihn aus allen Nicht-Web-Projekten.
+- **Die Grenze „direkt genutzt" vs. „nur über die API von A" kennt der Compiler nicht.** Erbt ein Typ aus A öffentlich von B, verlangt er B (CS0012). Deshalb Ausnahmeliste statt einer reinen Regel.
+
+**Begründung:** Implizite Abhängigkeiten brechen fern vom Ort der Änderung: Entfernt ein Projekt oder Paket eine Abhängigkeit, scheitert ein anderes, das sie unbemerkt mitbenutzt hat. Sie verbargen zudem eine Versionsschere (EF Core 10.0.4 über Npgsql gegen 10.0.5 über Design: grüner Build, Laufzeitfehler `Could not load file or assembly 'Microsoft.EntityFrameworkCore, Version=10.0.5.0'`). Mit expliziten Referenzen steht dieselbe Version in mehreren Projekten – ohne zentrale Versionen wäre das die nächste Divergenzquelle.
+
+**Verworfen:**
+- Nur die beiden Schalter ohne Paket-zu-Paket-Prüfung – ließe die häufigste Form (Paket A bringt B, Code nutzt B) unentdeckt.
+- `Microsoft.OpenApi` zusätzlich in Server.Tests referenzieren, statt den Generator zu entfernen – Schein-Abhängigkeit, nur damit ungenutzter generierter Code kompiliert.
+- Alle über A hereinkommenden Pakete direkt referenzieren statt Ausnahmen (auch Docker.DotNet, xUnit-Bausteine) – macht API-Details fremder Pakete zu eigenen Abhängigkeiten.
 
 ---
 

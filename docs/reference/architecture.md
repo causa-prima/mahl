@@ -23,7 +23,7 @@ kritische-regeln:
 | [Projekt-Struktur](#ARC-projekt-struktur) | Verzeichnis-Layout: mahl.Infrastructure (public) / mahl.Server (internal) – strikt getrennt | Beim Anlegen neuer Dateien oder Projekte |
 | [SKELETON-Phase: Scope-Constraints](#ARC-skeleton-constraints) | Was in der SKELETON-Phase bewusst nicht gebaut wird | Bevor Umfang über den Walking Skeleton hinaus wächst |
 | [TDD-Prozess](#ARC-tdd) | Verweis auf `docs/process/tdd-process.md` (Red→Green→Refactor, Full State Assertion, Mutation Testing) | Beim Schreiben von Produktionscode oder Tests – TDD gilt für jeden Code-Zyklus |
-| [Logging](#ARC-logging) | Serilog-Konfiguration, Format, kein Logging sensitiver Daten | Beim Konfigurieren oder Erweitern von Logging |
+| [Logging](#ARC-logging) | Ist-Stand (Framework-Standard, stdout), Verweis auf die Anforderungen, kein Logging sensitiver Daten | Beim Konfigurieren oder Erweitern von Logging |
 | [API Errors](#ARC-api-errors) / [Auth](#ARC-auth) / [Git](#ARC-git-workflow) / [Bilder](#ARC-bilder) | Querschnittsthemen: Problem Details, Auth-Roadmap, Branch-Strategie, Dateispeicherung | Bei spezifischem Bedarf |
 
 > **Wann lesen:** Beim Implementieren von Backend-/Frontend-Code, beim Schreiben von Tests, bei Architektur-Entscheidungen.
@@ -108,7 +108,7 @@ Kein `InternalsVisibleTo` – das erzwingt, dass Tests ausschließlich über die
 - **.NET 10.0 (LTS)** – ASP.NET Core Web API
 - **Minimal APIs** – Endpoint-Pattern statt Controllers (`Server/Endpoints/`)
 - **Entity Framework Core 10** mit **Npgsql** (PostgreSQL-Provider)
-- **Serilog** – strukturiertes Logging
+- **Logging** – Framework-Standard von ASP.NET Core, siehe [Logging](#ARC-logging)
 - **OpenAPI** – API-Dokumentation via `Microsoft.AspNetCore.OpenApi` (built-in seit .NET 9, verfügbar unter `/openapi/v1.json` in Development; kein Swashbuckle erforderlich)
 
 ### Frontend
@@ -239,13 +239,11 @@ TDD gilt für **jeden Produktionscode** (Features, Bugfixes, Refactorings) – n
 <a id="ARC-logging"></a>
 ## Logging
 
-```csharp
-// Serilog – konfiguriert in Program.cs
-// Format: [HH:mm:ss LEVEL] [TraceId: {TraceId}] Message
-// Development: Console
-// Production: Console + File (daily rolling)
-// Request-Logging: UseSerilogRequestLogging() (nur non-development)
-```
+Das Backend konfiguriert kein eigenes Logging. Es gilt der Standard aus `WebApplication.CreateBuilder`:
+Console-Provider, Ausgabe auf stdout. Was geloggt werden muss und wohin, regelt
+[Observability](../process/nfr.md#NFR-observability) – insbesondere: Ausgabeziel ist stdout, Persistenz
+und Rotation verantwortet die Laufzeitumgebung, nicht die Anwendung. Serilog ist kein MVP-Scope
+(ADR-S054-7).
 
 Keine sensitiven Daten loggen (Passwörter, etc.).
 

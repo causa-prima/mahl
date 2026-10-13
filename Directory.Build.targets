@@ -1,0 +1,36 @@
+<Project>
+	<!-- Der OpenAPI-Source-Generator (Paket Microsoft.AspNetCore.OpenApi) gehört nur in Web-Projekte.
+	     Über die Projekt-Referenz auf Server erreicht er auch Server.Tests: Das SDK gibt Analyzer
+	     transitiver Pakete weiter, obwohl PrivateAssets "analyzers" enthält (project.assets.json kennt
+	     keine Analyzer-Assets, das SDK liest sie aus dem Paketordner). Sein erzeugter Code braucht die
+	     Typen aus Microsoft.OpenApi, die dort wegen PrivateAssets=compile nicht sichtbar sind. -->
+	<Target Name="RemoveOpenApiGeneratorOutsideWebProjects"
+	        AfterTargets="ResolveLockFileAnalyzers"
+	        Condition="'$(UsingMicrosoftNETSdkWeb)' != 'true'">
+		<ItemGroup>
+			<Analyzer Remove="@(Analyzer)" Condition="'%(Analyzer.NuGetPackageId)' == 'Microsoft.AspNetCore.OpenApi'" />
+		</ItemGroup>
+	</Target>
+
+	<!-- Ein Projekt kompiliert nur gegen Pakete, die es selbst referenziert. Paket-zu-Paket-Abhängigkeiten
+	     (Paket A bringt Paket B mit) bleiben zur Laufzeit erhalten, sind für den Compiler aber unsichtbar:
+	     Wer B im eigenen Code benutzt, referenziert B direkt. Folge eines Verstoßes sind gewöhnliche
+	     Compilerfehler (CS0246, CS1061, CS0012) – die Liste der entzogenen Pakete zeigt `dotnet build -v:n`.
+
+	     Ausnahmen trägt das Projekt in seiner .csproj ein, jeweils mit Begründung:
+	         <IndirectCompileReference Include="Testcontainers" Reason="…" />
+	     Gedacht für Fälle, in denen der Compiler B verlangt, obwohl der eigene Code nur A benutzt:
+	     A erbt öffentlich von Typen aus B (CS0012), oder A ist ein Sammelpaket aus Bausteinen. -->
+	<Target Name="CompileOnlyAgainstDirectPackages" BeforeTargets="FindReferenceAssembliesForReferences">
+		<Error Condition="'%(IndirectCompileReference.Reason)' == '' and '@(IndirectCompileReference)' != ''"
+		       Text="IndirectCompileReference '%(IndirectCompileReference.Identity)' in $(MSBuildProjectFile) braucht eine Begründung (Reason)." />
+		<ItemGroup>
+			<_DeclaredPackage Include="@(PackageReference);@(IndirectCompileReference)" NuGetPackageId="%(Identity)" />
+			<_UndeclaredPackageReference Include="@(ReferencePath)" Condition="'%(ReferencePath.NuGetSourceType)' == 'Package'" />
+			<_UndeclaredPackageReference Remove="@(_DeclaredPackage)" MatchOnMetadata="NuGetPackageId" />
+			<ReferencePath Remove="@(_UndeclaredPackageReference)" />
+		</ItemGroup>
+		<Message Importance="normal" Condition="'@(_UndeclaredPackageReference)' != ''"
+		         Text="$(MSBuildProjectName): nicht direkt referenziert, für den Compiler entzogen: %(_UndeclaredPackageReference.NuGetPackageId)" />
+	</Target>
+</Project>

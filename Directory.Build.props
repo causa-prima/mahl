@@ -5,23 +5,18 @@
 		<WarningsAsErrors>Nullable</WarningsAsErrors>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<AnalysisMode>All</AnalysisMode>
-		<!-- <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences> -->
+		<!-- Abhängigkeiten explizit: Ein Projekt sieht nur, was es selbst referenziert. Dieser Schalter
+		     betrifft nur Projekt-Referenzen; Pakete aus anderen Projekten blendet PrivateAssets=compile unten
+		     aus, Paket-zu-Paket-Abhängigkeiten der Target CompileOnlyAgainstDirectPackages in
+		     Directory.Build.targets. -->
+		<DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
 	</PropertyGroup>
 
-	<ItemGroup>
-		<PackageReference Include="SonarAnalyzer.CSharp" Version="10.22.0.136894">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="Meziantou.Analyzer" Version="3.0.43">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-	</ItemGroup>
-
-	<!-- <ItemDefinitionGroup>
+	<!-- PrivateAssets ersetzt den NuGet-Standard contentfiles;analyzers;build, statt ihn zu ergänzen –
+	     deshalb steht er hier vollständig, nur um compile erweitert. -->
+	<ItemDefinitionGroup>
 		<PackageReference>
-			<PrivateAssets>compile</PrivateAssets>
+			<PrivateAssets>compile;contentfiles;analyzers;build</PrivateAssets>
 		</PackageReference>
-	</ItemDefinitionGroup> -->
+	</ItemDefinitionGroup>
 </Project>

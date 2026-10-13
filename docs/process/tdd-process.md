@@ -350,7 +350,7 @@ Diese Regel gilt für POST (anlegen), PUT/PATCH (ändern), DELETE (löschen/soft
 - **Ziel:** 100% Mutation Score
 - **Ende jeder Phase:** Vollständiger Lauf (PFLICHT)
 - **Während Entwicklung:** Nur geänderte Files: `python3 -m prozesscode.dotnet-stryker --mutate Endpoints/IngredientsEndpoints.cs`
-- **Konfiguration:** `stryker-config.json` im Root (mit `coverage-analysis: "off"` für WebApplicationFactory)
+- **Konfiguration:** `stryker-config.json` im Root (mit `coverage-analysis: "off"` – `perTest` ist hier langsamer, Messung in ADR-S000-10)
 - **Ausnahmen** (äquivalente Mutanten, müssen dokumentiert werden): Generated Code (EF Migrations), Framework-Boilerplate (Program.cs)
 
 **100 % Mutation Score pinnt keine Reihenfolge.** Bei „erstes-von-N"-Auswahl- oder Prioritätslogik

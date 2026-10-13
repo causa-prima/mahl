@@ -28,7 +28,9 @@ Der Agent bereitet dafür eine Anfrage mit folgenden fünf Punkten vor:
 4. **Betrachtete Alternativen** – Welche anderen Pakete oder Eigenimplementierungen wurden evaluiert und warum scheiden sie aus
 5. **Paket-Status** – Wer maintained es, wie aktiv (Commit-Frequenz, offene Issues/PRs), wie viele Sicherheitslücken gab es historisch und in letzter Zeit (CVE-Historie)
 
-Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/history/adr.md` + Installation.
+Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/history/adr.md` + Installation: die Version kommt in `Directory.Packages.props` (PackageVersion), die .csproj bekommt nur `<PackageReference Include="…" />`.
+
+`IndirectCompileReference` fügt kein Paket hinzu und braucht deshalb keine Freigabe. Es macht ein bereits vorhandenes, mitgebrachtes Paket für den Compiler sichtbar.
 
 ## Allowlist
 
@@ -69,16 +71,15 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 
 | Paket | Projekt |
 |-------|---------|
-| `Npgsql.EntityFrameworkCore.PostgreSQL` | Infrastructure |
+| `Npgsql.EntityFrameworkCore.PostgreSQL` | Infrastructure, Server, Server.Tests |
 | `Microsoft.EntityFrameworkCore.Design` | Server (Design-Time) |
 | `Microsoft.AspNetCore.OpenApi` | Server |
 | `OneOf` | Server |
-| `Serilog.AspNetCore` | Server |
-| `Serilog.Sinks.Console` | Server |
-| `Serilog.Sinks.File` | Server |
 | `Microsoft.AspNetCore.Mvc.Testing` | Server.Tests |
-| `Microsoft.EntityFrameworkCore.Relational` | Infrastructure (Versions-Pin, Grund als Kommentar in der .csproj) |
+| `Microsoft.EntityFrameworkCore` | Infrastructure, Server, Server.Tests |
+| `Microsoft.EntityFrameworkCore.Relational` | Infrastructure, Server, Server.Tests |
 | `Microsoft.NET.Test.Sdk` | Server.Tests |
+| `Npgsql` | Server |
 | `xunit.v3.mtp-v2` | Server.Tests |
 | `xunit.runner.visualstudio` | Server.Tests |
 | `AwesomeAssertions` | Server.Tests |

@@ -134,3 +134,11 @@ Eintrag-Format:
 **Fällig:** Szenario:„Zutat nicht gefunden oder Einheit falsch", Phase:MVP – Lauf 11 von US-602 ist der letzte Lauf zum Zerleger der Zutatenzeilen (Übergangsregel, abgelöst durch US-607); erst dann gibt es echte Zahlen zum Testaufwand.
 **Hintergrund:** Aus der Auswertung des neuen Workshop-Schritts „Tiefe je Regel" an US-602. Der User fragte, ob „temporärer Code keine Coverage braucht"; Gegenfrage war, wie sicher die typischsten Fälle dann korrekt umgesetzt werden. Zu erheben in den Läufen 7, 10 und 11 von US-602: Wie viele Tests (Unit, Integration, Mutanten) entstehen für den Zerleger, und wie viele davon entfallen mit US-607? Die Spezifikation selbst wurde bereits verschlankt (SKELETON 63 → 46 Szenarien).
 **Aufschubgrund:** User – im Workshop vereinbart, nach dem Ausprobieren mit echten Zahlen zu entscheiden
+
+---
+
+## OQ-S137-1 — Log-Ziel in Produktion: Wo landen Logs, sodass sie ein Redeploy überstehen?
+**Frage:** Wohin gehen die Backend-Logs in Produktion, damit sich Probleme im Nachhinein nachvollziehen lassen – auch über Neustarts und Redeploys hinweg? Optionen: (a) Docker-Log-Treiber, der außerhalb des Containers persistiert (z.B. journald), (b) Log-Sammler (z.B. Seq, Loki, Elasticsearch) – dann lohnt strukturiertes Logging (Serilog, JSON), (c) Datei durch die Anwendung – widerspräche der Observability-Anforderung in docs/process/nfr.md (stdout, Persistenz durch die Laufzeitumgebung). Hängt an der Hosting-Entscheidung.
+**Fällig:** Phase:V1 – erst mit dem Produktivbetrieb müssen Logs Redeploys überstehen; vorher reicht stdout in der Entwicklung
+**Hintergrund:** S137: Serilog (AspNetCore, Sinks.Console, Sinks.File) war referenziert, aber nie angeschlossen, und wurde vom User entfernt. ADR-S054-7 schließt Serilog aus dem MVP-Scope aus. Die Observability-Anforderung (docs/process/nfr.md, Abschnitt Observability) legt stdout als Ausgabeziel fest und überlässt Persistenz der Laufzeitumgebung. Falle (aus Docker-Wissen, nicht verifiziert): Der Standard-Log-Treiber json-file hält Logs pro Container; sie verschwinden, wenn der Container beim Redeploy neu erzeugt wird – also gerade nach dem Update, das ein Problem verursacht haben könnte. Der User will in V1 nachvollziehen können, was Probleme verursacht hat.
+**Aufschubgrund:** User – der User hat entschieden, die Frage mit V1 zu klären

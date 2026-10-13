@@ -49,5 +49,4 @@ Auswahl. TD-Einträge mit
 
 ## Nächste Prioritäten
 
-- TD-S136-1 · Done: Beide Schalter in Directory.Build.props aktiv, Build und Backend-Tests grün, jede verwendete Bibliothek ist im nutzenden Projekt direkt referenziert
 - **Visuelle Konsistenz-Guideline erweitern** — `Fällig: Phase:MVP` · Quelle: `docs/guidelines/coding-guideline-ux.md` → Visuelle Baseline · Done: Spacing/Hierarchie/Farbe sind dort als System geregelt und im Theme verankert.

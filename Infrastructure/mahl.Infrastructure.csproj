@@ -6,13 +6,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- Versions-Pin, keine überflüssige Referenz: Npgsql bringt EF Core nur in der niedrigsten
-             passenden Version mit (derzeit 10.0.4), Server kompiliert über EntityFrameworkCore.Design
-             aber gegen 10.0.5. Fehlt dieser Pin, baut alles grün, doch die Backend-Tests scheitern zur
-             Laufzeit mit "Could not load file or assembly 'Microsoft.EntityFrameworkCore, Version=10.0.5.0'".
-             Version immer gleich der von Microsoft.EntityFrameworkCore.Design in Server halten. -->
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.5" />
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     </ItemGroup>
 
 </Project>

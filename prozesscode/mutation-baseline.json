@@ -19,6 +19,10 @@
     "beurteilbar": 84,
     "getoetet": 64
   },
+  "prozesscode.hooks.check-dependency-allowlist": {
+    "beurteilbar": 25,
+    "getoetet": 18
+  },
   "prozesscode.hooks.check-feature-plan": {
     "beurteilbar": 41,
     "getoetet": 27

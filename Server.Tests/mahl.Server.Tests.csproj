@@ -14,16 +14,40 @@
 </ItemGroup>
 
 <ItemGroup>
-    <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.5" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
-    <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
-    <PackageReference Include="xunit.v3.mtp-v2" Version="3.2.2" />
-    <PackageReference Include="coverlet.MTP" Version="10.0.1" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
+    <PackageReference Include="coverlet.MTP" />
+    <PackageReference Include="xunit.runner.visualstudio">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+</ItemGroup>
+
+<!-- Pakete, gegen die der Compiler kompilieren muss, obwohl unser Code sie nicht direkt benutzt
+     (Regel: Directory.Build.targets, Target CompileOnlyAgainstDirectPackages). -->
+<ItemGroup>
+    <IndirectCompileReference Include="Testcontainers;Docker.DotNet.Enhanced"
+        Reason="PostgreSqlBuilder/PostgreSqlContainer erben öffentlich von
+                Testcontainers-Typen, deren Signaturen Docker.DotNet-Typen enthalten (CS0012)" />
+    <IndirectCompileReference Include="Microsoft.Bcl.AsyncInterfaces"
+        Reason="xUnits IAsyncLifetime erbt IAsyncDisposable aus diesem Polyfill (CS0012)" />
+    <IndirectCompileReference Include="
+        xunit.v3.core.mtp-v2;
+        xunit.v3.extensibility.core;
+        xunit.v3.runner.common;
+        xunit.v3.runner.inproc.console;
+        Microsoft.Testing.Platform;
+        Microsoft.Testing.Platform.MSBuild;
+        Microsoft.Testing.Extensions.Telemetry"
+        Reason="Bausteine des Sammelpakets xunit.v3.mtp-v2: Fact/Theory liegen dort,
+                und der beim Build generierte Code (Einstiegspunkt, Reporter,
+                Plattform-Erweiterungen) kompiliert gegen sie" />
 </ItemGroup>
 
 </Project>

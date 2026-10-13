@@ -322,3 +322,14 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: keiner
 - Aufschubgrund: Umfang – betrifft alle schreibenden Tracker-Werkzeuge, und erst ist zu entscheiden, welche Edit-Prüfungen für Tracker-Text gelten sollen; mit Tests und Gegenprobe je Werkzeug sprengt das den Session-Abschluss
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S137-1 – Paket- und Werkzeug-Updates werden nirgends regelmäßig vorgelegt
+- Quelle: User + Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: Sonstiges
+- Beobachtung: Kein Mechanismus legt verfügbare Updates der Abhängigkeiten vor – weder für NuGet-Pakete (Directory.Packages.props), npm-Pakete (Client/package.json) noch lokale .NET-Werkzeuge (.config/dotnet-tools.json). Ob eine Abhängigkeit veraltet ist oder eine bekannte Sicherheitslücke hat, fällt nur zufällig auf. Beleg S137: dotnet-stryker steht auf 4.14.2, inzwischen sind 4.15.0, 4.16.0 und 5.0.0 erschienen; 5.0.0 bringt perTest-Coverage für den MTP-Runner, also potenziell deutlich schnellere Mutationsläufe – bemerkt nur, weil der User zufällig den Stryker-Blog gelesen hatte. Anforderung des Users: regelmäßig aktualisieren, auch Major-Versionen, aber bewusst abgewogen statt automatisch; ein bewusst abgelehntes Update darf nicht bei jeder Session erneut vorgelegt werden.
+- Vorprägung: Im Gespräch S137 diskutiert: (1) Prüfung als Schritt im OBS-Drain – vom Agent abgeraten: Drain-Takt hängt am OBS-Backlog, nicht am Update-Bedarf, und Drain ist Prozess-, Updates sind Produkt-Seite; (2) Prüfung beim Session-Start, die TD/OBS anlegt statt in die Agenda zu schreiben. Agent-Vorschlag: Abwägungsstand je Paket (zuletzt bewertete Version, bei Ablehnung mit Grund), Prüfung meldet nur neuere Versionen; Sicherheitslücken (dotnet list package --vulnerable, npm audit) sofort prominent beim Session-Start; normale Updates als Nachrangig-Eintrag der Agenda mit Mindestabstand (z.B. 4 Wochen). Einfachere Variante: fester Schritt 'Abhängigkeiten durchsehen' in der Retro (kaizen) – Takt aber am Jenga-Score.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – der User hat entschieden, die Beobachtung zu erfassen und den Mechanismus gesondert zu bauen
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
