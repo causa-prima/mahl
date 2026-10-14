@@ -345,7 +345,7 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 **Status:** Accepted
 **Tags:** scope:cross-cutting, testing:integration-test, tooling:build
 
-**Entscheidung:** Die `Server.Tests`-Integrationstests laufen gegen ein **echtes Postgres in einem Testcontainer** (`Testcontainers.PostgreSql`) statt gegen den EF-Core-InMemory-Provider. Container-Lebenszyklus: ein geteilter Container pro Test-Lauf (xUnit-Collection-/Class-Fixture), Schema via `MigrateAsync` (dieselben Migrations wie E2E/Prod), Daten-Reset pro Test.
+**Entscheidung:** Die `Server.Tests`-Integrationstests laufen gegen ein **echtes Postgres in einem Testcontainer** (`Testcontainers.PostgreSql`) statt gegen den EF-Core-InMemory-Provider. Eine geteilte Fixture je Test-Lauf (xUnit-Collection-Fixture), Schema via `MigrateAsync` (dieselben Migrations wie E2E/Prod), Daten-Reset pro Test. Lebensdauer von Container und Datenbank: ADR-S137-2.
 
 **Begründung:** Der InMemory-Provider ist keine relationale DB – er erzwingt **weder Unique-Constraints noch funktionale Indizes** (`LOWER(name)`). Integritätsregeln wie die case-insensitive Namens-Eindeutigkeit (ADR-S105-2) sind dort strukturell nicht testbar; ein DB-Constraint wäre unverifiziert. Testcontainers nutzt die **identische Engine wie Prod** → kein Dialekt-Drift, alle Constraints/Indizes/Collations greifen im Test exakt wie in Produktion. Deckt sich mit der offiziellen EF-Core-Testing-Guidance (InMemory nicht für Verhalten, das relationale Semantik braucht).
 
@@ -357,7 +357,7 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 
 **Addendum (S105) – DB-Locale muss umlaut-faltend sein (`en_US.utf8`, nicht `C`):** Ob `LOWER('Ö')='ö'` gilt, hängt am **`LC_CTYPE` der DB**, nicht am Postgres-Dialekt oder Encoding an sich (unter `--locale=C` faltet `LOWER()` nur ASCII, auch bei UTF8-Encoding). Der funktionale `LOWER(name)`-Unique-Index (ADR-S105-2) setzt die Umlaut-Case-Insensitivität (ADR-S051-3) also nur unter einem umlaut-faltenden Locale korrekt durch. Empirisch bestätigt: Der Testcontainer (`postgres:15-alpine`) nutzt Default `en_US.utf8` und faltet Umlaute. `docker-compose.yml` erzwang zunächst `--locale=C` (Test≠Prod-Divergenz) → der Override wurde entfernt, damit initdb denselben Default `en_US.utf8` erbt. Guard: Der case-insensitive Duplikat-Test verwendet bewusst „Öl"/„öl" (nicht ASCII) – auf E2E-Ebene der **einzige** Test, der eine regressierte compose-Locale fängt (Server.Tests nutzt immer den Container-Default). Verworfen: `--locale=en_US.utf8` explizit setzen (Risiko, dass ein künftiges Alpine-Image die Locale nicht generieren kann; der Image-Default ist beweisbar vorhanden).
 
-**Addendum (S105) – Trade-off geteilte Collection (Inter-Klassen-Parallelität):** Ein *einziger* geteilter Container für die ganze Assembly (via `[CollectionDefinition]`) bindet alle Testklassen in **eine** xUnit-Collection → sie laufen **seriell**, nicht klassen-parallel. Bewusst akzeptiert (Container-Start dominiert; ein Container pro Klasse wäre teurer). Die Suite ist gegenüber EF-InMemory rund **4,6× langsamer** (gemessen S105) – spürbar, aber nicht kritisch. Skalierungsrisiko v. a. unter Stryker (Suite pro Mutant) → falls die Suite-Dauer kritisch wird, hier ansetzen (mehrere Collections + Container-Pool).
+**Addendum (S105) – Trade-off geteilte Collection (Inter-Klassen-Parallelität):** Ein *einziger* geteilter Container für die ganze Assembly (via `[CollectionDefinition]`) bindet alle Testklassen in **eine** xUnit-Collection → sie laufen **seriell**, nicht klassen-parallel. Bewusst akzeptiert (Container-Start dominiert; ein Container pro Klasse wäre teurer). Die Suite ist gegenüber EF-InMemory rund **4,6× langsamer** (gemessen S105) – spürbar, aber nicht kritisch. Skalierungsrisiko v. a. unter Stryker (Suite pro Mutant) → falls die Suite-Dauer kritisch wird, hier ansetzen: mehrere Collections, je eine Datenbank aus der Vorlage (ADR-S137-2) statt eines Container-Pools. Die Kosten je Lauf trägt nicht mehr der Container-Start (ADR-S137-2).
 
 ---
 
@@ -1300,12 +1300,46 @@ Code ohne treibendes Szenario. Route `"/"` mit Suppression – unnötig, seit `"
 
 ### ADR-S000-10: Stryker `coverage-analysis: "off"` für Integration-Tests
 
-**Status:** Accepted
+**Status:** Superseded by ADR-S137-2 (ohne Container-Start je Testlauf ist `perTest` schneller)
 **Tags:** scope:cross-cutting, testing:stryker, testing:integration-test
 
 **Entscheidung:** `coverage-analysis: "off"` in `stryker-config.json`.
 
-**Begründung (gemessen mit Stryker.NET 5.0.0, MTP-Runner):** `perTest` funktioniert, lohnt aber nicht. Gesamtlauf Backend (86 Mutanten, 56 Tests), je drei Läufe abwechselnd: `off` 116–121 s, `perTest` 181–188 s. Die Abdeckungserfassung kostet 64–70 s, die Mutantenphase bleibt in beiden Modi bei 96–106 s – obwohl die meisten Mutanten laut Report nur von 1–13 Tests erreicht werden. Zudem meldete einer der drei `perTest`-Läufe 4 Timeouts statt Kills (Score unverändert, unter `off` nie beobachtet). Ein Lauf mit `verbosity: trace` belegt, dass `perTest` unter MTP wirklich filtert: je Mutant liefen genau die geplanten Tests, zusammen 1499 statt 86 × 56 = 4816. Die Laufzeit hängt trotzdem an festen Kosten je Mutant: Mutanten mit 1–5 Tests brauchten im Schnitt 9,1 s, mit 31–54 Tests 12,9 s. Vermutete Quelle (nicht gemessen): Jeder Mutantenlauf ist ein neuer Testlauf und startet damit die Collection-Fixture neu – Postgres-Testcontainer samt `MigrateAsync`. Neu zu messen, wenn die Testsuite deutlich wächst oder die Fixture-Kosten sinken.
+**Begründung (gemessen mit Stryker.NET 5.0.0, MTP-Runner, Container-Start je Testlauf):** `perTest` filtert zwar nachweislich (je Mutant liefen genau die abdeckenden Tests), war aber langsamer: `off` 116–121 s, `perTest` 181–188 s (je drei Läufe). Die Abdeckungserfassung kostete 64–70 s, die Mutantenphase blieb bei rund 100 s, weil jeder Mutantenlauf rund 9 s feste Kosten trug – davon 4,8–5 s Container-Start und 0,5 s Migrationen.
+
+---
+
+### ADR-S137-2: Test-Datenbank: Container überdauert den Lauf, Datenbank je Lauf aus Vorlage; Stryker `perTest`
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:integration-test, testing:stryker
+
+**Entscheidung:** `PostgresContainerFixture` startet den Postgres-Container mit `WithReuse(true)` und gibt ihn nicht frei – er läuft nach dem Testlauf weiter und wird beim nächsten wiederverwendet. Darin:
+- **Vorlage je DDL-Stand:** Datenbank `mahl_tpl_<Kennung>`, einmal per `MigrateAsync` angelegt – unter einem Bau-Namen, erst nach erfolgreicher Migration umbenannt, damit ein Abbruch keine halb migrierte Vorlage hinterlässt. Die Kennung ist ein Hash über die MVIDs der Assemblies, die das DDL bestimmen: Infrastructure (Migrationen), EF Core Relational und der Npgsql-Provider (SQL-Generierung). Eine MVID wechselt mit jedem inhaltlich geänderten Build bzw. Paket-Update (deterministischer Build) – auch wenn eine bestehende Migration nachträglich angepasst wird, was `MigrateAsync` auf einer schon migrierten Datenbank übersähe. Änderungen in Infrastructure ohne Schemabezug erzeugen ebenfalls eine neue Vorlage; das kostet einmal rund 0,5 s.
+- **Datenbank je Testlauf:** `CREATE DATABASE mahl_run_<Guid> TEMPLATE <Vorlage>`, beim Dispose gelöscht. Parallele Testläufe (Stryker: bis zu zehn) teilen sich so nie Daten.
+- **Besitz und Aufräumen:** Jeder Lauf hält für seine ganze Dauer auf einer eigenen Sitzung ein Advisory-Lock auf den Namen seiner Datenbank. Der nächste Lauf löscht eine fremde Lauf-Datenbank nur, wenn er dieses Lock bekommt – also ihr Besitzerprozess nicht mehr lebt (Abbruch, Stryker-Timeout). Ein Lauf am Breakpoint bleibt damit unangetastet, egal wie lange. Vorlagen eines anderen Stands und liegengebliebene Bau-Vorlagen werden gelöscht. Ein zweites Advisory-Lock serialisiert Anlegen und dieses Aufräumen über parallele Läufe. Advisory-Locks gelten je Datenbank, alle Sitzungen nehmen sie deshalb in `postgres`.
+- **Stryker:** `coverage-analysis: "perTest"`.
+
+Innerhalb eines Laufs gilt weiter ADR-S105-1: ein Schema, jeder Test setzt seine Daten zurück.
+
+**Begründung (gemessen, je drei Läufe):** Eine volle Backend-Suite läuft in 3,8–4,4 s statt ~9 s, ein einzelner Datenbank-Test in 1,6–2,9 s statt 6,8–7,7 s – das zählt in jeder Red-Green-Runde. Stryker (86 Mutanten): `off` 51–58 s statt 116–121 s; `perTest` 40–51 s (vier Läufe). Ohne die festen Kosten je Mutant überwiegt der Gewinn von `perTest` (je Mutant nur die abdeckenden Tests) die Abdeckungserfassung (12 s), und er wächst mit der Suite.
+
+Gegenproben:
+- **Kills sind echt:** Je Mutant töten im neuen Aufbau exakt dieselben Tests wie im alten mit eigenem Container je Lauf (alle 131 Mutanten verglichen). Ein Infrastrukturfehler sähe in Stryker wie ein Kill aus; „weiterhin 86/86" allein hätte das nicht ausgeschlossen. Ein absichtlich eingebauter, nicht geprüfter Header erscheint unter voller Parallelität als *Survived*.
+- **Besitz:** Ein Lauf lässt die Datenbank eines parallel laufenden Prozesses und eine gesperrte stehen und löscht eine ungesperrte.
+- **Vorlage:** Eine geänderte Infrastructure-Assembly erzeugt eine neue Vorlage und entfernt die alte; die unveränderte trifft wieder dieselbe Kennung.
+
+**Grenzen:**
+- Die Wiederverwendung ist in Testcontainers als experimentell gekennzeichnet und schaltet dessen automatisches Aufräumen ab: Der Container läuft weiter, bis er von Hand entfernt wird ([Test-Container zurücksetzen](../process/dev-workflow.md#DEV-test-container)). Eine Änderung an Image oder `config/postgres.env` ergibt einen neuen Container; der alte bleibt liegen.
+- Startet beim ersten Lauf ohne laufenden Container mehr als ein Prozess gleichzeitig, ist das Verhalten nicht dokumentiert; Stryker startet den Erstlauf allein.
+- Der Container läuft dauerhaft mit Superuser `postgres`/`postgres`. Sein Port ist deshalb an `127.0.0.1` gebunden statt an alle Schnittstellen (Docker-Standard) – unter WSL mit `networkingMode=mirrored` wäre er sonst im lokalen Netz sichtbar. Testcontainers bietet dafür keine eigene Option; gesetzt wird die Bindung per `WithCreateParameterModifier`, und weil der Wiederverwendungs-Hash diesen Modifier nicht erfasst, trägt das Label `bind=localhost` die Bindung in den Hash.
+
+**Verworfen:**
+- **Container wiederverwenden, aber je Lauf migrieren statt aus Vorlage kopieren** – einfacher (keine Vorlage, keine Kennung), kostet aber je Lauf rund 0,5 s Migration (gemessen), bei einem einzelnen Test grob ein Viertel der Laufzeit.
+- **`WithReuse` ohne eigene Datenbank je Lauf** – parallele Stryker-Läufe teilten eine Datenbank und löschten sich gegenseitig die Testdaten; zudem bliebe ein veraltetes Schema stehen.
+- **Postgres aus `docker-compose.yml` statt Testcontainer** – Tests hingen vom Zustand der Entwicklungsumgebung ab.
+- **Mehrere Collections mit Container-Pool** (Ausblick in ADR-S105-1) – löst Parallelität innerhalb eines Laufs, nicht die Kosten je Lauf. Mit der Vorlage ginge Parallelität innerhalb eines Laufs ohnehin billiger: eine Datenbank je Collection statt eines Containers.
+
 ---
 
 ### ADR-S000-11: TestWebApplicationFactory: InMemoryDatabaseRoot für DB-Sichtbarkeit über Context-Grenzen

@@ -4,9 +4,8 @@ using Xunit;
 
 namespace mahl.Server.Tests.Helpers;
 
-// ADR-S105-1: Schema lebt im geteilten Postgres-Testcontainer (PostgresContainerFixture, einmalig
-// via MigrateAsync provisioniert) – hier wird pro Test nur noch der Datenbestand zurückgesetzt
-// (TruncateAllTablesAsync), nicht das Schema selbst neu angelegt/gelöscht.
+// ADR-S105-1: Das Schema stellt PostgresContainerFixture je Testlauf bereit (ADR-S137-2) – hier wird pro
+// Test nur der Datenbestand zurückgesetzt (TruncateAllTablesAsync), nicht das Schema.
 public class EndpointsTestsBase : IAsyncLifetime
 {
     private readonly PostgresContainerFixture _postgres;

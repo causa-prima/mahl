@@ -265,6 +265,19 @@ python3 -m prozesscode.playwright-test --verbose
 
 > **E2E startet das Backend selbst** (`playwright.config.ts`, `reuseExistingServer:false` auf 5059) – vorher **keinen eigenen Backend auf 5059** laufen lassen (sonst Port-Konflikt), Postgres muss aber laufen. Begründung im Config-Kommentar.
 
+<a id="DEV-test-container"></a>
+### Test-Container zurücksetzen
+
+Die Backend-Tests verwenden einen Postgres-Container, der Testläufe überdauert (ADR-S137-2): Er läuft
+nach dem Testlauf weiter und wird nicht automatisch entfernt. Zurücksetzen – etwa bei kaputtem Zustand
+oder um Ressourcen freizugeben; der nächste Testlauf legt ihn neu an:
+
+```bash
+docker rm -f -v $(docker ps -aq --filter label=reuse-id=mahl-server-tests)
+```
+
+`-v` entfernt auch das anonyme Datenvolume des Postgres-Image.
+
 ---
 
 <a id="DEV-datenbank-workflow"></a>

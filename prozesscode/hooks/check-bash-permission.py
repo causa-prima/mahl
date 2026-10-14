@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
 """PreToolUse-Hook: Bash-Kommandos prüfen (deny/allow/ask).
 
-Reihenfolge in check_command:
-1. ONE_TIME_MARKER → ask (übersteuert alle anderen Prüfungen inkl. WRONG_APPROACH)
-2. Repo-Pfad-Normalisierung (normalize_repo_paths): absoluter Repo-Root-Präfix
-   → relativ. Spart den Permission-Retry, den absolute Pfade sonst auslösen
-   (OBS-S085-1). Bei Änderung gibt der Hook den normalisierten Befehl via
-   updatedInput zurück (s. _build_allow_output).
-3. WRONG_APPROACH_PATTERNS → deny (kein impliziter Override – # --allow-once nötig)
-4. Compound-Segmente → jedes Segment via check_simple_command
-5. check_simple_command: ALLOW_PATTERNS → DESTRUCTIVE_PATTERNS → deny
+Die Reihenfolge der Prüfungen steht im Docstring von check_command (einzige Quelle).
+Umschreibungen (Repo-Pfad → relativ, Filter hinter Wrappern entfernt) liefert der Hook
+via updatedInput zurück (s. _build_allow_output).
 
 check_simple_command prüft kein WRONG_APPROACH – das ist Aufgabe von check_command
 auf dem Gesamtbefehl, bevor gesplittet wird.
@@ -33,7 +27,7 @@ Rückgabe von check_command / check_simple_command: tuple[str, str, str]
   reason:    Hinweistext für den Agenten (leer wenn kein Hint vorhanden)
   log_type:  ALLOW | WRONG_APPROACH | DESTRUCTIVE | UNSAFE_REDIRECT | UNKNOWN |
              COMPOUND_DESTRUCTIVE | COMPOUND_UNSAFE_REDIRECT | COMPOUND_UNKNOWN |
-             ONE_TIME
+             ONE_TIME | UNSUPPORTED_QUOTING | INDIRECT_WRAPPER_FILTER
 """
 import datetime
 import json
@@ -188,55 +182,206 @@ def werkzeug_aufruf(modul: str) -> str:
 _WRAPPER_RUN_RE = re.compile(
     r'python3\s+' + werkzeug_aufruf("(?:" + "|".join(_FILTERABLE_WRAPPERS) + ")"))
 _FILTER_CMD_RE = re.compile(r'(?:tail|head|grep|sed|awk)\b')
-# Verkettung hinter einem Filter: ab hier steht ein eigener Befehl, kein Filter mehr.
-_VERKETTUNG_RE = re.compile(r'(?:&&|\|\||;)')
+# Ein Filter, dessen Entfernen mehr ändert als die Menge der Ausgabe: grep mit Exit-Code- oder
+# Zähl-Semantik (`-q`, `-c`, `-l`) kehrt sonst still die Logik um, eine Umleitung fiele weg.
+_FILTER_MIT_WIRKUNG_RE = re.compile(
+    r'^grep\b.*\s-(?:[a-zA-Z]*[qcl][a-zA-Z]*\b|-(?:quiet|silent|count|files-with-matches)\b)|[<>]')
+_TEE_RE = re.compile(r'tee\b')
+# Ende der eigenen Pipeline eines Wrappers – auf dem maskierten Befehl gesucht, damit ein `)`
+# oder `;` in einem Argument sie nicht vorzeitig beendet.
+_PIPELINE_ENDE_RE = re.compile(r'&&|\|\||;|\n|\)|`')
+# Hinter einem verschachtelten Wrapper: alles, was dessen aufgefangene Ausgabe weiterreichen kann.
+_WEITERGABE_RE = re.compile(r'(?<!\|)\|(?!\|)|<<<|<\(|>\(')
+_BLOCK_WORT_RE = re.compile(r'(?<![\w-])(do|done|if|fi|case|esac)(?![\w-])')
+
+_INDIRECT_FILTER_REASON = (
+    "Die Ausgabe eines Wrappers würde hier gefiltert oder weiterverarbeitet – {erkannt}. "
+    "Wrapper geben im Erfolgsfall nur das Verdikt aus; ein Filter kann es abschneiden, und "
+    "still umschreiben lässt sich dieser Befehl nicht, ohne seine Bedeutung zu ändern.\n"
+    "Ausweg: den Wrapper in einem eigenen Aufruf ungefiltert laufen lassen; mehr Tiefe über "
+    "--verbose. Einen fremden Befehl mit Filter in einen eigenen Aufruf legen."
+)
+
+
+_UNGEQUOTETER_HEREDOC_RE = re.compile(r"(?<!<)<<(?!<)-?\s*[A-Za-z_]")
+_UNGEQUOTETER_HEREDOC_REASON = (
+    "Heredoc ohne Anführungszeichen am Endmarker: Die Shell führt $(…) und `…` im Text aus, "
+    "der Hook prüft den Text aber nicht als Befehl.\n"
+    "Ausweg: den Marker quoten – <<'EOF' statt <<EOF."
+)
+_ANSI_C_QUOTE_REASON = (
+    "ANSI-C-Quoting ($'…') kann der Hook nicht sicher zerlegen – ein \\' darin verschiebt, wo "
+    "der nächste Befehl beginnt.\n"
+    "Ausweg: normale Anführungszeichen ('…' oder \"…\"); Sonderzeichen über printf erzeugen."
+)
+
+
+def _maskiere_strings(command: str) -> str:
+    """Gleich lange Kopie, in der Text in Anführungszeichen durch `_` ersetzt ist.
+
+    Ausgenommen sind Befehlssubstitutionen `$(…)` und `` `…` `` in doppelten Anführungszeichen
+    – sie werden ausgeführt, ein Wrapper darin ist ein Aufruf. Eine Zeilenfortsetzung (`\\`
+    vor dem Zeilenumbruch) wird maskiert: Sie trennt keine Befehle. Gleiche Länge, damit
+    Positionen aus der maskierten Fassung auf das Original übertragbar bleiben.
+
+    Strings innerhalb einer solchen Substitution werden ebenfalls maskiert (`"$(grep '^$' x)"`
+    – im Bestand vorgekommen), ohne dort Escapes oder weitere Verschachtelung zu verfolgen.
+    """
+    zeichen = list(command)
+    quote, innen, tiefe, backtick, i = None, None, 0, False, 0
+    while i < len(command):
+        c = command[i]
+        if quote == "'":
+            if c == "'":
+                quote = None
+            else:
+                zeichen[i] = "_"
+        elif quote == '"' and backtick:
+            backtick = c != "`"
+        elif quote == '"' and tiefe and innen:
+            if c == innen:
+                innen = None
+            else:
+                zeichen[i] = "_"
+        elif quote == '"' and tiefe:
+            if c in "'\"":
+                innen = c
+            else:
+                tiefe += {"(": 1, ")": -1}.get(c, 0)
+        elif quote == '"':
+            if command.startswith("$(", i):
+                tiefe = 1
+                i += 1
+            elif c == "`":
+                backtick = True
+            elif c == '"':
+                quote = None
+            else:
+                zeichen[i] = "_"
+                if c == "\\" and i + 1 < len(command):
+                    i += 1
+                    zeichen[i] = "_"
+        elif c == "\\" and command.startswith("\n", i + 1):
+            zeichen[i] = zeichen[i + 1] = "_"
+            i += 1
+        elif c == "\\":
+            i += 1
+        elif c in "'\"":
+            quote = c
+        i += 1
+    return "".join(zeichen)
+
+
+def _umschliessung(maskiert_davor: str) -> str | None:
+    """Das innerste Konstrukt, in dem ein Wrapper steht und dessen Ausgabe auffängt.
+
+    `"<("`/`">("` für Prozess-Substitution, `"("`/`"{"`/`` "`" `` für Substitution, Subshell,
+    Gruppe, `"block"` für Schleife/if/case – oder None, wenn der Wrapper frei steht.
+    """
+    if maskiert_davor.count("`") % 2:
+        return "`"
+    offen: list[int] = []
+    for i, c in enumerate(maskiert_davor):
+        if c in "({":
+            offen.append(i)
+        elif c in ")}" and offen:
+            offen.pop()
+    if offen:
+        pos = offen[-1]
+        if maskiert_davor[pos] == "(" and maskiert_davor[pos - 1:pos] in ("<", ">"):
+            return maskiert_davor[pos - 1:pos + 1]
+        return maskiert_davor[pos]
+    woerter = [m.group(1) for m in _BLOCK_WORT_RE.finditer(maskiert_davor)]
+    for auf, zu in (("do", "done"), ("if", "fi"), ("case", "esac")):
+        if woerter.count(auf) > woerter.count(zu):
+            return "block"
+    return None
+
+
+def _stufen_urteil(stufen: list[str]) -> str:
+    """Einordnung der Stufen hinter einem Wrapper: 'tee', 'filter' oder 'andere'."""
+    stufen = [s.strip() for s in stufen]
+    if all(_TEE_RE.match(s) and ">(" not in s for s in stufen):
+        return "tee"  # reicht die vollständige Ausgabe durch
+    if all(_FILTER_CMD_RE.match(s) and not _FILTER_MIT_WIRKUNG_RE.search(s) for s in stufen):
+        return "filter"
+    return "andere"
+
+
+def _bewerte_wrapper(command: str) -> tuple[str | None, list[tuple[int, int]]]:
+    """(Ablehnungsgrund oder None, zu entfernende Bereiche) für alle Wrapper-Aufrufe.
+
+    Je Wrapper drei Fälle, entschieden an der Struktur des maskierten Befehls:
+    - **eigene Pipeline** bis zur ersten Verkettung, zum Zeilenumbruch oder zur schließenden
+      Klammer: Folgen nur einfache Filter, werden sie entfernt; ein reines `tee` bleibt;
+      jede andere Stufe (`wc`, `grep -q`, Umleitung, `>(…)`, `|&`) führt zur Ablehnung, weil
+      das Entfernen die Bedeutung änderte.
+    - **verschachtelt** (`$(…)`, Subshell, Gruppe, Schleife, if): Die Ausgabe fließt weiter.
+      Wird danach gepiped, per Here-String oder `${…}` weiterverarbeitet → Ablehnung.
+      In Prozess-Substitution (`head <(wrapper)`) immer.
+    - **frei**: Was hinter der eigenen Pipeline steht, ist ein fremder Befehl und bleibt.
+    """
+    maskiert = _maskiere_strings(command)
+    schnitte: list[tuple[int, int]] = []
+    for match in _WRAPPER_RUN_RE.finditer(maskiert):
+        umschliessung = _umschliessung(maskiert[:match.start()])
+        if umschliessung in ("<(", ">("):
+            return "der Wrapper steht in einer Prozess-Substitution", []
+
+        ende = _PIPELINE_ENDE_RE.search(maskiert, match.end())
+        pipeline_ende = ende.start() if ende else len(maskiert)
+        stufen = maskiert[match.end():pipeline_ende].split("|")[1:]
+        urteil = _stufen_urteil(stufen) if stufen else "tee"
+        if urteil == "andere":
+            return "in seiner Pipeline steht eine Stufe, die nicht nur filtert", []
+        if urteil == "filter":
+            schnitte.append((maskiert.index("|", match.end()), pipeline_ende))
+
+        # `${` bewusst im unmaskierten Befehl: `"${out: -200}"` steht in Anführungszeichen und
+        # wäre in der Maske unsichtbar.
+        if umschliessung and (_WEITERGABE_RE.search(maskiert, pipeline_ende)
+                              or "${" in command[pipeline_ende:]):
+            return "die aufgefangene Ausgabe kann weitergereicht werden", []
+    return None, schnitte
 
 
 def strip_wrapper_filter(command: str) -> tuple[str, bool]:
-    """Entfernt nachgelagerte Filter-Pipes hinter einem Wrapper-Aufruf.
+    """Entfernt einfache Filter in der eigenen Pipeline jedes Wrapper-Aufrufs.
 
-    Gibt (neuer_befehl, geändert) zurück. Drei Abgrenzungen tragen die Korrektheit:
-    Ein Filter **vor** dem Wrapper filtert dessen Ausgabe nicht (`grep … | python3 … .py`)
-    und bleibt unberührt; alles zwischen Wrapper und erstem Filter bleibt erhalten,
-    damit Argumente und Redirects (`--layer frontend 2>&1`) nicht verlorengehen;
-    und hinter dem Filter endet die Filterung an der ersten Verkettung.
+    Gibt (neuer_befehl, geändert) zurück. Abgrenzungen (Einzelheiten: `_bewerte_wrapper`):
+    Ein Filter **vor** dem Wrapper filtert dessen Ausgabe nicht und bleibt; Argumente und
+    Redirects des Wrappers (`--layer frontend 2>&1`) bleiben; was hinter der eigenen Pipeline
+    steht, bleibt unverändert. Fälle, in denen ein Rewrite raten müsste, lehnt `check_command`
+    ab, bevor es hierher kommt.
 
-    Der dritte Punkt ist S130 (OBS-S129-2): Zuvor brach die Schleife beim ersten Filter ab
-    und verwarf den ganzen Rest. Ein `&& nächster-befehl` steht im selben `|`-Teilstück
-    **hinter** dem Filter und fiel damit weg – ausgeführt wurde weniger als angefordert,
-    während die Rückmeldung nur den entfernten Filter nannte. Ein still verschwundener
-    Befehl fällt niemandem auf, der die Ausgabe nicht Zeile für Zeile gegenprüft.
-
-    Bewusst ohne String-Maskierung: Ein `&&` im Argument eines Filters (`grep "a && b"`)
-    wird als Verkettung gelesen, und der Filter bleibt dann stehen. Das ist die sichere
-    Richtung – es wird zu viel erhalten, nie zu wenig.
+    Die Grenzen halten zwei Fehlformen fern. Ein Strip, der alles ab dem Filter verwirft,
+    verliert ein `&& nächster-befehl` – ausgeführt würde weniger als angefordert. Einer, der
+    alles hinter dem Wrapper durchsucht, entfernt Filter fremder Befehle (`wrapper && git log
+    | head`), reißt eine schließende Klammer mit und liest Wrapper-Namen in Strings als Aufruf.
     """
-    match = _WRAPPER_RUN_RE.search(command)
-    if not match:
+    grund, schnitte = _bewerte_wrapper(command)
+    if grund or not schnitte:
         return command, False
+    for von, bis in reversed(schnitte):
+        davor, danach = command[:von].rstrip(), command[bis:]
+        # Stand der Filter hinter einer Zeilenfortsetzung, fällt der Backslash mit weg.
+        davor = davor.removesuffix("\\").rstrip()
+        # `.rstrip()` nimmt den Abstand vor dem Filter mit – `&&`/`||` bekommen ihn zurück;
+        # `;`, `)` und Zeilenumbruch schließen direkt an.
+        command = davor + (" " if danach.startswith(("&&", "||")) else "") + danach
+    return command, True
 
-    parts = command[match.end():].split("|")
-    keep = [parts[0]]
-    schwanz = ""
-    for i, part in enumerate(parts[1:], start=1):
-        if _FILTER_CMD_RE.match(part.strip()):
-            # Ab hier ist es Filterung – aber nur bis zur ersten Verkettung. Der Rest wird
-            # aus den ungeteilten Stücken gelesen, damit ein `||` den Split übersteht.
-            rest = "|".join(parts[i:])
-            treffer = _VERKETTUNG_RE.search(rest)
-            schwanz = rest[treffer.start():] if treffer else ""
-            break
-        keep.append(part)
 
-    if len(keep) == len(parts):
-        return command, False
+def wrapper_filter_ablehnung(command: str) -> str | None:
+    """Grund für die Ablehnung, wenn die Wrapper-Ausgabe nicht sicher umschreibbar gefiltert wird.
 
-    ergebnis = (command[:match.end()] + "|".join(keep)).rstrip()
-    if schwanz:
-        # Das `.rstrip()` entfernt den Abstand, der im Original vor dem Filter stand –
-        # `&&`/`||` bekommen ihn zurück, `;` schließt üblicherweise direkt an.
-        ergebnis += schwanz if schwanz.startswith(";") else " " + schwanz
-    return ergebnis, True
+    Grenzen: Der Umweg über eine Datei (`wrapper > x`, später `head x`) ist für eine Prüfung
+    des Befehlstexts unsichtbar. Hinter einem verschachtelten Wrapper wird jede Weitergabe
+    abgelehnt, auch eine ohne Bezug zu ihm (`out=$(wrapper); git log | head`) – im Zweifel
+    laut statt still.
+    """
+    grund, _ = _bewerte_wrapper(command)
+    return _INDIRECT_FILTER_REASON.format(erkannt=grund) if grund else None
 
 
 # ---------------------------------------------------------------------------
@@ -884,8 +1029,13 @@ def strip_heredoc_bodies(command: str) -> str:
     Sonst sucht der Splitter im Fließtext nach `|`/`;`/`&&` und zerlegt ihn in
     „Befehle", die kein Allow-Muster treffen.
 
-    Der Konsument bleibt geprüft: nach dem Strippen steht noch `python3 -` bzw.
-    `bash` da, beides ohne Allow-Muster. Ein Heredoc erkauft keine Freigabe.
+    Der Konsument bleibt geprüft: Ausgeblendet werden nur der Operator und der Body, der Rest
+    der Operatorzeile bleibt stehen. Von `cat <<'EOF' | bash` bleibt `cat  | bash`, von
+    `python3 - <<'EOF'` bleibt `python3 -` – ohne Allow-Muster. Ein Heredoc erkauft keine
+    Freigabe.
+
+    Nur gequotete Heredocs (`<<'EOF'`, `<<"EOF"`) sind reiner Text. Einer ohne Quote führt
+    `$(…)` im Body aus; `check_command` lehnt ihn vorher ab, hier bleibt sein Body stehen.
 
     Fail-closed bei fehlendem Endmarker: Rest bleibt stehen und wird geprüft.
 
@@ -934,21 +1084,24 @@ def strip_heredoc_bodies(command: str) -> str:
         # ist ein Here-String (einzeiliger Wert, kein Body zum Entfernen).
         if command.startswith('<<', i) and not command.startswith('<<<', i):
             m = re.match(r"<<-?\s*(['\"]?)(\w+)\1", command[i:])
-            if not m:
-                i += 2
+            if not m or not m.group(1):
+                i += 2  # ungequotet: Body ist Code, bleibt stehen (fail-closed)
                 continue
             marker = m.group(2)
             body_start = command.find('\n', i)
             if body_start == -1:
-                return command[:i]  # Heredoc angekündigt, aber kein Body → Rest ist leer
+                # Heredoc angekündigt, aber kein Body: nur den Operator entfernen – der Rest
+                # der Zeile (`| bash; rm …`) bleibt geprüft
+                command = command[:i] + command[i + m.end():]
+                continue
             # Endmarker: eigene Zeile, nur der Marker (bei <<- mit führendem Whitespace)
             end_re = re.compile(r'^[ \t]*' + re.escape(marker) + r'[ \t]*$', re.M)
             end = end_re.search(command, body_start)
             if not end:
                 i += 2  # fail-closed: Body bleibt stehen und wird geprüft
                 continue
-            # Heredoc-Operator und Body herausschneiden, Rest weiter untersuchen
-            command = command[:i] + command[end.end():]
+            # Operator und Body herausschneiden; der Rest der Operatorzeile bleibt geprüft
+            command = command[:i] + command[i + m.end():body_start] + command[end.end():]
             continue
 
         i += 1
@@ -1230,8 +1383,11 @@ def check_command(command: str) -> tuple[str, str, str]:
     fünf Schritte, der Körper acht, inklusive der Einschübe `2b`/`3b`/`4a`/`4b`):
       Einmal-Marker      → nackten Befehl klassifizieren (erlaubt → allow+Hinweis, sonst ask+Grund)
       Pfad-Normalisierung  absolute Repo-Pfade → relativ
+      Quoting-Grenzen    → deny bei ungequotetem Heredoc und $'…'
       Heredoc-Ausblendung  Bodies sind Daten, kein Code
+      Wrapper + Heredoc  → deny, wenn ein Wrapper-Filter umzuschreiben wäre
       WRONG_APPROACH     → deny, auf dem Gesamtbefehl vor dem Split
+      Wrapper-Filter     → deny, wo ein Rewrite raten müsste (_bewerte_wrapper)
       Zugriffs-Scripte   → ask, vor dem Segment-Check
       Compound-Split     → Segmente bilden
       Verzeichniswechsel   npm-Sonderfall, braucht die Segmente
@@ -1255,9 +1411,25 @@ def check_command(command: str) -> tuple[str, str, str]:
     #    zu python3 .claude/... und matcht die Allow-Liste statt WRONG_APPROACH).
     command, _ = normalize_repo_paths(command)
 
+    # Quoting, das die Zerlegung nicht sicher liest: ablehnen statt auszuwerten. Beides
+    #     kam im Bestand nicht vor; der Ausweg kostet nichts.
+    maskiert = _maskiere_strings(command)
+    if _UNGEQUOTETER_HEREDOC_RE.search(maskiert):
+        return ("deny", _UNGEQUOTETER_HEREDOC_REASON, "UNSUPPORTED_QUOTING")
+    if "$'" in maskiert:
+        return ("deny", _ANSI_C_QUOTE_REASON, "UNSUPPORTED_QUOTING")
+
     # Heredoc-Ausblendung: Bodies sind Daten, kein Code (OBS-S111-4) – vor jeder weiteren
     #     Analyse entfernen, sonst wird Fließtext als Befehlsfolge gelesen.
+    mit_heredoc = command
     command = strip_heredoc_bodies(command)
+
+    # Wrapper mit Filter UND Heredoc: Geprüft würde die Fassung ohne Body, umgeschrieben
+    #     (_build_allow_output) das Original – zwei Fassungen, eine Entscheidung. Kam im Bestand
+    #     nicht vor; ablehnen statt beide abzugleichen.
+    if command != mit_heredoc and strip_wrapper_filter(command)[1]:
+        return ("deny", _INDIRECT_FILTER_REASON.format(erkannt="er steht in einem Befehl mit Heredoc"),
+                "INDIRECT_WRAPPER_FILTER")
 
     # WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells).
     #    String-Argumente nicht-ausführender Befehle werden dabei maskiert: eine
@@ -1265,6 +1437,12 @@ def check_command(command: str) -> tuple[str, str, str]:
     for pattern, reason in WRONG_APPROACH_PATTERNS:
         if pattern.search(mask_data_strings(command)):
             return ("deny", reason, "WRONG_APPROACH")
+
+    # Wrapper-Ausgabe auf einem Umweg gefiltert: ablehnen statt umschreiben – welcher Teil
+    #    ohne Filter gemeint war, lässt sich nicht sicher erraten (strip_wrapper_filter).
+    ablehnung = wrapper_filter_ablehnung(command)
+    if ablehnung:
+        return ("deny", ablehnung, "INDIRECT_WRAPPER_FILTER")
 
     # Zugriffs-Scripte (schreibend) → ask. Muss VOR dem Segment-Check liegen, sonst greift
     #     das generische Allow-Muster für `prozesscode/<script>.py` und der Text ginge
@@ -1500,7 +1678,11 @@ def _build_allow_output(command: str) -> dict:
         # Filter-Strip auf dem bereits normalisierten Befehl: so greift das Wrapper-Muster
         # auch bei absolut geschriebenen Pfaden, und beide Rewrites landen in EINEM
         # updatedInput (zwei würden sich gegenseitig überschreiben).
-        rewritten, filtered = strip_wrapper_filter(rewritten)
+        # Nie in einem Befehl mit Heredoc: Dessen Text ist Daten, und Wrapper mit Filter
+        # plus Heredoc lehnt check_command ohnehin ab.
+        filtered = False
+        if strip_heredoc_bodies(rewritten) == rewritten:
+            rewritten, filtered = strip_wrapper_filter(rewritten)
         if filtered:
             changed = True
             hint = (hint + "\n\n" if hint else "") + _FILTER_STRIPPED_HINT

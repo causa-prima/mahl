@@ -203,7 +203,7 @@ Ausführungsbefehle (`dotnet-test.py`, `dotnet-stryker.py`): `docs/process/dev-w
 
 - **Alle Tests:** `Server.Tests/` – Domain Logic + API Endpoints (xunit.v3 + AwesomeAssertions + Microsoft.AspNetCore.Mvc.Testing + Testcontainers.PostgreSql; MTP-Runner via `UseMicrosoftTestingPlatformRunner`)
 
-> **Datenbank im Test:** echtes Postgres in einem geteilten Testcontainer (`PostgresContainerFixture`), Schema einmalig per `MigrateAsync` – dieselben Migrations wie E2E und Produktion. Vor jedem Test leert `EndpointsTestsBase.InitializeAsync` alle Tabellen (`TruncateAllTablesAsync`), der Initialzustand ist also immer leer. Begründung und Trade-offs: ADR-S105-1.
+> **Datenbank im Test:** echtes Postgres in einem Testcontainer, der Testläufe überdauert; jeder Testlauf bekommt eine eigene Datenbank als Kopie einer migrierten Vorlage (`PostgresContainerFixture`, ADR-S137-2) – dieselben Migrations wie E2E und Produktion. Vor jedem Test leert `EndpointsTestsBase.InitializeAsync` alle Tabellen (`TruncateAllTablesAsync`), der Initialzustand ist also immer leer. Begründung und Trade-offs: ADR-S105-1.
 >
 > **Folge für Constraints:** Unique-Indizes, FKs und funktionale Indizes greifen im Test genau wie in Produktion. Eine Integritätsregel, die die DB durchsetzen kann (z.B. case-insensitive Namens-Eindeutigkeit, ADR-S105-2), gehört als Constraint in die DB und wird über den Endpoint-Test geprüft.
 
@@ -350,7 +350,7 @@ Diese Regel gilt für POST (anlegen), PUT/PATCH (ändern), DELETE (löschen/soft
 - **Ziel:** 100% Mutation Score
 - **Ende jeder Phase:** Vollständiger Lauf (PFLICHT)
 - **Während Entwicklung:** Nur geänderte Files: `python3 -m prozesscode.dotnet-stryker --mutate Endpoints/IngredientsEndpoints.cs`
-- **Konfiguration:** `stryker-config.json` im Root (mit `coverage-analysis: "off"` – `perTest` ist hier langsamer, Messung in ADR-S000-10)
+- **Konfiguration:** `stryker-config.json` im Root (mit `coverage-analysis: "perTest"`, Messung in ADR-S137-2)
 - **Ausnahmen** (äquivalente Mutanten, müssen dokumentiert werden): Generated Code (EF Migrations), Framework-Boilerplate (Program.cs)
 
 **100 % Mutation Score pinnt keine Reihenfolge.** Bei „erstes-von-N"-Auswahl- oder Prioritätslogik

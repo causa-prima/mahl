@@ -123,3 +123,23 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: In S136 habe ich Microsoft.EntityFrameworkCore.InMemory in Server.Tests als tot eingestuft, weil der Code es nicht mehr verwendete. Nach dem Entfernen scheiterten 54 von 56 Backend-Tests zur Laufzeit: Das Paket hatte transitiv EF Core 10.0.5 in den Test-Build gezogen und so eine Versionsschere zu Infrastructure (10.0.4) kaschiert. Behoben durch einen expliziten Pin in Infrastructure.
   Warum: Die Einstufung stützte sich auf die Suche nach Verwendungen im Code. Ein Paket wirkt aber auch über die Versionsauflösung im Abhängigkeitsgraphen – das zeigt keine Codesuche, nur ein Lauf.
   Regel: Ob ein Paket entfernbar ist, belegt erst ein Build- und Testlauf ohne das Paket, nicht die Suche nach Verwendungen im Code. Bis dahin als Vermutung kennzeichnen.
+
+## Session 137 – 2026-10-13
+
+- **[MITTEL] [PROZESS] [Kommunikation] LL-S137-1 – Werkzeug-Verhalten in einer Erklärung als Tatsache dargestellt**
+  Quelle: Orchestrator
+  Was: Beim Erklären von PrivateAssets sagte der Agent dem User, analyzers privat zu halten verhindere, dass Analyzer-Regeln in referenzierenden Projekten greifen. Gestützt war das nur auf die NuGet-Doku. Über Projekt-Referenzen stimmt es nicht: Der OpenAPI-Source-Generator lief trotz PrivateAssets=analyzers in Server.Tests (das SDK liest Analyzer aus dem Paketordner, project.assets.json führt sie nicht). Korrigiert wurde es erst eine Antwort später, als der Build daran scheiterte.
+  Warum: Im Erklärmodus springt die Selbstprüfung 'belegt oder nur angenommen?' nicht an – die Antwort fühlt sich wie Wissensvermittlung an, nicht wie eine Behauptung über Werkzeug-Verhalten. Eine Doku-Aussage wurde ungeprüft auf einen Fall übertragen (Projekt- statt Paket-Weitergabe), den die Doku gar nicht beschreibt.
+  Regel: In Erklärungen bei jeder Aussage über Werkzeug-Verhalten die Quelle kennzeichnen: Doku, eigener Lauf in dieser Session oder Gedächtnis. Eine Doku-Aussage gilt nur für den Fall, den die Doku beschreibt; für einen anderen Weitergabe- oder Aufrufweg ist sie ungeprüft, bis ein Lauf sie bestätigt.
+
+- **[MITTEL] [PROZESS] [Bash/Permission] LL-S137-2 – Schreibender Befehl als Informationsquelle missbraucht**
+  Quelle: User
+  Was: Um die gültigen Kontext-Tags für OBS-Einträge zu erfahren, setzte der Agent 'obs add' mit absichtlich ungültigem Kontext ab, in der Erwartung, die Fehlermeldung nenne die gültigen Werte. Wäre der geratene Wert doch gültig gewesen, hätte der Befehl einen Müll-Eintrag in observations.md geschrieben. Der User lehnte den Aufruf ab ('was soll dieser Befehl? Du schreibst damit ein OBS').
+  Warum: Der Agent behandelte die Fehlermeldung eines schreibenden Werkzeugs als bequeme Auskunft und übersah, dass der Erfolgsfall Schreiben heißt. Die Information lag lesbar vor: Die Tag-Tabelle in docs/kaizen/process.md ist laut obs.py die einzige Quelle der erlaubten Werte.
+  Regel: Zum Erkunden nie einen schreibenden Befehl verwenden, auch nicht mit absichtlich ungültigen Argumenten. Erlaubte Werte stehen in der Quelle, die das Werkzeug selbst liest, oder in --help.
+
+- **[MITTEL] [PROZESS] [Hook/Script] LL-S137-3 – Guard-Änderung ohne Abgleich mit dem Altverhalten öffnete neue Umgehungen**
+  Quelle: Orchestrator
+  Was: Der erste Fix am Wrapper-Filter von check-bash-permission öffnete vier Umgehungen, die der alte Hook abfing: Klammer im Argument, Substitution in Anführungszeichen, Zwischenstufen der Pipeline, Schleifen. Aufgefallen ist das erst im Review, nicht in den eigenen Tests.
+  Warum: Getestet wurden nur die neu zu behandelnden Fälle. Das Verhalten des alten Guards galt nicht als Referenz – was er abfing, war in keinem Test festgehalten und ging beim Umbau unbemerkt verloren.
+  Regel: Bei jeder Änderung an einem Guard das alte Verhalten als Referenz nehmen: Fälle, die er abfing, werden Regressionstests, und der protokollierte Bestand läuft alt gegen neu durch, bevor die Änderung als fertig gilt. Der Abgleich findet beide Richtungen – neue Durchlässe und neue Fehl-Ablehnungen.

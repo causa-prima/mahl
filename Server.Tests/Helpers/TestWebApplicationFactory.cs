@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace mahl.Server.Tests.Helpers;
 
-// ADR-S105-1: verbindet den Test-Host mit dem geteilten Postgres-Testcontainer statt EF-InMemory.
+// ADR-S105-1: verbindet den Test-Host mit der Postgres-Datenbank des Testlaufs (ADR-S137-2) statt EF-InMemory.
 internal sealed class TestWebApplicationFactory(string connectionString) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)

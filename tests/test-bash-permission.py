@@ -775,6 +775,39 @@ def test_wrapper_filter_strip() -> int:
         ("python3 -m prozesscode.dotnet-test | head -3 | grep x && echo da",
          "python3 -m prozesscode.dotnet-test && echo da", True,
          "mehrere Filter, dahinter eine Verkettung"),
+
+        # Die Pipeline des Wrappers endet an Verkettung, Zeilenumbruch oder schließender Klammer.
+        # Ein Filter dahinter gehört einem anderen Befehl und bleibt stehen. Ihn zu entfernen
+        # veränderte einen fremden Befehl still und risse Klammer und Quote mit.
+        ("out=$(python3 -m prozesscode.dotnet-test | tail -2)",
+         "out=$(python3 -m prozesscode.dotnet-test)", True,
+         "Filter in der Substitution: Klammer bleibt stehen"),
+        ("python3 -m prozesscode.dotnet-test && git log --oneline | head -3",
+         "python3 -m prozesscode.dotnet-test && git log --oneline | head -3", False,
+         "Filter eines fremden Befehls hinter && bleibt"),
+        ("python3 -m prozesscode.jscpd-run; python3 tests/test-bash-permission.py 2>&1 | tail -2",
+         "python3 -m prozesscode.jscpd-run; python3 tests/test-bash-permission.py 2>&1 | tail -2", False,
+         "Filter eines fremden Befehls hinter ; bleibt"),
+        ("python3 -m prozesscode.dotnet-test\ngit log --oneline | head -2",
+         "python3 -m prozesscode.dotnet-test\ngit log --oneline | head -2", False,
+         "Filter eines fremden Befehls in der nächsten Zeile bleibt"),
+        ("python3 -m prozesscode.eslint-run; python3 -m prozesscode.jscpd-run | tail -5",
+         "python3 -m prozesscode.eslint-run; python3 -m prozesscode.jscpd-run", True,
+         "zweiter Wrapper mit eigenem Filter wird ebenfalls bereinigt"),
+        # Anführungszeichen werden maskiert: Eine Klammer im Argument beendet die Pipeline nicht,
+        # und ein Wrapper-Name im String ist kein Aufruf.
+        ('python3 -m prozesscode.dotnet-test --filter "Name~Foo(x)" | tail -5',
+         'python3 -m prozesscode.dotnet-test --filter "Name~Foo(x)"', True,
+         "Klammer im Argument: Filter wird trotzdem entfernt"),
+        ('grep -rn "python3 -m prozesscode.qa-check" docs | head -20',
+         'grep -rn "python3 -m prozesscode.qa-check" docs | head -20', False,
+         "Wrapper-Name im String ist kein Aufruf"),
+        ("python3 -m prozesscode.dotnet-test 2>&1 | tee log.txt",
+         "python3 -m prozesscode.dotnet-test 2>&1 | tee log.txt", False,
+         "reines tee bleibt"),
+        ("python3 -m prozesscode.dotnet-test \\\n  | tail -3",
+         "python3 -m prozesscode.dotnet-test", True,
+         "Zeilenfortsetzung: Filter in der Folgezeile wird entfernt, samt Backslash"),
     ]
     for command, expected, expected_changed, desc in cases:
         result, changed = hook.strip_wrapper_filter(command)
@@ -803,6 +836,146 @@ def test_wrapper_filter_strip() -> int:
         print(f"  {Colors.GREEN}PASS{Colors.RESET} [output     ] Pfad-Normalisierung + Filter-Strip kombiniert")
     else:
         print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] Kombination fehlerhaft: {both}")
+        failures += 1
+
+    return failures
+
+
+def test_maskiere_strings() -> int:
+    """Maskierung gleicher Länge: Quotes werden zu `_`, ausgeführte `$(…)` bleiben lesbar.
+
+    Ist sie falsch, beendet eine Klammer im Argument die Wrapper-Pipeline zu früh, oder ein
+    Wrapper-Name in einem String gilt als Aufruf – beides öffnet Lücken in Strip und Ablehnung.
+    """
+    print(f"\n{Colors.BOLD}=== Strings maskieren ==={Colors.RESET}")
+    failures = 0
+    cases = [
+        ("'x' y", "'_' y", "einfache Quotes am Anfang"),
+        ("a 'b(c) \"d\"' e", "a '________' e", "einfache Quotes schützen Klammern und doppelte Quotes"),
+        ('x "a$(b "c") d" e', 'x "_$(b "_")__" e', "Substitution in doppelten Quotes bleibt lesbar"),
+        ("\"$(grep '^$' x)\"", "\"$(grep '__' x)\"", "String in der Substitution wird maskiert"),
+        ('"$(a (b) c) x"', '"$(a (b) c)__"', "verschachtelte Klammern in der Substitution"),
+        ('"a\\"b" c', '"____" c', "Escape in doppelten Quotes"),
+        ("\\'x y", "\\'x y", "Escape außerhalb: kein Quote-Beginn"),
+        ('"a`b c`d" e', '"_`b c`_" e', "Backticks in doppelten Quotes bleiben lesbar"),
+        ("a \\\n| b", "a __| b", "Zeilenfortsetzung wird maskiert"),
+    ]
+    for eingabe, erwartet, desc in cases:
+        ergebnis = hook._maskiere_strings(eingabe)
+        if ergebnis == erwartet and len(ergebnis) == len(eingabe):
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [maskieren   ] {desc}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [maskieren   ] {desc}: {eingabe!r}")
+            print(f"       Expected: {erwartet!r}")
+            print(f"       Got:      {ergebnis!r}")
+            failures += 1
+    return failures
+
+
+def test_wrapper_filter_indirekt() -> int:
+    """Wrapper-Ausgabe, die auf einem Umweg gefiltert wird, wird abgelehnt statt umgeschrieben.
+
+    Der Strip greift nur in der Pipeline des Wrappers selbst. Liest ein Filter dahinter etwas,
+    das die Wrapper-Ausgabe tragen kann – Variable, Klammer, Gruppe, Prozess-Substitution –,
+    wäre jeder Rewrite geraten: ablehnen, laut. Ein gewöhnlicher fremder Befehl bleibt frei.
+    """
+    print(f"\n{Colors.BOLD}=== Wrapper-Filter auf Umwegen ablehnen ==={Colors.RESET}")
+    failures = 0
+
+    cases = [
+        ("( python3 -m prozesscode.dotnet-test ) | tail -5", "deny", "Subshell-Klammer"),
+        ("{ python3 -m prozesscode.dotnet-test; } | head", "deny", "Gruppe"),
+        ('out=$(python3 -m prozesscode.dotnet-test 2>&1); echo "$out" | head -1', "deny",
+         "Ausgabe in Variable, dann gefiltert"),
+        ('for f in A B; do s=$(date +%s%N); out=$(python3 -m prozesscode.dotnet-test --filter $f 2>&1); '
+         'e=$(date +%s%N); echo "Runde $f: $(( (e-s)/1000000 )) ms  | $(echo "$out" | head -1)"; done',
+         "deny", "Messschleife aus dem Bestand: Variable in verschachtelter Substitution gefiltert"),
+        ("head -5 <(python3 -m prozesscode.dotnet-test)", "deny", "Prozess-Substitution"),
+        ('echo "$(python3 -m prozesscode.dotnet-test)" | head -1', "deny",
+         "Substitution in Anführungszeichen"),
+        ("( python3 -m prozesscode.dotnet-test ) 2>&1 | tail -5", "deny", "Subshell mit Umleitung"),
+        ('out=$(python3 -m prozesscode.dotnet-test); echo "$out" | cat | head', "deny",
+         "Variable über Zwischenstufe gefiltert"),
+        ('out=$(python3 -m prozesscode.dotnet-test); head -1 <<< "$out"', "deny", "Here-String"),
+        ('out=$(python3 -m prozesscode.dotnet-test); echo "${out: -200}"', "deny",
+         "Variable per Parameter-Expansion gekürzt"),
+        ("for f in A B; do python3 -m prozesscode.dotnet-test --filter $f; done | tail -3", "deny",
+         "Schleife gepiped"),
+        ("if python3 -m prozesscode.dotnet-test; then echo ok; fi | head -1", "deny", "if-Block gepiped"),
+        ("python3 -m prozesscode.dotnet-test | grep -q FAIL && echo rot", "deny",
+         "grep -q: Entfernen kehrte die Logik um"),
+        ("python3 -m prozesscode.dotnet-test | tail -5 > out.txt", "deny",
+         "Umleitung hinter dem Filter fiele beim Entfernen weg"),
+        ("python3 -m prozesscode.dotnet-test | wc -l", "deny", "andere Stufe als ein Filter"),
+        ("python3 -m prozesscode.dotnet-test | tee >(head -1)", "deny", "tee in Prozess-Substitution"),
+        ('echo "`python3 -m prozesscode.dotnet-test`" | tail -3', "deny", "Backticks in Anführungszeichen"),
+        ('out=`python3 -m prozesscode.dotnet-test`; echo "$out" | tail -3', "deny",
+         "Backticks als Zuweisung"),
+        # Prüfung sieht den Befehl ohne Heredoc-Body, der Rewrite das Original – beides zugleich
+        # (Wrapper mit Filter und Heredoc) wird abgelehnt statt in zwei Fassungen bewertet.
+        ("python3 -m prozesscode.dotnet-test <<'X' | tail -3\nfoo\nX", "deny",
+         "Wrapper mit Filter und Heredoc in einem Befehl"),
+        # Gegenproben: gewöhnliche fremde Befehle, direkte Filter und Variablen ohne Filter.
+        ("python3 -m prozesscode.dotnet-test && git log --format=%s | grep -v '^$' | head", "allow",
+         "GEGENPROBE: $ im Regex eines fremden Befehls"),
+        ('echo "Hook lehnt head <(python3 -m prozesscode.dotnet-test) ab"', "allow",
+         "GEGENPROBE: Wrapper-Erwähnung in einem String"),
+        ("python3 -m prozesscode.dotnet-test && git log --oneline | head -3", "allow",
+         "GEGENPROBE: fremder Befehl hinter &&"),
+        ("python3 -m prozesscode.playwright-test --filter X; git diff Client/src/main.tsx | grep '^[+-] '",
+         "allow", "GEGENPROBE: fremder Befehl hinter ;"),
+        ("python3 -m prozesscode.dotnet-test | tail -5", "allow",
+         "GEGENPROBE: direkter Filter wird umgeschrieben, nicht abgelehnt"),
+        ('out=$(python3 -m prozesscode.dotnet-test); echo "$out"', "allow",
+         "GEGENPROBE: Variable ohne Filter"),
+        # Ein abgeschlossenes Konstrukt VOR dem Wrapper macht ihn nicht verschachtelt.
+        ("echo `date`; python3 -m prozesscode.dotnet-test; git log --oneline | head -2", "allow",
+         "GEGENPROBE: geschlossene Backticks davor"),
+        ("for f in a b; do echo $f; done; python3 -m prozesscode.dotnet-test; git log --oneline | head -2",
+         "allow", "GEGENPROBE: beendete Schleife davor"),
+    ]
+    for command, expected, desc in cases:
+        if not assert_decision(command, expected, desc):
+            failures += 1
+
+    # Direkt an der Bewertung: Diese Fälle lehnt sonst auch die Allow-Liste ab (tee, <(…)),
+    # ein Test über check_command sähe einen Fehler hier also nicht.
+    for befehl, erwartet in [
+        ("python3 -m prozesscode.dotnet-test | tee >(head -1)", "nicht nur filtert"),
+        ("head -5 <(python3 -m prozesscode.dotnet-test)", "Prozess-Substitution"),
+    ]:
+        grund = hook.wrapper_filter_ablehnung(befehl) or ""
+        if erwartet in grund:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [bewertung   ] {erwartet}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [bewertung   ] {befehl}: {grund!r}")
+            failures += 1
+
+    decision, reason, log_type = check_command("( python3 -m prozesscode.dotnet-test ) | tail -5")
+    if decision == "deny" and "eigenen Aufruf" in reason and log_type == "INDIRECT_WRAPPER_FILTER":
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [reason      ] Meldung nennt den Ausweg, eigene Kennung")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [reason      ] Ausweg/Kennung fehlt: {log_type!r} {reason!r}")
+        failures += 1
+
+    # Aufrufpfad: Der Rewrite der neuen Fälle kommt über check_command + Allow-Ausgabe an.
+    befehl = 'python3 -m prozesscode.dotnet-test --filter "Name~Foo(x)" | tail -5'
+    out = build_allow_output(befehl)
+    if (check_command(befehl)[0] == "allow"
+            and out.get("updatedInput", {}).get("command")
+            == 'python3 -m prozesscode.dotnet-test --filter "Name~Foo(x)"'):
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [output      ] Rewrite trotz Klammer im Argument")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [output      ] Rewrite fehlt: {out}")
+        failures += 1
+
+    # Ein Heredoc, der Wrapper und Filter nur erwähnt, ist Text: erlaubt und nicht umgeschrieben.
+    notiz = f"cat > {SCRATCH}/notiz.md <<'EOF'\nAgenten: python3 -m prozesscode.dotnet-test | tail -3\nEOF"
+    out = build_allow_output(notiz)
+    if check_command(notiz)[0] == "allow" and "updatedInput" not in out:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [output      ] Heredoc-Text bleibt unverändert")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [output      ] Heredoc-Text verändert: {out}")
         failures += 1
 
     return failures
@@ -871,6 +1044,29 @@ def test_segment_expansion() -> int:
         # Aufbau so, dass ein falsch gelesenes `<<X` ein gültiges `echo "…"` übrig ließe.
         ('echo "$(pwd) <<X"\nrm -rf /tmp/x\nX\n"', "deny",
          'GEGENPROBE: <<X in "…" nach $(…) blendet Folgezeilen nicht aus'),
+        # Ausgeblendet wird nur der Body – der Rest der Operatorzeile bleibt geprüft.
+        ("cat <<'EOF' | bash\nrm -rf /tmp/x\nEOF", "deny",
+         "GEGENPROBE: Pipe in der Operatorzeile reicht den Body an bash"),
+        ("cat <<'X' | bash; rm -rf /tmp/x", "deny",
+         "GEGENPROBE: Heredoc ohne Body – Rest der Zeile bleibt geprüft"),
+        ("python3 -m prozesscode.tracker <<'EOF' | jq -r '.x'\n{}\nEOF", "allow",
+         "erlaubter Konsument in der Operatorzeile bleibt erlaubt"),
+        # Ein Heredoc ohne Quote am Marker führt $(…) und `…` im Body aus. Agenten brauchen
+        # ihn nicht (Bestand: kein einziger Fall) – abgelehnt statt den Body zu analysieren.
+        ("cat <<EOF\n$(rm -rf /tmp/x)\nEOF", "deny", "GEGENPROBE: ungequoteter Heredoc führt $(…) aus"),
+        ("cat <<EOF\nnur Text\nEOF", "deny", "ungequoteter Heredoc wird grundsätzlich abgelehnt"),
+        ('grep -n "<<EOF" tests/test-bash-permission.py', "allow", "<<EOF als Suchtext bleibt erlaubt"),
+        ("git log --oneline <<< x", "allow", "Here-String ist kein Heredoc"),
+
+        # --- ANSI-C-Quoting ------------------------------------------------------
+        # `$'…'` erlaubt `\'` im String; der Zerleger kennt das nicht und läse den Rest als
+        # einen einzigen Befehl. Agenten nutzen es nicht (Bestand: kein Fall) – abgelehnt.
+        ("echo $'\\''; rm -rf /tmp/x", "deny", "GEGENPROBE: $'…' verschleiert den Folgebefehl"),
+        ("echo $'a\\tb'", "deny", "$'…' wird grundsätzlich abgelehnt"),
+        ("grep -v '^$' docs/tech-debt.md", "allow", "$ am Ende eines normalen Strings ist kein $'"),
+        ('grep -n "$\'" docs/tech-debt.md', "allow", "$' in doppelten Quotes ist Text"),
+        ('echo "Leer: $(grep -cE \'^---$\' docs/tech-debt.md)"', "allow",
+         "'…$' in einer Substitution in doppelten Quotes ist kein $' (im Bestand vorgekommen)"),
 
         # --- Schleifen -----------------------------------------------------------
         ("for f in a b; do echo $f; done", "allow", "Schleife mit lesendem Rumpf"),
@@ -1109,6 +1305,8 @@ def main() -> None:
     total_failures += test_path_normalization()
     total_failures += test_cd_npm_deny()
     total_failures += test_wrapper_filter_strip()
+    total_failures += test_maskiere_strings()
+    total_failures += test_wrapper_filter_indirekt()
     total_failures += test_segment_expansion()
     total_failures += test_allowed_logging()
     total_failures += test_deny_text_werkzeugfrage()
