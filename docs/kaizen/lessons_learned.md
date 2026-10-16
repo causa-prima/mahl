@@ -143,3 +143,26 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: Der erste Fix am Wrapper-Filter von check-bash-permission öffnete vier Umgehungen, die der alte Hook abfing: Klammer im Argument, Substitution in Anführungszeichen, Zwischenstufen der Pipeline, Schleifen. Aufgefallen ist das erst im Review, nicht in den eigenen Tests.
   Warum: Getestet wurden nur die neu zu behandelnden Fälle. Das Verhalten des alten Guards galt nicht als Referenz – was er abfing, war in keinem Test festgehalten und ging beim Umbau unbemerkt verloren.
   Regel: Bei jeder Änderung an einem Guard das alte Verhalten als Referenz nehmen: Fälle, die er abfing, werden Regressionstests, und der protokollierte Bestand läuft alt gegen neu durch, bevor die Änderung als fertig gilt. Der Abgleich findet beide Richtungen – neue Durchlässe und neue Fehl-Ablehnungen.
+
+## Session 138 – 2026-10-16
+
+- **[HOCH] [QUALITÄT] [Hook/Script] LL-S138-1 – Auditor-Sperre im Bash-Hook galt nicht für benannt gestartete Auditoren**
+  Quelle: Orchestrator
+  Was: Die Nur-Lese-Weiche für Auditoren (check-bash-permission, AUDITOREN) erkennt Auditoren am Feld agent_type der Hook-Eingabe. Mit Gegenproben, Lückenprobe und einer Live-Probe (agent_type kommt an) galt sie als belegt. Erst eine spätere Live-Probe für ein anderes Thema zeigte: Wird ein Agent mit name gestartet, steht in agent_type der Name statt des Typs – ein code-quality-auditor namens cq-probe durfte touch ausführen. Bis August 2026 waren 57 von 113 Auditor-Starts benannt.
+  Warum: Die Live-Probe prüfte, DASS das Feld ankommt, an genau einer Startform (unbenannt). Die Formen, in denen der Auslöser vorkommt (benannt, unbenannt, Team), wurden nie aufgezählt; die Annahme 'agent_type = Typ' stammte aus dieser einen Form. Die Gegenproben brachen den Guard an seinen Mustern, nicht an seiner Erkennung.
+  Regel: Hängt ein Guard an einem Feld der Hook-Eingabe, vor dem Fertig die Formen aufzählen, in denen der Auslöser auftreten kann (bei Agenten: mit/ohne name, Hintergrund, Team), und je Form einmal live prüfen, was in dem Feld ankommt – nicht nur, dass es ankommt.
+  CM-Bezug: CM-S095-2
+
+- **[MITTEL] [AGENT] [Kommunikation] LL-S138-2 – Agenten-Namen für selten erklärt, ohne Logs oder alle Skills anzusehen**
+  Quelle: User
+  Was: Zur Abwägung fail-open gegen fail-closed behauptete ich, kein Skill vergebe Agenten-Namen, der Fehlalarm treffe also fast nie. Der User fragte nach einem Beleg. Die Logs zeigten 113 benannte Starts (bis August der Normalfall, bei Implementern ausnahmslos), und implementing-scenario schreibt Namen für Implementer sogar vor – ich hatte nur review-code angesehen.
+  Warum: Ich habe aus der Vorschrift eines einzigen Skills auf die Praxis geschlossen, also zweimal verkürzt: ein Dokument statt aller, und Vorschrift statt Bestand. Die Regel 'Eine Vorschrift beschreibt nicht die Praxis' kannte ich; der Selbst-Check sprang nicht an, weil die Aussage nur ein Nebensatz in einer Abwägung war.
+  Regel: Stützt eine Häufigkeitsaussage eine Abwägung (selten, nie, fast immer), sie vor dem Aussprechen am Bestand belegen (Logs, alle Skills) oder ausdrücklich als ungeprüft kennzeichnen – auch als Nebensatz.
+  CM-Bezug: CM-S095-2
+
+- **[MITTEL] [AGENT] [Kommunikation] LL-S138-3 – Gleichgewicht des Drain-Triggers aus einer Phase ohne Implementierung geschlossen**
+  Quelle: User
+  Was: Für OBS-S122-1 rekonstruierte ich den Drain-Trigger über S128–S138 und empfahl, den Eintrag zu verwerfen: Die Frequenz liege zwar bei 1 von 7 statt 1 von 3, der Backlog sei aber im Gleichgewicht. Der User fragte, ob die Daten dafür reichen – in den sechs stillen Sessions lief kein einziger Implementierungs-Lauf, also gerade die Phase, die vermutlich die meisten und gewichtigsten Beobachtungen erzeugt.
+  Warum: Ich habe korrekt gemessen, aber die Aussage auf den Normalbetrieb ausgedehnt, ohne zu prüfen, ob das Messfenster ihn enthält. Die Zusammensetzung der Sessions stand im Commit-Verlauf, den ich für dieselbe Prüfung schon gelesen hatte; das Gleichgewicht selbst war zudem gerechnet (Zulauf gegen Drain-Leistung), nicht gemessen.
+  Regel: Vor einem Schluss aus einem Messfenster fragen, welche Betriebsarten die Aussage abdecken soll, und prüfen, ob das Fenster jede davon enthält. Fehlt eine, die Messung als Basislinie dieser Phase festhalten statt als Urteil.
+  CM-Bezug: CM-S127-1

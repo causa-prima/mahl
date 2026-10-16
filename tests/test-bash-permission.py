@@ -214,6 +214,12 @@ def test_allow_patterns() -> int:
         # dotnet tool (lokales Manifest)
         ("dotnet tool restore", "dotnet tool restore"),
         ("dotnet tool list", "dotnet tool list"),
+        # Update-Abfragen der Abhängigkeits-Durchsicht (lesend; dev-workflow.md)
+        ("dotnet list mahl.slnx package --outdated", "dotnet list package --outdated"),
+        ("dotnet list package --outdated", "dotnet list package --outdated ohne Projekt"),
+        ("dotnet list mahl.slnx package --vulnerable --include-transitive",
+         "dotnet list package --vulnerable"),
+        ("dotnet tool search dotnet-stryker --take 3", "dotnet tool search"),
         # npm run / audit / outdated / update / ci (nativ)
         ("npm run build", "npm run build"),
         ("npm run dev", "npm run dev"),
@@ -379,6 +385,13 @@ def test_deny() -> int:
         # dotnet: andere Subcommands nicht erlaubt
         ("dotnet publish", "dotnet publish"),
         ("dotnet format", "dotnet format"),
+        # Schreibende Nachbarn der Update-Abfragen: ändern Abhängigkeiten → deny
+        ("dotnet tool install dotnet-stryker", "dotnet tool install"),
+        ("dotnet tool update dotnet-stryker", "dotnet tool update"),
+        ("dotnet add Server package Foo", "dotnet add package"),
+        ("dotnet list package", "dotnet list package ohne --outdated/--vulnerable"),
+        ("dotnet list mahl.slnx package", "dotnet list <projekt> package ohne Flag"),
+        ("dotnet tool search", "dotnet tool search ohne <id>"),
         # docker-compose (v1) nicht verfügbar in dieser WSL-Distro → deny mit Smart-Hint auf docker compose
         ("docker-compose up -d", "docker-compose v1 → deny (nutze docker compose)"),
         ("docker-compose down", "docker-compose down v1 → deny"),
@@ -549,6 +562,104 @@ def test_write_access_scripts() -> int:
     for command, description in allow_cases:
         if not assert_decision(command, "allow", description):
             failures += 1
+
+    return failures
+
+
+def test_auditoren_nur_lesend() -> int:
+    """Auditoren prüfen am Arbeitsbaum, ändern ihn aber nicht.
+
+    Reviewt wird vor dem Commit: Ein `rm`, `git stash push` oder `ruff-run --fix` eines
+    Auditors träfe genau die Arbeit, die git noch nicht sichert. Rückfragen gibt es für sie
+    keine – eine Freigabe für einen Subagenten, der nur Findings liefern soll, wäre schon der
+    Fehler.
+    """
+    print(f"\n{Colors.BOLD}=== Auditoren: nur lesend ==={Colors.RESET}")
+    failures = 0
+
+    allow_cases = [
+        ("git diff HEAD -- prozesscode/doc.py", "git diff"),
+        ("git show HEAD:docs/kaizen/principles.md", "git show"),
+        ("git log --oneline -5", "git log"),
+        ("git config --get user.name", "git config --get"),
+        ("grep -rn check_command prozesscode/", "grep"),
+        ("git diff | grep '^+'", "Compound aus Lesebefehlen"),
+        ("python3 -m pytest tests/test_session_agenda.py", "pytest"),
+        ("python3 tests/test-bash-permission.py", "Test-Runner"),
+        ("python3 -m prozesscode.doc get KPI-kommunikation", "doc get"),
+        ("python3 -m prozesscode.obs get OBS-S125-4", "obs get"),
+        ("python3 -m prozesscode.td list", "td list"),
+        ("python3 -m prozesscode.decisions get ADR-S084-3", "decisions get"),
+        ("python3 -m prozesscode.ruff-run", "ruff-run ohne --fix"),
+        ("python3 -m prozesscode.vitest-run --filter Liste", "vitest-run"),
+        ("sed -n '10,20p' AGENTS.md", "sed-Zeilenbereich"),
+        ("git diff | sort | uniq -c", "sort und uniq in der Pipeline"),
+        ("find prozesscode -name '*.py'", "find ohne Schreib-Aktion"),
+        ("git branch --show-current", "git branch lesend"),
+        ("git tag --list 'v*'", "git tag lesend"),
+        ("git remote -v", "git remote lesend"),
+    ]
+    for command, description in allow_cases:
+        decision, reason, log_type = check_command(command, nur_lesend=True)
+        if decision == "allow":
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [allow       ] {description}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [allow       ] {description}: "
+                  f"{decision} ({log_type})")
+            failures += 1
+
+    # Jeder dieser Befehle ist ohne Weiche erlaubt oder eine Rückfrage – sonst prüfte der Fall
+    # nicht die Weiche, sondern die allgemeine Allow-Liste.
+    deny_cases = [
+        ("touch notiz.md", "touch"),
+        ("rm prozesscode/doc.py", "rm"),
+        ("mv a.md b.md", "mv"),
+        ("git add prozesscode/doc.py", "git add"),
+        ("git stash push", "git stash push"),
+        ("git status && touch x", "Schreiber in Compound"),
+        ("python3 -m prozesscode.ruff-run --fix", "ruff-run --fix"),
+        ("python3 -m prozesscode.obs-archive", "obs-archive (schreibt ohne Rückfrage)"),
+        ("python3 -m prozesscode.mutmut-run --mutate prozesscode.doc", "mutmut-run"),
+        ("python3 -m prozesscode.dotnet-test", "dotnet-test (Build-Ausgabe geteilt)"),
+        ("npm --prefix Client run build", "npm run"),
+        ("dotnet build", "dotnet build"),
+        ('python3 -m prozesscode.obs add --titel "X"', "Tracker-Schreiben: deny statt ask"),
+        ("rm notiz.md # --allow-once", "--allow-once: deny statt ask"),
+        # Lesewerkzeuge mit einer Option oder einem Skript, das schreibt – der Kern der Weiche,
+        # weil Auditoren außer Bash keinen Schreibweg haben.
+        ("sed -n 'w notiz.md' AGENTS.md", "sed mit w-Kommando"),
+        ("sed 's/a/b/' AGENTS.md", "sed jenseits des Zeilenbereichs"),
+        ("sort -o notiz.md AGENTS.md", "sort -o"),
+        ("sort --output=notiz.md AGENTS.md", "sort --output"),
+        ("uniq AGENTS.md notiz.md", "uniq mit Ausgabedatei"),
+        ("awk '{print > \"notiz.md\"}' AGENTS.md", "awk (Redirect im Skript)"),
+        ("find . -maxdepth 1 -fprint notiz.md", "find -fprint"),
+        ("git diff --output=notiz.md", "git diff --output"),
+        ("git branch neu", "git branch <neu>"),
+        ("git tag v9", "git tag <neu>"),
+        ("git remote add x y", "git remote add"),
+        ("ls | xargs sort -o notiz.md", "xargs mit schreibendem Kind"),
+    ]
+    for command, description in deny_cases:
+        ohne_weiche = check_command(command)[0]
+        decision, reason, log_type = check_command(command, nur_lesend=True)
+        if ohne_weiche in ("allow", "ask") and decision == "deny":
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [deny        ] {description}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [deny        ] {description}: "
+                  f"ohne Weiche {ohne_weiche}, mit {decision} ({log_type})")
+            failures += 1
+
+    # Die Weiche erkennt Auditoren am Namen. Ein umbenannter oder neuer Auditor, der hier
+    # fehlt, liefe lautlos mit vollen Rechten.
+    agenten = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".claude", "agents")
+    definiert = {name[:-3] for name in os.listdir(agenten) if name.endswith("-auditor.md")}
+    if definiert == hook.AUDITOREN:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [agenten     ] AUDITOREN = .claude/agents/*-auditor.md")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [agenten     ] nur definiert: "
+              f"{sorted(definiert - hook.AUDITOREN)}, nur im Hook: {sorted(hook.AUDITOREN - definiert)}")
+        failures += 1
 
     return failures
 
@@ -1300,6 +1411,7 @@ def main() -> None:
     total_failures += test_deny()
     total_failures += test_one_time_marker()
     total_failures += test_write_access_scripts()
+    total_failures += test_auditoren_nur_lesend()
     total_failures += test_deny_overrides_allow()
     total_failures += test_edge_cases()
     total_failures += test_path_normalization()

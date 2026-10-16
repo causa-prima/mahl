@@ -502,3 +502,68 @@ def test_kombinierte_quelle_bleibt_bei_obs_zulaessig():
 def test_set_weist_status_ohne_bekanntes_schluesselwort_ab():
     with pytest.raises(ValueError):
         oe.set_fields(BESTAND, "OBS-S110-1", status="ERLEDIGT")
+
+
+# --- Korrektur ohne Hand-Edit ---------------------------------------------------
+def _feldfolge(eintrag: str) -> list[str]:
+    return [z.split(":")[0] for z in eintrag.splitlines() if z.startswith("- ")]
+
+
+def test_set_ersetzt_die_beobachtung_statt_sie_zu_erweitern():
+    neu = oe.set_fields(BESTAND, "OBS-S110-1", beobachtung="korrigierter Text")
+    eintrag = oe.get(neu, "OBS-S110-1")
+    assert "- Beobachtung: korrigierter Text" in eintrag
+    assert "irgendwas" not in eintrag
+    assert oe.get(neu, "OBS-S110-2") == oe.get(BESTAND, "OBS-S110-2")
+
+
+def test_set_weist_eine_leere_beobachtung_ab():
+    with pytest.raises(ValueError):
+        oe.set_fields(BESTAND, "OBS-S110-1", beobachtung="  ")
+
+
+def test_set_fuegt_die_vorpraegung_hinter_der_beobachtung_ein():
+    neu = oe.set_fields(BESTAND, "OBS-S110-1", vorpraegung="User denkt an Lösung X")
+    eintrag = oe.get(neu, "OBS-S110-1", mit_vorpraegung=True)
+    assert "- Vorprägung: User denkt an Lösung X" in eintrag
+    folge = _feldfolge(eintrag)
+    assert folge.index("- Beobachtung") + 1 == folge.index("- Vorprägung")
+
+
+def test_set_ersetzt_eine_vorhandene_vorpraegung():
+    text = oe.set_fields(BESTAND, "OBS-S110-1", vorpraegung="alt")
+    neu = oe.set_fields(text, "OBS-S110-1", vorpraegung="neu")
+    eintrag = oe.get(neu, "OBS-S110-1", mit_vorpraegung=True)
+    assert "- Vorprägung: neu" in eintrag and "- Vorprägung: alt" not in eintrag
+
+
+def test_der_fall_aus_s125_laesst_sich_in_einem_aufruf_korrigieren():
+    """Die Zielvorstellung des Users stand in der Beobachtung statt in der Vorprägung."""
+    falsch = oe.set_fields(BESTAND, "OBS-S110-1",
+                           beobachtung="irgendwas. Der User will Lösung X.")
+    neu = oe.set_fields(falsch, "OBS-S110-1", beobachtung="irgendwas.",
+                        vorpraegung="Der User will Lösung X.")
+    assert "Lösung X" not in oe.get(neu, "OBS-S110-1")  # Standardzugriff: neutral
+    assert "Lösung X" in oe.get(neu, "OBS-S110-1", mit_vorpraegung=True)
+
+
+def test_set_fuegt_den_aufschubgrund_vor_der_entscheidung_ein():
+    neu = oe.set_fields(BESTAND, "OBS-S110-1", zusammen="keiner",
+                        aufschubgrund="Umfang – eigener Umbau")
+    folge = _feldfolge(oe.get(neu, "OBS-S110-1"))
+    # Position wie bei neuen Einträgen: Zusammen-erledigen, Aufschubgrund, Entscheidung.
+    assert folge.index("- Zusammen-erledigen") + 1 == folge.index("- Aufschubgrund") \
+        == folge.index("- Entscheidung/Maßnahme") - 1
+
+
+def test_set_ersetzt_einen_vorhandenen_aufschubgrund():
+    text = oe.set_fields(BESTAND, "OBS-S110-1", aufschubgrund="Umfang – eigener Umbau")
+    neu = oe.set_fields(text, "OBS-S110-1", aufschubgrund="User – später entschieden")
+    eintrag = oe.get(neu, "OBS-S110-1")
+    assert "- Aufschubgrund: User – später entschieden" in eintrag
+    assert "eigener Umbau" not in eintrag
+
+
+def test_set_prueft_den_aufschubgrund_wie_die_erfassung():
+    with pytest.raises(ValueError):
+        oe.set_fields(BESTAND, "OBS-S110-1", aufschubgrund="später")

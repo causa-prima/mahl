@@ -11,19 +11,18 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
 ## Review-Prozess
 
 - **Reviewer-Agenten stets ohne Iterations-Vorwissen beauftragen.**
-  Jeder Review-Agent erhält ausschließlich den aktuellen Code – keinen Kontext über frühere Review-Runden. Vorwissen dämpft die
-  Kritikbereitschaft strukturell – der Reviewer denkt "wurde ja schon reviewt".
+  Jeder Review-Agent erhält nur den aktuellen Code, keinen Kontext früherer Review-Runden –
+  Vorwissen dämpft die Kritikbereitschaft strukturell („wurde ja schon reviewt").
 
 - **Review-Agent-Outputs auf semantische Korrektheit prüfen, nicht blind übernehmen.**
   Vor jeder Übernahme eines Agent-Vorschlags prüfen: Ist die Begründung stichhaltig, oder klingt
   sie nur plausibel? Umsetzbar ≠ inhaltlich korrekt.
 
 - **Findings ohne Zwischen-Nachfrage abarbeiten.**
-  Beim Abarbeiten einer Finding-Liste (z.B. review-code/review-docs, implementing-scenario Review-Loop)
-  nach jedem umgesetzten Finding kurz bestätigen und **sofort** zum nächsten übergehen – kein
-  Pause-und-Fragen (User hat das explizit so gewünscht). **Ausnahme – invalide Findings** (nach
-  Verifikation nicht haltbar): kurz erklären, warum der Reviewer darauf gekommen sein könnte und was
-  ich evtl. übersehen habe, **dann** beim User nachfragen, bevor weitergearbeitet wird.
+  Nach jedem umgesetzten Finding einer Liste (review-code, review-docs, Review-Loop) kurz
+  bestätigen und **sofort** zum nächsten – kein Pause-und-Fragen. **Ausnahme – invalide Findings**
+  (nach Verifikation nicht haltbar): erklären, wie der Reviewer darauf gekommen sein könnte und was
+  ich evtl. übersehen habe, **dann** beim User nachfragen, bevor es weitergeht.
 
 <a id="KPI-prozess-disziplin"></a>
 ## Prozess-Disziplin
@@ -36,12 +35,10 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
 ## Doku & Referenzen
 
 - **Single Source of Truth: Information am passendsten Ort, sonst referenzieren.**
-  Jede Information lebt an *einer* Stelle – dem dafür passendsten Dokument – und dort so
-  ausführlich, dass sie **ohne Vorwissen/Session-Kontext** verständlich ist. Andere Stellen
-  **referenzieren** diese Quelle (eine Kurzzusammenfassung ist erlaubt, eine Kopie nicht –
-  Kopien driften). Jede referenzierte Stelle braucht einen **leicht auffindbaren Anchor**
-  (grep-barer Marker / Heading-Text / ID – **keine** „Sektion N"-/Zeilen-Position, die stale wird;
-  Zeilennummern nur für read-only-Dateien wie Session-Logs). Ändert man eine referenzierte Stelle,
+  Jede Information lebt an *einer* Stelle – dem passendsten Dokument – und dort so ausführlich,
+  dass sie **ohne Vorwissen/Session-Kontext** verständlich ist. Andere Stellen **referenzieren**
+  sie über einen Anker oder eine ID (Kurzzusammenfassung erlaubt, Kopie nicht – Kopien driften);
+  Zeilennummern nur in read-only-Dateien wie Session-Logs. Ändert man eine referenzierte Stelle,
   **prüfen, ob die referenzierenden Stellen mitgepflegt werden müssen.**
 
 - **Abschnitte tragen Anker, Verweise zeigen auf den Anker – nie auf eine Nummer.**
@@ -53,96 +50,83 @@ Einträge wandern hierher aus lessons_learned.md oder countermeasures.md (wenn B
 
   Präfix = Dokument, Rest ein Slug in Kleinbuchstaben. So bleibt der Verweis **klickbar** und
   zugleich stabil: Titel dürfen sich ändern, Abschnitte umsortiert werden. Kaputte Verweise blockt
-  `check-anchors.py` (Bestand: `python3 -m prozesscode.anchors list|check`, Escape: `anchor-ok`).
-  Tracker-IDs (TD-/OBS-/ADR-) sind keine Anker.
+  `check-anchors.py`. Tracker-IDs (TD-/OBS-/ADR-) sind keine Anker.
 
 - **Ein Anker ist eine Abrufeinheit – was zu ihm gehört, muss aus der Gliederung folgen.**
   `doc.py get <ANKER>` liefert bei einem Überschriften-Anker alles bis zur nächsten gleich- oder
   höherrangigen Überschrift, bei einem Absatz-Anker nur dessen Block. Ein Nachsatz hinter dem
   Block, der inhaltlich dazugehört, fehlt beim Abruf unbemerkt. Deshalb: Braucht ein Gedanke mehr
-  als seinen Absatz, bekommt er eine Überschrift, keinen zweiten Absatz. Bestand sichten:
-  `python3 -m prozesscode.doc audit`.
+  als seinen Absatz, bekommt er eine Überschrift, keinen zweiten Absatz.
 
 - **Abschnitte, Regeln und Schritte bekommen Namen, keine Nummern.**
-  Eine selbstvergebene Nummer ist eine *zweite Adresse* neben dem Anker – und nur der Anker
-  wird geprüft; sie wird bei jeder Umsortierung still falsch. Der Name sagt zudem, wohin man
-  springt, nicht nur, wie weit. Gilt für Überschriften (`## Findings präsentieren`),
-  Verweistexte (`[Findings präsentieren](#KZN-…)`) und fette Absatz-Leads (`**Rolle ≠ Typ**`).
-  **Legitim bleibt allein fremdbestimmte Nummerierung** – von einer externen Autorität
-  vergeben (RFC-Abschnitt, Gesetzesparagraph, fremde Spec). *Nicht* legitim ist „steht in
-  einer anderen Datei": Eine ADR-Punktnummer schreiben dieselben Autoren wie eine
-  Abschnittsnummer. Ausgenommen sind Markdown-Ordered-Lists – dort zählt Markdown selbst
-  weiter, solange kein Verweis von außen auf eine Position zeigt. Mechanisch abgesichert
-  (`check-ordinale.py`, Bestand: `python3 -m prozesscode.ordinale`); Einzelfall-Escape:
-  `ordinal-ok` in der Zeile.
+  Eine selbstvergebene Nummer ist eine *zweite*, ungeprüfte Adresse neben dem Anker und wird bei
+  jeder Umsortierung still falsch; der Name sagt zudem, wohin man springt, nicht nur, wie weit.
+  Gilt für Überschriften, Verweistexte und fette Absatz-Leads. **Legitim ist allein
+  fremdbestimmte Nummerierung** (RFC-Abschnitt, Gesetzesparagraph, fremde Spec) – nicht die
+  eigene, auch wenn sie in einer anderen Datei steht (ADR-Punktnummern). Markdown-Ordered-Lists
+  sind erlaubt, solange kein Verweis von außen auf eine Position zeigt. Abgesichert durch
+  `check-ordinale.py`.
 
 - **Ein Filter findet nur, woran beim Bauen gedacht wurde – Bestände werden gesichtet, nicht gefiltert.**
   Ein Suchnetz kodiert die Wortliste, die beim Bauen im Kopf war, meldet sauber und übersieht
-  alles andere. Konsequenz, zweigeteilt: Für den **Neuzugang** ist ein
-  Filter richtig (er läuft bei jedem Edit, Lücken fallen mit der Zeit auf). Für einen
-  **bestehenden Bestand** ist er es nicht – dort trägt nur vollständiges Sichten, notfalls
-  klassenweise: alles aufnehmen, Klassen mit Stichprobenbeleg abziehen, den Rest ansehen.
-  Wer eine Klasse ohne Beleg abzieht, hat wieder gefiltert.
+  alles andere. Für den **Neuzugang** ist ein Filter richtig (er läuft bei jedem Edit, Lücken
+  fallen mit der Zeit auf), für einen **bestehenden Bestand** nicht – dort trägt nur vollständiges
+  Sichten, notfalls klassenweise: alles aufnehmen, Klassen mit Stichprobenbeleg abziehen, den Rest
+  ansehen. Wer eine Klasse ohne Beleg abzieht, hat wieder gefiltert.
 
 - **Referenzen laufen von volatil → stabil, nie umgekehrt.**
   Eine stabile Quelle (z.B. ADR) darf **keine** volatile Stelle referenzieren (z.B. `open-questions.md`,
   die bei Lösung gelöscht wird) – sonst dangelt die Referenz, sobald die volatile Stelle verschwindet.
-  Die volatile Stelle referenziert die stabile; relevante Informationen leben (auch) in der stabilen Quelle.
-  Mechanisch abgesichert in beide Richtungen: `check-ref-direction.py` blockt volatile IDs in stabilen
-  Dokumenten (Einzelfall-Escape: `ref-ok`), `check-dangling-refs.py` blockt das Löschen eines TD-/OQ-Eintrags,
-  auf den noch verwiesen wird (Escape: `dangling-ok`).
+  Die volatile referenziert die stabile; Relevantes lebt (auch) in der stabilen Quelle. Abgesichert
+  durch `check-ref-direction.py` (volatile IDs in stabilen Dokumenten) und `check-dangling-refs.py`
+  (Löschen eines TD-/OQ-Eintrags, auf den noch verwiesen wird).
 
 - **Zustandsdokumente tragen nur den offenen/aktuellen Zustand – kein Erledigtes.**
   Ein Zustandsdokument (z.B. `AGENT_MEMORY.md` „Nächste Prioritäten", `tech-debt.md`, `open-questions.md`,
-  der `NEU`-Pool in `observations.md`) beschreibt, was **offen** ist – kein Changelog. Zwei Richtungen, beide Pflicht:
-  **(a) präventiv** – nichts Erledigtes hineinschreiben (Einträge vorwärtsgerichtet formulieren, nicht „erledigt in run-X");
-  **(b) kurativ** – ist ein Eintrag erledigt, wird er **aus dem Dokument entfernt** (er lebt in git-Historie / Session-Log /
-  Archiv weiter), nicht als „erledigt"-Notiz stehengelassen. Weil solche Dokumente laufend geräumt werden, sind ihre
-  Einträge/IDs volatil → an Verweisstellen die nötige Info **inlinen** oder nur auf **stabile** Artefakte (ADR, Guideline)
-  verweisen (siehe Prinzip „volatil → stabil" oben; die syntaktischen Guards dafür stehen dort).
+  der `NEU`-Pool in `observations.md`) beschreibt, was **offen** ist – kein Changelog. Also nichts
+  Erledigtes hineinschreiben (vorwärtsgerichtet formulieren, nicht „erledigt in run-X"), und ist ein
+  Eintrag erledigt, wird er **entfernt** statt als „erledigt" stehengelassen (er lebt in
+  git-Historie, Session-Log, Archiv weiter). Weil solche Dokumente laufend geräumt werden, sind ihre
+  IDs volatil: an Verweisstellen die nötige Info **inlinen** oder nur auf **stabile** Artefakte
+  (ADR, Guideline) verweisen.
 
 <a id="KPI-kommunikation"></a>
 ## Kommunikation & Argumentation
 
-**Vier der folgenden Regeln sichern dieselbe Kette – von der Frage über die Erhebung zur
-Aussage – an je einer Bruchstelle, in dieser Reihenfolge:** gar nichts erhoben („Unterstützt ≠
-beweist"), am untauglichen Aufbau erhoben („Die Gegenprobe"), nur über einen Teil des Raums erhoben
-(„Vollständige Zerlegung"), korrekt erhoben und in einer anderen Größe berichtet („Die berichtete
-Größe ist die gemessene"). Wie ein Fall einer davon zugeordnet wird: [Fälle einer Bruchstelle zuordnen](process.md#KPR-bruchstellen).
+Vier der folgenden Regeln sichern je eine Bruchstelle der Kette Frage → Erhebung → Aussage: gar
+nichts erhoben („Unterstützt ≠ beweist"), am untauglichen Aufbau erhoben („Die Gegenprobe"), nur
+über einen Teil des Raums erhoben („Vollständige Zerlegung"), korrekt erhoben und in einer anderen
+Größe berichtet („Die berichtete Größe ist die gemessene").
 
 - **Eine Tracker-ID nie nackt nennen.**
-  Wer den Volltext hat, ist der Agent – der User müsste ihn heraussuchen. Erstnennung eines
-  Eintrags (OBS/LL/TD/OQ/ADR): ID + Kurztitel + zwei, drei Sätze, die den Punkt verständlich
-  machen und eine qualifizierte Nachfrage erlauben. Jede weitere Nennung: ID + **derselbe**
-  Kurztitel, auch wenn der User selbst nur die ID schreibt – der Name hält im Gespräch fest,
-  wofür die Ziffer steht. Der Kurztitel ist der **Titel** des Eintrags; trägt der den Punkt
-  nicht, Alternativen vorschlagen und die Wahl per `--titel` zurückschreiben, statt einen
-  zweiten Namen danebenzustellen (der veraltete still und behauptete dann Falsches).
-  Dasselbe gilt für jedes Kürzel, das nur der Agent kennt – Review-Findings („A1", „FC-6"),
-  selbst vergebene Befund-Labels, Werkzeug- und Prüfnamen: Eine Frage an den User nennt
-  Gegenstand, Problem und Vorschlag ausgeschrieben, das Kürzel höchstens als Zusatz.
+  Den Volltext hat der Agent, nicht der User. Erstnennung eines Eintrags (OBS/LL/TD/OQ/ADR):
+  ID + Kurztitel + zwei, drei Sätze, die den Punkt verständlich machen und eine qualifizierte
+  Nachfrage erlauben. Jede weitere Nennung: ID + **derselbe** Kurztitel, auch wenn der User nur
+  die ID schreibt. Der Kurztitel ist der **Titel** des Eintrags – trägt er den Punkt nicht, einen
+  besseren vorschlagen und per `--titel` zurückschreiben, keinen zweiten Namen danebenstellen (der
+  veraltete still). Dasselbe gilt für jedes Kürzel, das nur der Agent kennt – Review-Findings
+  („A1", „FC-6"), selbst vergebene Befund-Labels, Werkzeug- und Prüfnamen: Eine Frage an den User
+  nennt Gegenstand, Problem und Vorschlag ausgeschrieben, das Kürzel höchstens als Zusatz.
 
 - **"Unterstützt" ≠ "beweist" – Empirie vor Behauptung, Empfehlung und Fertig-Erklärung.**
-  Vor jeder Aussage oder Handlung, die auf angenommenem Tool-/Prozess-Verhalten beruht – eine
-  Behauptung, eine Empfehlung, ein „fertig", oder das Verlassen auf einen dokumentierten
-  Befehl/Snippet – prüfen: Garantiert der Mechanismus das, oder erleichtert er es nur? Ist ein
-  empirischer Check machbar (Befehl real ausführen, am echten Datensatz, am frischen Agenten),
-  erst verifizieren. Gesichert ist eine Aussage über externes Tool-Verhalten nur, wenn sie auf
-  einem konkreten Tool-Call dieser Session basiert – alles andere proaktiv als unverified
-  kennzeichnen und Verifizierung anbieten, nicht warten bis der User nachfragt.
-  Zwei Tarnungen, die den Selbst-Check aushebeln:
-  **(a) Rechnen ist keine Messung.** Werden zitierte Zahlen addiert, geteilt oder ins Verhältnis
-  gesetzt, war der Tool-Call das Rechnen – nicht die Erhebung. Das Ergebnis ist abgeleitet und
-  erbt jeden Fehler der Quelle; es so zu nennen ist Pflicht, sonst entfällt die Gegenprobe.
-  **(b) Eine Vorschrift beschreibt nicht die Praxis.** Was ein Skill, eine Guideline oder ein
+  Beruht eine Behauptung, eine Empfehlung, ein „fertig" oder das Verlassen auf einen dokumentierten
+  Befehl auf angenommenem Tool-/Prozess-Verhalten, prüfen: Garantiert der Mechanismus das, oder
+  erleichtert er es nur? Ist ein empirischer Check machbar (Befehl real ausführen, am echten
+  Datensatz, am frischen Agenten), erst verifizieren. Gesichert ist eine Aussage über externes
+  Tool-Verhalten nur durch einen konkreten Tool-Call dieser Session – alles andere proaktiv als
+  ungeprüft kennzeichnen und Verifizierung anbieten, nicht warten, bis der User nachfragt.
+  Drei Tarnungen, die den Selbst-Check aushebeln:
+  **Rechnen ist keine Messung.** Wer zitierte Zahlen addiert, teilt oder ins Verhältnis setzt, hat
+  gerechnet, nicht erhoben: Das Ergebnis ist abgeleitet, erbt jeden Fehler der Quelle und muss so
+  genannt werden.
+  **Eine Vorschrift beschreibt nicht die Praxis.** Was ein Skill, eine Guideline oder ein
   Prozessdoc anordnet, sagt nichts darüber, ob es befolgt wird. Bevor Kosten oder Nutzen einer
   Regel beziffert werden: am Bestand prüfen, ob sie greift.
-  **(c) Redaktionsarbeit fühlt sich nicht wie eine Behauptung an.** Doku schreiben, Zustand
-  ablegen, Information platzieren – dort springt der Selbst-Check nicht an, obwohl jeder
-  dokumentierte Befehl eine Behauptung ist und jede Ablage eine über ihre Wiedervorlage. Drei
-  Fragen: Befehl in dieser Session ausgeführt (sonst als ungeprüft kennzeichnen)? Bezeugt die
-  Quelle einen *Versuch* oder eine *Ausführung*? Welcher Mechanismus legt das Abgelegte wieder
-  vor – verträgt der Zielstatus ihn?
+  **Redaktionsarbeit fühlt sich nicht wie eine Behauptung an.** Beim Doku-Schreiben, Zustand-Ablegen
+  und Platzieren springt der Selbst-Check nicht an, obwohl jeder dokumentierte Befehl eine
+  Behauptung ist und jede Ablage eine über ihre Wiedervorlage. Drei Fragen: Befehl in dieser
+  Session ausgeführt (sonst als ungeprüft kennzeichnen)? Bezeugt die Quelle einen *Versuch* oder
+  eine *Ausführung*? Welcher Mechanismus legt das Abgelegte wieder vor – verträgt der Zielstatus ihn?
   Gegenprobe für alle drei: Widerspricht die eigene Rechnung einer vorliegenden Messung um
   Größenordnungen, ist zuerst die Rechnung verdächtig.
 
@@ -153,16 +137,14 @@ Größe ist die gemessene"). Wie ein Fall einer davon zugeordnet wird: [Fälle e
   und Fixture danach wählen, nicht nach Verfügbarkeit.
   **Nach dem Bauen oder Ändern eines Prüfmechanismus** (Hook, Gate, Wrapper, Audit, Guard-Test):
   ihn einmal absichtlich brechen und bestätigen, dass er anspringt – und fragen, wodurch er selbst
-  abgesichert ist. Ein Mechanismus, der nichts prüft, fällt lautlos aus: Sein Ausfall löst per
-  Definition nichts aus.
+  abgesichert ist. Ein Mechanismus, der nichts prüft, fällt lautlos aus.
 
 - **Vor dem Ausgeben eines Prüfergebnisses fragen, ob die Prüfung hätte anschlagen können.**
-  Dieselbe Bruchstelle wie die Gegenprobe, eine Ebene höher: Dort fällt das Werkzeug aus, hier
-  war schon die **Wahl** des Werkzeugs untauglich. Ein grünes Ergebnis fühlt sich wie ein Beleg
-  an, auch wenn der Test seinen Gegenstand nie berührt hat (S124: ein Diff nach `TODO|FIXME`
-  durchsucht, um Vollständigkeit zu belegen – bei Arbeit, die solche Marker nie setzt).
-  Gegenfrage vor jeder Aussage: *Hätte dieses Ergebnis anders ausgesehen, wenn der Fehler
-  vorläge?*
+  Wie die Gegenprobe, eine Ebene höher: Dort fällt das Werkzeug aus, hier war schon seine **Wahl**
+  untauglich. Ein grünes Ergebnis fühlt sich wie ein Beleg an, auch wenn die Prüfung ihren
+  Gegenstand nie berührt hat (ein Diff nach `TODO|FIXME` durchsucht, um Vollständigkeit zu belegen –
+  bei Arbeit, die solche Marker nie setzt). Gegenfrage vor jeder Aussage: *Hätte dieses Ergebnis
+  anders ausgesehen, wenn der Fehler vorläge?*
 
 - **Vollständige Zerlegung vor Schluss/Empfehlung.**
   Bevor ein Schluss, eine Empfehlung oder eine abgeleitete Anforderung steht, den relevanten
@@ -172,20 +154,18 @@ Größe ist die gemessene"). Wie ein Fall einer davon zugeordnet wird: [Fälle e
   (z.B. Injektion + Lesen + Schreiben), bevor eine Empfehlung steht.
 
 - **Die berichtete Größe ist die gemessene – sonst ist es keine Messung mehr.**
-  Letzte Bruchstelle der Kette, und die unauffälligste: Erhoben wurde korrekt, berichtet wird
-  eine andere Größe. Der Fehler fällt nicht auf, weil beide Zahlen plausibel klingen und in
-  dieselbe Richtung zeigen. Drei Fragen vor jeder Zahl, die in eine Aussage eingeht:
-  **(1) Zähleinheit** – was genau ist *ein* Treffer, und kann *ein* Ereignis mehrere erzeugen?
-  (S125: 31 Vorkommen der Agenda-Injektion, verteilt auf 11 Session-Logs, wurden als „30
-  Session-Starts" berichtet – Resume, `/clear` und manuelle Aufrufe erzeugen je einen Treffer.
-  Damit fiel das tragende Argument weg.)
-  **(2) Grundgesamtheit und Zeitpunkt** – worauf bezieht sich die Quote, und wurde zwischen
-  Erhebung und Bericht daran etwas verändert? Wer eine Menge erst bearbeitet und dann misst,
-  misst die Überlebenden (S124: Fehlalarmquote auf dem bereits bereinigten Bestand – 91 % statt
-  realer 65–75 %).
-  **(3) Zielgröße** – rechnet der Mechanismus, über den geredet wird, in genau dieser Größe?
-  Eine Ersatzgröße ist erst zulässig, wenn ihr Zusammenhang mit der Zielgröße selbst belegt ist
-  (S126: der Drain rechnet in Score, gemessen wurde Anzahl).
+  Erhoben wurde korrekt, berichtet wird eine andere Größe – unauffällig, weil beide Zahlen
+  plausibel klingen und in dieselbe Richtung zeigen. Drei Fragen vor jeder Zahl, die in eine
+  Aussage eingeht:
+  **Zähleinheit** – was genau ist *ein* Treffer, und kann *ein* Ereignis mehrere erzeugen? (31
+  Agenda-Injektionen in 11 Session-Logs, berichtet als „30 Session-Starts" – Resume, `/clear` und
+  manuelle Aufrufe erzeugen je einen Treffer.)
+  **Grundgesamtheit und Zeitpunkt** – worauf bezieht sich die Quote, und wurde zwischen Erhebung
+  und Bericht daran etwas verändert? Wer eine Menge erst bearbeitet und dann misst, misst die
+  Überlebenden (Fehlalarmquote auf dem schon bereinigten Bestand: 91 % statt realer 65–75 %).
+  **Zielgröße** – rechnet der Mechanismus, über den geredet wird, in genau dieser Größe? Eine
+  Ersatzgröße ist erst zulässig, wenn ihr Zusammenhang mit der Zielgröße selbst belegt ist (der
+  Drain rechnet in Score, gemessen wurde Anzahl).
   Ein Muster trifft zudem Zeichenketten, keine Objekte der gemeinten Art: Zählt es in Dokumenten,
   die über den gesuchten Gegenstand *schreiben* (Logs, Retros, Archive), sind diese vor dem Zählen
   auszuschließen – und die Treffer sind anzusehen, nicht nur ihre Anzahl.

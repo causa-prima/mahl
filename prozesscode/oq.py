@@ -34,7 +34,7 @@ from .oq_entry import (  # noqa: E402
     remove,
     set_fields,
 )
-from .eintrag_felder import AUFSCHUB_HILFE  # noqa: E402
+from .eintrag_felder import AUFSCHUB_HILFE, AUFSCHUB_HILFE_SET  # noqa: E402
 from .tracker_entry import kuerzungen
 
 _HOOKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".claude", "hooks")
@@ -106,15 +106,16 @@ def cmd_add(args) -> int:
 def cmd_set(args) -> int:
     path = oq_path()
     text = path.read_text(encoding="utf-8")
-    if not any((args.frage, args.faellig, args.hintergrund, args.titel)):
+    if not any((args.frage, args.faellig, args.hintergrund, args.titel, args.aufschubgrund)):
         print("Nichts zu ändern – mindestens ein Feld angeben.", file=sys.stderr)
         return 1
     neu = set_fields(text, args.id, frage=args.frage, faellig=args.faellig,
-                     hintergrund=args.hintergrund, titel=args.titel)
+                     hintergrund=args.hintergrund, titel=args.titel,
+                     aufschubgrund=args.aufschubgrund)
     path.write_text(neu, encoding="utf-8")
     geaendert = [n for n, w in (("Titel", args.titel), ("Frage", args.frage),
-                                ("Fällig", args.faellig),
-                                ("Hintergrund", args.hintergrund)) if w]
+                                ("Fällig", args.faellig), ("Hintergrund", args.hintergrund),
+                                ("Aufschubgrund", args.aufschubgrund)) if w]
     print(f"✓ {args.id}: {', '.join(geaendert)} aktualisiert.")
     for warnung in kuerzungen(text, neu):
         print(f"  {warnung}", file=sys.stderr)
@@ -177,6 +178,8 @@ def main() -> int:
     p_set.add_argument("--frage")
     p_set.add_argument("--faellig")
     p_set.add_argument("--hintergrund")
+    p_set.add_argument("--aufschubgrund", help=AUFSCHUB_HILFE_SET + " Ältere Einträge führen "
+                       "das Feld nicht.")
     p_set.set_defaults(fn=cmd_set)
 
     p_rm = sub.add_parser("remove", help="Geklärte Frage entfernen (Zustandsdokument)")

@@ -48,6 +48,45 @@ def test_bash_hook_laesst_erlaubten_befehl_durch(tmp_path, monkeypatch, capsys):
         "permissionDecision", "allow") == "allow"
 
 
+@pytest.mark.parametrize("agent_type, erwartet", [
+    ("code-quality-auditor", "deny"),
+    # Gegenprobe: Implementer schreiben, und ohne `agent_type` läuft die Hauptsession.
+    ("backend-layer-implementer", "allow"),
+    (None, "allow"),
+])
+def test_bash_hook_sperrt_auditoren_auf_lesen(tmp_path, monkeypatch, capsys, agent_type, erwartet):
+    """Claude Code nennt den Subagenten im Feld `agent_type` – daran hängt die Weiche."""
+    hook = import_module("prozesscode.hooks.check-bash-permission")
+    monkeypatch.setattr(hook, "_LOG_FILE", str(tmp_path / "denied.log"))
+    monkeypatch.setattr(hook, "_ALLOWED_LOG_FILE", str(tmp_path / "allowed.log"))
+    daten = {"tool_name": "Bash", "tool_input": {"command": "touch notiz.md"}}
+    if agent_type:
+        daten["agent_type"] = agent_type
+    _mit_stdin(monkeypatch, hook, daten)
+    entscheidung = json.loads(capsys.readouterr().out)["hookSpecificOutput"]
+    assert entscheidung["permissionDecision"] == erwartet
+
+
+
+@pytest.mark.parametrize("befehl", [
+    "touch notiz.md",        # Allow-Muster, für Auditoren gesperrt
+    "rm -rf notiz",          # destruktiv: der Grund nennt ein Beispiel mit Marker
+    "dotnet test",           # falscher Weg: der Grund verweist auf einen gesperrten Wrapper
+    "python3 - <<'EOF'\nprint(1)\nEOF",  # Smart-Hint: empfiehlt Scratchpad plus Marker
+])
+def test_bash_hook_bietet_auditoren_keinen_marker_an(tmp_path, monkeypatch, capsys, befehl):
+    """Den Ausweg über `--allow-once` gibt es für Auditoren nicht – die Meldung darf ihn
+    nicht anbieten, auch nicht über den Grund des ursprünglichen Denys."""
+    hook = import_module("prozesscode.hooks.check-bash-permission")
+    monkeypatch.setattr(hook, "_LOG_FILE", str(tmp_path / "denied.log"))
+    monkeypatch.setattr(hook, "_ALLOWED_LOG_FILE", str(tmp_path / "allowed.log"))
+    _mit_stdin(monkeypatch, hook, {"tool_name": "Bash", "tool_input": {"command": befehl},
+                                   "agent_type": "code-quality-auditor"})
+    entscheidung = json.loads(capsys.readouterr().out)["hookSpecificOutput"]
+    assert entscheidung["permissionDecision"] == "deny"
+    assert "--allow-once" not in entscheidung["permissionDecisionReason"]
+
+
 @pytest.mark.aufrufpfad("dispatch-edit-write")
 def test_dispatcher_gibt_den_grund_eines_checks_als_deny_aus(tmp_path, monkeypatch, capsys):
     # Leeres Repo für check-anchors: Geprüft wird die Weitergabe des Grunds, nicht der

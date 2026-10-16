@@ -25,7 +25,7 @@ import sys
 
 
 from . import td_entry as tde  # noqa: E402
-from .eintrag_felder import AUFSCHUB_HILFE  # noqa: E402
+from .eintrag_felder import AUFSCHUB_HILFE, AUFSCHUB_HILFE_SET  # noqa: E402
 from .tracker_entry import kuerzungen  # noqa: E402
 
 
@@ -97,16 +97,17 @@ def cmd_set(args) -> int:
     if tde.get(text, args.id) is None:
         print(f"{args.id} existiert nicht.", file=sys.stderr)
         return 1
-    if not any((args.faellig, args.problem, args.behebung, args.titel)):
+    if not any((args.faellig, args.problem, args.behebung, args.titel, args.aufschubgrund)):
         print("Nichts zu ändern – mindestens ein Feld angeben.", file=sys.stderr)
         return 1
 
     neu = tde.set_fields(text, args.id, faellig=args.faellig, problem=args.problem,
-                         behebung=args.behebung, titel=args.titel)
+                         behebung=args.behebung, titel=args.titel,
+                         aufschubgrund=args.aufschubgrund)
     pfad.write_text(neu, encoding="utf-8")
     geaendert = [n for n, w in (("Titel", args.titel), ("Fällig", args.faellig),
-                                ("Problem", args.problem),
-                                ("Behebung", args.behebung)) if w]
+                                ("Problem", args.problem), ("Behebung", args.behebung),
+                                ("Aufschubgrund", args.aufschubgrund)) if w]
     print(f"✓ {args.id}: {', '.join(geaendert)} aktualisiert.")
     for warnung in kuerzungen(text, neu):
         print(f"  {warnung}", file=sys.stderr)
@@ -183,6 +184,8 @@ def main() -> int:
     p_set.add_argument("--faellig")
     p_set.add_argument("--problem")
     p_set.add_argument("--behebung")
+    p_set.add_argument("--aufschubgrund", help=AUFSCHUB_HILFE_SET + " Ältere Einträge führen "
+                       "das Feld nicht.")
     p_set.add_argument("--done", help="Done-Kriterium, falls die Änderung auf `jetzt` geht")
     p_set.set_defaults(fn=cmd_set)
 

@@ -99,6 +99,22 @@ def test_bestandseintrag_ohne_aufschubgrund_bleibt_aenderbar():
     assert "Aufschubgrund" not in td.get(neu, "TD-S044-1")
 
 
+def test_set_ersetzt_den_aufschubgrund():
+    """Korrektur ohne Hand-Edit: Der Aufschubgrund ist per `set` ersetzbar."""
+    text, tid = td.add(BESTAND, 124, titel="X", faellig="Phase:MVP – beim Wechsel",
+                       problem="P", behebung="B", aufschubgrund=AUFSCHUB)
+    neu = td.set_fields(text, tid, aufschubgrund="User – Regel gilt, Umbau später")
+    assert "**Aufschubgrund:** User – Regel gilt, Umbau später" in td.get(neu, tid)
+    assert AUFSCHUB not in td.get(neu, tid)
+
+
+def test_set_prueft_den_aufschubgrund_wie_add():
+    text, tid = td.add(BESTAND, 124, titel="X", faellig="Phase:MVP – beim Wechsel",
+                       problem="P", behebung="B", aufschubgrund=AUFSCHUB)
+    with pytest.raises(ValueError):
+        td.set_fields(text, tid, aufschubgrund="später")
+
+
 # --- AGENT_MEMORY-Kopplung (OBS-S118-1) --------------------------------------
 def test_jetzt_erkennt_fehlenden_memory_punkt():
     assert td.braucht_memory_punkt("jetzt – sofort")

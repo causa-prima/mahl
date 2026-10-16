@@ -1,8 +1,8 @@
 """Tests für session-agenda.py – Rangfolge, Stubs und Ausfall-Isolation.
 
 Vier Zusagen, die der Session-Start hält:
-  1. GENAU EINE „Nächste Aufgabe", nach fester Rangfolge (retro > obs-drain > priorities >
-     next-run), und ihr Text ist BUCHSTÄBLICH die Ausgabe von `--only <name>` – keine
+  1. GENAU EINE „Nächste Aufgabe", nach fester Rangfolge (retro > abhaengigkeiten > obs-drain >
+     priorities > next-run), und ihr Text ist BUCHSTÄBLICH die Ausgabe von `--only <name>` – keine
      zusammenfassende Kopfzeile davor, die den Inhalt darunter doppelte.
   2. Jeder unterdrückte Kandidat bleibt als Stub MIT MESSWERT sichtbar – man kann nicht
      anfordern, wovon man nicht weiß, dass es existiert, und der User übersteuert regelmäßig.
@@ -15,10 +15,12 @@ import functools
 import json
 import subprocess
 import sys
+from datetime import date
 from importlib import import_module
 from pathlib import Path
 
 import pytest
+from conftest import git_repo
 
 agenda = import_module("prozesscode.session-agenda")
 
@@ -546,6 +548,68 @@ def test_der_repo_zustand_erzeugt_keine_stub_zeile(monkeypatch):
     assert agenda.modul_repo_state().stub == ""
 
 
+# --- Abhängigkeits-Durchsicht: monatlich, Gedächtnis im Commit-Trailer -------
+# Fällig ist sie, solange im laufenden Monat kein Commit die Zeile
+# `Abhängigkeiten-Durchsicht: JJJJ-MM` trägt. Ein Auslöser „erste Session des Monats" verfiele
+# still, sobald diese Session die Durchsicht nicht macht – der Trailer hält sie fällig, bis
+# sie gemacht ist. Geprüft gegen ein echtes Repo, weil die Zusage am `--grep` von git hängt.
+def _mit_trailer(monat: str) -> str:
+    return (f"Session 140: Updates\n\nRumpf.\n\nAbhängigkeiten-Durchsicht: {monat}\n"
+            "Session-Ende: 140\n")
+
+
+def test_die_durchsicht_ist_ohne_trailer_faellig(tmp_path):
+    root = git_repo(tmp_path, ["Session 1: Start\n"])
+    block = agenda.modul_abhaengigkeiten(root, date(2026, 10, 14))
+    assert block.beansprucht
+    assert "2026-10" in block.inhalt
+    assert "DEV-abhaengigkeiten-durchsicht" in block.inhalt
+
+
+def test_ein_trailer_des_laufenden_monats_erledigt_sie(tmp_path):
+    root = git_repo(tmp_path, [_mit_trailer("2026-10"), "Session 141: danach\n"])
+    block = agenda.modul_abhaengigkeiten(root, date(2026, 10, 30))
+    assert not block.beansprucht
+    assert block.stub == ""
+
+
+def test_ein_trailer_eines_frueheren_monats_zaehlt_nicht(tmp_path):
+    """Auch über den Jahreswechsel und nach einer Pause: Maßgeblich ist der laufende Monat,
+    nicht der Abstand zum letzten Commit."""
+    root = git_repo(tmp_path, [_mit_trailer("2026-12")])
+    assert agenda.modul_abhaengigkeiten(root, date(2027, 1, 3)).beansprucht
+
+
+def test_nur_eine_eigene_zeile_zaehlt_als_trailer(tmp_path):
+    """Gegenprobe zum Zeilenanker: Ein Rumpf, der über den Trailer SPRICHT, ist keine
+    erledigte Durchsicht."""
+    root = git_repo(tmp_path, [
+        "Session 140: x\n\nNoch offen: Abhängigkeiten-Durchsicht: 2026-10\n",
+        "Session 141: y\n\nAbhängigkeiten-Durchsicht: 2026-10 verschoben\n"])
+    assert agenda.modul_abhaengigkeiten(root, date(2026, 10, 14)).beansprucht
+
+
+def test_der_stub_nennt_faelligkeit_und_monat(tmp_path):
+    root = git_repo(tmp_path, ["Session 1: Start\n"])
+    stub = agenda.modul_abhaengigkeiten(root, date(2026, 10, 14)).stub
+    assert "fällig" in stub and "2026-10" in stub
+
+
+def test_ohne_repo_faellt_das_modul_mit_ursache_aus(tmp_path):
+    """Weder „nicht fällig" noch stumm: Der Rahmen macht aus dem Fehler eine Warnzeile, und
+    die soll sagen, woran es lag – deshalb über `_laufe`, das stderr mitgibt."""
+    with pytest.raises(RuntimeError, match="Exit 128: .+"):
+        agenda.modul_abhaengigkeiten(tmp_path, date(2026, 10, 14))
+
+
+def test_die_durchsicht_rangiert_zwischen_retro_und_drain():
+    """Vor dem Drain, weil erledigt die Durchsicht für den Monat verschwindet, der Drain sie
+    aber beliebig lange verdrängen könnte. Die Retro bleibt vorn."""
+    assert agenda.waehle_aufgabe(blocks(abhaengigkeiten=True, **{"obs-drain": True})) \
+        == "abhaengigkeiten"
+    assert agenda.waehle_aufgabe(blocks(abhaengigkeiten=True, retro=True)) == "retro"
+
+
 # --- Injektions-Blöcke: der 10.000-u16-Cap -----------------------------------
 # Der Runtime verwirft zu große Hook-Ausgaben kommentarlos; Mechanik, Einheit und Quellen
 # stehen an `CAP` in session-agenda.py. Hier wird geprüft, was daraus folgt.
@@ -653,7 +717,7 @@ def test_kein_agenda_modul_startet_einen_subprozess_auf_eigenen_code(monkeypatch
     gesehen: list[tuple[str, ...]] = []
     echt = agenda._laufe
     monkeypatch.setattr(agenda, "_laufe",
-                        lambda *befehl: (gesehen.append(befehl), echt(*befehl))[1])
+                        lambda *befehl, **kw: (gesehen.append(befehl), echt(*befehl, **kw))[1])
     agenda.sammle()
     eigen = [b for b in gesehen if b[0] != "git"]
     assert not eigen, f"Subprozess auf eigenen Code: {eigen}"
@@ -740,7 +804,9 @@ def test_settings_registriert_genau_die_definierten_bloecke():
     #   user-message: gibt JSON mit `systemMessage` aus (erreicht den USER, nicht den Agenten)
     #     und darf deshalb kein Agenda-Block sein – Blöcke geben Plain-Text aus, und sobald ein
     #     Hook JSON ausgibt, wird es als JSON statt als Kontext gelesen.
-    erlaubt_ohne_block = {"prozesscode.user-message"}
+    #   merke-rueckgaben: derselbe Einstieg wie für PostToolUse und Stop – die offenen
+    #     Rückgaben der Session gehören zu ihm, nicht zur Agenda (prozesscode/rueckgaben.py).
+    erlaubt_ohne_block = {"prozesscode.user-message", "prozesscode.hooks.merke-rueckgaben"}
     fremd = [b for b in befehle
              if "--block" not in b and not any(e in b for e in erlaubt_ohne_block)]
     assert fremd == [], f"unbekannter SessionStart-Hook ohne --block: {fremd}"

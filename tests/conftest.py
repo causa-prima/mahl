@@ -6,6 +6,7 @@ Test, der den Test grün lässt, wäre als „überlebt" gezählt und sähe aus 
 Produktivcode.
 """
 import itertools
+import subprocess
 import sys
 import os
 
@@ -58,6 +59,25 @@ def _guard_log_ins_leere(_guard_log_verzeichnis, monkeypatch):
     """
     monkeypatch.setattr(guard_log, "LOG",
                         _guard_log_verzeichnis / f"guard-{next(_LAUFENDE_NUMMER)}.jsonl")
+
+
+def git_repo(verzeichnis, nachrichten: list[str]):
+    """Minimales git-Repo in `verzeichnis` mit je einem Commit pro Nachricht.
+
+    Für Werkzeuge, die ihre Zusage an der echten git-Historie festmachen (Trailer, `--grep`) –
+    ein nachgebauter `git log`-Output prüfte den eigenen Parser, nicht git.
+    """
+    def git(*argumente: str) -> None:
+        subprocess.run(["git", *argumente], cwd=verzeichnis, check=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "T")
+    for i, nachricht in enumerate(nachrichten):
+        (verzeichnis / f"datei_{i}.txt").write_text(str(i), encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-q", "-m", nachricht)
+    return verzeichnis
 
 
 def cli_aufruf(monkeypatch, modul, *argumente) -> int:

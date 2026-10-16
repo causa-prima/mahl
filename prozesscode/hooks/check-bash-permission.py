@@ -692,6 +692,19 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         None,
         'dotnet tool restore|list',
     ),
+    # Update-Abfragen der monatlichen Abhängigkeits-Durchsicht (dev-workflow.md) – lesend.
+    # Nur mit --outdated/--vulnerable: Die schreibenden Nachbarn (dotnet add package,
+    # dotnet tool install|update) bleiben deny, die Abhängigkeiten ändert der User.
+    (
+        re.compile(r'^dotnet\s+list\s+(?:\S+\s+)?package\s+(?:.*\s)?--(?:outdated|vulnerable)\b'),
+        None,
+        'dotnet list [<projekt>] package --outdated|--vulnerable',
+    ),
+    (
+        re.compile(r'^dotnet\s+tool\s+search\s+\S'),
+        None,
+        'dotnet tool search <id>',
+    ),
     # docker compose up|down (v2-Plugin, nativ in WSL). docker-compose (v1) → Smart-Deny-Hint.
     (
         # `config` rendert die effektive Compose-Konfiguration und startet nichts.
@@ -826,6 +839,69 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         'git [-C <pfad>] hash-object [-w] <datei>…  (Blob-SHA für Test-Freigabe-Anker)',
     ),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Auditoren: nur lesend
+# Reviewt wird vor dem Commit – was ein Auditor im Arbeitsbaum ändert, trifft Arbeit, die git
+# noch nicht sichert. Für Auditoren ist Bash der einzige Schreibweg (kein Edit/Write), deshalb
+# muss ein Befehl zusätzlich zu ALLOW_PATTERNS eines dieser Muster treffen. Die Gruppen der
+# Allow-Liste taugen dafür nicht: „Lesen" und „Shell" sind Anzeigegruppen für --list und
+# enthalten Schreiber (`awk '{print > "f"}'`, `sort -o`, `sed 'w f'`, `find -fprint`).
+# Grenze: Erkannt wird, wer `agent_type` mitbringt und in AUDITOREN steht – ein umbenannter
+# Auditor liefe mit vollen Rechten (abgesichert durch einen Abgleich mit .claude/agents/), ein
+# mit `name` gestarteter ebenso: Dann steht dort der Name (abgesichert durch check-agent-start).
+# `pytest` führt Testcode aus; was der schreibt, liegt in tmp_path, nicht im Arbeitsbaum.
+# ---------------------------------------------------------------------------
+AUDITOREN = frozenset({
+    "code-quality-auditor", "functional-correctness-auditor", "security-auditor",
+    "test-quality-auditor", "ux-ui-auditor", "workflow-auditor",
+})
+# Das Paket-Muster der Allow-Liste erlaubt jedes Modul, auch solche, die ohne Rückfrage
+# schreiben (`obs-archive`). Die schreibenden Unterbefehle der Tracker-Werkzeuge fängt
+# WRITE_ACCESS ab. Nicht dabei: `dotnet-test` – parallel laufende Auditoren teilten sich die
+# Build-Ausgabe – und die Mutationsläufe mit ihrem Run-Lock.
+_LESENDE_MODULE = frozenset({
+    "doc", "anchors", "decisions", "test-inventory", "tracker", "ordinale",
+    "obs", "td", "oq", "lessons", "ruff-run", "eslint-run", "vitest-run",
+})
+_GIT = r'^git\s+(?:-C\s+\S+\s+)?'
+AUDITOR_PATTERNS: list[re.Pattern[str]] = [
+    # Befehle ohne jede Option, die eine Datei schreibt.
+    re.compile(r'^(?:ls|cat|head|tail|wc|grep|stat|file|diff|echo|printf|test|\[|cd|pwd|date|'
+               r'which|tr|cut|rev|fold|dirname|basename|realpath|jq|xargs)(?=\s|$)'),
+    re.compile(r'^sort\b(?!.*(?:\s-[a-zA-Z]*o|\s--output))'),
+    re.compile(r'^uniq(?:\s+-\S+)*$'),                      # `uniq ein aus` schriebe `aus`
+    re.compile(r"^sed\s+-n\s+'(?:\d+|\$)(?:,(?:\d+|\$))?p'(?:\s|$)"),  # nur Zeilenbereich drucken
+    re.compile(r'^find\b(?!.*\s-(?:delete|exec|execdir|ok|okdir|fprint|fprint0|fprintf|fls)\b)'),
+    re.compile(_GIT + r'(?:status|log|diff|show|rev-parse|ls-files|shortlog|check-ignore)\b'
+               r'(?!.*\s--output\b)'),
+    re.compile(_GIT + r'branch(?:\s+(?:-a|-r|-v|-vv|--all|--remotes|--list|--show-current))*\s*$'),
+    re.compile(_GIT + r'tag(?:\s+(?:-l|--list)(?:\s+\S+)?)?\s*$'),
+    re.compile(_GIT + r'remote(?:\s+-v)?\s*$'),
+    re.compile(_GIT + r'config\s+--get\b'),
+    re.compile(r'^python3\s+-m\s+pytest\s+tests/'),
+    re.compile(r'^python3\s+(?!-)tests/\S+\.py'),
+    re.compile(r'^python3\s+\S*\.claude/skills/recall-session/scripts/recall\.py\b'),
+    re.compile(r'^python3\s+-m\s+prozesscode\.(?:'
+               + '|'.join(re.escape(m) for m in sorted(_LESENDE_MODULE))
+               + r')(?=\s|$)(?!.*\s--fix\b)'),
+]
+
+_NUR_LESEND_DENY_REASON = (
+    "Auditoren arbeiten nur lesend: Lesebefehle ohne schreibende Optionen (kein awk, kein sort -o, "
+    "sed nur als `sed -n '10,20p' <datei>`), git lesend, pytest, die Test-Runner und die Lese-, "
+    "Test- und Lint-Werkzeuge aus prozesscode (ohne --fix). Was Dateien, Index oder einen "
+    "Tracker ändert, bleibt dem Orchestrator."
+)
+_NUR_LESEND_FOOTER = (
+    "\n\nAls Auditor gibt es keine Freigabe per Marker. Was sich nur schreibend prüfen ließe, "
+    "im Finding als offene Prüfung nennen."
+)
+
+
+def _fuer_auditoren(command: str) -> bool:
+    return any(pattern.search(command) for pattern in AUDITOR_PATTERNS)
 
 
 # ---------------------------------------------------------------------------
@@ -1344,7 +1420,8 @@ def split_compound_command(command: str) -> list[str]:
 # Kern-Logik
 # ---------------------------------------------------------------------------
 
-def check_simple_command(command: str, in_loop: bool = False) -> tuple[str, str, str]:
+def check_simple_command(command: str, in_loop: bool = False,
+                         nur_lesend: bool = False) -> tuple[str, str, str]:
     """Prüft ein einzelnes Segment: INDIRECT → ALLOW → DESTRUCTIVE → deny.
 
     WRONG_APPROACH wird nicht geprüft – das übernimmt check_command auf dem
@@ -1353,6 +1430,7 @@ def check_simple_command(command: str, in_loop: bool = False) -> tuple[str, str,
     in_loop: Kommando aus einem Schleifenrumpf oder aus `-exec`/`xargs`. Dort sind
     Dateiverwaltungs-Befehle gesperrt – `rm` ist einzeln erlaubt, wiederholt ergibt
     es ein `rm -rf`, und die Wiederholungszahl ist zur Prüfzeit unsichtbar.
+    nur_lesend: Aufruf eines Auditors – zusätzlich muss ein AUDITOR_PATTERNS-Muster passen.
 
     Gibt (decision, reason, log_type) zurück. decision: 'allow' | 'deny'.
     """
@@ -1361,6 +1439,8 @@ def check_simple_command(command: str, in_loop: bool = False) -> tuple[str, str,
 
     for pattern, category, _ in ALLOW_PATTERNS:
         if pattern.search(command):
+            if nur_lesend and not _fuer_auditoren(command):
+                return ("deny", _NUR_LESEND_DENY_REASON, "NUR_LESEND")
             if in_loop and category == 'Dateiverwaltung':
                 return ("deny", _LOOP_WRITE_DENY_REASON, "LOOP_WRITE")
             if has_unsafe_output_redirect(command):
@@ -1375,8 +1455,23 @@ def check_simple_command(command: str, in_loop: bool = False) -> tuple[str, str,
     return ("deny", hint, "UNKNOWN")
 
 
-def check_command(command: str) -> tuple[str, str, str]:
+def check_command(command: str, nur_lesend: bool = False) -> tuple[str, str, str]:
     """Prüft einen Befehl und gibt (decision, reason, log_type) zurück.
+
+    nur_lesend: Aufruf eines Auditors (AUDITOREN). Jede Rückfrage wird dann zum Deny mit
+    log_type `NUR_LESEND_<bisheriger Typ>` – an dieser einen Stelle, damit kein künftiger
+    ask-Pfad sie umgeht.
+
+    decision: 'allow' | 'deny' | 'ask' (für Auditoren nie 'ask')
+    """
+    decision, reason, log_type = _entscheide(command, nur_lesend)
+    if nur_lesend and decision == "ask":
+        return ("deny", _NUR_LESEND_DENY_REASON, f"NUR_LESEND_{log_type}")
+    return (decision, reason, log_type)
+
+
+def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
+    """Die eigentliche Prüfung hinter check_command.
 
     Reihenfolge (die Namen stehen so auch an den Stellen im Körper – bewusst keine Nummern:
     zwei Nummerierungen derselben Abfolge liefen bereits auseinander, der Docstring kannte
@@ -1401,7 +1496,7 @@ def check_command(command: str) -> tuple[str, str, str]:
     #      User am Freigabe-Prompt als Reason mitgegeben (statt eines kontextlosen „erlauben?").
     if ONE_TIME_MARKER in command:
         bare = command.replace(ONE_TIME_MARKER, "").strip()
-        decision, reason, _ = check_command(bare)  # bare hat keinen Marker → terminiert
+        decision, reason, _ = _entscheide(bare, nur_lesend)  # bare hat keinen Marker → terminiert
         if decision == "allow":
             return ("allow", _ONE_TIME_UNNEEDED_HINT, "ONE_TIME_UNNEEDED")
         return ("ask", reason, "ONE_TIME")
@@ -1480,7 +1575,7 @@ def check_command(command: str) -> tuple[str, str, str]:
         for cmd, is_mass in expand_segment(segment):
             checked_any = True
             decision, reason, log_type = check_simple_command(
-                cmd, in_loop=loop_depth > 0 or is_mass)
+                cmd, in_loop=loop_depth > 0 or is_mass, nur_lesend=nur_lesend)
             if decision == "deny":
                 if is_compound:
                     log_type = f"COMPOUND_{log_type}"
@@ -1497,8 +1592,12 @@ def check_command(command: str) -> tuple[str, str, str]:
     return ("allow", _ALLOW_REASON, "ALLOW")
 
 
-def _build_deny_message(reason: str) -> str:
+def _build_deny_message(reason: str, nur_lesend: bool = False) -> str:
     """Baut die vollständige Deny-Nachricht für den Agenten."""
+    # Für Auditoren nie der ursprüngliche Grund: Die Hinweistexte empfehlen `# --allow-once`
+    # oder Wrapper, die ihnen gesperrt sind.
+    if nur_lesend:
+        return _NUR_LESEND_DENY_REASON + _NUR_LESEND_FOOTER
     if reason:
         return reason + _ALLOW_ONCE_WITH_HINT_FOOTER
     return _NO_HINT_MESSAGE
@@ -1711,7 +1810,10 @@ def main() -> None:
     if not command:
         sys.exit(0)
 
-    decision, reason, log_type = check_command(command)
+    # Claude Code nennt bei Subagent-Aufrufen den Typ in `agent_type`, bei einem mit `name`
+    # gestarteten allerdings den Namen – s. Grenze bei AUDITOREN.
+    nur_lesend = inp.get("agent_type") in AUDITOREN
+    decision, reason, log_type = check_command(command, nur_lesend)
 
     # allow: in separates allowed-commands.log (Misuse-Pattern-Analyse, OBS-S085-3 D) –
     # denied-commands.log bleibt ausschließlich für Denies/Asks.
@@ -1742,7 +1844,7 @@ def main() -> None:
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": _build_deny_message(reason),
+            "permissionDecisionReason": _build_deny_message(reason, nur_lesend),
         }
     }))
     sys.exit(0)

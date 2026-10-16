@@ -11,6 +11,10 @@
     "beurteilbar": 21,
     "getoetet": 20
   },
+  "prozesscode.hooks.check-agent-start": {
+    "beurteilbar": 12,
+    "getoetet": 12
+  },
   "prozesscode.hooks.check-bash-permission": {
     "beurteilbar": 241,
     "getoetet": 129
@@ -63,9 +67,17 @@
     "beurteilbar": 21,
     "getoetet": 5
   },
+  "prozesscode.hooks.merke-rueckgaben": {
+    "beurteilbar": 40,
+    "getoetet": 40
+  },
   "prozesscode.ordinale": {
     "beurteilbar": 105,
     "getoetet": 97
+  },
+  "prozesscode.rueckgaben": {
+    "beurteilbar": 119,
+    "getoetet": 108
   },
   "prozesscode.td": {
     "beurteilbar": 177,

@@ -16,10 +16,12 @@ kritische-regeln:
 |-----------|--------|------------|
 | [Befehlsauswahl](#DEV-befehlsauswahl) | Auto-deny/allow-once-Mechanismus, Scratchpad, zusammengesetzte Befehle | Wenn ein Befehl geblockt wird |
 | [Tool-Call-Failure-Analyse](#DEV-failure-analyse) | Root Cause → korrektes Muster ableiten → dokumentieren → wiederholen | Bei fehlgeschlagenen Befehlen |
+| [Rückgaben abhaken](#DEV-rueckgaben) | Knoten für Agenten- und Hintergrund-Ergebnisse, Stop-Erinnerung, `rueckgaben erledigt` | Wenn der Stop-Hook an eine Rückgabe erinnert |
 | [WSL-native Toolchain](#DEV-wsl-toolchain) | .NET + Node nativ; lokale Tool-Manifest; Test/Stryker via Wrapper | Beim Aufrufen von dotnet/npm |
 | [Datenbank starten](#DEV-datenbank-starten) | Docker Compose, Connection String | Beim Starten der lokalen Umgebung |
 | [Backend](#DEV-backend) | Build, Run | Beim Starten / Bauen des Backends |
 | [Frontend](#DEV-frontend) | npm install, dev-Server, Produktions-Build, Vite-Proxy | Beim Starten / Bauen des Frontends |
+| [Abhängigkeits-Durchsicht](#DEV-abhaengigkeiten-durchsicht) | Monatliche Update-Abfrage, Vorlage, Trailer | Wenn die Agenda sie fällig meldet |
 | [Tests](#DEV-tests) | Alle Tests / einzelnes Projekt / einzelner Test / Frontend-Tests | Beim Ausführen von Tests |
 | [Datenbank-Workflow](#DEV-datenbank-workflow) | Drop+Recreate (Entwicklung) vs. Migrations (ab V1) | Bei Schema-Änderungen |
 | [Mutation Testing](#DEV-mutation-testing) | Stryker gezielt (eine Datei) und vollständig, --mutate-Pfad-Konvention | Nach jeder Phase oder gezielt nach Änderungen |
@@ -39,8 +41,9 @@ kritische-regeln:
 - **Destruktiv** (z.B. `rm -rf`, `git reset --hard`): Auto-deny, aber per `# --allow-once` freigabefähig.
 - **Auto-deny**: Alle anderen Befehle werden automatisch abgelehnt.
 - **`# --allow-once`**: Marker an den Befehl hängen → Hook fragt den User. Wird geloggt in `.claude/tmp/denied-commands.log`.
+- **Auditoren** (die Review-Agenten, erkannt am Feld `agent_type` der Hook-Eingabe): nur lesend. Zusätzlich zur Allow-Liste muss ein Befehl eine engere Auditor-Liste treffen (`AUDITOR_PATTERNS` im Hook): Lesebefehle ohne schreibende Optionen (also kein `awk`, kein `sort -o`, `sed` nur als Zeilenbereich), git lesend, `pytest`, die Test-Runner und die Lese-, Test- und Lint-Werkzeuge aus `prozesscode` (ohne `--fix`). Rückfragen werden für sie zum Deny, auch `# --allow-once`: Reviewt wird vor dem Commit, und was ein Auditor ändert, träfe ungesicherte Arbeit. Grenze: Wer ohne bekannten `agent_type` kommt, hat die vollen Rechte. Deshalb gleicht ein Test `AUDITOREN` mit `.claude/agents/*-auditor.md` ab, und **Auditoren starten ohne `name`**: Bei einem benannten Agenten steht in `agent_type` der Name statt des Typs (live gemessen), deshalb lehnt `check-agent-start` einen solchen Start ab. `pytest` führt Testcode aus, dessen Schreibzugriffe gehen nach `tmp_path`.
 
-**Wegwerf-Artefakte gehören ins Session-Scratchpad**, nicht ins Repo: Analyse-Scripte, Zwischenergebnisse, Diffs, Redirect-Ziele. Es liegt außerhalb des Repos, wird nicht committet und verschwindet mit der Session – nichts muss aufgeräumt werden. Redirects dorthin sind erlaubt; den konkreten Pfad zeigt `check-bash-permission.py --list`. In `.claude/tmp/` leben nur die beiden Permission-Logs.
+**Wegwerf-Artefakte gehören ins Session-Scratchpad**, nicht ins Repo: Analyse-Scripte, Zwischenergebnisse, Diffs, Redirect-Ziele. Es liegt außerhalb des Repos, wird nicht committet und muss nicht aufgeräumt werden – es liegt unter `/tmp`, und das leert systemd beim Booten, auch mitten in einer Session. Was eine Unterbrechung überstehen muss, gehört nicht hinein. Redirects dorthin sind erlaubt; den konkreten Pfad zeigt `check-bash-permission.py --list`. In `.claude/tmp/` (gitignored) leben nur die Protokolle der Hooks und die [Rückgaben-Ablage](#DEV-rueckgaben) – kein Schreibziel für Bash.
 
 Das **Ausführen** eines dort liegenden Scripts ist dagegen freigabepflichtig (`python3 <scratchpad>/<name>.py # --allow-once`): Ein Script führt beliebigen Code aus und umginge sonst genau die Prüfung, für die der Hook existiert – der Ablageort ändert daran nichts. Davor steht ohnehin die Werkzeugfrage: Edit, Read, `grep`/`find` und die `prozesscode`-Werkzeuge zuerst; ein eigenes Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist als diese – nicht deshalb, weil Bash gerade geblockt hat.
 
@@ -60,6 +63,33 @@ Schlägt ein Tool-Call fehl:
 4. **Erst dann wiederholen** – mit dem korrekten Befehl.
 
 Parameter einfach weglassen oder "blind" variieren ist kein Debugging.
+
+---
+
+<a id="DEV-rueckgaben"></a>
+## Rückgaben aus dem Hintergrund abhaken
+
+Agenten und Bash-Befehle mit `run_in_background` liefern zeitversetzt. Damit ein Ergebnis nicht
+untergeht, während weitergearbeitet wird, gilt ein **Knoten im Taschentuch**:
+
+- **Knüpfen passiert von selbst:** Jeder solche Start der Hauptsession landet als Eintrag in
+  `.claude/tmp/rueckgaben/<session-id>/<id>.json` (Hook `merke-rueckgaben`, PostToolUse).
+  Was ein Subagent startet, verarbeitet er selbst.
+- **Lösen ist deine Aufgabe:** Ist alles aus einer Rückgabe verarbeitet (jedes Finding
+  umgesetzt, verworfen oder dem User vorgelegt), abhaken:
+  `python3 -m prozesscode.rueckgaben erledigt <id> --ausgang '3 umgesetzt, 1 verworfen'`.
+  Der Ausgang wird nicht gespeichert – er zwingt dazu, das Ergebnis zu benennen, und steht
+  danach im Transkript. Offenes zeigt `python3 -m prozesscode.rueckgaben liste`.
+- **Erinnert wird an zwei Stellen:** Willst du den Turn beenden, während eine fertige Rückgabe
+  offen ist, blockt der Stop-Hook **einmal** und nennt sie. Wartest du bewusst oder fragst den
+  User, beendest du einfach erneut. Nach `compact` oder `resume` zeigt der Session-Start die
+  offenen Einträge.
+
+Fertig oder laufend entscheidet der Harness (`background_tasks` der Stop-Eingabe), nicht die
+Ablage. Sie trägt nur Offenes, mit dem letzten Eintrag verschwindet der Ordner. Verwaiste
+Ordner fremder Sessions löscht der Session-Start nach 14 Tagen. Eine unlesbare Eintragsdatei
+erscheint als Eintrag der Art „unlesbar“ und lässt sich ebenso abhaken. Hintergrund:
+`prozesscode/rueckgaben.py`.
 
 ---
 
@@ -239,6 +269,32 @@ Wurde **Playwright** gebumpt, zusätzlich das passende Browser-Binary neu instal
 cd Client && npx playwright install chromium
 python3 -m prozesscode.playwright-test   # E2E-Kette nach dem Bump verifizieren
 ```
+
+---
+
+<a id="DEV-abhaengigkeiten-durchsicht"></a>
+## Abhängigkeits-Durchsicht (monatlich)
+
+Die Session-Agenda legt sie vor, solange im laufenden Monat kein Commit die Zeile
+`Abhängigkeiten-Durchsicht: JJJJ-MM` trägt. Abgelehnte Updates werden nicht festgehalten und
+erscheinen im Folgemonat wieder – ein Grund, eines länger liegen zu lassen, trat bisher nicht auf.
+
+1. Updates abfragen:
+   ```bash
+   dotnet list mahl.slnx package --outdated                   # NuGet (Directory.Packages.props)
+   dotnet list mahl.slnx package --vulnerable --include-transitive
+   dotnet tool search <id>   # je Werkzeug aus .config/dotnet-tools.json – sucht unscharf, Zeile mit exakter ID lesen
+   npm --prefix Client outdated                               # Exit 1 heißt „etwas ist veraltet", kein Fehler
+   npm --prefix Client audit
+   ```
+2. Dem User vorlegen: je Paket aktuell → neu, Majors und Lücken hervorgehoben, bei Majors die
+   Breaking Changes aus dem Changelog. Er entscheidet je Update und führt es selbst aus – Edit
+   auf die geschützten Abhängigkeitsdateien und `dotnet add package` / `dotnet tool update` sind gesperrt.
+3. Nach den Updates verifizieren: Frontend per [Pflicht-Verifikation](#DEV-dependency-updates),
+   Backend per `python3 -m prozesscode.dotnet-test`.
+4. Den abschließenden Commit mit `Abhängigkeiten-Durchsicht: JJJJ-MM` im Trailer-Absatz
+   versehen – auch wenn nichts aktualisiert wurde. Fehlt die Zeile, legt die Agenda die
+   Durchsicht erneut vor.
 
 ---
 

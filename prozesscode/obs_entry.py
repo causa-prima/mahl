@@ -245,13 +245,48 @@ def add(text: str, session: int, **felder) -> tuple[str, str]:
     return text.rstrip("\n") + "\n\n" + eintrag, oid
 
 
+def _feldzeile(feld: str) -> re.Pattern:
+    return re.compile(rf"^- {re.escape(feld)}:.*$", re.M)
+
+
+def _setze_zeile(oid: str, block: str, feld: str, wert: str, *,
+                 vor: str | None = None, hinter: str | None = None) -> str:
+    """Ersetzt die Zeile `- feld: …` – oder fügt sie ein, vor `vor` bzw. hinter `hinter`.
+
+    Ohne Einfügeposition muss das Feld vorhanden sein. Die Ersetzung läuft als Funktion, nicht
+    als String: Ein String wäre ein Regex-Template, in dem `\\s` mit „bad escape" abbräche und
+    `\\1` still durch eine Gruppe ersetzt würde. Einträge zitieren regelmäßig Muster und Pfade –
+    der Wert muss literal bleiben.
+    """
+    zeile = f"- {feld}: {wert}"
+    vorhanden = _feldzeile(feld)
+    if vorhanden.search(block):
+        return vorhanden.sub(lambda _: zeile, block, count=1)
+    anker_feld = vor or hinter
+    anker = _feldzeile(anker_feld) if anker_feld else None
+    if anker is None or not anker.search(block):
+        raise ValueError(f"{oid} hat kein Feld `- {anker_feld or feld}:` – Datei von Hand prüfen.")
+    if vor:
+        return anker.sub(lambda m: zeile + "\n" + m.group(0), block, count=1)
+    return anker.sub(lambda m: m.group(0) + "\n" + zeile, block, count=1)
+
+
+def _nicht_leer(oid: str, feld: str, wert: str) -> str:
+    if not wert.strip():
+        raise ValueError(f"{oid}: `{feld}` darf nicht leer sein.")
+    return wert.strip()
+
+
 def set_fields(text: str, oid: str, status: str | None = None,
                entscheidung: str | None = None, zusammen: str | None = None,
-               titel: str | None = None) -> str:
-    """Ersetzt Titel, Status, Entscheidung und/oder die `Zusammen-erledigen`-Kanten.
+               titel: str | None = None, beobachtung: str | None = None,
+               vorpraegung: str | None = None, aufschubgrund: str | None = None) -> str:
+    """Ersetzt Titel und Felder eines Eintrags – auch zur Korrektur einer Erfassung.
 
-    `zusammen` wird **eingefügt**, wenn das Feld fehlt – Einträge aus der Zeit vor der
-    Pflichtangabe haben es nicht, und der Drain muss Kanten beidseitig korrigieren können.
+    `zusammen`, `vorpraegung` und `aufschubgrund` werden **eingefügt**, wenn das Feld fehlt –
+    an derselben Position wie bei neuen Einträgen. Ältere Einträge führen sie nicht, und ohne
+    Einfügen bliebe für die Korrektur nur der Hand-Edit. `beobachtung` ERSETZT den
+    Text; Anhängen bei einer Konsolidierung ist `append_beobachtung`.
 
     `titel` ändert die Überschrift, nicht die ID: Der Titel ist zugleich der Kurztitel, unter
     dem der Eintrag im Gespräch geführt wird. Trägt er den Punkt nicht mehr, wird er korrigiert
@@ -266,42 +301,28 @@ def set_fields(text: str, oid: str, status: str | None = None,
     if status is not None:
         eintrag_felder.pruefe_obs_status(status)
     if titel is not None:
-        if not titel.strip():
-            raise ValueError(f"{oid}: leerer Titel.")
         kopf = re.compile(rf"^## {re.escape(oid)} .*$", re.M)
-        neue_zeile = f"## {oid} – {titel.strip()}"
+        neue_zeile = f"## {oid} – {_nicht_leer(oid, 'Titel', titel)}"
         block = kopf.sub(lambda _: neue_zeile, block, count=1)
+    if beobachtung is not None:
+        block = _setze_zeile(oid, block, "Beobachtung", _nicht_leer(oid, "Beobachtung", beobachtung))
+    if vorpraegung is not None:
+        # Direkt hinter der Beobachtung: Dort endet die neutrale Schilderung (s. format_entry).
+        block = _setze_zeile(oid, block, VORPRAEGUNG_FELD,
+                             _nicht_leer(oid, VORPRAEGUNG_FELD, vorpraegung), hinter="Beobachtung")
     if zusammen is not None:
         _pruefe_ziele(oid, re.findall(r"OBS-S\d{3}-\d+", zusammen), text)
-        zeile = f"- {ZUSAMMEN_FELD}: {_pruefe_zusammen(zusammen)}"
-        vorhanden = re.compile(rf"^- {re.escape(ZUSAMMEN_FELD)}:.*$", re.M)
-        if vorhanden.search(block):
-            block = vorhanden.sub(lambda _: zeile, block, count=1)
-        else:
-            # Dieselbe Position wie bei neuen Einträgen: hinter der Beobachtung (bzw. der
-            # Vorprägung, die zwischen beiden steht), vor der Entscheidung.
-            anker = re.compile(r"^- Entscheidung/Maßnahme:", re.M)
-            if not anker.search(block):
-                raise ValueError(f"{oid} hat kein Feld `- Entscheidung/Maßnahme:` – "
-                                 f"Datei von Hand prüfen.")
-            block = anker.sub(lambda m: zeile + "\n" + m.group(0), block, count=1)
-
-    for feld, wert in (("Status", status), ("Entscheidung/Maßnahme", entscheidung)):
-        if wert is None:
-            continue
-        muster = re.compile(rf"^- {re.escape(feld)}:.*$", re.M)
-        if not muster.search(block):
-            raise ValueError(f"{oid} hat kein Feld `- {feld}:` – Datei von Hand prüfen.")
-        # Ersetzung als Funktion, nicht als String: Ein String-Argument wäre ein
-        # Regex-Ersetzungs-Template, in dem `\s` mit „bad escape“ abbricht und `\1`
-        # still durch eine Regex-Gruppe ersetzt würde. Entscheidungstexte zitieren
-        # regelmäßig Muster und Pfade – der Wert muss literal bleiben.
-        neuer_wert = f"- {feld}: {wert}"
-        # noqa B023: Das Lambda fängt zwar `neuer_wert` aus der Schleife, wird von `sub` aber
-        # SOFORT in derselben Iteration aufgerufen und überlebt sie nicht – der Fallstrick,
-        # den die Regel meint (gespeicherte Closure sieht später den letzten Wert), liegt hier
-        # nicht vor. Geprüft in S128.
-        block = muster.sub(lambda _: neuer_wert, block, count=1)  # noqa: B023
+        block = _setze_zeile(oid, block, ZUSAMMEN_FELD, _pruefe_zusammen(zusammen),
+                             vor="Entscheidung/Maßnahme")
+    if aufschubgrund is not None:
+        # Vor der Entscheidung und damit hinter `Zusammen-erledigen` – die Reihenfolge von add.
+        block = _setze_zeile(oid, block, AUFSCHUB_FELD,
+                             eintrag_felder.pruefe_aufschubgrund(aufschubgrund),
+                             vor="Entscheidung/Maßnahme")
+    if status is not None:
+        block = _setze_zeile(oid, block, "Status", status)
+    if entscheidung is not None:
+        block = _setze_zeile(oid, block, "Entscheidung/Maßnahme", entscheidung)
 
     pruefe_wohlgeformt(oid, block)
     return text[:span[0]] + block + text[span[1]:]

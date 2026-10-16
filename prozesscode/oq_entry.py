@@ -88,11 +88,14 @@ def add(text: str, session: int, root: Path | None = None, *, titel: str, frage:
 
 def set_fields(text: str, oid: str, frage: str | None = None, faellig: str | None = None,
                hintergrund: str | None = None, root: Path | None = None,
-               titel: str | None = None) -> str:
+               titel: str | None = None, aufschubgrund: str | None = None) -> str:
     if faellig is not None:
         _pruefe_anker(oid, faellig, root)
+    if aufschubgrund is not None:
+        aufschubgrund = pruefe_aufschubgrund(aufschubgrund)
     werte = {f: w for f, w in (("Frage", frage), ("Fällig", faellig),
-                               ("Hintergrund", hintergrund)) if w is not None}
+                               ("Hintergrund", hintergrund), (AUFSCHUB_FELD, aufschubgrund))
+             if w is not None}
     return te.set_fields(SPEC, text, oid, werte, titel=titel)
 
 

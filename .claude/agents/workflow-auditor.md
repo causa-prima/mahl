@@ -1,7 +1,7 @@
 ---
 name: workflow-auditor
 description: Auditiert das Workflow-/Prozess-DESIGN (nicht Doku-Qualität – das macht review-docs) – Entwickler-Belastung, Robustheit/Single-Points-of-Failure, ob Hooks/Gates TDD wirklich erzwingen, Ressourceneffizienz, Skalierbarkeit. Read-only, liefert Analyse. NUR manuell bei expliziter Anfrage nach einem Workflow-/Prozess-Review – nicht auto-triggern, nicht Teil eines normalen Code-Reviews.
-tools: Read, Grep, Glob
+tools: Read, Bash
 model: sonnet
 ---
 
@@ -26,15 +26,15 @@ soll trotzdem vermieden werden.
 ## Zu prüfende Artefakte
 
 Du auditierst das Prozess-Design – nicht jede Datei im Projekt. Verschaffe dir zuerst per
-`ls`/Glob einen Überblick über die folgenden Kategorien und lies dann gezielt. **Verlass dich
+`ls`/`find` einen Überblick über die folgenden Kategorien und lies dann gezielt. **Verlass dich
 NICHT auf eine feste Dateiliste** – die veraltet, sobald ein Skill, Agent oder Hook dazukommt.
-Globben statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
+Suchen statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
 
 - **Die Workflow-Skills** – `.claude/skills/*/SKILL.md`: sie *sind* der Workflow. Schwerpunkt auf
   den Skills, die den Entwicklungsfluss tragen (z.B. gherkin-workshop, implementing-scenario,
   review-code, closing-session), aber verschaffe dir Überblick über alle.
 - **Die Agenten** – `.claude/agents/*.md`: die Akteure im Workflow (Implementer + Auditoren).
-- **Die Enforcement-Mechanismen** – `prozesscode/hooks/` (Glob nach `*.py`/`*.sh`) und
+- **Die Enforcement-Mechanismen** – `prozesscode/hooks/` (`find` nach `*.py`/`*.sh`) und
   `.claude/settings.json` / `settings.local.json`: Welche Gates/Hooks greifen *wirklich*, welche
   nur advisory? Zentral für die Dimensionen „Qualitätssicherung" und „Robustheit & Fehlerresistenz".
 - **Die Prozess-Docs** – in `docs/`: insbesondere `AGENTS.md` (Navigation), `docs/process/tdd-process.md`,
@@ -49,14 +49,12 @@ Globben statt Aufzählen sorgt dafür, dass du auch neu Hinzugekommenes erfasst.
 
 **Bewusst ausnehmen** (außerhalb des Prozesses – kostet nur Kontext):
 - `docs/kaizen/archive/` – historische Archive.
-- `docs/history/adr.md` – bei einer konkreten Prozessfrage gezielt per Grep die Fundstelle
-  suchen und nur deren Umgebung lesen, nicht die ganze Datei. (Die Abrufscripte des Projekts
-  stehen dir nicht zur Verfügung: Du hast bewusst kein Bash, damit aus dem Audit keine Änderung
-  werden kann.)
+- `docs/history/adr.md` – bei einer konkreten Prozessfrage gezielt die Fundstelle holen
+  (`python3 -m prozesscode.decisions list --tag <X>` bzw. `get <ID>`), nicht die ganze Datei.
 - Produkt-/Anwendungs-Inhalt: `Server/` und `Client/` (Anwendungscode → Gegenstand von review-code),
   `*_SPEC.md`, `docs/stories/` – sie definieren *was* gebaut wird, nicht *wie der Workflow läuft*.
-- `.claude/tmp/` – enthält nur noch die Bash-Permission-Logs (Scratch-Artefakte liegen seit
-  S121 im Session-Scratchpad außerhalb des Repos).
+- `.claude/tmp/` – Laufzeitdaten der Hooks: Protokolle und die offenen Rückgaben der Sessions
+  (Scratch-Artefakte liegen im Session-Scratchpad außerhalb des Repos).
 
 Fällt dir beim Überblick dennoch etwas echt Prozess-Relevantes auf, das oben nicht genannt ist, bezieh
 es ein – die Include-Liste ist Orientierung, keine abschließende Aufzählung.

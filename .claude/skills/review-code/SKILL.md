@@ -69,7 +69,7 @@ Scope bestimmt welche Agenten nötig sind:
 | Nur Dokumentation / Kommentare geändert | `code-quality-auditor` |
 | Prozess-Code (Python unter `prozesscode/`) | [Eigene Stufen](#RVC-prozess-code) – meist **kein** Agent |
 
-Jeden Agenten via Agent-Tool mit `subagent_type: "<name>"` spawnen (z.B. `subagent_type: "code-quality-auditor"`) – die Namen entsprechen der Tabelle (es sind registrierte Agenten in `.claude/agents/`, read-only).
+Jeden Agenten via Agent-Tool mit `subagent_type: "<name>"` spawnen (z.B. `subagent_type: "code-quality-auditor"`) – die Namen entsprechen der Tabelle (es sind registrierte Agenten in `.claude/agents/`, read-only). **Ohne `name`-Parameter:** Mit Namen sieht der Bash-Hook den Namen statt des Typs und hebt die Nur-Lese-Sperre auf; `check-agent-start` lehnt einen solchen Start ab. Erreichbar bleibt der Auditor per `SendMessage` an seine agent_id. Abhaken nach dem Verarbeiten: [Rückgaben](../../../docs/process/dev-workflow.md#DEV-rueckgaben).
 
 **Modellwahl vor Spawn:** Auditoren laufen per Default auf `model: sonnet` (Frontmatter). Den `model`-Parameter des Agent-Tools nur dann setzen, wenn die Änderung erhöhte Tiefe verlangt (z.B. subtile Nebenläufigkeit, nicht-triviale Sicherheits-Edge-Cases) → gezielt `opus` für den betroffenen Auditor; Routine-Reviews bleiben auf `sonnet`. Vor jedem Spawn kurz prüfen: reicht der Default?
 
@@ -81,19 +81,20 @@ Agent-Prompts enthalten (je Agent):
   (konkrete Datei + Sektion) und Begründung (nicht nur Guideline zitieren)
 - Hinweis: Projekt-Guidelines (`docs/guidelines/coding-guideline-*.md`) haben Vorrang vor
   agenten-eigenen Checklisten
-- **ADR-Volltexte im Prompt, plus Auftrag zur eigenen Gegenprobe.** Die Auditoren haben **kein Bash**
-  (Tools: Read, Grep, Glob, LSP – s. `.claude/agents/*.md`), und das bleibt so: Die Tool-Liste ist
-  der Mechanismus, der „erzeugt ausschließlich Findings" garantiert – eine Allow-Liste wäre dafür
-  nur Disziplin. Ein Prompt, der ihnen `python3 -m prozesscode.decisions get …` aufträgt, läuft
-  deshalb ins Leere. Stattdessen zweigleisig:
+- **Auftrag, jedes Finding vor der Meldung am Stand zu belegen** – `git diff`, `grep`, `pytest`,
+  die Lese-Werkzeuge. Die Auditoren haben dafür Bash, aber nur lesend: Der Permission-Hook erkennt
+  sie und lässt nichts durch, was Arbeitsbaum, Index oder Tracker ändert
+  ([Befehlsauswahl](../../../docs/process/dev-workflow.md#DEV-befehlsauswahl)). Was sich nur
+  schreibend prüfen ließe, kennzeichnet das Finding als offene Prüfung.
+- **ADR-Volltexte im Prompt, plus Auftrag zur eigenen Gegenprobe.** Zweigleisig:
   1. Die vom Orchestrator als relevant eingestuften ADRs **im Prompt ausschreiben**.
-  2. Den Auditor ausdrücklich beauftragen, in `docs/history/adr.md` **per Grep selbst nachzusehen** –
-     eine zweite Meinung, die nur die Auswahl des Orchestrators kennt, ist keine.
+  2. Den Auditor ausdrücklich beauftragen, **selbst nachzusehen** (`python3 -m prozesscode.decisions
+     list --tag <X>`, `get <ID>`) – eine zweite Meinung, die nur die Auswahl des Orchestrators
+     kennt, ist keine.
 
-  Aus demselben Grund lesen Auditoren die **Guidelines vollständig** und nicht abschnittsweise über
-  `doc.py get <ANKER>`, obwohl der gezielte Abruf für Implementierer der Regelweg ist: Ohne Bash
-  könnten sie das Script ohnehin nicht ausführen – vor allem aber setzt gezieltes Abrufen voraus,
-  dass man schon weiß, wonach man sucht. Ein Implementierer weiß das (er kennt seine Aufgabe), ein
+  Auditoren lesen die **Guidelines vollständig** und nicht abschnittsweise über
+  `doc.py get <ANKER>`, obwohl der gezielte Abruf für Implementierer der Regelweg ist: Gezieltes
+  Abrufen setzt voraus, dass man schon weiß, wonach man sucht. Ein Implementierer weiß das (er kennt seine Aufgabe), ein
   Reviewer nicht: Er sucht Verstöße, deren betroffene Guideline-Stelle vorher niemand kennt. Wer ihm
   nur die Abschnitte gibt, die der Orchestrator für einschlägig hielt, bekommt genau die Findings
   zurück, die der Orchestrator ohnehin erwartet hat.
@@ -135,8 +136,8 @@ kein Vergessen – bei einer Änderungsrate von nahezu jeder Session wäre der R
 teurer als der Ertrag, und geprüft würde überwiegend Lesbarkeit, also die bereits gedeckte
 Fehlerklasse.
 
-**Grenze des Auditors, im Prompt zu nennen:** Er hat kein Bash, kann also weder den Guard
-auslösen noch einen Wrapper fahren. Er beurteilt Struktur, Testdesign und Meldungsqualität –
+**Grenze des Auditors, im Prompt zu nennen:** Er arbeitet nur lesend. Die Tests kann er fahren,
+den Guard aber nicht absichtlich brechen. Er beurteilt Struktur, Testdesign und Meldungsqualität –
 **nicht**, ob der Mechanismus wirkt. Dieser Beleg bleibt die Gegenprobe des Autors; ein
 Auditor-Report ersetzt sie nie.
 

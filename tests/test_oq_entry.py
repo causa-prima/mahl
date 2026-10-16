@@ -106,6 +106,20 @@ def test_set_laesst_andere_eintraege_unberuehrt():
     assert oq.get(neu, "OQ-S119-3") == oq.get(BESTAND, "OQ-S119-3")
 
 
+def test_set_ersetzt_den_aufschubgrund():
+    text, oid = oq.add(BESTAND, 124, titel="X", frage="?", faellig="S140 – x",
+                       hintergrund="H", aufschubgrund=AUFSCHUB)
+    neu = oq.set_fields(text, oid, aufschubgrund="Recherche – Messung steht aus")
+    assert "**Aufschubgrund:** Recherche – Messung steht aus" in oq.get(neu, oid)
+
+
+def test_set_prueft_den_aufschubgrund_wie_add():
+    text, oid = oq.add(BESTAND, 124, titel="X", frage="?", faellig="S140 – x",
+                       hintergrund="H", aufschubgrund=AUFSCHUB)
+    with pytest.raises(ValueError):
+        oq.set_fields(text, oid, aufschubgrund="Entscheidung – steht mir nicht zu")
+
+
 def test_set_prueft_den_anker_ebenfalls():
     with pytest.raises(ValueError):
         oq.set_fields(BESTAND, "OQ-S094-1", faellig="bald")

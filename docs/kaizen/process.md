@@ -189,9 +189,14 @@ Die **Agenda** selbst ist einer dieser fünf Blöcke und enthält zusammenhänge
 | Rang | Modul | Beansprucht, wenn |
 |------|-------|-------------------|
 | 1 | `retro` | Jenga ≤ 0 |
-| 2 | `obs-drain` | `triggers()` erfüllt – Top-5-Score ≥ 9 oder ≥ 4 Einträge über 15 Sessions alt |
-| 3 | `priorities` | ein AGENT_MEMORY-Punkt trägt `Fällig: jetzt` |
-| 4 | `next-run` | es gibt einen fälligen Lauf (Phase erreicht, Vorgänger erledigt) |
+| 2 | `abhaengigkeiten` | kein Commit des laufenden Monats trägt `Abhängigkeiten-Durchsicht: JJJJ-MM` ([Ablauf](../process/dev-workflow.md#DEV-abhaengigkeiten-durchsicht)) |
+| 3 | `obs-drain` | `triggers()` erfüllt – Top-5-Score ≥ 9 oder ≥ 4 Einträge über 15 Sessions alt |
+| 4 | `priorities` | ein AGENT_MEMORY-Punkt trägt `Fällig: jetzt` |
+| 5 | `next-run` | es gibt einen fälligen Lauf (Phase erreicht, Vorgänger erledigt) |
+
+`abhaengigkeiten` steht vor dem Drain, weil die Verdrängung asymmetrisch ist: Erledigt
+verschwindet die Durchsicht für den Monat, verdrängt den Drain also höchstens bis dahin – der Drain
+dagegen hängt an einer Backlog-Schwelle und könnte sie beliebig lange verdrängen.
 
 `open-questions`, `td-due` und `ungeclusterte-szenarien` beanspruchen **nie** – sie verlangen eine
 Entscheidung, keinen Arbeitstag; als Aufgabe verdrängte eine 34 Sessions alte Frage eine

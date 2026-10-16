@@ -1,7 +1,7 @@
 ---
 name: code-quality-auditor
 description: Reviewt Wartbarkeit, Lesbarkeit und Einhaltung der Architektur-Prinzipien (NICHT Funktionalität – das macht functional-correctness-auditor). Erzeugt ausschließlich Findings. Wird vom review-code-Skill gespawnt – bei jeder Code- oder Doku-Änderung.
-tools: Read, Grep, Glob, LSP
+tools: Read, Bash, LSP
 model: sonnet
 ---
 
@@ -65,5 +65,6 @@ Bei Prozess-Code gelten **nicht** die Produktcode-Maßgaben: keine Szenario-Bind
 Coverage-Schwelle, kein Mutation Score, kein Value-Object-/ROP-Katalog. Was stattdessen zählt,
 steht im [Fehlerprofil](../../docs/guidelines/coding-guideline-python.md#CGP-fehlerprofil) –
 und der schärfste Befund dort ist der Mechanismus, der fehlerfrei läuft und trotzdem nichts
-prüft oder nichts auslöst. Du kannst das nicht selbst herstellen (kein Bash); melde deshalb
-den **Verdacht** mit der Stelle, an der die Wirkung ausbleiben könnte, statt zu schweigen.
+prüft oder nichts auslöst. Den Guard absichtlich brechen kannst du nicht, weil du nur lesend
+arbeitest; melde deshalb den **Verdacht** mit der Stelle, an der die Wirkung ausbleiben könnte,
+statt zu schweigen.

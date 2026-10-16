@@ -30,7 +30,7 @@ Lessons und AGENT_MEMORY – und direkt vor dem Befehl. Kommt danach noch etwas 
 Prüfung für das Neue erneut. Ein Amend ist ein Commit und braucht sie ebenso.
 
 **Wie:** Stagen, dann `git diff --cached` vollständig lesen, dazu den Entwurf der Nachricht – nicht
-Datei für Datei aus dem Gedächtnis. Drei Fragen, Befunde sofort beheben und neu stagen:
+Datei für Datei aus dem Gedächtnis. Vier Fragen, Befunde sofort beheben und neu stagen:
 
 - **Überflüssig?** Steht eine Aussage mehrfach, gehört sie an die passendste Stelle, die anderen
   verweisen ([Single Source of Truth](../../../docs/kaizen/principles.md#KPI-doku-referenzen)).
@@ -40,6 +40,12 @@ Datei für Datei aus dem Gedächtnis. Drei Fragen, Befunde sofort beheben und ne
   Verweise laufen von volatil nach stabil; ein neuer LL/OBS ist womöglich der Rückfall oder die
   Dublette eines bestehenden. Stimmt jede Behauptung in Doku und Kommentar mit dem, was
   ausgeführt oder gemessen wurde?
+- **Knapp genug?** Jede neue oder erweiterte Passage in Doku, Skill oder Tracker im Zusammenhang
+  ihres Abschnitts lesen, nicht nur im Diff – Kürzbares zeigt sich erst neben den Nachbarn, etwa
+  ein Nachtrag, doppelt so lang wie die übrigen derselben Maßnahme. Wer kürzt, listet vorher und
+  nachher die normativen Aussagen (muss, darf, nie, nur) und gleicht sie ab: Beim Verdichten
+  wird leicht aus einer Erlaubnis ein Verbot. Verschärft für die Dateien, die jeder Session-Start
+  vollständig lädt (`principles.md`, `AGENTS.md`) – dort kostet jede Zeile dauerhaft.
 - **Nur vorwärtsgerichtet?** Zustandsdokumente tragen nichts Erledigtes – es wird entfernt, nicht
   als erledigt markiert ([Zustandsdokumente](../../../docs/kaizen/principles.md#KPI-doku-referenzen)).
   Jeder Verweis auf eine Session (`S134`) oder einen Tracker-Eintrag (OBS, LL, TD, OQ, ADR) muss

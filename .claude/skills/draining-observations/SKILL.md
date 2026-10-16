@@ -162,6 +162,13 @@ python3 -m prozesscode.obs set OBS-SNNN-N --status "UMGESETZT (S<NNN>)" --entsch
   Reaktivierung zusätzlich eine **Re-Trigger-Notiz** („wieder aktiv wenn …"); kein Script wertet sie aus, der
   Termin ist der verlässliche Backstop. Ein **blockiertes** Item (wartet auf X) ist genau dieser Fall: Grund =
   der Blocker, Termin = Spätestens-Wiedervorlage, Re-Trigger = dessen Auflösung.
+- **entschieden, aber später gebaut** („machen wir, nicht jetzt") → kein Aufschieben: Offen ist keine
+  Entscheidung mehr, sondern eine Aufgabe, und eine Wiedervorlage legte sie mit der falschen Frage
+  („entscheiden") wieder vor. Stattdessen ein Eintrag in `docs/AGENT_MEMORY.md` unter „Nächste
+  Prioritäten" im dort beschriebenen Format (Titel, `Fällig: <Anker>` – auch ereignisbasiert,
+  Quelle, Done). Weil der OBS danach ins Archiv geht, nennt der Prioritäten-Eintrag die gewählte
+  Lösung selbst, nicht nur die OBS-ID. Status `UMGESETZT (S<NNN>, terminiert in AGENT_MEMORY)`,
+  Herleitung ins Feld `Entscheidung/Maßnahme:`.
 
 **Aufgelöste Einträge** (UMGESETZT / VERWORFEN) → mechanisch ins Archiv verschieben:
 `python3 -m prozesscode.obs-archive` (schneidet sie aus `observations.md` und hängt sie ans

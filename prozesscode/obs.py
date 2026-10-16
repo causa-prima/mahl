@@ -31,7 +31,7 @@ from .obs_entry import (  # noqa: E402
     obs_path,
     set_fields,
 )
-from .eintrag_felder import AUFSCHUB_HILFE  # noqa: E402
+from .eintrag_felder import AUFSCHUB_HILFE, AUFSCHUB_HILFE_SET  # noqa: E402
 from .tracker_entry import kuerzungen
 
 
@@ -96,18 +96,18 @@ def cmd_list_offen(args) -> int:
 
 
 def cmd_set(args) -> int:
-    if (args.status is None and args.entscheidung is None and args.titel is None
-            and args.beobachtung_anhaengen is None and args.zusammen_erledigen is None):
-        print("Nichts zu ändern – --titel, --status, --entscheidung, --zusammen-erledigen "
-              "und/oder --beobachtung-anhängen angeben.", file=sys.stderr)
+    felder = {"status": args.status, "titel": args.titel, "entscheidung": args.entscheidung,
+              "zusammen": args.zusammen_erledigen, "beobachtung": args.beobachtung,
+              "vorpraegung": args.vorpraegung, "aufschubgrund": args.aufschubgrund}
+    if all(v is None for v in felder.values()) and args.beobachtung_anhaengen is None:
+        print("Nichts zu ändern – mindestens ein Feld angeben (obs.py set --help).",
+              file=sys.stderr)
         return 1
     path = obs_path()
     inhalt = path.read_text(encoding="utf-8")
     vorher = inhalt
-    if (args.status is not None or args.entscheidung is not None
-            or args.zusammen_erledigen is not None or args.titel is not None):
-        inhalt = set_fields(inhalt, args.id, status=args.status, titel=args.titel,
-                            entscheidung=args.entscheidung, zusammen=args.zusammen_erledigen)
+    if any(v is not None for v in felder.values()):
+        inhalt = set_fields(inhalt, args.id, **felder)
     if args.beobachtung_anhaengen is not None:
         inhalt = append_beobachtung(inhalt, args.id, args.beobachtung_anhaengen)
     path.write_text(inhalt, encoding="utf-8")
@@ -115,8 +115,12 @@ def cmd_set(args) -> int:
                                          ("Status", args.status),
                                          ("Entscheidung", args.entscheidung),
                                          ("Zusammen-erledigen", args.zusammen_erledigen),
+                                         ("Beobachtung ersetzt", args.beobachtung),
                                          ("Beobachtung erweitert",
-                                          args.beobachtung_anhaengen)) if v is not None)
+                                          args.beobachtung_anhaengen),
+                                         ("Vorprägung", args.vorpraegung),
+                                         ("Aufschubgrund", args.aufschubgrund))
+                          if v is not None)
     print(f"✓ {args.id}: {geaendert} aktualisiert.")
     for warnung in kuerzungen(vorher, inhalt):
         print(f"  {warnung}", file=sys.stderr)
@@ -173,7 +177,10 @@ def main() -> None:
                             help="offene Einträge als Titelliste mit Score (Basis für --zusammen-erledigen)")
     p_list.set_defaults(func=cmd_list_offen)
 
-    p_set = sub.add_parser("set", help="Titel/Status/Entscheidung eines Eintrags ändern (Drain)")
+    # allow_abbrev=False: Sonst ergänzt argparse eindeutige Präfixe still – ohne eigene Option
+    # liefe `--beobachtung` als `--beobachtung-anhängen` und hängte an, statt zu ersetzen.
+    p_set = sub.add_parser("set", allow_abbrev=False,
+                           help="Felder eines Eintrags ändern (Drain, Korrektur einer Erfassung)")
     p_set.add_argument("id", metavar="OBS-ID")
     p_set.add_argument("--titel", help="Titel korrigieren – er ist zugleich der Kurztitel, "
                                        "unter dem der Eintrag im Gespräch läuft")
@@ -184,11 +191,18 @@ def main() -> None:
                        help="Kanten setzen/korrigieren: OBS-IDs oder 'keiner'. Wird eingefügt, "
                             "wenn das Feld fehlt (Einträge von vor der Pflichtangabe). Beim "
                             "Herauslösen aus einem Cluster **beide** Seiten korrigieren.")
-    p_set.add_argument("--beobachtung-anhängen", dest="beobachtung_anhaengen",
-                       metavar="TEXT",
-                       help="Text an die Beobachtung anhängen – für die Konsolidierung, wenn "
-                            "dasselbe Problem an anderer Stelle erneut auftritt (statt einen "
-                            "zweiten Eintrag anzulegen)")
+    beobachtung = p_set.add_mutually_exclusive_group()
+    beobachtung.add_argument("--beobachtung", metavar="TEXT",
+                             help="Beobachtung ERSETZEN – zur Korrektur einer Erfassung")
+    beobachtung.add_argument("--beobachtung-anhängen", dest="beobachtung_anhaengen",
+                             metavar="TEXT",
+                             help="Text an die Beobachtung anhängen – für die Konsolidierung, "
+                                  "wenn dasselbe Problem an anderer Stelle erneut auftritt "
+                                  "(statt einen zweiten Eintrag anzulegen)")
+    p_set.add_argument("--vorprägung", dest="vorpraegung", metavar="TEXT",
+                       help="Vorprägung setzen oder ersetzen (wird eingefügt, wenn sie fehlt)")
+    p_set.add_argument("--aufschubgrund", help=AUFSCHUB_HILFE_SET + " Fehlt das Feld, wird "
+                       "es eingefügt.")
     p_set.set_defaults(func=cmd_set)
 
     args = parser.parse_args()

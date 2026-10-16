@@ -55,6 +55,7 @@ import subprocess
 import sys
 from contextlib import redirect_stdout
 from dataclasses import dataclass
+from datetime import date
 from importlib import import_module
 from pathlib import Path
 
@@ -118,13 +119,13 @@ def _lies(pfad: Path) -> str:
     return pfad.read_text(encoding="utf-8") if pfad.is_file() else ""
 
 
-def _laufe(*befehl: str) -> str:
+def _laufe(*befehl: str, cwd: Path = ROOT) -> str:
     """Fremdes Programm ausführen (git); stdout zurück.
 
     Für eigene Paketmodule ist `_modulausgabe` zuständig – nicht dieser Weg.
     Fehler wirft – der Rahmen fängt ihn je Modul.
     """
-    ergebnis = subprocess.run(befehl, capture_output=True, text=True, cwd=ROOT)
+    ergebnis = subprocess.run(befehl, capture_output=True, text=True, cwd=cwd)
     if ergebnis.returncode != 0:
         raise RuntimeError(f"{' '.join(befehl)} → Exit {ergebnis.returncode}: "
                            f"{ergebnis.stderr.strip()[:200]}")
@@ -304,6 +305,32 @@ def modul_retro() -> Block:
         stub=f"{score} (fällig ≤ 0)",
         inhalt=f"Retro – {score}\n→ Session mit Skill `kaizen` beginnen.",
         beansprucht=faellig,
+    )
+
+
+DURCHSICHT_TRAILER = "Abhängigkeiten-Durchsicht"
+
+
+def modul_abhaengigkeiten(root: Path = ROOT, heute: date | None = None) -> Block:
+    """Monatliche Durchsicht der Paket- und Werkzeug-Updates; erledigt per Commit-Trailer.
+
+    Das Gedächtnis ist die git-Historie, keine Datei: Fällig bleibt die Durchsicht, bis ein
+    Commit des laufenden Monats die Zeile `Abhängigkeiten-Durchsicht: JJJJ-MM` trägt. Ein
+    Auslöser „letzter Commit im Vormonat" verfiele still, sobald die erste Session des Monats
+    die Durchsicht nicht macht – und träfe nach einer Pause von zwei Monaten gar nicht.
+    `--grep` statt `%(trailers:…)`, weil es nicht davon abhängt, dass die Zeile im letzten
+    Absatz steht. Bewusst ohne Netzwerk: Die Abfragen macht der Agent in der fälligen Session.
+    """
+    monat = (heute or date.today()).strftime("%Y-%m")
+    if _laufe("git", "log", "-1", "--format=%h",
+              f"--grep=^{DURCHSICHT_TRAILER}: {monat}$", cwd=root):
+        return Block(stub="")
+    return Block(
+        stub=f"Abhängigkeits-Durchsicht für {monat} fällig",
+        inhalt=(f"Abhängigkeits-Durchsicht für {monat} fällig – kein Commit trägt "
+                f"`{DURCHSICHT_TRAILER}: {monat}`.\n"
+                "→ Ablauf: docs/process/dev-workflow.md#DEV-abhaengigkeiten-durchsicht"),
+        beansprucht=True,
     )
 
 
@@ -620,6 +647,9 @@ MODULE: list[tuple[str, str, callable]] = [
     ("memory-state", ZUSTAND, modul_memory_state),
     ("repo-state", ZUSTAND, modul_repo_state),
     ("retro", AUFGABE, modul_retro),
+    # Vor dem Drain, weil die Verdrängung asymmetrisch ist (process.md, Rangfolge): Erledigt
+    # verschwindet die Durchsicht für den Monat; der Drain könnte sie beliebig lange verdrängen.
+    ("abhaengigkeiten", AUFGABE, modul_abhaengigkeiten),
     ("obs-drain", AUFGABE, modul_obs_drain),
     ("priorities", AUFGABE, modul_priorities),
     ("next-run", AUFGABE, modul_next_run),

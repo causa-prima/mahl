@@ -25,6 +25,8 @@ AUFSCHUB_HILFE = (
     "PFLICHT: warum erfasst statt sofort behoben – '<Wert> – <konkreter Grund>'. Werte: "
     + "; ".join(f"{k} ({v})" for k, v in AUFSCHUB_WERTE.items())
     + ". Trifft keiner zu: beheben. Steht die Behebung dir nicht zu: den User fragen.")
+# Für `set`: dasselbe Format, aber optional – und es ersetzt den bisherigen Wert.
+AUFSCHUB_HILFE_SET = AUFSCHUB_HILFE.removeprefix("PFLICHT: ") + " Ersetzt den bisherigen Wert."
 _AUFSCHUB_RE = re.compile(rf"^({'|'.join(AUFSCHUB_WERTE)})\s+[–—-]\s+(\S.*)$")
 
 QUELLE_WERTE = ("User", "Orchestrator", "Subagent")
