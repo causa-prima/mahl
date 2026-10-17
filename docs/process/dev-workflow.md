@@ -74,7 +74,8 @@ untergeht, während weitergearbeitet wird, gilt ein **Knoten im Taschentuch**:
 
 - **Knüpfen passiert von selbst:** Jeder solche Start der Hauptsession landet als Eintrag in
   `.claude/tmp/rueckgaben/<session-id>/<id>.json` (Hook `merke-rueckgaben`, PostToolUse).
-  Was ein Subagent startet, verarbeitet er selbst.
+  Derselbe Hook nennt dabei als Kontext den Abhak-Befehl mit der ID – damit er beim Verarbeiten
+  bekannt ist, nicht erst beim Stop. Was ein Subagent startet, verarbeitet er selbst.
 - **Lösen ist deine Aufgabe:** Ist alles aus einer Rückgabe verarbeitet (jedes Finding
   umgesetzt, verworfen oder dem User vorgelegt), abhaken:
   `python3 -m prozesscode.rueckgaben erledigt <id> --ausgang '3 umgesetzt, 1 verworfen'`.
@@ -168,9 +169,9 @@ Mit `--ratchet` hält es den Score je Modul in `prozesscode/mutation-baseline.js
 meldet einen Rückschritt als `✗`; Gleichstand geht durch, eine Verbesserung zieht die
 Baseline nach. Kommt mutmut in einem Modul nicht durch alle Mutanten, wird es nicht verglichen,
 und das Verdikt lautet `⚠ Sperrklinke ohne Aussage` (Exit 1) – kein Beleg für die Tests.
-Auch das ist **kein Gate**: Ein Modul mittlerer Größe braucht gemessen 84 s,
-die großen deutlich mehr – ein Zwang in dieser Größenordnung erzeugt den Druck, unter dem er
-umgangen wird. `--frisch` wirft `mutants/` weg; nötig nach geänderten **Tests**, weil mutmut
+Auch das ist **kein Gate**: Ein Hook-Modul braucht gemessen Sekunden, der Bash-Guard rund
+zweieinhalb Minuten – ein Zwang je Edit erzeugte trotzdem den Druck, unter dem er umgangen
+wird. `--frisch` wirft `mutants/` weg; nötig nach geänderten **Tests**, weil mutmut
 die Test-zu-Funktion-Zuordnung nur ergänzt und nie bereinigt.
 
 Zusätzlich läuft ruff **automatisch** über jede geänderte Python-Datei des Prozess-Codes
@@ -276,25 +277,43 @@ python3 -m prozesscode.playwright-test   # E2E-Kette nach dem Bump verifizieren
 ## Abhängigkeits-Durchsicht (monatlich)
 
 Die Session-Agenda legt sie vor, solange im laufenden Monat kein Commit die Zeile
-`Abhängigkeiten-Durchsicht: JJJJ-MM` trägt. Abgelehnte Updates werden nicht festgehalten und
-erscheinen im Folgemonat wieder – ein Grund, eines länger liegen zu lassen, trat bisher nicht auf.
+`Dependency-Check: JJJJ-MM` trägt. Gegenstand ist **alles, womit gearbeitet wird**: die
+Pakete des Produkts, die Prozess-Werkzeuge, die Toolchain darunter und Claude Code selbst – ein
+veraltetes Werkzeug kostet sonst Umwege um Fehler, die oben längst behoben sind. Abgelehnte Updates
+erscheinen im Folgemonat wieder; ihre Gründe stehen im Rumpf des letzten Durchsicht-Commits.
 
 1. Updates abfragen:
    ```bash
+   git log -1 --grep='^Dependency-Check:'                     # Gründe der Vormonats-Durchsicht
    dotnet list mahl.slnx package --outdated                   # NuGet (Directory.Packages.props)
    dotnet list mahl.slnx package --vulnerable --include-transitive
    dotnet tool search <id>   # je Werkzeug aus .config/dotnet-tools.json – sucht unscharf, Zeile mit exakter ID lesen
    npm --prefix Client outdated                               # Exit 1 heißt „etwas ist veraltet", kein Fehler
    npm --prefix Client audit
+   .venv/bin/pip list --outdated                              # Python-Werkzeuge (requirements-dev.txt); listet auch deren Abhängigkeiten
+   dotnet --version; node --version; docker --version         # Toolchain (Installation: DEV-wsl-toolchain)
    ```
+   Die Toolchain-Stände gegen die offiziellen Release-Listen halten: .NET
+   (`release-metadata/<major>/releases.json`, Sicherheits-Releases beachten), Node (`nodejs.org/dist/index.json`,
+   LTS-Linie aus `Client/.nvmrc`), PostgreSQL (`postgresql.org/support/versioning`, Image in
+   `docker-compose.yml`). Python und Docker kommen aus Ubuntu und laufen mit dessen Updates.
+   Aktualisiert wird auf demselben Weg wie installiert – .NET:
+   `curl -fsSL -o /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh && bash /tmp/dotnet-install.sh --channel <major> --install-dir ~/.dotnet`,
+   Node: `fnm install <LTS-Linie> && fnm default <LTS-Linie>`.
+   **Claude Code:** Abgleich nach [Anknüpfung an Claude Code](claude-code-anknuepfung.md#CCA-abgleich).
 2. Dem User vorlegen: je Paket aktuell → neu, Majors und Lücken hervorgehoben, bei Majors die
-   Breaking Changes aus dem Changelog. Er entscheidet je Update und führt es selbst aus – Edit
-   auf die geschützten Abhängigkeitsdateien und `dotnet add package` / `dotnet tool update` sind gesperrt.
+   Breaking Changes aus dem Changelog; beim Claude-Code-Abgleich die berührten Anknüpfungen mit
+   Befund. Er entscheidet je Update und führt es selbst aus – Edit auf die geschützten
+   Abhängigkeitsdateien und `dotnet add package` / `dotnet tool update` sind gesperrt.
 3. Nach den Updates verifizieren: Frontend per [Pflicht-Verifikation](#DEV-dependency-updates),
-   Backend per `python3 -m prozesscode.dotnet-test`.
-4. Den abschließenden Commit mit `Abhängigkeiten-Durchsicht: JJJJ-MM` im Trailer-Absatz
+   Backend per `python3 -m prozesscode.dotnet-test`, Python-Werkzeuge per `python3 -m prozesscode.coverage-run`
+   (läuft mit pytest und pytest-cov aus dem venv; `python3 -m pytest` nimmt das pytest des
+   System-Pythons und prüft ein Update nicht) und `python3 -m prozesscode.ruff-run`. Nach einem mutmut-Update setzt die Sperrklinke ihre
+   Baselines je Modul selbst neu (Messkennung in `mutation-baseline.json`).
+4. Den abschließenden Commit mit `Dependency-Check: JJJJ-MM` im Trailer-Absatz
    versehen – auch wenn nichts aktualisiert wurde. Fehlt die Zeile, legt die Agenda die
-   Durchsicht erneut vor.
+   Durchsicht erneut vor. Der Rumpf nennt die abgelehnten Updates mit Grund – Schritt 1 des
+   Folgemonats liest sie dort.
 
 ---
 
@@ -500,15 +519,18 @@ persistiert nirgends.
 
 **Warum nicht `$PWD`?** `$PWD` ist fragil: wenn Claude `cd` in einem Bash-Tool-Call ausführt, persistiert der neue CWD für alle folgenden Bash-Calls in dieser Session. Hooks erben dieses CWD – alle `$PWD`-basierten Pfade zeigen dann auf das falsche Verzeichnis. `$CLAUDE_PROJECT_DIR` zeigt immer auf den Projekt-Root, unabhängig vom CWD.
 
-**KRITISCH:** `cd` in ein Unterverzeichnis **ohne Subshell** bricht im *Bash-Tool* die
-Hook-Chain bis zum nächsten Neustart:
+**KRITISCH:** `cd` in ein Unterverzeichnis bricht im *Bash-Tool* die Hook-Chain bis zum
+nächsten Neustart – das Verzeichnis bleibt für alle folgenden Aufrufe gesetzt:
 ```bash
 # FALSCH – persistiert CWD, bricht Hooks:
 cd Client && npm run build
 
-# RICHTIG – Subshell, CWD bleibt erhalten:
-(cd Client && npm run build)
+# RICHTIG – ohne Verzeichniswechsel:
+npm --prefix Client run build
 ```
+Ebenso `git -C <pfad>` oder der Pfad als Argument. Eine Subshell `(cd Client && …)` hielte das
+Verzeichnis zwar fest, lässt die Allow-Liste aber nicht zu. Zurück zum Root führt
+`cd <absoluter Repo-Pfad>`; der Bash-Guard lässt diesen Pfad absolut stehen.
 
 <a id="DEV-hooks-dynamisch"></a>
 ### Hooks werden dynamisch geladen

@@ -133,8 +133,8 @@ def test_unknown_when_nothing_at_all_is_available():
 
 
 # --- Log-Parsing -------------------------------------------------------------
-def _rec(*blocks, skill: str | None = None) -> dict:
-    rec: dict = {"message": {"content": list(blocks)}}
+def _rec(*blocks, skill: str | None = None, typ: str = "assistant") -> dict:
+    rec: dict = {"type": typ, "message": {"content": list(blocks)}}
     if skill:
         rec["attributionSkill"] = skill
     return rec
@@ -176,6 +176,22 @@ def test_read_events_flag_targeted_reads():
         _rec({"type": "tool_result", "tool_use_id": "t1", "content": "12345"}),
     ]
     assert sl.read_events(records) == [("a.md", 5, True)]
+
+
+def test_kopien_der_api_anfragen_zaehlen_nicht_mit():
+    """Seit Claude Code 2.1.300 legt das Log je Anfrage `api-request-blob`-Einträge ab, die
+    frühere Nachrichten wiederholen – in derselben `message`-Form wie das Gespräch selbst."""
+    aufruf = {"type": "tool_use", "id": "t1", "name": "Read", "input": {"file_path": "a.md"}}
+    ergebnis = {"type": "tool_result", "tool_use_id": "t1", "content": "12345"}
+    records = [
+        _rec(aufruf),
+        _rec(ergebnis, typ="user"),
+        {"type": "api-request-blob", "hash": "h1", "sessionId": "s",
+         "message": {"role": "assistant", "content": [aufruf]}},
+        {"type": "api-request-blob", "hash": "h2", "sessionId": "s",
+         "message": {"role": "user", "content": [ergebnis]}},
+    ]
+    assert sl.read_events(records) == [("a.md", 5, False)]
 
 
 # --- Ausgelagerte Tool-Ausgaben ----------------------------------------------

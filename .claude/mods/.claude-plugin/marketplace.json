@@ -1,0 +1,11 @@
+{
+  "name": "mahl-mods",
+  "owner": { "name": "mahl" },
+  "plugins": [
+    {
+      "name": "tracker-diff",
+      "source": "./tracker-diff",
+      "description": "Zeigt bei Tracker-Schreibbefehlen die Änderung im Pane, solange die Freigabe aussteht"
+    }
+  ]
+}

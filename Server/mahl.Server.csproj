@@ -17,10 +17,15 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
-    <PackageReference Include="Microsoft.OpenApi" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="OneOf" />
+</ItemGroup>
+
+<ItemGroup>
+    <IndirectCompileReference Include="Microsoft.OpenApi"
+        Reason="Der OpenAPI-Source-Generator aus Microsoft.AspNetCore.OpenApi erzeugt beim Build
+                Code gegen Microsoft.OpenApi-Typen (CS0234/CS0012)" />
 </ItemGroup>
 
 </Project>

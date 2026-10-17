@@ -28,15 +28,20 @@ TESTS = Path(__file__).resolve().parent
 AUSNAHMEN: dict[str, str] = {}
 
 
-def werkzeuge(paket: Path = ROOT / "prozesscode") -> list[str]:
-    """Jedes Modul mit eigenem Einstieg – Dateiname ohne Endung, Hooks eingeschlossen."""
-    dateien = list(paket.glob("*.py")) + list(paket.glob("hooks/*.py"))
-    return sorted(p.stem for p in dateien
-                  if '__name__ == "__main__"' in p.read_text(encoding="utf-8"))
-
-
 def dispatch_hooks() -> set[str]:
     return set(import_module("prozesscode.hooks.dispatch-edit-write").CHECKS)
+
+
+def module_mit_einstieg(paket: Path) -> set[str]:
+    """Jedes Modul mit `__main__`-Block – Dateiname ohne Endung, Hooks eingeschlossen."""
+    dateien = list(paket.glob("*.py")) + list(paket.glob("hooks/*.py"))
+    return {p.stem for p in dateien if '__name__ == "__main__"' in p.read_text(encoding="utf-8")}
+
+
+def werkzeuge() -> list[str]:
+    """Jedes Werkzeug: Module mit eigenem Einstieg und die Checks des Edit-Dispatchers – die
+    haben keinen `__main__`-Block, ihr Einstieg ist `check()`, gerufen vom Dispatcher."""
+    return sorted(module_mit_einstieg(ROOT / "prozesscode") | dispatch_hooks())
 
 
 def _funktionen(baum: ast.Module) -> dict[str, ast.FunctionDef]:
@@ -185,4 +190,12 @@ def test_werkzeugsuche_findet_module_mit_einstieg(tmp_path):
     (tmp_path / "ohne.py").write_text("x = 1\n", encoding="utf-8")
     (tmp_path / "hooks" / "h.py").write_text('if __name__ == "__main__":\n    pass\n',
                                               encoding="utf-8")
-    assert werkzeuge(tmp_path) == ["h", "mit"]
+    assert module_mit_einstieg(tmp_path) == {"h", "mit"}
+
+
+def test_dispatcher_checks_zaehlen_auch_ohne_einstieg():
+    """Die Dispatcher-Checks haben keinen `__main__`-Block mehr – an ihm allein erkannt, fielen
+    sie still aus der Pflicht, einen Test über `check(payload)` zu haben."""
+    ohne_einstieg = dispatch_hooks() - module_mit_einstieg(ROOT / "prozesscode")
+    assert ohne_einstieg, "Gegenprobe ohne Gegenstand: jeder Dispatcher-Check hat wieder ein main()"
+    assert ohne_einstieg <= set(werkzeuge())

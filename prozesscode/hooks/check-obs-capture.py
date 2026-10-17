@@ -24,11 +24,9 @@ Format-Kopplung: Eintrags-Heading `## OBS-S<NNN>-<n>` und Feld-Präfix `- Entsch
 sind im Header von `observations.md` kanonisch festgelegt (dieselbe Kopplung wie `obs_parse.py`).
 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt und prüft ihn.
-Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
+Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
-import json
 import re
-import sys
 from pathlib import Path
 
 from ..eintrag_felder import AUFSCHUB_FELD, aufschub_verstoss
@@ -107,7 +105,7 @@ def check_entry(body: str) -> list[str]:
 
     decision = decision_of(body)
     if not is_canonical_open(decision):
-        shown = "(Feld fehlt)" if decision is None else f"„{decision[:70]}“"
+        shown = _FELD_FEHLT if decision is None else f"„{decision[:_MAX_ZITAT]}“"
         reasons.append(f"`- Entscheidung/Maßnahme:` = {shown}")
 
     names = field_names(body)
@@ -150,44 +148,27 @@ def check(data: dict) -> str | None:
         return None
 
     lines = "\n".join(f"  - {oid}: {reason}" for oid, reason in violations)
-    allowed = "\n".join(f"    - Entscheidung/Maßnahme: {v}" for v in CANONICAL_OPEN_VALUES)
-    return (
-        "❌ OBS-Erfassung (Poka-Yoke): neu erfasster Eintrag verletzt die Erfassungs-Regeln:\n"
-        f"{lines}\n"
-        "  Ein neu erfasster OBS beschreibt NUR, was beobachtet wurde – die Entscheidung trifft "
-        "der Drain mit frischem Blick, und jeder hier notierte Kandidat ankert ihn.\n"
-        "  1. `- Entscheidung/Maßnahme:` trägt GENAU einen dieser zwei Werte – nichts davor, "
-        f"nichts dahinter:\n{allowed}\n"
-        f"  2. Nur diese Felder sind zulässig: {', '.join(f'`- {f}:`' for f in ALLOWED_FIELDS)} "
-        "(`- Bezug:` optional, der Rest Pflicht). Ein eigenes Feld für Kandidaten/Lösungsideen "
-        "ist genau die Umgehung, die hier verhindert wird.\n"
-        "  3. Keine Lösungs-Ansage im Eintrags-Text (`Lösungsvorschlag:`, `Idee:`, `Kandidat:` …). "
-        "Ein Risiko zu beschreiben (`X könnte passieren`) ist ausdrücklich erlaubt – gemeint ist "
-        "nur die vorweggenommene Abhilfe.\n"
-        "  Was dir aufgefallen ist, gehört in `- Beobachtung:` – dort darf es beliebig ausführlich "
-        "stehen, inklusive der Frage, die sich dir stellt und der Kosten, die es verursacht hat. "
-        "Bewusster Einzelfall (z.B. Umnummerierung eines Bestands-Eintrags) → `obs-ok`-Marker "
-        "irgendwo in den Eintrag."
-    )
+    return f"{_KOPF}{lines}\n{_VORLAGE}"
 
 
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        sys.exit(0)  # kein parsbarer Input → nichts blocken
-
-    try:
-        reason = check(data)
-        if reason:
-            print(reason, file=sys.stderr)
-            sys.exit(2)  # exit 2 = Edit blockieren
-    except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
-        print(f"check-obs-capture: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)
-        sys.exit(0)
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+_FELD_FEHLT = "(Feld fehlt)"
+_MAX_ZITAT = 70  # Zeichen des abgelehnten Werts in der Meldung
+_KOPF = "❌ OBS-Erfassung (Poka-Yoke): neu erfasster Eintrag verletzt die Erfassungs-Regeln:\n"
+_ERLAUBT = "\n".join(f"    - Entscheidung/Maßnahme: {v}" for v in CANONICAL_OPEN_VALUES)
+_FELDER = ", ".join(f"`- {f}:`" for f in ALLOWED_FIELDS)
+_VORLAGE = (
+    "  Ein neu erfasster OBS beschreibt NUR, was beobachtet wurde – die Entscheidung trifft "
+    "der Drain mit frischem Blick, und jeder hier notierte Kandidat ankert ihn.\n"
+    "  1. `- Entscheidung/Maßnahme:` trägt GENAU einen dieser zwei Werte – nichts davor, "
+    f"nichts dahinter:\n{_ERLAUBT}\n"
+    f"  2. Nur diese Felder sind zulässig: {_FELDER} "
+    "(`- Bezug:` optional, der Rest Pflicht). Ein eigenes Feld für Kandidaten/Lösungsideen "
+    "ist genau die Umgehung, die hier verhindert wird.\n"
+    "  3. Keine Lösungs-Ansage im Eintrags-Text (`Lösungsvorschlag:`, `Idee:`, `Kandidat:` …). "
+    "Ein Risiko zu beschreiben (`X könnte passieren`) ist ausdrücklich erlaubt – gemeint ist "
+    "nur die vorweggenommene Abhilfe.\n"
+    "  Was dir aufgefallen ist, gehört in `- Beobachtung:` – dort darf es beliebig ausführlich "
+    "stehen, inklusive der Frage, die sich dir stellt und der Kosten, die es verursacht hat. "
+    "Bewusster Einzelfall (z.B. Umnummerierung eines Bestands-Eintrags) → `obs-ok`-Marker "
+    "irgendwo in den Eintrag."
+)

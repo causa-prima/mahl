@@ -222,7 +222,15 @@ def effective_size(text: str) -> int:
     return target.stat().st_size if target.exists() else len(text)
 
 
-def _content_blocks(record: dict):
+# Nur diese Einträge sind das Gespräch. Andere tragen dieselbe `message`-Form als Kopie –
+# `api-request-blob` (Claude Code ≥ 2.1.300) wiederholt je Anfrage frühere Nachrichten und
+# verdoppelte sonst jede Zählung.
+_GESPRAECH = ("user", "assistant")
+
+
+def content_blocks(record: dict):
+    if record.get("type") not in _GESPRAECH:
+        return []
     return (record.get("message") or {}).get("content") or []
 
 
@@ -248,7 +256,7 @@ def edited_paths(records: list[dict]) -> set[str]:
     return {
         fp
         for rec in records
-        for block in _content_blocks(rec)
+        for block in content_blocks(rec)
         if isinstance(block, dict)
         and block.get("type") == "tool_use"
         and block.get("name") in ("Edit", "Write", "NotebookEdit")
@@ -269,7 +277,7 @@ def read_events(records: list[dict]) -> list[tuple[str, int, bool]]:
             bool((block.get("input") or {}).get("offset") or (block.get("input") or {}).get("limit")),
         )
         for rec in records
-        for block in _content_blocks(rec)
+        for block in content_blocks(rec)
         if isinstance(block, dict)
         and block.get("type") == "tool_use"
         and block.get("name") == "Read"
@@ -278,7 +286,7 @@ def read_events(records: list[dict]) -> list[tuple[str, int, bool]]:
     return [
         (entry[0], effective_size(block_text(block)), entry[1])
         for rec in records
-        for block in _content_blocks(rec)
+        for block in content_blocks(rec)
         if isinstance(block, dict)
         and block.get("type") == "tool_result"
         and (entry := id_to_read.get(block.get("tool_use_id"))) is not None

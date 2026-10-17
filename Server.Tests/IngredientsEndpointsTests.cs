@@ -472,7 +472,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: 201 Created with a quoted, non-empty ETag header (ADR-S058-3: xmin, hex-encoded)
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         response.Headers.ETag.Should().NotBeNull();
-        response.Headers.ETag!.Tag.Should().StartWith("\"").And.EndWith("\"");
+        response.Headers.ETag.Tag.Should().StartWith("\"").And.EndWith("\"");
         response.Headers.ETag.Tag.Trim('"').Should().NotBeEmpty();
     }
 

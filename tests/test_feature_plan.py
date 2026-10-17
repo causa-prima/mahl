@@ -73,6 +73,32 @@ def test_message_names_the_way_out():
     assert "# @phase:" in grund
 
 
+def test_meldung_nennt_jeden_verstoss_auf_eigener_zeile():
+    ohne_phase = FEATURE_OK.replace("  # @phase: SKELETON\n\n", "")
+    zeilen = hook.check(_daten("features/ingredients.feature", ohne_phase)).splitlines()
+    assert zeilen[0] + "\n" == hook._KOPF
+    assert all(z.startswith("  - ") for z in zeilen[1:3])
+
+
+# --- Die anderen Feature-Dateien ------------------------------------------------
+def test_andere_feature_dateien_ohne_die_bearbeitete(tmp_path, monkeypatch):
+    """Rekursiv, sortiert, nur `.feature`; ein nicht lesbarer Treffer (Verzeichnis) wird
+    übersprungen, ohne die Suche abzubrechen."""
+    (tmp_path / "0.feature").mkdir()
+    (tmp_path / "a.feature").write_text("A", encoding="utf-8")
+    (tmp_path / "b.feature").write_text("B", encoding="utf-8")
+    (tmp_path / "unter").mkdir()
+    (tmp_path / "unter" / "c.feature").write_text("C", encoding="utf-8")
+    (tmp_path / "notiz.txt").write_text("X", encoding="utf-8")
+    monkeypatch.setattr(hook, "_FEATURES_DIR", tmp_path)
+    assert hook._other_feature_texts("features/b.feature") == ["A", "C"]
+
+
+def test_ohne_feature_verzeichnis_keine_anderen(tmp_path, monkeypatch):
+    monkeypatch.setattr(hook, "_FEATURES_DIR", tmp_path / "fehlt")
+    assert hook._other_feature_texts("features/b.feature") == []
+
+
 # --- Registrierung ------------------------------------------------------------
 def test_check_is_registered_in_the_dispatcher():
     # Ein Guard, der nicht registriert ist, läuft nie – und sein Ausfall löst nichts aus.

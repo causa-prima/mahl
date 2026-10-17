@@ -273,3 +273,64 @@ def test_check_allows_removal_without_references(monkeypatch, tmp_path):
             "tool_input": {"file_path": str(tracker),
                            "old_string": entry, "new_string": ""}}
     assert hook.check(data) is None
+
+
+# --- Weiter nach einem übersprungenen Treffer ---------------------------------------
+# Feste Reihenfolge statt `rglob`: Ob nach dem Überspringen weitergesucht wird, zeigt sich nur,
+# wenn hinter der übersprungenen Datei noch eine mit Verweis kommt.
+def test_nach_jeder_uebersprungenen_datei_geht_die_suche_weiter(monkeypatch, tmp_path):
+    monkeypatch.setattr(hook, "_REPO_ROOT", tmp_path)
+    tracker = tmp_path / "tracker.md"
+    tracker.write_text("TD-S001-1\n", encoding="utf-8")
+    kaputt = tmp_path / "kaputt.md"
+    kaputt.write_bytes(b"\xff\xfe TD-S001-1")
+    markiert = tmp_path / "markiert.md"
+    markiert.write_text("TD-S001-1 dangling-ok\nTD-S001-1\n", encoding="utf-8")
+    ohne = tmp_path / "ohne.md"
+    ohne.write_text("nichts\n", encoding="utf-8")
+    verweis = tmp_path / "verweis.md"
+    verweis.write_text("siehe TD-S001-1\n", encoding="utf-8")
+    monkeypatch.setattr(hook, "_scannable_files",
+                        lambda: [tracker, kaputt, ohne, markiert, verweis])
+    assert hook.find_references(["TD-S001-1"], tracker) == [
+        ("markiert.md", 2, "TD-S001-1"), ("verweis.md", 1, "TD-S001-1")]
+
+
+def test_verzeichnis_mit_passender_endung_ist_keine_datei(monkeypatch, tmp_path):
+    monkeypatch.setattr(hook, "_REPO_ROOT", tmp_path)
+    (tmp_path / "ordner.md").mkdir()
+    (tmp_path / "a.md").write_text("x", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("x", encoding="utf-8")
+    assert sorted(p.name for p in hook._scannable_files()) == ["a.md"]
+
+
+# --- Form der Meldung ----------------------------------------------------------------
+def _block_mit(monkeypatch, tmp_path, treffer):
+    monkeypatch.setattr(hook, "find_references", lambda ids, ausschluss: treffer)
+    tracker = tmp_path / "docs" / "tech-debt.md"
+    tracker.parent.mkdir()
+    tracker.write_text("## TD-S001-1 — A\n## TD-S002-1 — B\n", encoding="utf-8")
+    return hook.check({"tool_name": "Write",
+                       "tool_input": {"file_path": str(tracker), "content": ""}})
+
+
+def test_meldung_nennt_die_ids_sortiert_und_jede_fundstelle(monkeypatch, tmp_path):
+    grund = _block_mit(monkeypatch, tmp_path, [("x.md", 3, "TD-S002-1"), ("y.md", 1, "TD-S001-1")])
+    assert grund.split("\n")[:3] == [
+        hook._KOPF.format(removed="TD-S001-1, TD-S002-1").rstrip("\n"),
+        "  - x.md:3 → TD-S002-1", "  - y.md:1 → TD-S001-1"]
+    assert "weitere" not in grund
+
+
+def test_meldung_deckelt_die_fundstellen(monkeypatch, tmp_path):
+    monkeypatch.setattr(hook, "_MAX_HITS", 2)
+    treffer = [("x.md", n, "TD-S001-1") for n in range(1, 6)]
+    grund = _block_mit(monkeypatch, tmp_path, treffer)
+    assert "  - x.md:2 → TD-S001-1" + hook._MEHR.format(n=3) + "\n" in grund
+    assert "x.md:3" not in grund
+
+
+def test_genau_am_deckel_kein_nachsatz(monkeypatch, tmp_path):
+    monkeypatch.setattr(hook, "_MAX_HITS", 2)
+    grund = _block_mit(monkeypatch, tmp_path, [("x.md", 1, "TD-S001-1"), ("x.md", 2, "TD-S001-1")])
+    assert "weitere" not in grund

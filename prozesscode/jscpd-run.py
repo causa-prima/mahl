@@ -21,8 +21,9 @@ import argparse
 import re
 import sys
 from collections import Counter
+from pathlib import Path
 
-from ._util import run_npm
+from ._util import REPO_ROOT, run_npm
 from ._wrapper_output import emit, strip_noise
 
 # Klone, die der Bestand kennt: Dateipaar (sortiert) → Grund, warum er stehen bleiben darf.
@@ -49,8 +50,9 @@ _MEHRFACH: dict[tuple[str, str], int] = {}
 _JSCPD_CHROME = re.compile(r"^[\x1b\[\d;m]*[┌├└│]|^\x1b\[90mtime:|💡|🎩|💖")
 _CLONE_COUNT = re.compile(r"Found (\d+) clones?\.")
 _ANSI = re.compile(r"\x1b\[[\d;]*m")
-# Eine Fundstelle: Pfad, dann der Zeilenbereich in eckigen Klammern. Der Pfad steht relativ
-# zu Client/ (dort läuft npm), also mit führendem `../`.
+# Eine Fundstelle: Pfad, dann der Zeilenbereich in eckigen Klammern. Der Pfad ist absolut
+# (`"absolute": true` in jscpd.config.json) – ohne die Option nennt jscpd 5.4 die Datei ohne
+# Verzeichnis, und gleichnamige Dateien in verschiedenen Wurzeln wären nicht zu unterscheiden.
 _FUNDSTELLE = re.compile(r"^\s*(?:- )?(\S+) \[\d+:\d+ - \d+:\d+\]")
 
 _PARSER_HINWEIS = ("✗ jscpd meldet {gemeldet} Klon(e), erkannt wurden {erkannt} – das "
@@ -58,11 +60,23 @@ _PARSER_HINWEIS = ("✗ jscpd meldet {gemeldet} Klon(e), erkannt wurden {erkannt
                    "  Parser `_FUNDSTELLE` in prozesscode/jscpd-run.py nachziehen; bis "
                    "dahin trägt kein Verdikt.")
 
+_PFAD_HINWEIS = ("✗ jscpd nennt Fundstellen ohne absoluten Pfad im Repo: {pfad}\n"
+                 "  `\"absolute\": true` in jscpd.config.json prüfen – ohne ihn lässt sich kein "
+                 "Fund der Baseline zuordnen, und bis dahin trägt kein Verdikt.")
+
 
 def _fundstellen(ausgabe: str) -> list[str]:
     """Alle genannten Dateien in Reihenfolge – je zwei bilden einen Klon."""
-    return [m.group(1).removeprefix("../") for zeile in _ANSI.sub("", ausgabe).splitlines()
+    return [m.group(1) for zeile in _ANSI.sub("", ausgabe).splitlines()
             if (m := _FUNDSTELLE.match(zeile))]
+
+
+def _repo_relativ(pfad: str) -> str | None:
+    """Der Pfad relativ zum Repo-Root, oder None, wenn jscpd keinen absoluten Repo-Pfad nennt."""
+    absolut = Path(pfad)
+    if not absolut.is_absolute() or not absolut.is_relative_to(REPO_ROOT):
+        return None
+    return absolut.relative_to(REPO_ROOT).as_posix()
 
 
 def klon_paare(fundstellen: list[str]) -> list[tuple[str, str]]:
@@ -118,7 +132,12 @@ def main(argv: list[str] | None = None) -> int:
         print(_PARSER_HINWEIS.format(gemeldet=gemeldet.group(1), erkannt=len(fundstellen) // 2))
         return 1
 
-    paare = klon_paare(fundstellen)
+    relativ = [_repo_relativ(pfad) for pfad in fundstellen]
+    if None in relativ:
+        print(_PFAD_HINWEIS.format(pfad=fundstellen[relativ.index(None)]))
+        return 1
+
+    paare = klon_paare(relativ)
     neu = neue_klone(paare)
     if neu:
         # Die Fundstellen selbst sind die Analyse-Information – Tabelle und Werbung nicht.

@@ -550,12 +550,23 @@ def test_der_repo_zustand_erzeugt_keine_stub_zeile(monkeypatch):
 
 # --- Abhängigkeits-Durchsicht: monatlich, Gedächtnis im Commit-Trailer -------
 # Fällig ist sie, solange im laufenden Monat kein Commit die Zeile
-# `Abhängigkeiten-Durchsicht: JJJJ-MM` trägt. Ein Auslöser „erste Session des Monats" verfiele
+# `Dependency-Check: JJJJ-MM` trägt. Ein Auslöser „erste Session des Monats" verfiele
 # still, sobald diese Session die Durchsicht nicht macht – der Trailer hält sie fällig, bis
 # sie gemacht ist. Geprüft gegen ein echtes Repo, weil die Zusage am `--grep` von git hängt.
 def _mit_trailer(monat: str) -> str:
-    return (f"Session 140: Updates\n\nRumpf.\n\nAbhängigkeiten-Durchsicht: {monat}\n"
+    return (f"Session 140: Updates\n\nRumpf.\n\n{agenda.DURCHSICHT_TRAILER}: {monat}\n"
             "Session-Ende: 140\n")
+
+
+def test_git_liest_die_marke_als_trailer(tmp_path):
+    """Ein Trailer-Schlüssel darf nur ASCII-Buchstaben, Ziffern und `-` tragen. Ein Schlüssel mit
+    Umlaut macht den ganzen Absatz für git zu Fließtext, `Session-Ende` eingeschlossen."""
+    root = git_repo(tmp_path, [_mit_trailer("2026-10")])
+    trailer = subprocess.run(
+        ["git", "log", "-1", f"--format=%(trailers:key={agenda.DURCHSICHT_TRAILER},valueonly=true)"
+                             "%(trailers:key=Session-Ende,valueonly=true)"],
+        cwd=root, capture_output=True, text=True, check=True).stdout.split()
+    assert trailer == ["2026-10", "140"]
 
 
 def test_die_durchsicht_ist_ohne_trailer_faellig(tmp_path):
@@ -584,8 +595,8 @@ def test_nur_eine_eigene_zeile_zaehlt_als_trailer(tmp_path):
     """Gegenprobe zum Zeilenanker: Ein Rumpf, der über den Trailer SPRICHT, ist keine
     erledigte Durchsicht."""
     root = git_repo(tmp_path, [
-        "Session 140: x\n\nNoch offen: Abhängigkeiten-Durchsicht: 2026-10\n",
-        "Session 141: y\n\nAbhängigkeiten-Durchsicht: 2026-10 verschoben\n"])
+        f"Session 140: x\n\nNoch offen: {agenda.DURCHSICHT_TRAILER}: 2026-10\n",
+        f"Session 141: y\n\n{agenda.DURCHSICHT_TRAILER}: 2026-10 verschoben\n"])
     assert agenda.modul_abhaengigkeiten(root, date(2026, 10, 14)).beansprucht
 
 
@@ -726,11 +737,7 @@ def test_kein_agenda_modul_startet_einen_subprozess_auf_eigenen_code(monkeypatch
 def test_die_allow_liste_kommt_ohne_subprozess(monkeypatch):
     """Der Block holt die Liste als Funktionsaufruf, nicht über `python3 -m …`.
 
-    Der Subprozess war nötig, solange der Hook unter `.claude/hooks/` lag und nicht
-    importierbar war. Er hat zwei Kosten: Ein Prozessstart je Session-Start, und unter
-    mutmut lädt der Subprozess den instrumentierten Hook ohne die mutmut-Laufzeit – der
-    Lauf brach dort ab, bevor ein Mutant bewertet war (dieselbe Ursache wie in
-    `test_bash_permission_runner.py`).
+    Der Hook ist importierbar, ein Subprozess kostete nur einen Prozessstart je Session-Start.
     """
     monkeypatch.setattr(agenda, "_laufe", lambda *b: pytest.fail(f"Subprozess: {b}"))
     block = agenda.modul_bash_allowlist()

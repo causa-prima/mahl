@@ -21,5 +21,6 @@
     "Client/e2e/**",
     "Infrastructure/Migrations/**"
   ],
-  "reporters": ["console"]
+  "reporters": ["console"],
+  "absolute": true
 }

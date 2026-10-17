@@ -8,6 +8,7 @@ bleiben frei änderbar, und ein `adr-ok`-Marker hebt die Prüfung für einen Ein
 from importlib import import_module
 
 import pytest
+from conftest import git_repo
 
 hook = import_module("prozesscode.hooks.check-adr-capture")
 
@@ -220,3 +221,44 @@ def test_check_passes_terminal_adr(tmp_path):
 
     new = old + _adr("ADR-S002-1")
     assert hook.check(_data(str(target), old, new)) is None
+
+
+# --- check(): laufende Session aus dem Repo der Datei --------------------------------
+# Bisher prüften die Tests `falsche_session` nur mit vorgegebener Nummer; ob `check()` die
+# Nummer aus dem Repo der Datei überhaupt ermittelt und durchreicht, war ungeprüft.
+_HEADER = "# Architecture Decision Records\n"
+
+
+@pytest.fixture
+def repo_s139(tmp_path):
+    git_repo(tmp_path, ["Abschluss\n\nSession-Ende: 138"])
+    ziel = tmp_path / "docs" / "history" / "adr.md"
+    ziel.parent.mkdir(parents=True)
+    ziel.write_text(_HEADER, encoding="utf-8")
+    return ziel
+
+
+def test_laufende_session_aus_dem_repo_der_datei(repo_s139):
+    assert hook._laufende_session(str(repo_s139)) == 139
+
+
+def test_ohne_adr_datei_darueber_keine_session(tmp_path):
+    assert hook._laufende_session(str(tmp_path / "irgendwo" / "adr.md")) is None
+
+
+def test_check_blockt_adr_mit_fremder_session(repo_s139):
+    grund = hook.check(_data(str(repo_s139), _HEADER, _HEADER + _adr("ADR-S138-1")))
+    assert grund == f"{hook._KOPF_SESSION}  - ADR-S138-1\n{hook._HINWEIS_SESSION}"
+
+
+def test_check_laesst_adr_der_laufenden_session_durch(repo_s139):
+    assert hook.check(_data(str(repo_s139), _HEADER, _HEADER + _adr("ADR-S139-1"))) is None
+
+
+def test_meldung_nennt_jede_aufschub_adr_mit_ihren_wendungen(repo_s139):
+    neu = (_HEADER + _adr("ADR-S139-1", entscheidung="Bleibt vorerst so, Rest vertagt.")
+           + _adr("ADR-S139-2", entscheidung="Bleibt aufgeschoben."))
+    grund = hook.check(_data(str(repo_s139), _HEADER, neu))
+    assert grund.split("\n")[:3] == [hook._KOPF_AUFSCHUB.rstrip("\n"),
+                                     "  - ADR-S139-1: „vorerst“, „vertagt“",
+                                     "  - ADR-S139-2: „aufgeschoben“"]

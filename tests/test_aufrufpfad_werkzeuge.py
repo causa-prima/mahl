@@ -16,7 +16,7 @@ def _obs_eintrag(oid: str, status: str = "NEU") -> str:
     text = obs_entry.format_entry(
         oid, titel="Probe", quelle="User", impact="MITTEL", haeufigkeit="häufig",
         kategorie="PROZESS", kontext="Doku", beobachtung="Etwas fiel auf.", bezug=None,
-        zusammen="keiner", aufschubgrund="Umfang – eigener Umbau")
+        zusammen="keiner", aufschubgrund="User – eigener Umbau, auf später gelegt")
     return text.replace("- Status: NEU", f"- Status: {status}")
 
 

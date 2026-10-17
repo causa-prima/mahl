@@ -22,8 +22,8 @@ Eintrag-Format:
   **Fällig:** <Anker>[, <Anker>…] – <Freitext-Erläuterung>
   **Problem:** <was ist die Schuld>
   **Behebung:** <wie behoben wird>
-  **Aufschubgrund:** User | Umfang | Recherche – <warum erfasst statt sofort behoben>
-            (Pflicht für neue Einträge seit S133; trifft keiner der drei Werte zu, wird behoben
+  **Aufschubgrund:** User | Recherche – <warum erfasst statt sofort behoben>
+            (Pflicht für neue Einträge seit S133; trifft keiner der Werte zu, wird behoben
              statt erfasst. Bedeutung der Werte: `prozesscode/eintrag_felder.py`)
 
   ID: TD-S<NNN>-<n> – 3-stellige Session (Ursprung), laufende Nummer innerhalb der Session.
@@ -84,7 +84,7 @@ Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
 
 ## TD-S080-1 — Frontend Deps: `qs`-DoS (dev-only, akzeptiert)
 **Fällig:** Phase:MVP – primär der nächste Stryker-Major-Bump; ein Dependency-Bump ist kein maschinenlesbarer Anker, deshalb trägt hier der Backstop: ab MVP neu bewerten, falls der Bump bis dahin ausbleibt.
-**Problem:** `qs`-DoS (moderate) via `@stryker-mutator/core`→`typed-rest-client`→`qs` – dev-only, kein untrusted-Input-Pfad, akzeptiert.
+**Problem:** `qs`-DoS (moderate) via `@stryker-mutator/core`→`typed-rest-client`→`qs` – dev-only, kein untrusted-Input-Pfad, akzeptiert. Auch Stryker 10 pinnt `typed-rest-client ~2.3.0`, das `qs` exakt auf 6.15.1 festlegt; ein `overrides` in `package.json` wäre möglich, lohnt bei fehlender Angriffsfläche aber nicht.
 **Behebung:** Entfällt mit dem Bump von selbst; bis dahin bewusst getragen.
 
 ---

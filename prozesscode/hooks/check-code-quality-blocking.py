@@ -15,10 +15,11 @@ CHECKS = [
     primitives_blocking,
 ]
 
+_TRENNER = "\n" + "─" * 60 + "\n"
 
-def check(data: dict | None = None) -> str | None:
-    """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py.
-    Ohne `data` wird von stdin gelesen (Standalone-Aufruf)."""
+
+def check(data: dict) -> str | None:
+    """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py."""
     inp = parse_input(data)
     if inp is None:
         return None
@@ -33,18 +34,4 @@ def check(data: dict | None = None) -> str | None:
     if not violations:
         return None
 
-    separator = "\n" + "─" * 60 + "\n"
-    return separator.join(violations) + "\n" + BLOCKING_DISCUSSION_NOTE
-
-
-def main() -> None:
-    reason = check()
-    if reason:
-        print(reason, file=sys.stderr)
-        sys.exit(2)  # exit 2 = Claude soll Aktion überdenken/korrigieren
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+    return _TRENNER.join(violations) + "\n" + BLOCKING_DISCUSSION_NOTE

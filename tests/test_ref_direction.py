@@ -102,6 +102,32 @@ def test_check_laesst_dieselbe_id_im_volatilen_tracker_durch():
     assert hook.check(_write("docs/tech-debt.md", "Siehe TD-S999-1.\n")) is None
 
 
+def test_check_nennt_jede_fundstelle_auf_eigener_zeile():
+    grund = hook.check(_write("docs/guidelines/aufrufpfad-probe.md", "TD-S999-1\nOBS-S998-2\n"))
+    assert grund.split("\n")[:3] == [hook._KOPF.rstrip("\n"), "  - Zeile 1: TD-S999-1",
+                                     "  - Zeile 2: OBS-S998-2"]
+
+
+# --- Absolute und Windows-Pfade ----------------------------------------------------
+def test_absoluter_pfad_im_repo_ist_geschuetzt():
+    assert hook.is_protected(str(hook._REPO_ROOT / "docs" / "history" / "adr.md"))
+
+
+def test_absoluter_pfad_ausserhalb_des_repos_ist_nicht_geschuetzt(tmp_path):
+    assert not hook.is_protected(str(tmp_path / "docs" / "history" / "adr.md"))
+
+
+def test_relativer_pfad_mit_backslash_ist_geschuetzt():
+    assert hook.is_protected("docs\\history\\adr.md")
+    assert not hook.is_protected("docs\\tech-debt.md")
+
+
+def test_relativer_pfad_haengt_nicht_am_arbeitsverzeichnis(tmp_path, monkeypatch):
+    """Der Dispatcher liefert repo-relative Pfade unabhängig davon, wo der Prozess steht."""
+    monkeypatch.chdir(tmp_path)
+    assert hook.is_protected("docs/history/adr.md")
+
+
 # Die compute_post_content-Tests standen bis S128 hier und prüften eine LOKALE Kopie mit
 # eigener Signatur (tool, file_path, tool_input) – die 18-Zeilen-Duplikation, die jscpd als
 # größten Python-Clone meldete. Die Kopie ist entfallen, der Hook nutzt `_hook_io.edit_zustand`;

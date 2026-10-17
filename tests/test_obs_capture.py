@@ -20,7 +20,7 @@ def _obs(
     extra: str = "",
     bezug: str | None = "–",
     verwandt: str | None = "keiner",
-    aufschub: str | None = "Umfang – eigener Umbau",
+    aufschub: str | None = "User – eigener Umbau, auf später gelegt",
 ) -> str:
     """Minimaler, formatgetreuer OBS-Block."""
     entscheidung = "" if decision is None else f"- Entscheidung/Maßnahme: {decision}\n"
@@ -268,6 +268,36 @@ def test_check_passes_a_wellformed_new_entry(tmp_path):
     ziel = tmp_path / "docs" / "kaizen" / "observations.md"
     daten = {"tool_name": "Write", "tool_input": {"file_path": str(ziel), "content": _obs("OBS-S100-1")}}
     assert hook.check(daten) is None
+
+
+def test_check_prueft_nur_das_backlog(tmp_path):
+    ziel = tmp_path / "docs" / "kaizen" / "notizen.md"
+    daten = {"tool_name": "Write", "tool_input": {"file_path": str(ziel),
+                                                  "content": _obs("OBS-S100-1", "Hook bauen")}}
+    assert hook.check(daten) is None
+
+
+def test_check_nennt_jeden_eintrag_auf_eigener_zeile(tmp_path):
+    ziel = tmp_path / "docs" / "kaizen" / "observations.md"
+    inhalt = _obs("OBS-S100-1", "Hook bauen") + _obs("OBS-S100-2", "Hook bauen")
+    zeilen = hook.check({"tool_name": "Write",
+                         "tool_input": {"file_path": str(ziel), "content": inhalt}}).split("\n")
+    assert [z.split(":")[0] for z in zeilen[1:3]] == ["  - OBS-S100-1", "  - OBS-S100-2"]
+
+
+def test_fehlendes_entscheidungsfeld_und_zu_langer_wert_in_der_meldung():
+    assert hook.check_entry(_obs("OBS-S100-1", decision=None))[0] == (
+        f"`- Entscheidung/Maßnahme:` = {hook._FELD_FEHLT}")
+    lang = "Hook bauen " * 20
+    assert hook.check_entry(_obs("OBS-S100-1", lang))[0] == (
+        f"`- Entscheidung/Maßnahme:` = „{lang.strip()[:hook._MAX_ZITAT]}“")
+
+
+def test_mehrere_gruende_stehen_getrennt():
+    _, grund = hook.find_violations("", _obs("OBS-S100-1", "Hook bauen", bezug=None,
+                                             extra="- Erfunden: x\n"))[0]
+    assert grund.split(" · ")[:2] == ["`- Entscheidung/Maßnahme:` = „Hook bauen“",
+                                       "unbekanntes Feld `- Erfunden:`"]
 
 
 def test_existing_entry_without_aufschubgrund_stays_editable():

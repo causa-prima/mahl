@@ -92,3 +92,15 @@ def test_mengenangabe_blockt_nicht(md):
     md.write_text("# Guide\n\nText.\n", encoding="utf-8")
     grund = check_ordinale.check(_edit(md, "Text.", "Text.\n\nWarte auf alle vier Agenten."))
     assert grund is None
+
+
+# --- Form der Meldung ------------------------------------------------------------
+def test_meldung_zitiert_gekuerzt_und_hoechstens_zehn_funde(md):
+    md.write_text("# Guide\n\nText.\n", encoding="utf-8")
+    lang = "## 1. " + "x" * 200
+    neu = "Text.\n\n" + "\n\n".join([lang] + [f"## {n}. Teil" for n in range(2, 13)])
+    zeilen = check_ordinale.check(_edit(md, "Text.", neu)).split("\n")
+    funde = [z for z in zeilen if z.startswith("  - ")]
+    assert zeilen[0] + "\n" == check_ordinale._KOPF
+    assert len(funde) == check_ordinale._MAX_HITS
+    assert funde[0].endswith(f"`{lang[:check_ordinale._MAX_ZEICHEN]}`")

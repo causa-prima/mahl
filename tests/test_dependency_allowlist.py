@@ -92,19 +92,26 @@ _hook = import_module("prozesscode.hooks.check-dependency-allowlist")
 
 
 @pytest.mark.aufrufpfad("check-dependency-allowlist")
-def test_check_blockt_edit_an_package_json_mit_absolutem_pfad(monkeypatch):
-    """Der Dispatcher liefert absolute Pfade; `check` kürzt sie um CLAUDE_PROJECT_DIR."""
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/repo")
+def test_check_blockt_edit_an_package_json_mit_absolutem_pfad():
+    """Der Dispatcher liefert absolute Pfade – die Muster tragen sie ohne Kürzung."""
     daten = {"tool_name": "Edit", "tool_input": {"file_path": "/repo/Client/package.json"}}
     assert _hook.check(daten) is not None
+
+
+@pytest.mark.parametrize("daten", [
+    {"tool_name": "Edit"},
+    {"tool_name": "Edit", "tool_input": {}},
+    {"tool_name": "Write", "tool_input": {"file_path": "Directory.Build.props"}},  # ohne Text
+])
+def test_check_ohne_pfad_oder_text_blockt_nicht(daten):
+    assert _hook.check(daten) is None
 
 
 @pytest.mark.parametrize("tool_input", [
     {"file_path": "/repo/Directory.Build.props", "new_string": '<PackageReference Include="Npgsql" />'},
     {"file_path": "/repo/Directory.Build.targets", "content": '<PackageVersion Include="Npgsql" />'},
 ])
-def test_check_prueft_neuen_text_von_edit_und_write(monkeypatch, tool_input):
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/repo")
+def test_check_prueft_neuen_text_von_edit_und_write(tool_input):
     tool_name = "Write" if "content" in tool_input else "Edit"
     assert _hook.check({"tool_name": tool_name, "tool_input": tool_input}) is not None
 

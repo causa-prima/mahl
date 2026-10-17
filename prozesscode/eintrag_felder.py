@@ -8,8 +8,10 @@ ist das Gegenteil – ein verstandener Befund, dessen Behebung der Agent selbst 
 wird sofort behoben (LL-S128-3, LL-S129-3: zweimal erfasst, beide Male in Minuten erledigt,
 nachdem der User nachfragte). Das Feld erzwingt die Frage im Moment der Erfassung, weil nur
 dort jede Erfassung vorbeikommt – mitten in der Session wie beim Abschluss. Zulässig sind
-genau drei Gründe; „die Entscheidung steht mir nicht zu" gehört bewusst nicht dazu, denn dann
-wird der User gefragt – und erst sein „später" ist ein Grund (`User`).
+genau zwei Gründe; „die Entscheidung steht mir nicht zu" gehört bewusst nicht dazu, denn dann
+wird der User gefragt – und erst sein „später" ist ein Grund (`User`). Ebenso wenig der
+Umfang: Ob er einen Aufschub trägt, bewertet der User selbst; der Agent nennt ihn als Frage,
+und die Antwort „später" wird `User – Umfang: …`.
 
 **Quelle** (OBS, LL): Freitext ließ „Agent" durch, ein Wert ohne definierte Bedeutung.
 """
@@ -18,7 +20,6 @@ import re
 AUFSCHUB_FELD = "Aufschubgrund"
 AUFSCHUB_WERTE = {
     "User": "der User hat „später“ entschieden (vorher gefragt, nicht angenommen)",
-    "Umfang": "die Behebung sprengt den Fokus der Session",
     "Recherche": "den Befund zu verstehen braucht viele Schritte oder viel Zeit",
 }
 AUFSCHUB_HILFE = (
@@ -27,6 +28,11 @@ AUFSCHUB_HILFE = (
     + ". Trifft keiner zu: beheben. Steht die Behebung dir nicht zu: den User fragen.")
 # Für `set`: dasselbe Format, aber optional – und es ersetzt den bisherigen Wert.
 AUFSCHUB_HILFE_SET = AUFSCHUB_HILFE.removeprefix("PFLICHT: ") + " Ersetzt den bisherigen Wert."
+_UMFANG_HINWEIS = (
+    "\nUmfang allein trägt keinen Aufschub – ob er trägt, bewertet der User. Ihn fragen und den "
+    "Umfang dabei als einzigen Grund nennen; sagt er „später“: 'User – Umfang: <was es kostet>'.")
+# Für Meldungen der Capture-Hooks, die die Feldform zeigen.
+AUFSCHUB_FORM = "|".join(AUFSCHUB_WERTE)
 _AUFSCHUB_RE = re.compile(rf"^({'|'.join(AUFSCHUB_WERTE)})\s+[–—-]\s+(\S.*)$")
 
 QUELLE_WERTE = ("User", "Orchestrator", "Subagent")
@@ -47,7 +53,8 @@ def pruefe_aufschubgrund(wert: str) -> str:
         f"{AUFSCHUB_FELD}: '{wert}' trägt nicht. Form: '<Wert> – <konkreter Grund>'. "
         f"Zulässige Werte:\n{gruende}\n"
         f"Trifft keiner zu, wird nicht erfasst, sondern behoben – ist die Behebung nicht deine "
-        f"Entscheidung, frag den User.")
+        f"Entscheidung, frag den User."
+        + (_UMFANG_HINWEIS if wert.startswith("Umfang") else ""))
 
 
 def fett_feldwert(block: str, feld: str) -> str | None:

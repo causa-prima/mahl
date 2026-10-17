@@ -32,16 +32,14 @@ Format-Kopplung: Eintrags-Heading `## TD-S<NNN>-<n>` und die Feld-Präfixe sind 
 `tech-debt.md` kanonisch festgelegt.
 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt und prüft ihn.
-Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockiert nie einen Edit.
+Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
 import dataclasses
-import json
 import re
-import sys
 from pathlib import Path
 
 from .. import td_anchors
-from ..eintrag_felder import AUFSCHUB_FELD, aufschub_verstoss, fett_feldwert
+from ..eintrag_felder import AUFSCHUB_FELD, AUFSCHUB_FORM, aufschub_verstoss, fett_feldwert
 from ._hook_io import edit_zustand, read_file_text
 
 TD_FILE = "docs/tech-debt.md"
@@ -65,6 +63,48 @@ RETIRED_FIELDS = {
 }
 
 _NOW_RE = re.compile(r"^jetzt\b", re.I)
+
+_ABGESCHAFFT = "abgeschafftes Feld `**{name}:**` – {why}"
+_PFLICHT_FEHLT = "Pflichtfeld `**{name}:**` fehlt"
+_FAELLIG_LEER = ("`**Fällig:**` ist leer – zulässig ist `jetzt` oder ein benennbares "
+                 "auslösendes Ereignis")
+_JETZT_OHNE_MEMORY = ("`**Fällig:** jetzt`, aber {td_id} steht nicht in `{memory}` – "
+                      "ohne Eintrag in „Nächste Prioritäten\" wird der Posten nie vorgelegt")
+_KOPF = "❌ TD-Format (Poka-Yoke): Eintrag verletzt das Format:\n"
+_VORLAGE = (
+    "  Die Vorlage lautet:\n"
+    "    **Fällig:** <Anker>[, <Anker>…] – <Freitext-Erläuterung>\n"
+    "    **Problem:** <was ist die Schuld>\n"
+    "    **Behebung:** <wie behoben wird>\n"
+    f"    **Aufschubgrund:** <{AUFSCHUB_FORM}> – <warum nicht sofort behoben> "
+    "(nur bei neuen Einträgen; trifft keiner zu: beheben statt erfassen)\n"
+    "  1. `**Fällig:**` ist Pflicht. Ein Eintrag, der nur sagt, WIE behoben wird, schuldet "
+    "niemandem einen Zeitpunkt.\n"
+    "  2. Der Kopf vor dem Gedankenstrich ist maschinenlesbar. Anker-Vokabular:\n"
+    "       jetzt            sofort\n"
+    "       Phase:MVP        Phasenwechsel (auch V1/V2)\n"
+    "       S130             Spätestens-Termin (Session)\n"
+    "       Szenario:„…\"     ein Gherkin-Szenario aus features/ (Titel exakt)\n"
+    "       US-602           eine Story – nur solange sie noch keine Szenarien hat\n"
+    "       TD-S089-1        ein anderer Eintrag (Kette muss terminieren, zyklenfrei)\n"
+    "     Alles Erklärende gehört HINTER den Gedankenstrich und bleibt dort erhalten.\n"
+    "  3. Mindestens ein Anker muss **terminiert** sein, also sagen WANN. Terminiert: "
+    "`jetzt`, `Phase:`, `S<NNN>`, `Szenario:` mit `# @run-N`-Zuordnung. Nicht terminiert: "
+    "`US-NNN` und ein Szenario ohne Lauf – die brauchen einen Backstop dazu "
+    "(`Szenario:„…\", Phase:MVP`). Ein Anker, der nur eintreten *kann*, lässt den Eintrag "
+    "verwaisen (OBS-S099-1).\n"
+    "  4. `jetzt` verlangt einen Punkt in `docs/AGENT_MEMORY.md` unter „Nächste "
+    "Prioritäten\" – nur das wird bei jedem Session-Start gelesen. Trag ihn dort zuerst "
+    "ein, dann greift diese Prüfung.\n"
+    "  5. Verletzt der Eintrag eine HEUTE geltende Regel (NFR, Guideline, DoD), ist die "
+    "Fälligkeit immer `jetzt` – eine geltende Regel wartet auf keine Bedingung. Soll sie "
+    "doch warten, ist das eine Entscheidung über die Regel: Regel ändern, oder die "
+    "Abweichung als **dauerhafte** Ausnahme per ADR festschreiben – dann ist sie "
+    "entschieden und der Eintrag entfällt. Was es nicht gibt: eine ADR, die dem Eintrag "
+    "nur erlaubt zu warten (Hybrid – s. `AGENTS.md#CLA-ablage`, „Ablage: in welchen "
+    "Tracker gehört dieser Eintrag?\"). Ein ungeprüfter Verdacht ist keine Verletzung – dann ist die Prüfung die "
+    "Behebung und bekommt eine eigene Fälligkeit."
+)
 
 
 def is_td_file(file_path: str) -> bool:
@@ -96,23 +136,18 @@ def is_now(faellig: str) -> bool:
 def check_entry(td_id: str, body: str, memory_text: str,
                 ktx: td_anchors.Kontext | None = None) -> list[str]:
     """Begründungen, warum dieser Eintrag die Format-Regeln verletzt."""
-    reasons = []
     names = field_names(body)
 
-    reasons += [f"abgeschafftes Feld `**{name}:**` – {why}"
-                for name, why in RETIRED_FIELDS.items() if name in names]
-    reasons += [f"Pflichtfeld `**{name}:**` fehlt" for name in REQUIRED_FIELDS if name not in names]
+    reasons = [_ABGESCHAFFT.format(name=name, why=why)
+               for name, why in RETIRED_FIELDS.items() if name in names]
+    reasons += [_PFLICHT_FEHLT.format(name=name) for name in REQUIRED_FIELDS if name not in names]
 
     faellig = value_of(body, "Fällig")
     if faellig is not None and not faellig:
-        reasons.append("`**Fällig:**` ist leer – zulässig ist `jetzt` oder ein benennbares "
-                       "auslösendes Ereignis")
+        reasons.append(_FAELLIG_LEER)
     elif faellig:
         if is_now(faellig) and td_id not in memory_text:
-            reasons.append(
-                f"`**Fällig:** jetzt`, aber {td_id} steht nicht in `{MEMORY_FILE}` – "
-                "ohne Eintrag in „Nächste Prioritäten\" wird der Posten nie vorgelegt"
-            )
+            reasons.append(_JETZT_OHNE_MEMORY.format(td_id=td_id, memory=MEMORY_FILE))
         # Anker-Grammatik: Kopf maschinenlesbar, mindestens ein terminierter Anker,
         # Referenziertes existiert. Kanonisch in `prozesscode/td_anchors.py`.
         reasons += td_anchors.validiere(td_id, faellig, ktx or td_anchors.Kontext())
@@ -140,9 +175,9 @@ def find_violations(pre: str, post: str, memory_text: str,
 
 
 def repo_root_for(td_path: str) -> Path:
-    """Repo-Wurzel, abgeleitet aus dem Pfad der bearbeiteten `tech-debt.md`."""
-    posix = Path(td_path).as_posix()
-    return Path(posix[: -len(TD_FILE)] if posix.endswith(TD_FILE) else ".")
+    """Repo-Wurzel, abgeleitet aus dem Pfad der bearbeiteten `tech-debt.md` (nur für Pfade,
+    die `is_td_file` erkennt – sie enden auf `TD_FILE`)."""
+    return Path(Path(td_path).as_posix().removesuffix(TD_FILE))
 
 
 def kontext_for(td_path: str, post: str) -> td_anchors.Kontext:
@@ -162,9 +197,7 @@ def memory_text_for(td_path: str) -> str:
     Leerer String, wenn sie fehlt – dann greift die „jetzt"-Kopplung nicht (fail-open:
     ein fehlendes Nachbardokument darf keinen Edit blocken).
     """
-    posix = Path(td_path).as_posix()
-    root = posix[: -len(TD_FILE)] if posix.endswith(TD_FILE) else ""
-    return read_file_text(str(Path(root) / MEMORY_FILE))
+    return read_file_text(str(repo_root_for(td_path) / MEMORY_FILE))
 
 
 def check(data: dict) -> str | None:
@@ -184,61 +217,4 @@ def check(data: dict) -> str | None:
         return None
 
     lines = "\n".join(f"  - {tid}: {reason}" for tid, reason in violations)
-    return (
-        "❌ TD-Format (Poka-Yoke): Eintrag verletzt das Format:\n"
-        f"{lines}\n"
-        "  Die Vorlage lautet:\n"
-        "    **Fällig:** <Anker>[, <Anker>…] – <Freitext-Erläuterung>\n"
-        "    **Problem:** <was ist die Schuld>\n"
-        "    **Behebung:** <wie behoben wird>\n"
-        "    **Aufschubgrund:** <User|Umfang|Recherche> – <warum nicht sofort behoben> "
-        "(nur bei neuen Einträgen; trifft keiner zu: beheben statt erfassen)\n"
-        "  1. `**Fällig:**` ist Pflicht. Ein Eintrag, der nur sagt, WIE behoben wird, schuldet "
-        "niemandem einen Zeitpunkt.\n"
-        "  2. Der Kopf vor dem Gedankenstrich ist maschinenlesbar. Anker-Vokabular:\n"
-        "       jetzt            sofort\n"
-        "       Phase:MVP        Phasenwechsel (auch V1/V2)\n"
-        "       S130             Spätestens-Termin (Session)\n"
-        "       Szenario:„…\"     ein Gherkin-Szenario aus features/ (Titel exakt)\n"
-        "       US-602           eine Story – nur solange sie noch keine Szenarien hat\n"
-        "       TD-S089-1        ein anderer Eintrag (Kette muss terminieren, zyklenfrei)\n"
-        "     Alles Erklärende gehört HINTER den Gedankenstrich und bleibt dort erhalten.\n"
-        "  3. Mindestens ein Anker muss **terminiert** sein, also sagen WANN. Terminiert: "
-        "`jetzt`, `Phase:`, `S<NNN>`, `Szenario:` mit `# @run-N`-Zuordnung. Nicht terminiert: "
-        "`US-NNN` und ein Szenario ohne Lauf – die brauchen einen Backstop dazu "
-        "(`Szenario:„…\", Phase:MVP`). Ein Anker, der nur eintreten *kann*, lässt den Eintrag "
-        "verwaisen (OBS-S099-1).\n"
-        "  4. `jetzt` verlangt einen Punkt in `docs/AGENT_MEMORY.md` unter „Nächste "
-        "Prioritäten\" – nur das wird bei jedem Session-Start gelesen. Trag ihn dort zuerst "
-        "ein, dann greift diese Prüfung.\n"
-        "  5. Verletzt der Eintrag eine HEUTE geltende Regel (NFR, Guideline, DoD), ist die "
-        "Fälligkeit immer `jetzt` – eine geltende Regel wartet auf keine Bedingung. Soll sie "
-        "doch warten, ist das eine Entscheidung über die Regel: Regel ändern, oder die "
-        "Abweichung als **dauerhafte** Ausnahme per ADR festschreiben – dann ist sie "
-        "entschieden und der Eintrag entfällt. Was es nicht gibt: eine ADR, die dem Eintrag "
-        "nur erlaubt zu warten (Hybrid – s. `AGENTS.md#CLA-ablage`, „Ablage: in welchen "
-        "Tracker gehört dieser Eintrag?\"). Ein ungeprüfter Verdacht ist keine Verletzung – dann ist die Prüfung die "
-        "Behebung und bekommt eine eigene Fälligkeit."
-    )
-
-
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        sys.exit(0)  # kein parsbarer Input → nichts blocken
-
-    try:
-        reason = check(data)
-        if reason:
-            print(reason, file=sys.stderr)
-            sys.exit(2)  # exit 2 = Edit blockieren
-    except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
-        print(f"check-td-capture: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)
-        sys.exit(0)
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+    return f"{_KOPF}{lines}\n{_VORLAGE}"

@@ -27,21 +27,37 @@ Scope:
   zu parken.
 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt und prüft ihn.
-Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockiert nie einen Edit.
+Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
-import json
 import re
-import sys
 from pathlib import Path
 
 from .. import td_anchors
-from ..eintrag_felder import AUFSCHUB_FELD, aufschub_verstoss, fett_feldwert
+from ..eintrag_felder import AUFSCHUB_FELD, AUFSCHUB_FORM, aufschub_verstoss, fett_feldwert
 from ._hook_io import edit_zustand
 
 OQ_FILE = "docs/open-questions.md"
 
 _ENTRY_SPLIT_RE = re.compile(r"^## (OQ-S\d{2,3}-\d+)", re.M)
 _FAELLIG_RE = re.compile(r"^\*\*Fällig:\*\*(.*)$", re.M)
+
+_FAELLIG_FEHLT = ("`**Fällig:**` fehlt – jede offene Frage schuldet einen Termin oder ein "
+                  "auslösendes Ereignis. Ohne Feld greift nur die Alters-Regel, und die macht "
+                  "eine treibende Frage von einer frisch gestellten ununterscheidbar")
+_FAELLIG_LEER = "`**Fällig:**` ist leer – Anker setzen (Termin `S<NNN>` oder Ereignis)"
+_KOPF = "❌ OQ-Erfassung (Poka-Yoke): Eintrag verletzt die Regeln:\n"
+_VORLAGE = (
+    f"  Neue Fragen tragen `**Aufschubgrund:** <{AUFSCHUB_FORM}> – <Grund>` – meist "
+    "`User`: Du hast gefragt, und der User will die Antwort später geben.\n"
+    "  `**Fällig:**` ist Pflicht: Ohne es greift nur die Alters-Regel (~10 Sessions), und die "
+    "macht eine treibende Frage von einer frisch gestellten ununterscheidbar. Ein gesetzter "
+    "Anker unterdrückt diese Regel – einer, der nie eintritt oder nicht gelesen werden "
+    "kann, lässt die Frage deshalb dauerhaft verwaisen.\n"
+    "  Anker-Vokabular: `jetzt`, `Phase:<NAME>`, `S<NNN>`, `Szenario:„<Titel>\"`, "
+    "`US-<NNN>`, `TD-S<NNN>-<n>`; mehrere mit Komma, alles Erklärende hinter den "
+    "Gedankenstrich. Kanonisch: `prozesscode/td_anchors.py`, Vorlage im Header von "
+    f"`{OQ_FILE}`."
+)
 
 
 def is_oq_file(file_path: str) -> bool:
@@ -65,11 +81,9 @@ def check_entry(oq_id: str, body: str, ktx: td_anchors.Kontext | None = None) ->
     """Begründungen, warum die Fälligkeit dieses Eintrags nicht trägt (leer = in Ordnung)."""
     faellig = faellig_of(body)
     if faellig is None:
-        return ["`**Fällig:**` fehlt – jede offene Frage schuldet einen Termin oder ein "
-                "auslösendes Ereignis. Ohne Feld greift nur die Alters-Regel, und die macht "
-                "eine treibende Frage von einer frisch gestellten ununterscheidbar"]
+        return [_FAELLIG_FEHLT]
     if not faellig:
-        return ["`**Fällig:**` ist leer – Anker setzen (Termin `S<NNN>` oder Ereignis)"]
+        return [_FAELLIG_LEER]
     return td_anchors.validiere(oq_id, faellig, ktx or td_anchors.Kontext())
 
 
@@ -92,9 +106,9 @@ def find_violations(pre: str, post: str,
 
 
 def repo_root_for(oq_path: str) -> Path:
-    """Repo-Wurzel, abgeleitet aus dem Pfad der bearbeiteten `open-questions.md`."""
-    posix = Path(oq_path).as_posix()
-    return Path(posix[: -len(OQ_FILE)] if posix.endswith(OQ_FILE) else ".")
+    """Repo-Wurzel, abgeleitet aus dem Pfad der bearbeiteten `open-questions.md` (nur für
+    Pfade, die `is_oq_file` erkennt – sie enden auf `OQ_FILE`)."""
+    return Path(Path(oq_path).as_posix().removesuffix(OQ_FILE))
 
 
 def check(data: dict) -> str | None:
@@ -108,49 +122,12 @@ def check(data: dict) -> str | None:
         return None
     file_path, pre, post = zustand
 
-    try:
-        ktx = td_anchors.lade_kontext(repo_root_for(file_path))
-    except Exception:  # noqa: BLE001 – unvollständiger Kontext meldet weniger, blockt nie fälschlich
-        ktx = td_anchors.Kontext()
-
-    violations = find_violations(pre, post, ktx)
+    # Ohne eigenes try: Ein leerer Ersatz-Kontext ließe jeden `TD-`-Anker als unbekannt
+    # durchfallen und blockte eine gültige Frage. Scheitert das Laden, überspringt der
+    # Dispatcher den Check ganz (fail-open) – wie bei check-td-capture.
+    violations = find_violations(pre, post, td_anchors.lade_kontext(repo_root_for(file_path)))
     if not violations:
         return None
 
     lines = "\n".join(f"  - {oid}: {reason}" for oid, reason in violations)
-    return (
-        "❌ OQ-Erfassung (Poka-Yoke): Eintrag verletzt die Regeln:\n"
-        f"{lines}\n"
-        "  Neue Fragen tragen `**Aufschubgrund:** <User|Umfang|Recherche> – <Grund>` – meist "
-        "`User`: Du hast gefragt, und der User will die Antwort später geben.\n"
-        "  `**Fällig:**` ist Pflicht: Ohne es greift nur die Alters-Regel (~10 Sessions), und die "
-        "macht eine treibende Frage von einer frisch gestellten ununterscheidbar. Ein gesetzter "
-        "Anker unterdrückt diese Regel – einer, der nie eintritt oder nicht gelesen werden "
-        "kann, lässt die Frage deshalb dauerhaft verwaisen.\n"
-        "  Anker-Vokabular: `jetzt`, `Phase:<NAME>`, `S<NNN>`, `Szenario:„<Titel>\"`, "
-        "`US-<NNN>`, `TD-S<NNN>-<n>`; mehrere mit Komma, alles Erklärende hinter den "
-        "Gedankenstrich. Kanonisch: `prozesscode/td_anchors.py`, Vorlage im Header von "
-        f"`{OQ_FILE}`."
-    )
-
-
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        sys.exit(0)  # kein parsbarer Input → nichts blocken
-
-    try:
-        reason = check(data)
-        if reason:
-            print(reason, file=sys.stderr)
-            sys.exit(2)  # exit 2 = Edit blockieren
-    except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
-        print(f"check-oq-capture: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)
-        sys.exit(0)
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+    return f"{_KOPF}{lines}\n{_VORLAGE}"

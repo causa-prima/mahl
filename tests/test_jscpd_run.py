@@ -29,12 +29,12 @@ _TEST_BASELINE = {(_A, _B): "Import-Bootstrap", (_C, _D): "Kommentarblock"}
 
 
 def _klon(datei_a: str, datei_b: str) -> str:
-    """Ein Klon-Block im Konsolenformat von jscpd 5 – inklusive der ANSI-Sequenzen,
-    die im echten Lauf um jeden Dateinamen stehen."""
+    """Ein Klon-Block im Konsolenformat von jscpd 5.4 mit `"absolute": true` – die ANSI-Sequenzen
+    stehen im echten Lauf nur um die erste Fundstelle."""
     return (
         "\x1b[1mClone found (python)\x1b[22m\n"
-        f" - \x1b[1m\x1b[32m../{datei_a}\x1b[39m\x1b[22m [33:77 - 44:48] (12 lines, 80 tokens)\n"
-        f"   \x1b[1m\x1b[32m../{datei_b}\x1b[39m\x1b[22m [24:97 - 35:48]\n"
+        f" - \x1b[1m\x1b[32m{jscpd.REPO_ROOT}/{datei_a}\x1b[39m\x1b[22m [33:77 - 44:48] (12 lines, 80 tokens)\n"
+        f"   {jscpd.REPO_ROOT}/{datei_b} [24:97 - 35:48]\n"
     )
 
 
@@ -115,10 +115,47 @@ def test_nicht_erkannte_klone_melden_den_parser(monkeypatch, capsys):
     assert "jscpd-run.py" in ausgabe
 
 
+def test_echte_ausgabe_von_jscpd_5_4_wird_der_baseline_zugeordnet(monkeypatch, capsys):
+    """Gespeicherte Ausgabe des echten Laufs (jscpd 5.4.1, 2026-10), nur der Repo-Pfad ist
+    eingesetzt. Eine handgeschriebene Fixture prüft nur den eigenen Parser – ändert jscpd sein
+    Ausgabeformat, fällt das erst gegen die echte Ausgabe auf."""
+    wurzel = jscpd.REPO_ROOT
+    echt = (
+        "\n> mahl-client@0.0.0 lint:duplicates\n> jscpd --config ../jscpd.config.json\n\n"
+        "Using config from ../jscpd.config.json\n"
+        "\x1b[1mClone found (python)\x1b[22m\n"
+        f" - \x1b[1m\x1b[32m{wurzel}/prozesscode/dotnet-stryker.py\x1b[39m\x1b[22m"
+        " [85:65 - 93:67] (9 lines, 72 tokens)\n"
+        f"   {wurzel}/prozesscode/stryker-frontend.py [85:66 - 93:67]\n"
+        "\x1b[90m│\x1b[39m python     \x1b[90m│\x1b[39m 168            \x1b[90m│\x1b[39m 33050"
+        "       \x1b[90m│\x1b[39m 204843       \x1b[90m│\x1b[39m 1            \x1b[90m│\x1b[39m\n"
+        "\x1b[90mFound 1 clones.\x1b[39m\n"
+        "\x1b[90mtime: 56.045ms\x1b[39m\n"
+    )
+    monkeypatch.setattr(jscpd, "run_npm", lambda *_a, **_k: (echt, 0))
+    assert jscpd.main([]) == 0
+    assert "✓" in capsys.readouterr().out
+
+
+def test_fundstelle_ohne_absoluten_pfad_meldet_die_konfiguration(monkeypatch, capsys):
+    """Fehlt `"absolute": true`, nennt jscpd 5.4 nur den Dateinamen. Der passt auf keinen
+    Baseline-Eintrag und erschiene sonst als „neues Duplikat" – eine falsche Spur."""
+    ohne_pfad = (
+        "\x1b[1mClone found (python)\x1b[22m\n"
+        " - \x1b[1m\x1b[32mdotnet-stryker.py\x1b[39m\x1b[22m [85:65 - 93:67] (9 lines, 72 tokens)\n"
+        "   stryker-frontend.py [85:66 - 93:67]\n"
+    )
+    _lauf(monkeypatch, _ausgabe(ohne_pfad))
+    assert jscpd.main([]) == 1
+    ausgabe = capsys.readouterr().out
+    assert "absolute" in ausgabe
+    assert "jscpd.config.json" in ausgabe
+
+
 def test_zusaetzliche_fundstelle_je_klon_meldet_den_parser(monkeypatch, capsys):
     """Gezählt werden Fundstellen, nicht Paare: Nennte ein geändertes Format drei Dateien je
     Klon, käme die Paarzahl zufällig hin und der Fehlgriff bliebe stumm."""
-    dritte = f"   \x1b[1m\x1b[32m../{_NEU_1}\x1b[39m\x1b[22m [10:1 - 21:9]\n"
+    dritte = f"   {jscpd.REPO_ROOT}/{_NEU_1} [10:1 - 21:9]\n"
     _lauf(monkeypatch, _ausgabe(_klon(_A, _B) + dritte, _klon(_C, _D)))
     assert jscpd.main([]) == 1
     assert "jscpd-run.py" in capsys.readouterr().out

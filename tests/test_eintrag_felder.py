@@ -7,7 +7,7 @@ from prozesscode import eintrag_felder as ef
 # --- Aufschubgrund: warum ein Befund erfasst statt behoben wird (S133) -------------
 @pytest.mark.parametrize("wert", [
     "User – im Gespräch auf später gelegt",
-    "Umfang - braucht einen eigenen Umbau dreier Hooks",
+    "User - Umfang: braucht einen eigenen Umbau dreier Hooks",
     "Recherche – Ursache des SIGKILL ungeklärt, mehrere Läufe nötig",
 ])
 def test_aufschubgrund_mit_zulaessigem_wert_und_grund_traegt(wert):
@@ -16,8 +16,9 @@ def test_aufschubgrund_mit_zulaessigem_wert_und_grund_traegt(wert):
 
 @pytest.mark.parametrize("wert", [
     "",
-    "Umfang",                       # Grund fehlt – genau er ist der Zweck des Feldes
-    "Umfang –   ",
+    "Recherche",                    # Grund fehlt – genau er ist der Zweck des Feldes
+    "Recherche –   ",
+    "Umfang – sprengt die Session",  # bewertet der User: gefragt wird, nicht erfasst
     "später – keine Zeit",           # kein zulässiger Wert
     "Entscheidung – steht mir nicht zu",  # bewusst verworfen: dann wird gefragt, nicht erfasst
 ])
@@ -32,6 +33,13 @@ def test_abweisung_nennt_die_zulaessigen_werte():
         ef.pruefe_aufschubgrund("irgendwann")
     for wert in ef.AUFSCHUB_WERTE:
         assert wert in str(fehler.value)
+
+
+def test_umfang_als_grund_verweist_auf_die_frage_an_den_user():
+    """Umfang war ein eigener Wert; ob er einen Aufschub trägt, bewertet aber der User."""
+    with pytest.raises(ValueError) as fehler:
+        ef.pruefe_aufschubgrund("Umfang – sprengt die Session")
+    assert "User – Umfang:" in str(fehler.value)
 
 
 # --- fett_feldwert: `**Feld:**`-Zeilen von TD und OQ -----------------------------------
@@ -60,7 +68,7 @@ def test_aufschub_verstoss_meldet_fehlendes_feld():
 
 
 def test_aufschub_verstoss_schweigt_bei_tragendem_wert():
-    assert ef.aufschub_verstoss("Umfang – eigener Umbau") is None
+    assert ef.aufschub_verstoss("User – eigener Umbau, auf später gelegt") is None
 
 
 # --- Quelle ------------------------------------------------------------------------

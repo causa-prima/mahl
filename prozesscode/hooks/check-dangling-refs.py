@@ -25,11 +25,9 @@ Scope:
 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt und prüft ihn.
 Der teure Repo-Scan läuft nur, wenn überhaupt eine ID verschwindet.
-Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
+Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
-import json
 import re
-import sys
 from pathlib import Path
 
 from ._hook_io import edit_zustand
@@ -156,39 +154,20 @@ def check(data: dict) -> str | None:
 
     shown = hits[:_MAX_HITS]
     lines = "\n".join(f"  - {f}:{n} → {i}" for f, n, i in shown)
-    more = f"\n  … und {len(hits) - len(shown)} weitere" if len(hits) > len(shown) else ""
-    removed = ", ".join(sorted(set(i for _, _, i in hits)))
-    return (
-        f"❌ Dangling-Referenzen (Poka-Yoke): {removed} soll verschwinden, es wird aber noch "
-        "darauf verwiesen:\n"
-        f"{lines}{more}\n"
-        "  Volatile IDs (TD-/OQ-) verschwinden beim Erledigen – ein verbliebener Verweis zeigt "
-        "danach ins Leere und ist von außen nicht mehr auflösbar.\n"
-        "  Pass zuerst die Fundstellen an: nötige Information dort inlinen, auf ein stabiles "
-        "Artefakt (ADR/Guideline) umhängen, oder den Verweis entfernen. Danach den Eintrag "
-        "löschen.\n"
-        "  Bewusst historischer Verweis („War bis SNNN als … abgelegt“) → `dangling-ok` in die "
-        "betreffende Zeile."
-    )
+    more = _MEHR.format(n=len(hits) - len(shown)) if len(hits) > len(shown) else ""
+    removed = ", ".join(sorted({i for _, _, i in hits}))
+    return f"{_KOPF.format(removed=removed)}{lines}{more}\n{_HINWEIS}"
 
 
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        sys.exit(0)  # kein parsbarer Input → nichts blocken
-
-    try:
-        reason = check(data)
-        if reason:
-            print(reason, file=sys.stderr)
-            sys.exit(2)  # exit 2 = Edit blockieren
-    except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
-        print(f"check-dangling-refs: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)
-        sys.exit(0)
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+_KOPF = ("❌ Dangling-Referenzen (Poka-Yoke): {removed} soll verschwinden, es wird aber noch "
+         "darauf verwiesen:\n")
+_MEHR = "\n  … und {n} weitere"
+_HINWEIS = (
+    "  Volatile IDs (TD-/OQ-) verschwinden beim Erledigen – ein verbliebener Verweis zeigt "
+    "danach ins Leere und ist von außen nicht mehr auflösbar.\n"
+    "  Pass zuerst die Fundstellen an: nötige Information dort inlinen, auf ein stabiles "
+    "Artefakt (ADR/Guideline) umhängen, oder den Verweis entfernen. Danach den Eintrag "
+    "löschen.\n"
+    "  Bewusst historischer Verweis („War bis SNNN als … abgelegt“) → `dangling-ok` in die "
+    "betreffende Zeile."
+)

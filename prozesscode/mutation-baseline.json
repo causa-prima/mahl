@@ -7,45 +7,83 @@
     "beurteilbar": 216,
     "getoetet": 125
   },
+  "prozesscode.commit_msg": {
+    "beurteilbar": 162,
+    "getoetet": 160,
+    "messung": "mutmut 3.8.0, Wertung 2"
+  },
   "prozesscode.eintrag_felder": {
     "beurteilbar": 21,
     "getoetet": 20
+  },
+  "prozesscode.hooks.check-adr-capture": {
+    "beurteilbar": 83,
+    "getoetet": 79,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-agent-start": {
     "beurteilbar": 12,
     "getoetet": 12
   },
+  "prozesscode.hooks.check-anchors": {
+    "beurteilbar": 71,
+    "getoetet": 67,
+    "messung": "mutmut 3.8.0, Wertung 2"
+  },
   "prozesscode.hooks.check-bash-permission": {
-    "beurteilbar": 241,
-    "getoetet": 129
+    "beurteilbar": 1228,
+    "getoetet": 1206,
+    "messung": "mutmut 3.8.0, Wertung 2"
+  },
+  "prozesscode.hooks.check-code-quality-blocking": {
+    "beurteilbar": 15,
+    "getoetet": 15,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-dangling-refs": {
-    "beurteilbar": 84,
-    "getoetet": 64
+    "beurteilbar": 103,
+    "getoetet": 98,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-dependency-allowlist": {
-    "beurteilbar": 25,
-    "getoetet": 18
+    "beurteilbar": 40,
+    "getoetet": 38,
+    "messung": "mutmut 3.8.0, Wertung 2"
+  },
+  "prozesscode.hooks.check-e2e-scenario-ref": {
+    "beurteilbar": 113,
+    "getoetet": 110,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-feature-plan": {
-    "beurteilbar": 41,
-    "getoetet": 27
+    "beurteilbar": 49,
+    "getoetet": 47,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-obs-capture": {
-    "beurteilbar": 81,
-    "getoetet": 54
+    "beurteilbar": 95,
+    "getoetet": 95,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-oq-capture": {
-    "beurteilbar": 79,
-    "getoetet": 52
+    "beurteilbar": 80,
+    "getoetet": 78,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-ordinale": {
-    "beurteilbar": 40,
-    "getoetet": 31
+    "beurteilbar": 39,
+    "getoetet": 39,
+    "messung": "mutmut 3.8.0, Wertung 2"
+  },
+  "prozesscode.hooks.check-ref-direction": {
+    "beurteilbar": 49,
+    "getoetet": 49,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-td-capture": {
-    "beurteilbar": 113,
-    "getoetet": 92
+    "beurteilbar": 130,
+    "getoetet": 130,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.checks.common": {
     "beurteilbar": 28,
@@ -68,8 +106,9 @@
     "getoetet": 5
   },
   "prozesscode.hooks.merke-rueckgaben": {
-    "beurteilbar": 40,
-    "getoetet": 40
+    "beurteilbar": 115,
+    "getoetet": 115,
+    "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.ordinale": {
     "beurteilbar": 105,

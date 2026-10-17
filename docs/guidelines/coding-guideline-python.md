@@ -113,8 +113,8 @@ Drei konkrete Formen, jede mit ihrer Regel:
   mindestens einen Test über genau diesen Weg – `main(argv)` oder den Prozessstart, nicht nur
   die Funktion dahinter. Gibt es mehrere Varianten, prüft der Test, dass sie sich
   **unterscheiden**. (S128: 59 Tests prüften `rendere_block()`; der CLI-Parameter `--block` wurde
-  nie ausgewertet, alle fünf Hooks hätten denselben Text injiziert.) Kann der Prozessstart im
-  Mutantenbaum nicht laufen, gehört der Test mit Grund nach `prozesscode/_mutmut_ausnahmen.py`.
+  nie ausgewertet, alle fünf Hooks hätten denselben Text injiziert.) Kann ein Test im
+  Mutantenbaum nicht laufen, gehört er mit Grund nach `prozesscode/_mutmut_ausnahmen.py`.
 - **Fremdes Werkzeug.** Wer die Ausgabe eines fremden Werkzeugs auswertet, prüft dessen
   Exit-Code und hat mindestens einen Test gegen eine **echte, gespeicherte** Ausgabe.
   Handgeschriebene Fixtures prüfen den eigenen Parser, nicht die Schnittstelle. (S129: ein
@@ -150,6 +150,14 @@ Ein Guard, der unverständlich scheitert, wird abgeschaltet statt repariert. Jed
 deshalb den **herstellenden Befehl** oder den Ausweg, nicht nur den Befund – so wie
 `ruff-run.py` bei fehlendem venv die beiden Zeilen ausgibt, die es anlegen.
 
+**Meldungstexte stehen als Modulkonstante.** mutmut mutiert nur Funktionsrümpfe; ein Text in
+der Funktion erzeugt Mutanten, die nur ein wörtlicher Textvergleich töten könnte – ein Test,
+der bei jeder Umformulierung bricht. Muss ein Text in der Funktion bleiben, steht er als
+eigene Anweisung mit `# pragma: no mutate – <Grund>` am Ende – innerhalb von Klammern liest
+mutmut das Pragma nicht, und es nimmt die erste Zeile der Anweisung ganz aus. Der Wrapper weist
+solche Zeilen im Verdikt aus. Protokollschlüssel, Konstanten und Regex-Muster gehören nicht
+dazu: Sie sind Verhalten und werden getestet.
+
 <a id="CGP-duplikate"></a>
 ### Duplikate: gemessen, nicht als Gate
 
@@ -182,7 +190,7 @@ niemand sie später als Versehen nachrüstet:
 |---|---|
 | **User Stories / Gherkin-Szenarien** | Es gibt keinen externen Nutzer. Das Sollverhalten steht in `docs/process/` und den Skills; Szenarien wären eine zweite Ablage, die driftet. |
 | **100 % Branch-Coverage als Gate** | Coverage misst berührte Zeilen. Klasse STUMM hat 100 % Coverage und wirkt trotzdem nicht – die Zahl beantwortet die Frage nicht, die hier zählt. Als *Metrik* ist sie zulässig, um Testlücken zu finden; als *Gate* nicht. |
-| **100 % Mutation Score als Gate** | Ein Volllauf mutiert 11.606 Stellen gegen eine 1.100er-Suite: Stunden, also kein Hook. Die *Sichtung* dagegen ist wertvoll – und trifft, anders als hier bis S128 vermutet, genau Klasse STUMM: Ein überlebender Mutant in einem Guard heißt, dessen Prüfung lässt sich ändern, ohne dass ein Test es merkt. In S129 direkt gemessen, sobald der Code als Paket erreichbar war: In `check-td-capture` überlebten 10 von 105 bewerteten Mutanten, 11 weitere Stellen berührt **kein** Test – darunter die `main()` **jedes** Hooks, also die Funktion, die stdin liest und den Exit-Code setzt. Nicht mitgezählt sind 38 Mutanten an Meldungstexten: mutmut umschließt den Text mit `XX…XX`, der Originaltext bleibt Substring, und ein `in`-Test kann so einen Mutanten prinzipiell nicht töten (Details: `mutmut-run.string_mutanten`). Werkzeug: `python3 -m prozesscode.mutmut-run --mutate <modul> [--ratchet]`. |
+| **100 % Mutation Score als Gate** | Ein Volllauf mutiert 11.606 Stellen gegen eine 1.100er-Suite: Stunden, also kein Hook. Die *Sichtung* dagegen ist wertvoll – und trifft, anders als hier bis S128 vermutet, genau Klasse STUMM: Ein überlebender Mutant in einem Guard heißt, dessen Prüfung lässt sich ändern, ohne dass ein Test es merkt. In S129 direkt gemessen, sobald der Code als Paket erreichbar war: In `check-td-capture` überlebten 10 von 105 bewerteten Mutanten, 11 weitere Stellen berührt **kein** Test – darunter die `main()` **jedes** Hooks, also die Funktion, die stdin liest und den Exit-Code setzt. Meldungstexte erzeugen keine Mutanten, wenn sie als Modulkonstante stehen ([Meldungen](#CGP-meldungen)). Werkzeug: `python3 -m prozesscode.mutmut-run --mutate <modul> [--ratchet]`. |
 | **Stil-Linting** (Import-Sortierung, Modernisierung) | Erzeugt Diff-Rauschen an Dateien, die sonst niemand anfasst, ohne je einen Fehler zu verhindern. |
 
 ---

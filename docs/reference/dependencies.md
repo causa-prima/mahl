@@ -85,7 +85,6 @@ Erst nach expliziter Freigabe: Eintrag in Allowlist + Begründung in `docs/histo
 | `AwesomeAssertions` | Server.Tests |
 | `coverlet.MTP` | Server.Tests |
 | `Testcontainers.PostgreSql` | Testing (Integrationstests, ADR-S105-1) |
-| `Microsoft.OpenApi` | Security-Pin 2.7.5 (CVE-2026-49451; transitiv via AspNetCore.OpenApi, das noch 2.0.0 fordert. Entfernen, sobald AspNetCore.OpenApi eine Version >= 2.7.5 referenziert) |
 
 ## Enforcement
 

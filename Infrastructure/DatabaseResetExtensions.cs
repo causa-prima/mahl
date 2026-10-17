@@ -18,10 +18,10 @@ public static class DatabaseResetExtensions
             .Distinct()
             .Select(t => t.Schema is null ? $"\"{t.Name}\"" : $"\"{t.Schema}\".\"{t.Name}\"");
         var truncate = $"TRUNCATE TABLE {string.Join(", ", tables)} RESTART IDENTITY CASCADE";
-        // EF1002: Tabellennamen stammen aus dem EF-Modell (Compile-Zeit-Schema), nicht aus Nutzereingaben
+        // EF1002/S2077: Tabellennamen stammen aus dem EF-Modell (Compile-Zeit-Schema), nicht aus Nutzereingaben
         // -> keine Injection-Fläche; Identifier sind in SQL ohnehin nicht parametrisierbar.
-#pragma warning disable EF1002 // Table identifiers come from the trusted EF model, not user input
+#pragma warning disable EF1002, S2077 // Table identifiers come from the trusted EF model, not user input
         await db.Database.ExecuteSqlRawAsync(truncate).ConfigureAwait(false);
-#pragma warning restore EF1002
+#pragma warning restore EF1002, S2077
     }
 }

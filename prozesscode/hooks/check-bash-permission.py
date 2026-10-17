@@ -94,19 +94,13 @@ _ALLOWED_LOG_FILE = os.path.join(_REPO_ROOT, '.claude', 'tmp', 'allowed-commands
 # ---------------------------------------------------------------------------
 _NORMALIZE_ROOT = os.path.normpath(_REPO_ROOT)
 
-# Bare Repo-Root (optional mit einem Trailing-Slash) als eigenständige
-# Verzeichnis-Referenz – gefolgt von Whitespace, Ende oder einem Shell-Operator.
-#
-# Diese Zeile sieht nach Kosmetik aus (kürzerer Befehl, sonst nichts) und ist es nicht –
-# in S130 einmal durchgemessen, damit es niemand ein zweites Mal versucht. Nimmt man sie
-# heraus, brechen drei Dinge: `cd_npm_conflict` liest das cd-Ziel inhaltlich und hält nur
-# "." für "im Root geblieben", also würde `cd <root> && npm run x` fälschlich als
-# Verzeichniswechsel geblockt; `cd <root>/` wird vom nachfolgenden Präfix-Replace zu einem
-# argumentlosen `cd `; und der umgeschriebene Befehl in `_build_allow_output` ändert sich mit.
-# Der Preis dafür ist bekannt und akzeptiert: Steht die Shell nach einem vorangehenden `cd`
-# nicht im Repo-Root, heißt `cd .` "bleib hier" statt "geh zum Root". Das trifft nur
-# innerhalb EINES Befehls – zwischen Bash-Aufrufen setzt das Harness das Verzeichnis zurück.
-_BARE_ROOT_RE = re.compile(re.escape(_NORMALIZE_ROOT) + r'/?(?=\s|$|[&|;])')
+# Der Repo-Root im Befehl: wahlweise als Ziel von `cd`, dann entweder bare (optional mit
+# Trailing-Slash, gefolgt von Whitespace, Ende oder Shell-Operator) oder mit Pfad-Fortsetzung.
+# Bare wird er zu ".", mit Fortsetzung fällt der Präfix weg – außer als bares `cd`-Ziel: Das
+# Arbeitsverzeichnis bleibt zwischen Bash-Aufrufen bestehen, und nach einem `cd` in ein
+# Unterverzeichnis hieße `cd .` „bleib hier". `cd <root>` ist dann der einzige Rückweg.
+_ROOT_RE = re.compile(r'(?P<cd>\bcd\s+)?' + re.escape(_NORMALIZE_ROOT)
+                      + r'(?:(?P<bare>/?)(?=\s|$|[&|;])|/)')
 
 _NORMALIZE_HINT = (
     "Der absolute Repo-Pfad wurde automatisch auf einen relativen Pfad normalisiert "
@@ -134,14 +128,13 @@ _CD_NPM_HINT = (
 
 
 def _strip_repo_root(text: str) -> str:
-    """Ersetzt den Repo-Root in einem Textstück durch relative Pfade.
-
-    Bare-Root (ohne Folge-Pfad) → '.', Präfix mit Pfad-Fortsetzung → relativ.
-    Bare-Root zuerst, damit der Präfix-Replace die '/'-Fortsetzungen nicht stiehlt.
-    """
-    text = _BARE_ROOT_RE.sub('.', text)
-    text = text.replace(_NORMALIZE_ROOT + '/', '')
-    return text
+    """Ersetzt den Repo-Root in einem Textstück durch relative Pfade (s. `_ROOT_RE`)."""
+    def ersetze(m: re.Match[str]) -> str:
+        cd = m.group("cd") or ""
+        if m.group("bare") is None:
+            return cd
+        return m.group(0) if cd else "."
+    return _ROOT_RE.sub(ersetze, text)
 
 
 def normalize_repo_paths(command: str) -> tuple[str, bool]:
@@ -201,6 +194,11 @@ _INDIRECT_FILTER_REASON = (
     "Ausweg: den Wrapper in einem eigenen Aufruf ungefiltert laufen lassen; mehr Tiefe über "
     "--verbose. Einen fremden Befehl mit Filter in einen eigenen Aufruf legen."
 )
+# Was `{erkannt}` darin einsetzt – je Fall, den die Prüfung unterscheidet.
+_GRUND_PROZESS_SUBSTITUTION = "der Wrapper steht in einer Prozess-Substitution"
+_GRUND_STUFE = "in seiner Pipeline steht eine Stufe, die nicht nur filtert"
+_GRUND_WEITERGABE = "die aufgefangene Ausgabe kann weitergereicht werden"
+_GRUND_HEREDOC = "er steht in einem Befehl mit Heredoc"
 
 
 _UNGEQUOTETER_HEREDOC_RE = re.compile(r"(?<!<)<<(?!<)-?\s*[A-Za-z_]")
@@ -326,14 +324,14 @@ def _bewerte_wrapper(command: str) -> tuple[str | None, list[tuple[int, int]]]:
     for match in _WRAPPER_RUN_RE.finditer(maskiert):
         umschliessung = _umschliessung(maskiert[:match.start()])
         if umschliessung in ("<(", ">("):
-            return "der Wrapper steht in einer Prozess-Substitution", []
+            return _GRUND_PROZESS_SUBSTITUTION, []
 
         ende = _PIPELINE_ENDE_RE.search(maskiert, match.end())
         pipeline_ende = ende.start() if ende else len(maskiert)
         stufen = maskiert[match.end():pipeline_ende].split("|")[1:]
-        urteil = _stufen_urteil(stufen) if stufen else "tee"
+        urteil = _stufen_urteil(stufen)  # ohne Stufen: "tee" – nichts zu entfernen
         if urteil == "andere":
-            return "in seiner Pipeline steht eine Stufe, die nicht nur filtert", []
+            return _GRUND_STUFE, []
         if urteil == "filter":
             schnitte.append((maskiert.index("|", match.end()), pipeline_ende))
 
@@ -341,7 +339,7 @@ def _bewerte_wrapper(command: str) -> tuple[str | None, list[tuple[int, int]]]:
         # wäre in der Maske unsichtbar.
         if umschliessung and (_WEITERGABE_RE.search(maskiert, pipeline_ende)
                               or "${" in command[pipeline_ende:]):
-            return "die aufgefangene Ausgabe kann weitergereicht werden", []
+            return _GRUND_WEITERGABE, []
     return None, schnitte
 
 
@@ -404,8 +402,9 @@ def cd_npm_conflict(segments: list[str]) -> bool:
         stripped = segment.strip()
         target = _CD_TARGET_RE.match(stripped)
         if target:
-            # `cd .` (auch der normalisierte bare-root) bleibt im Repo-Root → unkritisch.
-            left_root = target.group(1).rstrip("/") not in (".", "")
+            # `cd .` und `cd <root>` (bleibt absolut, s. `_ROOT_RE`) → im Repo-Root, unkritisch;
+            # `cd /` ist die Dateisystem-Wurzel.
+            left_root = target.group(1).rstrip("/") not in (".", _NORMALIZE_ROOT)
         elif left_root and _NPM_SEGMENT_RE.match(stripped):
             return True
     return False
@@ -503,9 +502,10 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         'Stryker (Frontend) immer via Script aufrufen:\n'
         '  python3 -m prozesscode.stryker-frontend [--mutate src/pages/Foo.tsx] [--verbose]',
     ),
-    # npx eslint / npm run lint: immer via eslint-run.py
+    # npx eslint / npm run lint: immer via eslint-run.py. `(?!:)`: `lint:duplicates` hat
+    # unten eine eigene Regel – `\b` allein träfe es hier schon und nennte den falschen Wrapper.
     (
-        re.compile(r'\bnpx\s+eslint\b|' + _NPM_RUN + r'lint\b'),
+        re.compile(r'\bnpx\s+eslint\b|' + _NPM_RUN + r'lint\b(?!:)'),
         'ESLint immer via Script aufrufen:\n'
         '  python3 -m prozesscode.eslint-run [--verbose]',
     ),
@@ -553,12 +553,13 @@ WRONG_APPROACH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 # Sie sind fachlich erwünscht – sie garantieren die Eintragsform und ersparen den vom Harness
 # erzwungenen Vor-Edit-Read der ganzen Datei. Genau dadurch umgehen sie aber den Freigabe-Dialog,
 # den `Edit`/`Write` auslösen: Der geschriebene Text liefe sonst nirgends am User vorbei. Deshalb
-# `ask` statt `allow` – der Befehl steht samt Text im Freigabe-Prompt.
+# `ask` statt `allow`. Der Prompt nennt, was angefasst wird (`tracker_preview`); die Änderung
+# selbst zeigt der Mod `tracker-diff` im Pane daneben.
 #
 # Bewusst NICHT hier: rein mechanische Umbauten ohne neuen Text (`obs-archive.py` verschiebt
 # aufgelöste Einträge ins Archiv) und alle `get`-Unterbefehle (read-only).
 def _mit_vorschau(command: str, reason: str) -> str:
-    """Hängt die lesbare Eintrags-Vorschau an den Freigabe-Grund (OBS-S116-1).
+    """Stellt dem Freigabe-Grund die Kopfzeile aus `tracker_preview` voran (OBS-S116-1).
 
     Jeder Fehlschlag fällt auf den reinen Hinweistext zurück: Ohne Vorschau ist der Dialog
     so gut wie vorher, mit einer abgestürzten Prüfung wäre er unbrauchbar.
@@ -566,7 +567,7 @@ def _mit_vorschau(command: str, reason: str) -> str:
     if tracker_preview is None:
         return reason
     try:
-        block = tracker_preview.vorschau(command, root=_REPO_ROOT)
+        block = tracker_preview.vorschau(command)
     except Exception:  # noqa: BLE001 – Darstellung darf die Entscheidung nie kippen
         return reason
     return f"{block}\n\n{reason}" if block else reason
@@ -578,26 +579,21 @@ _HILFE_ARGUMENT = re.compile(r"(?:^|\s)(?:--help|-h)(?=\s|$)")
 WRITE_ACCESS_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(werkzeug_aufruf("td") + r'\s+(?:add|set|remove)\b'),
-        'td.py add/set/remove ändert docs/tech-debt.md – bei `Fällig: jetzt` zusätzlich den '
-        'Prioritäten-Punkt in docs/AGENT_MEMORY.md. Freigabe wie bei einem Edit, damit der '
-        'Text vor dem Schreiben sichtbar ist.',
+        'td.py ändert docs/tech-debt.md – bei `Fällig: jetzt` zusätzlich den Prioritäten-Punkt '
+        'in docs/AGENT_MEMORY.md.',
     ),
     (
         re.compile(werkzeug_aufruf("oq") + r'\s+(?:add|set|remove)\b'),
-        'oq.py add/set/remove ändert docs/open-questions.md. Freigabe wie bei einem Edit, '
-        'damit der Text vor dem Schreiben sichtbar ist. `remove` löscht den Eintrag '
-        'ersatzlos – das Ergebnis gehört vorher an einen stabilen Ort (ADR, Guideline, '
-        'tech-debt.md).',
+        'oq.py ändert docs/open-questions.md. Vor `remove` gehört das Ergebnis an einen '
+        'stabilen Ort (ADR, Guideline, tech-debt.md).',
     ),
     (
         re.compile(werkzeug_aufruf("obs") + r'\s+(?:add|set)\b'),
-        'obs.py add/set schreibt einen Eintrag nach docs/kaizen/observations.md. Freigabe wie '
-        'bei einem Edit, damit der Text vor dem Schreiben sichtbar ist.',
+        'obs.py schreibt nach docs/kaizen/observations.md.',
     ),
     (
         re.compile(werkzeug_aufruf("lessons") + r'\s+add\b'),
-        'lessons.py add schreibt einen Eintrag nach docs/kaizen/lessons_learned.md. Freigabe wie '
-        'bei einem Edit, damit der Text vor dem Schreiben sichtbar ist.',
+        'lessons.py schreibt nach docs/kaizen/lessons_learned.md.',
     ),
 ]
 
@@ -704,6 +700,26 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
         re.compile(r'^dotnet\s+tool\s+search\s+\S'),
         None,
         'dotnet tool search <id>',
+    ),
+    # Python-Werkzeuge aus requirements-dev.txt; `pip install` bleibt deny wie oben.
+    (
+        re.compile(r'^\.venv/bin/pip\s+list\s+(?:.*\s)?--outdated\b'),
+        None,
+        '.venv/bin/pip list --outdated',
+    ),
+    # Toolchain-Stand für die Abhängigkeits-Durchsicht. Nur das nackte `--version`: Schon
+    # ein weiteres Argument (`node -e`, `python3 -c`) führte Code aus.
+    (
+        re.compile(r'^(?:dotnet|node|npm|python3|docker)\s+--version$'),
+        None,
+        'dotnet|node|npm|python3|docker --version',
+    ),
+    # Mods (.claude/mods/): validate liest nur, test läuft die Mod-Tests ohne Session.
+    # Installieren und Einstellungen ändern bleibt beim User.
+    (
+        re.compile(r'^claude\s+plugin\s+(?:validate|test)\s+\S'),
+        None,
+        'claude plugin validate|test <ordner>',
     ),
     # docker compose up|down (v2-Plugin, nativ in WSL). docker-compose (v1) → Smart-Deny-Hint.
     (
@@ -1156,9 +1172,13 @@ def strip_heredoc_bodies(command: str) -> str:
             i += 1
             continue
 
-        # Ab hier: außerhalb von Quotes. `<<` startet ein Heredoc – aber `<<<`
-        # ist ein Here-String (einzeiliger Wert, kein Body zum Entfernen).
-        if command.startswith('<<', i) and not command.startswith('<<<', i):
+        # Ab hier: außerhalb von Quotes. `<<<` ist ein Here-String (einzeiliger Wert, kein
+        # Body) – als Ganzes überspringen: Ab seinem zweiten `<` stünde sonst `<< 'E'` da,
+        # und die Zeilen danach verschwänden als vermeintlicher Body aus der Prüfung.
+        if command.startswith('<<<', i):
+            i += 3
+            continue
+        if command.startswith('<<', i):
             m = re.match(r"<<-?\s*(['\"]?)(\w+)\1", command[i:])
             if not m or not m.group(1):
                 i += 2  # ungequotet: Body ist Code, bleibt stehen (fail-closed)
@@ -1310,7 +1330,7 @@ def expand_segment(segment: str) -> list[tuple[str, bool]]:
         def repl(m: re.Match[str]) -> str:
             if any(start <= m.start() < ende for start, ende in woertlich):
                 return m.group(0)
-            inner = next((g for g in m.groups() if g is not None), '')
+            inner = next(g for g in m.groups() if g is not None)  # genau eine Alternative trifft
             if inner.strip():
                 out.extend(expand_segment(inner))
             return 'WERT'
@@ -1325,7 +1345,7 @@ def expand_segment(segment: str) -> list[tuple[str, bool]]:
 
     # Zuweisungs-Präfixe abstreifen: `FOO=bar ls -la` → `ls -la`; `SP=/pfad` → nichts
     while True:
-        stripped = _ASSIGN_PREFIX_RE.sub('', segment, count=1)
+        stripped = _ASSIGN_PREFIX_RE.sub('', segment)  # `^`-verankert: höchstens ein Treffer
         if stripped == segment:
             break
         segment = stripped.strip()
@@ -1390,10 +1410,11 @@ def split_compound_command(command: str) -> list[str]:
             i += 1
             continue
 
-        # Ab hier: definitiv außerhalb von Quotes
+        # Ab hier: definitiv außerhalb von Quotes. `||` trennt wie zwei `|` – das leere
+        # Stück dazwischen verwirft flush().
         if c == '|':
             flush()
-            i += 2 if (i + 1 < len(command) and command[i + 1] == '|') else 1
+            i += 1
             continue
 
         if c == '&' and i + 1 < len(command) and command[i + 1] == '&':
@@ -1523,8 +1544,7 @@ def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
     #     (_build_allow_output) das Original – zwei Fassungen, eine Entscheidung. Kam im Bestand
     #     nicht vor; ablehnen statt beide abzugleichen.
     if command != mit_heredoc and strip_wrapper_filter(command)[1]:
-        return ("deny", _INDIRECT_FILTER_REASON.format(erkannt="er steht in einem Befehl mit Heredoc"),
-                "INDIRECT_WRAPPER_FILTER")
+        return ("deny", _INDIRECT_FILTER_REASON.format(erkannt=_GRUND_HEREDOC), "INDIRECT_WRAPPER_FILTER")
 
     # WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells).
     #    String-Argumente nicht-ausführender Befehle werden dabei maskiert: eine
@@ -1581,7 +1601,8 @@ def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
                     log_type = f"COMPOUND_{log_type}"
                 return ("deny", reason, log_type)
 
-        if _LOOP_OPEN_RE.match(bare):
+        # Ohne das führende Strukturwort: Eine innere Schleife steht im Segment `do for …`.
+        if _LOOP_OPEN_RE.match(_LEADING_STRUCT_RE.sub('', bare)):
             loop_depth += 1
 
     # Kein einziges prüfbares Kommando (leerer Befehl, nur Struktur/Zuweisung) →
@@ -1649,6 +1670,53 @@ _SCRIPT_USAGE_HINT: str = (
 )
 
 
+_LISTE_EINLEITUNG = (
+    "Diese Liste regelt das Bash-Tool. Befehle die hier nicht passen, werden vom\n"
+    "PreToolUse-Hook automatisch geblockt (deny) – nicht nur \"unerwünscht\", sondern\n"
+    "hart blockiert. '# --allow-once' anhängen erzwingt eine einmalige User-Freigabe\n"
+    "(nur für echte Einzelfälle ohne regulären Weg).\n"
+    "Tool-Vorrang: für Datei-Lesen/-Ändern sind Read/Edit meist besser als cat/sed.\n"
+    "Gesucht wird per Bash mit grep / find – die Werkzeuge Grep und Glob fehlen unter\n"
+    "Linux/WSL jeder Session mit Bash.\n"
+)
+_KOPF_TASKS = "Häufige Projekt-Tasks – immer via Wrapper-Script (Direktaufruf wird geblockt):"
+_KOPF_LESEN = "Gezielt lesen statt Volldatei (Volldatei nur, wenn du fast alles brauchst):"
+_KOPF_ERLAUBT = "Erlaubte Befehle (Allow-Liste):"
+_ZUSAMMENSETZEN = (
+    "Zusammensetzen (jedes Teilstück wird einzeln geprüft – erlaubt ist die Struktur,\n"
+    "nicht ein Freibrief für ihren Inhalt):\n"
+    "  Verkettung   |  ||  &&  ;  sowie Zeilenumbruch\n"
+    "  Zuweisung    out=$(befehl); echo \"$out\"\n"
+    "  Substitution $(…), `…`, Prozess-Substitution <(…)\n"
+    "  Heredoc      befehl <<'EOF' … EOF   (Body gilt als Text, nicht als Befehl)\n"
+    "  Schleifen    for/while – im Rumpf nur lesende Befehle, keine Datei-Operationen\n"
+    "  Sub-Befehle  find … -exec <befehl> \\;  und  xargs <befehl>\n"
+    "\n"
+    "Nicht erlaubt, weil es jede Prüfung aushebelt: indirekte Ausführung – der Befehl\n"
+    "kommt aus einer Variablen ($CMD), aus eval/source oder aus bash -c."
+)
+_SCRATCHPAD_TEXT = (
+    "Scratchpad (Wegwerf-Scripte, Zwischenergebnisse, Redirect-Ziel):\n"
+    "  {pfad}/\n"
+    "  Liegt außerhalb des Repos, verschwindet mit der Session – kein Aufräumen nötig.\n"
+    "  Ablegen ist frei (Redirect, Write-Tool); .claude/tmp/ ist KEIN Schreibziel mehr.\n"
+    "  AUSFÜHREN braucht eine Freigabe: python3 <scratchpad>/<name>.py {marker}\n"
+    "  – ein Script führt beliebigen Code aus und umginge sonst diese Prüfung.\n"
+    "  Vorher die Werkzeugfrage: Edit/Read, grep/find und die prozesscode-Werkzeuge\n"
+    "  zuerst; ein Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist.\n"
+)
+_KOPF_SCHREIBEN = "Schreiben in Projektdokumente (User-Freigabe nötig, kein Marker):"
+_SCHREIBEN_TEXT = (
+    "  python3 -m prozesscode.obs add|set …       → docs/kaizen/observations.md\n"
+    "  python3 -m prozesscode.lessons add …       → docs/kaizen/lessons_learned.md\n"
+    "  python3 -m prozesscode.td add|set|remove … → docs/tech-debt.md (+ AGENT_MEMORY bei `jetzt`)\n"
+    "  python3 -m prozesscode.oq add|set|remove … → docs/open-questions.md\n"
+    "  Die Freigabe nennt Eintrag und Datei; die Änderung zeigt der Mod tracker-diff im Pane.\n"
+    "  Überblick über alle Tracker: python3 -m prozesscode.tracker\n"
+)
+_KOPF_DESTRUKTIV = "Destruktive Befehle (nur mit # --allow-once, User-Freigabe nötig):"
+
+
 def allow_list_text() -> str:
     """Die Allow-Liste als Text.
 
@@ -1662,29 +1730,21 @@ def allow_list_text() -> str:
     def schreib(text: str = "") -> None:
         zeilen.append(text)
 
-    schreib(
-        "Diese Liste regelt das Bash-Tool. Befehle die hier nicht passen, werden vom\n"
-        "PreToolUse-Hook automatisch geblockt (deny) – nicht nur \"unerwünscht\", sondern\n"
-        "hart blockiert. '# --allow-once' anhängen erzwingt eine einmalige User-Freigabe\n"
-        "(nur für echte Einzelfälle ohne regulären Weg).\n"
-        "Tool-Vorrang: für Datei-Lesen/-Ändern sind Read/Edit meist besser als cat/sed.\n"
-        "Gesucht wird per Bash mit grep / find – die Werkzeuge Grep und Glob fehlen unter\n"
-        "Linux/WSL jeder Session mit Bash.\n"
-    )
+    schreib(_LISTE_EINLEITUNG)
 
-    schreib("Häufige Projekt-Tasks – immer via Wrapper-Script (Direktaufruf wird geblockt):")
+    schreib(_KOPF_TASKS)
     for line in _PROJECT_TASK_SCRIPTS:
         schreib(f"  {line}")
     schreib()
     schreib(_SCRIPT_USAGE_HINT)
     schreib()
 
-    schreib("Gezielt lesen statt Volldatei (Volldatei nur, wenn du fast alles brauchst):")
+    schreib(_KOPF_LESEN)
     for line in _TARGETED_READ_SCRIPTS:
         schreib(f"  {line}")
     schreib()
 
-    schreib("Erlaubte Befehle (Allow-Liste):")
+    schreib(_KOPF_ERLAUBT)
 
     # Erst alle Einträge sammeln, dann alphabetisch sortiert ausgeben
     groups: dict[str, list[str]] = {}
@@ -1709,40 +1769,13 @@ def allow_list_text() -> str:
             schreib(f"    {', '.join(items)}")
 
     schreib()
-    schreib(
-        "Zusammensetzen (jedes Teilstück wird einzeln geprüft – erlaubt ist die Struktur,\n"
-        "nicht ein Freibrief für ihren Inhalt):\n"
-        "  Verkettung   |  ||  &&  ;  sowie Zeilenumbruch\n"
-        "  Zuweisung    out=$(befehl); echo \"$out\"\n"
-        "  Substitution $(…), `…`, Prozess-Substitution <(…)\n"
-        "  Heredoc      befehl <<'EOF' … EOF   (Body gilt als Text, nicht als Befehl)\n"
-        "  Schleifen    for/while – im Rumpf nur lesende Befehle, keine Datei-Operationen\n"
-        "  Sub-Befehle  find … -exec <befehl> \\;  und  xargs <befehl>\n"
-        "\n"
-        "Nicht erlaubt, weil es jede Prüfung aushebelt: indirekte Ausführung – der Befehl\n"
-        "kommt aus einer Variablen ($CMD), aus eval/source oder aus bash -c."
-    )
+    schreib(_ZUSAMMENSETZEN)
     schreib()
     if _SCRATCHPAD:
-        schreib("Scratchpad (Wegwerf-Scripte, Zwischenergebnisse, Redirect-Ziel):")
-        schreib(f"  {_SCRATCHPAD}/")
-        schreib("  Liegt außerhalb des Repos, verschwindet mit der Session – kein Aufräumen nötig.")
-        schreib("  Ablegen ist frei (Redirect, Write-Tool); .claude/tmp/ ist KEIN Schreibziel mehr.")
-        schreib("  AUSFÜHREN braucht eine Freigabe: python3 <scratchpad>/<name>.py " + ONE_TIME_MARKER)
-        schreib("  – ein Script führt beliebigen Code aus und umginge sonst diese Prüfung.")
-        schreib("  Vorher die Werkzeugfrage: Edit/Read, grep/find und die prozesscode-Werkzeuge")
-        schreib("  zuerst; ein Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist.")
-        schreib()
-    schreib("Schreiben in Projektdokumente (User-Freigabe nötig, kein Marker):")
-    schreib("  python3 -m prozesscode.obs add|set …       → docs/kaizen/observations.md")
-    schreib("  python3 -m prozesscode.lessons add …       → docs/kaizen/lessons_learned.md")
-    schreib("  python3 -m prozesscode.td add|set|remove … → docs/tech-debt.md "
-            "(+ AGENT_MEMORY bei `jetzt`)")
-    schreib("  python3 -m prozesscode.oq add|set|remove … → docs/open-questions.md")
-    schreib("  Die Freigabe zeigt den Eintrag im Klartext (bei `set` mit Vorher/Nachher).")
-    schreib("  Überblick über alle Tracker: python3 -m prozesscode.tracker")
-    schreib()
-    schreib("Destruktive Befehle (nur mit # --allow-once, User-Freigabe nötig):")
+        schreib(_SCRATCHPAD_TEXT.format(pfad=_SCRATCHPAD, marker=ONE_TIME_MARKER))
+    schreib(_KOPF_SCHREIBEN)
+    schreib(_SCHREIBEN_TEXT)
+    schreib(_KOPF_DESTRUKTIV)
     for _pattern, _hint, label in sorted(
         ((pat, h, lb) for pat, h, lb in DESTRUCTIVE_PATTERNS if lb),
         key=lambda x: x[2].lower(),
@@ -1779,12 +1812,11 @@ def _build_allow_output(command: str) -> dict:
         # updatedInput (zwei würden sich gegenseitig überschreiben).
         # Nie in einem Befehl mit Heredoc: Dessen Text ist Daten, und Wrapper mit Filter
         # plus Heredoc lehnt check_command ohnehin ab.
-        filtered = False
         if strip_heredoc_bodies(rewritten) == rewritten:
             rewritten, filtered = strip_wrapper_filter(rewritten)
-        if filtered:
-            changed = True
-            hint = (hint + "\n\n" if hint else "") + _FILTER_STRIPPED_HINT
+            if filtered:
+                changed = True
+                hint = (hint + "\n\n" if hint else "") + _FILTER_STRIPPED_HINT
 
         if changed:
             hso["updatedInput"] = {"command": rewritten}
@@ -1802,11 +1834,10 @@ def main() -> None:
     except (json.JSONDecodeError, EOFError):
         sys.exit(0)
 
-    tool_name = inp.get("tool_name", "")
-    if tool_name != "Bash":
+    if inp.get("tool_name") != "Bash":
         sys.exit(0)
 
-    command = inp.get("tool_input", {}).get("command", "")
+    command = inp.get("tool_input", {}).get("command")
     if not command:
         sys.exit(0)
 

@@ -18,10 +18,8 @@ an einer solchen Datei darf nicht kollateral blockieren.
 
 Zeilen-Ausnahme: `ordinal-ok` in der Zeile.
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt.
-Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
+Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
-import json
-import sys
 from pathlib import Path
 
 
@@ -29,6 +27,17 @@ from ._hook_io import edit_zustand
 from .. import anchors, ordinale
 
 _MAX_HITS = 10
+_MAX_ZEICHEN = 110  # je zitierter Zeile
+
+_KOPF = "❌ Gliederungsnummer (Poka-Yoke): neue selbstvergebene Nummer/Buchstabe:\n"
+_HINWEIS = (
+    "  Eine Nummer ist eine zweite Adresse neben dem Anker – nur der Anker wird geprüft, "
+    "die Nummer wird bei Umsortierung still falsch (S124: zwei tote Verweise im Bestand).\n"
+    "  Nimm den Namen: `## Findings präsentieren` statt `## 5. Findings`, "
+    "`[Findings präsentieren](#KZN-…)` statt `[Schritt 5](#KZN-…)`.\n"
+    "  Fremdbestimmte Nummerierung (RFC-Abschnitt o.ä.) oder bewusster Einzelfall → "
+    "`ordinal-ok` in die Zeile."
+)
 
 
 def _rel(file_path: str) -> str | None:
@@ -65,28 +74,5 @@ def check(data: dict) -> str | None:
     if not funde:
         return None
 
-    zeilen = "\n".join(f"  - {art}: `{zeile[:110]}`" for _nr, zeile, art in funde[:_MAX_HITS])
-    return (
-        "❌ Gliederungsnummer (Poka-Yoke): neue selbstvergebene Nummer/Buchstabe:\n"
-        f"{zeilen}\n"
-        "  Eine Nummer ist eine zweite Adresse neben dem Anker – nur der Anker wird geprüft, "
-        "die Nummer wird bei Umsortierung still falsch (S124: zwei tote Verweise im Bestand).\n"
-        "  Nimm den Namen: `## Findings präsentieren` statt `## 5. Findings`, "
-        "`[Findings präsentieren](#KZN-…)` statt `[Schritt 5](#KZN-…)`.\n"
-        "  Fremdbestimmte Nummerierung (RFC-Abschnitt o.ä.) oder bewusster Einzelfall → "
-        "`ordinal-ok` in die Zeile.")
-
-
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        sys.exit(0)
-    grund = check(data)
-    if grund:
-        print(grund, file=sys.stderr)
-        sys.exit(2)
-
-
-if __name__ == "__main__":
-    main()
+    zeilen = "\n".join(f"  - {art}: `{zeile[:_MAX_ZEICHEN]}`" for _nr, zeile, art in funde[:_MAX_HITS])
+    return f"{_KOPF}{zeilen}\n{_HINWEIS}"

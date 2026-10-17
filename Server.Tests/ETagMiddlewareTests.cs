@@ -111,10 +111,10 @@ public class ETagMiddlewareTests(PostgresContainerFixture postgres) : EndpointsT
         // xmin ist hex-kodiert und (bei uint) maximal 8 Ziffern lang – ein Content-Hash (z.B. SHA-256,
         // 64 Hex-Ziffern) würde dieses Format nicht erfüllen. Pinnt damit die im Testnamen versprochene
         // "xmin, kein Content-Hash"-Eigenschaft, nicht nur "irgendein nicht-leerer ETag".
-        response.Headers.ETag!.Tag.Trim('"').Should().MatchRegex("^[0-9a-f]{1,8}$");
+        response.Headers.ETag.Tag.Trim('"').Should().MatchRegex("^[0-9a-f]{1,8}$");
         var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
         body.Should().BeEquivalentTo(
-            new IngredientResponse(Id: body!.Id, Name: "Tomaten", BaseUnit: "Stück"));
+            new IngredientResponse(Id: body.Id, Name: "Tomaten", BaseUnit: "Stück"));
         // Id is server-generated; round-tripped value compared against itself, name/unit pinned exactly.
     }
 

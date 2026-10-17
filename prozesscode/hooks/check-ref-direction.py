@@ -15,11 +15,9 @@ Datei-Scope (default-protected + explizite Ausnahmen, robust gegen neue Dateien)
 - **Zeilen-Ausnahme:** eine Zeile mit `ref-ok`-Marker wird ignoriert (bewusste Einzelfälle).
 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt und prüft ihn.
-Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
+Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
-import json
 import re
-import sys
 from pathlib import Path
 
 from ._hook_io import edit_zustand
@@ -46,6 +44,14 @@ _EXEMPT_PREFIXES = ("docs/kaizen/archive/", ".claude/skills/kaizen/")
 _VOLATILE_RE = re.compile(r"\b(?:OBS|OQ|LL|TD)-S\d{2,3}(?:-\d+)?\b")
 _REF_OK = "ref-ok"
 
+_KOPF = "❌ Referenz-Richtung (Poka-Yoke): stabile Datei referenziert volatile ID(s):\n"
+_HINWEIS = (
+    "  Prinzip „Referenzen laufen volatil → stabil, nie umgekehrt“ (principles.md): volatile IDs "
+    "(OBS-/OQ-/LL-/TD-) verschwinden beim Erledigen/Archivieren → der Verweis dangelt. "
+    "Nötige Info hier inlinen oder nur auf stabile Artefakte (ADR/Guideline) verweisen. "
+    "Bewusster Einzelfall → `ref-ok`-Marker in die Zeile."
+)
+
 
 def _rel_path(file_path: str) -> str | None:
     """Repo-relativer POSIX-Pfad; None wenn außerhalb des Repos (oder unauflösbar)."""
@@ -57,7 +63,8 @@ def _rel_path(file_path: str) -> str | None:
 
 def is_protected(file_path: str) -> bool:
     """True, wenn die Datei stabil ist (geschützt) und nicht explizit ausgenommen."""
-    rel = _rel_path(file_path) if (file_path.startswith("/") or "\\" in file_path) else file_path
+    # Relative Pfade (auch mit `\`) bleiben wie sie sind; das Auflösen ergäbe dasselbe.
+    rel = _rel_path(file_path) if file_path.startswith("/") else file_path
     if rel is None:
         return False
     rel = rel.replace("\\", "/")
@@ -95,33 +102,4 @@ def check(data: dict) -> str | None:
         return None
 
     lines = "\n".join(f"  - Zeile {lineno}: {ident}" for lineno, ident in refs)
-    return (
-        "❌ Referenz-Richtung (Poka-Yoke): stabile Datei referenziert volatile ID(s):\n"
-        f"{lines}\n"
-        "  Prinzip „Referenzen laufen volatil → stabil, nie umgekehrt“ (principles.md): volatile IDs "
-        "(OBS-/OQ-/LL-/TD-) verschwinden beim Erledigen/Archivieren → der Verweis dangelt. "
-        "Nötige Info hier inlinen oder nur auf stabile Artefakte (ADR/Guideline) verweisen. "
-        "Bewusster Einzelfall → `ref-ok`-Marker in die Zeile."
-    )
-
-
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        sys.exit(0)  # kein parsbarer Input → nichts blocken
-
-    try:
-        reason = check(data)
-        if reason:
-            print(reason, file=sys.stderr)
-            sys.exit(2)  # exit 2 = Edit blockieren
-    except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
-        print(f"check-ref-direction: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)
-        sys.exit(0)
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+    return f"{_KOPF}{lines}\n{_HINWEIS}"

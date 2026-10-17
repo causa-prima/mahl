@@ -18,10 +18,7 @@ eingetragenes Werkzeug bliebe wirkungslos, weil die Bash-Allow-Liste sein Ausfü
 Grund: Externe Abhängigkeiten erfordern explizite Freigabe durch den User.
 Prozess: docs/reference/dependencies.md (Sektion "Prozess: Neues Paket hinzufügen")
 """
-import json
-import os
 import re
-import sys
 
 
 PROTECTED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -71,40 +68,15 @@ def get_denial_reason(file_path: str, new_text: str = "") -> str | None:
 
 def check(data: dict) -> str | None:
     """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py."""
-    if data.get("tool_name", "") not in ("Edit", "Write"):
+    if data.get("tool_name") not in ("Edit", "Write"):
         return None
 
-    tool_input = data.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
+    # Absolute Pfade brauchen keinen Abzug des Projektordners: Jedes Muster verankert am
+    # Anfang oder an einem Pfadtrenner.
+    tool_input = data.get("tool_input") or {}
+    file_path = tool_input.get("file_path")
     if not file_path:
         return None
 
-    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
-    if project_dir and file_path.startswith(project_dir):
-        file_path = file_path[len(project_dir):].lstrip("/\\")
-
     new_text = tool_input.get("new_string") or tool_input.get("content") or ""
     return get_denial_reason(file_path, new_text)
-
-
-def main() -> None:
-    try:
-        inp = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
-        sys.exit(0)
-
-    reason = check(inp)
-    if reason:
-        print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": reason,
-            }
-        }))
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()

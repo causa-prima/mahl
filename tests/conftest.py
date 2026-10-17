@@ -1,6 +1,6 @@
 """Gemeinsame Hilfsfunktionen für die Tests des Prozess-Codes.
 
-Die Tests liegen bewusst NEBEN dem Paket, nicht darin: mutmut mutiert `paths_to_mutate`,
+Die Tests liegen bewusst NEBEN dem Paket, nicht darin: mutmut mutiert `source_paths`,
 und läge `tests/` unter `prozesscode/`, mutierte es die Tests gleich mit – ein Mutant im
 Test, der den Test grün lässt, wäre als „überlebt" gezählt und sähe aus wie eine Lücke im
 Produktivcode.
@@ -84,8 +84,7 @@ def cli_aufruf(monkeypatch, modul, *argumente) -> int:
     """Startet `modul.main()` mit diesen Argumenten; `sys.exit` wird zum Rückgabewert.
 
     Der gemeinsame Weg der Aufrufpfad-Tests (tests/test_aufrufpfad.py erkennt ihn als Aufruf
-    von `main`). In-process statt Subprozess: Unter mutmut lädt ein Subprozess den
-    instrumentierten Code ohne dessen Laufzeit (s. prozesscode/_mutmut_ausnahmen.py).
+    von `main`). In-process statt Subprozess: derselbe Weg ohne Prozessstart je Aufruf.
     """
     monkeypatch.setattr(sys, "argv", [modul.__name__, *argumente])
     try:

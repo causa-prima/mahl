@@ -14,12 +14,10 @@ Entstehung, wo der Kontext noch da ist.
 
 Abgrenzung zu `check-e2e-scenario-ref.py`: Der hält Feature-Titel und E2E-`// Szenario:`-Kommentare
 deckungsgleich (Mapping Spec ↔ Test). Hier geht es um die Konsistenz *innerhalb* der
-Feature-Dateien. Die PreToolUse-Mechanik (Post-Edit-Inhalt simulieren, Exit 2, fail-open) ist
+Feature-Dateien. Die PreToolUse-Mechanik (Post-Edit-Inhalt simulieren, fail-open) ist
 dieselbe und dort beschrieben.
 """
-import json
 import re
-import sys
 from pathlib import Path
 
 from .._feature import find_malformed_run_comments
@@ -29,6 +27,14 @@ from ._hook_io import edit_zustand
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _FEATURES_DIR = _REPO_ROOT / "features"
 _FEATURE_RE = re.compile(r"\.feature$")
+
+_KOPF = "❌ Feature-Bauplan (Poka-Yoke, ADR-S131-1):\n"
+_HINWEIS = (
+    "  Jeder Lauf braucht eine Phase (`# @phase: <SKELETON|MVP|V1>` im Feature-Header oder\n"
+    "  `· Phase:<P>` am `# @run-N`-Tag) und auflösbare `braucht:`-Kanten (`run-8` in derselben\n"
+    "  Datei, `US-904/run-8` datei-übergreifend). Bestand prüfen:\n"
+    "  python3 -m prozesscode.next_run --check"
+)
 
 
 def is_feature(file_path: str) -> bool:
@@ -86,27 +92,4 @@ def check(data: dict) -> str | None:
         return None
 
     lines = "\n".join(f"  - {v}" for v in violations)
-    return (
-        "❌ Feature-Bauplan (Poka-Yoke, ADR-S131-1):\n"
-        f"{lines}\n"
-        "  Jeder Lauf braucht eine Phase (`# @phase: <SKELETON|MVP|V1>` im Feature-Header oder\n"
-        "  `· Phase:<P>` am `# @run-N`-Tag) und auflösbare `braucht:`-Kanten (`run-8` in derselben\n"
-        "  Datei, `US-904/run-8` datei-übergreifend). Bestand prüfen:\n"
-        "  python3 -m prozesscode.next_run --check"
-    )
-
-
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:  # noqa: BLE001 – kein parsbarer Input → nichts blocken
-        sys.exit(0)
-    reason = check(data)
-    if reason:
-        print(reason, file=sys.stderr)
-        sys.exit(2)
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+    return f"{_KOPF}{lines}\n{_HINWEIS}"

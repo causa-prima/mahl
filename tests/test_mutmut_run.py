@@ -7,11 +7,23 @@ Ein echter Mutationslauf kommt hier nicht vor – er dauert Minuten bis Stunden 
 pytest aus pytest heraus.
 """
 import subprocess
+import sys
 from importlib import import_module
+from pathlib import Path
 
 import pytest
 
 mr = import_module("prozesscode.mutmut-run")
+
+
+# --- Prozessstart ----------------------------------------------------------------
+def test_mutmut_laeuft_ohne_core_dumps(monkeypatch):
+    """Ein Timeout endet per SIGXCPU, und das schreibt einen Core-Dump – unter WSL über
+    `core_pattern` als Datei nach Windows, je Mutant einige hundert MB. Am echten
+    Prozessstart geprüft: Das Limit muss beim Kind ankommen."""
+    monkeypatch.setattr(mr, "MUTMUT", Path(sys.executable))
+    lauf = mr._laufe("-c", "import resource; print(resource.getrlimit(resource.RLIMIT_CORE)[0])")
+    assert lauf.stdout.strip() == "1"
 
 
 # --- Eine Stelle ansehen (S133) ------------------------------------------------
@@ -38,6 +50,49 @@ def test_show_gibt_die_mutation_aus_statt_einen_lauf_zu_starten(tmp_path, monkey
     assert mr.main(["--show", "prozesscode.anchors.x_f__mutmut_3"]) == 0
     assert aufrufe == [("show", "prozesscode.anchors.x_f__mutmut_3")]
     assert "+ neu" in capsys.readouterr().out
+
+
+# --- Abgebrochener Lauf --------------------------------------------------------
+# Schluss einer echten Ausgabe von mutmut 3.8: Sammelfehler beim Testimport.
+_ABBRUCH_SAMMELN = """\
+E   ModuleNotFoundError: No module named 'gibt_es_nicht'
+=========================== short test summary info ============================
+ERROR tests/test_zz_gegenprobe_kaputt.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1595 tests collected, 1 error in 0.54s
+Failed to collect list of tests
+"""
+
+
+def _main_mit_lauf(monkeypatch, tmp_path, lauf, *argv):
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    monkeypatch.setattr(mr, "_laufe", lambda *a: lauf)
+    # Ergebnisse eines früheren, grünen Laufs liegen noch im Mutantenbaum.
+    monkeypatch.setattr(mr, "lies_ergebnisse", lambda _m: [("a.x__mutmut_1", "killed")])
+    monkeypatch.setattr(mr, "lies_baseline", lambda: {})
+    monkeypatch.setattr(mr, "schreibe_baseline", lambda _s: None)
+    return mr.main(list(argv))
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_abgebrochener_lauf_meldet_den_abbruch_statt_alter_ergebnisse(
+        tmp_path, monkeypatch, capsys):
+    lauf = subprocess.CompletedProcess([], 1, stdout=_ABBRUCH_SAMMELN, stderr="")
+    assert _main_mit_lauf(monkeypatch, tmp_path, lauf, "--ratchet") == 1
+    ausgabe = capsys.readouterr().out
+    assert ausgabe.startswith("✗")
+    assert "Failed to collect list of tests" in ausgabe
+    assert "Sperrklinke gehalten" not in ausgabe
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_durchgelaufener_lauf_wertet_die_ergebnisse_aus(tmp_path, monkeypatch, capsys):
+    lauf = subprocess.CompletedProcess([], 0, stdout="Running mutation testing\n", stderr="")
+    assert _main_mit_lauf(monkeypatch, tmp_path, lauf, "--ratchet") == 0
+    assert "Sperrklinke gehalten" in capsys.readouterr().out
+
 
 # --- Verdikt -----------------------------------------------------------------
 def test_verdikt_ohne_befund_ist_gruen():

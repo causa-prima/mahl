@@ -166,3 +166,23 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Ich habe korrekt gemessen, aber die Aussage auf den Normalbetrieb ausgedehnt, ohne zu prüfen, ob das Messfenster ihn enthält. Die Zusammensetzung der Sessions stand im Commit-Verlauf, den ich für dieselbe Prüfung schon gelesen hatte; das Gleichgewicht selbst war zudem gerechnet (Zulauf gegen Drain-Leistung), nicht gemessen.
   Regel: Vor einem Schluss aus einem Messfenster fragen, welche Betriebsarten die Aussage abdecken soll, und prüfen, ob das Fenster jede davon enthält. Fehlt eine, die Messung als Basislinie dieser Phase festhalten statt als Urteil.
   CM-Bezug: CM-S127-1
+
+## Session 139 – 2026-10-17
+
+- **[MITTEL] [TOOLING] [Mutation-Testing] LL-S139-1 – Werkzeugfehler über Sessions umgangen, ohne die Version in Frage zu stellen**
+  Quelle: User
+  Was: mutmut bewertete im größten Guard über mehrere Sessions nur einen Teil der Mutanten (Abbruch mit KeyError -9) und vertrug keine Subprozess-Tests. Darum herum entstanden Umwege: eine Ausnahmeliste für Tests, Umbauten auf In-Prozess-Aufrufe, zwei Beobachtungen, Handproben statt Sperrklinke. Kein Agent prüfte, ob eine neuere mutmut-Version das behebt – mutmut 3.8 tat es, gefunden erst in der monatlichen Durchsicht.
+  Warum: Der Fehler wurde als Eigenschaft des Werkzeugs behandelt, nicht als möglicher Bug mit Fix upstream; die Frage nach der Version kam in keinem Schritt vor. Die monatliche Durchsicht hält Werkzeuge künftig nah an der aktuellen Version, deckt aber Fehler in der aktuellen Version nicht ab.
+  Regel: Verhält sich ein Fremdwerkzeug fehlerhaft, vor dem ersten Umweg prüfen: läuft die aktuelle Version, nennt der Changelog oder der Issue-Tracker den Fehler? Erst wenn nicht, umgehen – und den Umweg mit Version und Fundstelle begründen.
+
+- **[MITTEL] [AGENT] [Bash/Permission] LL-S139-2 – Ein nacktes cd verschiebt das Arbeitsverzeichnis aller folgenden Befehle**
+  Quelle: Orchestrator
+  Was: Ein Bash-Aufruf begann mit 'cd Client'. Das Verzeichnis blieb für die folgenden Aufrufe gesetzt; danach schlugen eigene Befehle mit relativen Pfaden fehl, ebenso ein Befehl, den der User per ! ausführte. Erst 'cd ..' stellte den Stand wieder her.
+  Warum: Die Regel (Subshell '(cd X && …)' oder '--prefix') stand in dev-workflow.md, wurde beim Schreiben des Befehls aber nicht angewendet – das Bash-Werkzeug behält das Arbeitsverzeichnis zwischen Aufrufen.
+  Regel: Nie ein nacktes cd in einem Bash-Aufruf: Werkzeuge mit --prefix/-C aufrufen oder den Pfad als Argument geben – eine Subshell '(cd X && …)' lässt die Allow-Liste nicht zu. Zurück führt 'cd <absoluter Repo-Pfad>'. Wiederholt sich der Fall, ist das der Anlass für einen Hook, nicht für eine weitere Regel.
+
+- **[MITTEL] [TOOLING] [Mutation-Testing] LL-S139-3 – Laufzeitproblem über Sessions hingenommen, ohne zu messen, wohin die Zeit geht**
+  Quelle: Orchestrator
+  Was: Mutationsläufe über den Bash-Guard dauerten 10–14 Minuten bei rund 20 % CPU-Last. Die Laufzeit stand als 'gemessen' im Docstring von mutmut-run.py, ihre Ursache maß niemand. Aufgeschlüsselt nach Ausgang (durations_by_key in der .meta von mutmut) belegten 60 Timeouts 95 % der Worker-Zeit: SIGXCPU schreibt einen Core-Dump, und WSL leitet ihn per core_pattern als 300–440-MB-Datei nach Windows. Mit Core-Limit 1 für mutmut: 2:28 statt 13:44 Minuten, gleiches Ergebnis.
+  Warum: Eine lange Laufzeit wirkte wie eine Eigenschaft der Methode (viele Mutanten), nicht wie ein Befund; gemessen wurde die Gesamtdauer, nicht ihre Verteilung. Die Ursache lag außerhalb des Werkzeugs, in der Umgebung – dort sucht niemand, der das Werkzeug für langsam hält.
+  Regel: Fällt eine Laufzeit auf, vor dem Hinnehmen oder Optimieren die Zeit je Einheit und Ausgang aufschlüsseln (Mittel, Ausreißer, wer die Summe trägt). Niedrige CPU-Last bei vielen Workern heißt: Sie warten auf etwas – das suchen.

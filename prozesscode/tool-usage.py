@@ -29,6 +29,7 @@ from collections import Counter, defaultdict
 
 
 from ._session_logs import (  # noqa: E402
+    content_blocks,
     load_mapping,
     load_records,
     project_log_dir,
@@ -170,7 +171,7 @@ def measure_lsp() -> tuple[Counter, Counter, dict[str, Counter], int]:
         calls = 0
         for recs in [records, *sub_records]:
             for rec in recs:
-                for block in (rec.get("message") or {}).get("content") or []:
+                for block in content_blocks(rec):
                     if (isinstance(block, dict) and block.get("type") == "tool_use"
                             and block.get("name") == "LSP"):
                         calls += 1

@@ -12,11 +12,8 @@ sicherheitsrelevantesten Stelle, während dieser Wrapper das Gate sofort schlie�
 Ausgabe des Runners wird bei Rot vollständig durchgereicht, damit die Ursache sichtbar
 bleibt und nicht auf „Exit-Code 1" zusammenschrumpft.
 
-Bewusst **im selben Prozess**, nicht als Subprozess: Unter mutmut läuft die Suite gegen einen
-instrumentierten Baum, und ein Subprozess lädt den mutierten Hook ohne die mutmut-Laufzeit –
-der Lauf brach dort mit `'NoneType' object has no attribute 'max_stack_depth'` ab, noch bevor
-ein einziger Mutant bewertet war. In-process gilt die Instrumentierung, und der Lauf misst
-tatsächlich den geladenen Code.
+Bewusst **im selben Prozess**, nicht als Subprozess: Der Runner ist der größte Einzeltest der
+Suite, und unter mutmut läuft er für jeden Mutanten – ein Prozessstart je Lauf summiert sich.
 """
 import importlib.util
 import io

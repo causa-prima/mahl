@@ -191,6 +191,20 @@ def test_deny_patterns() -> int:
         if not assert_decision(command, "deny", f"{desc}: {command}"):
             failures += 1
 
+    # Der Hinweis muss den richtigen Wrapper nennen, nicht nur ablehnen: `lint\b` traf auch
+    # `lint:duplicates` und schickte zu eslint-run statt jscpd-run.
+    for command, wrapper in [
+        ("npm run lint", "eslint-run"),
+        ("npm run lint:duplicates", "jscpd-run"),
+        ("npm --prefix Client run lint:duplicates", "jscpd-run"),
+    ]:
+        _decision, reason, _log = hook.check_command(command)
+        if wrapper in reason:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [hint        ] {command} → {wrapper}")
+        else:
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [hint        ] {command} → erwartet {wrapper}")
+            failures += 1
+
     return failures
 
 
@@ -220,6 +234,14 @@ def test_allow_patterns() -> int:
         ("dotnet list mahl.slnx package --vulnerable --include-transitive",
          "dotnet list package --vulnerable"),
         ("dotnet tool search dotnet-stryker --take 3", "dotnet tool search"),
+        (".venv/bin/pip list --outdated", "pip list --outdated (Python-Werkzeuge)"),
+        ("dotnet --version", "Toolchain-Version: dotnet"),
+        ("node --version", "Toolchain-Version: node"),
+        ("npm --version", "Toolchain-Version: npm"),
+        ("python3 --version", "Toolchain-Version: python3"),
+        ("docker --version", "Toolchain-Version: docker"),
+        ("claude plugin validate .claude/mods/tracker-diff", "Mod prüfen"),
+        ("claude plugin test .claude/mods/tracker-diff", "Mod-Tests"),
         # npm run / audit / outdated / update / ci (nativ)
         ("npm run build", "npm run build"),
         ("npm run dev", "npm run dev"),
@@ -392,6 +414,14 @@ def test_deny() -> int:
         ("dotnet list package", "dotnet list package ohne --outdated/--vulnerable"),
         ("dotnet list mahl.slnx package", "dotnet list <projekt> package ohne Flag"),
         ("dotnet tool search", "dotnet tool search ohne <id>"),
+        (".venv/bin/pip install -r requirements-dev.txt", "pip install"),
+        (".venv/bin/pip list", "pip list ohne --outdated"),
+        ("node --version; node -e 1", "--version erlaubt kein Anhängsel: node -e läuft Code"),
+        ("node -e 1 --version", "--version nur als einziges Argument"),
+        ("python3 --version -c 1", "--version nur als einziges Argument"),
+        ("claude plugin install tracker-diff@x", "plugin install ändert die Einrichtung"),
+        ("claude -p hallo", "claude -p startet eine Session"),
+        ("claude plugin validate", "validate ohne Ordner"),
         # docker-compose (v1) nicht verfügbar in dieser WSL-Distro → deny mit Smart-Hint auf docker compose
         ("docker-compose up -d", "docker-compose v1 → deny (nutze docker compose)"),
         ("docker-compose down", "docker-compose down v1 → deny"),
@@ -746,13 +776,16 @@ def test_path_normalization() -> int:
          "cat .claude/tmp/out.txt", True, "cat absoluter Repo-Pfad"),
         (f"ls {R}/docs",
          "ls docs", True, "ls Unterverzeichnis"),
-        # Bare-Root (kein Folge-Pfad) → '.'
+        # Bare-Root (kein Folge-Pfad) → '.' – außer als Ziel von `cd`: Das Arbeitsverzeichnis
+        # bleibt zwischen Aufrufen bestehen, und nach einem `cd` hieße `cd .` „bleib hier".
         (f"cd {R} && git status",
-         "cd . && git status", True, "cd bare-root vor &&"),
+         f"cd {R} && git status", False, "cd auf den Repo-Root bleibt absolut"),
         (f"git -C {R} diff --stat HEAD",
          "git -C . diff --stat HEAD", True, "git -C bare-root"),
         (f"cd {R}/",
-         "cd .", True, "bare-root mit Trailing-Slash → ."),
+         f"cd {R}/", False, "cd auf den Repo-Root mit Trailing-Slash bleibt absolut"),
+        (f"cd {R}/docs",
+         "cd docs", True, "cd mit Pfad-Fortsetzung → relativ"),
         # Mehrere Vorkommen (breit)
         (f"diff {R}/a.txt {R}/b.txt",
          "diff a.txt b.txt", True, "zwei Vorkommen"),
@@ -940,10 +973,9 @@ def test_wrapper_filter_strip() -> int:
         print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] updatedInput/Hinweis fehlt: {out}")
         failures += 1
 
-    # Beide Rewrites zusammen: absoluter Pfad UND Filter in einem Befehl. Der absolute Pfad
-    # sitzt seit dem Paket-Umzug im `cd`, nicht mehr im Wrapper-Aufruf – `-m` trägt keinen.
-    both = build_allow_output(f"cd {REPO_ROOT} && python3 -m prozesscode.eslint-run | tail -5")
-    if both.get("updatedInput", {}).get("command") == "cd . && python3 -m prozesscode.eslint-run":
+    # Beide Rewrites zusammen: absoluter Pfad UND Filter in einem Befehl.
+    both = build_allow_output(f"cd {REPO_ROOT}/Client && python3 -m prozesscode.eslint-run | tail -5")
+    if both.get("updatedInput", {}).get("command") == "cd Client && python3 -m prozesscode.eslint-run":
         print(f"  {Colors.GREEN}PASS{Colors.RESET} [output     ] Pfad-Normalisierung + Filter-Strip kombiniert")
     else:
         print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] Kombination fehlerhaft: {both}")

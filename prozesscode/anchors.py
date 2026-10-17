@@ -77,6 +77,7 @@ PRAEFIXE = {
     "docs/guidelines/csharp-rop.md": "ROP",
     "docs/guidelines/csharp-stryker.md": "STK",
     "docs/guidelines/csharp-sumtypes.md": "SUM",
+    "docs/process/claude-code-anknuepfung.md": "CCA",
     "docs/process/dev-workflow.md": "DEV",
     "docs/process/e2e-testing.md": "E2E",
     "docs/process/nfr.md": "NFR",

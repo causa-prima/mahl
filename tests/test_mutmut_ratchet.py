@@ -5,9 +5,8 @@ Die Sperrklinke beantwortet die Frage, die ein einzelner Lauf nicht beantworten 
 Vorher-Wert ist eine Mutationszahl nur eine Momentaufnahme – man sieht, dass 34 Mutanten
 überleben, aber nicht, ob es gestern 12 waren.
 
-Bewusst KEIN Gate (kein Hook, kein Commit-Zwang): Ein Lauf über ein Modul mittlerer Größe
-dauert gemessen 84 s, große Module liegen darüber. Ein Zwang in dieser Größenordnung
-erzeugt den Druck, unter dem er umgangen wird. Die Klinke greift nur, wenn jemand sie zieht.
+Bewusst KEIN Gate (kein Hook, kein Commit-Zwang) – Grund in `docs/process/dev-workflow.md#DEV-python-werkzeuge`.
+Die Klinke greift nur, wenn jemand sie zieht.
 """
 from importlib import import_module
 
@@ -62,14 +61,6 @@ def test_gruppiert_nach_modul():
 def test_das_modul_ist_der_name_ohne_den_mutantenteil():
     roh = [("prozesscode.hooks.check-td-capture.x_pruefe__mutmut_3", "killed")]
     assert list(mr.nach_modul(roh)) == ["prozesscode.hooks.check-td-capture"]
-
-
-def test_die_gruppierung_reicht_die_ausklammerung_durch():
-    """Sonst rechnete die Klinke mit den Meldungstext-Mutanten, die das Verdikt bereits
-    ausklammert – zwei verschiedene Zahlen für dieselbe Sache."""
-    roh = [("prozesscode.a.x_f__mutmut_1", "survived"),
-           ("prozesscode.a.x_f__mutmut_2", "killed")]
-    assert mr.nach_modul(roh, {"prozesscode.a.x_f__mutmut_1"}) == {"prozesscode.a": (1, 1)}
 
 
 # --- Die Klinke --------------------------------------------------------------
@@ -265,9 +256,54 @@ def test_der_aufrufpfad_meldet_den_teillauf(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(mr, "lies_ergebnisse", lambda _a=None: [
         ("prozesscode.a.x_f__mutmut_1", "killed"),
         ("prozesscode.a.x_f__mutmut_2", mr.NICHT_BEWERTET)])
-    monkeypatch.setattr(mr, "string_mutanten", lambda _m: set())
     assert mr.main(["--mutate", "prozesscode.a", "--ratchet"]) == 1
     assert "ohne Aussage" in capsys.readouterr().out
+
+
+# --- Wechsel des Messinstruments ---------------------------------------------
+# mutmut 3.8 erzeugte für merke-rueckgaben 94 statt 39 Mutanten: Über einen Versionswechsel
+# hinweg vergleicht die Klinke zwei Instrumente, nicht zwei Teststände.
+def test_andere_messung_setzt_die_baseline_neu_statt_zu_vergleichen():
+    basis = {"prozesscode.a": {"getoetet": 3, "beurteilbar": 4, "messung": "alt"}}
+    zeilen, schlechter, neu = mr.ratchet({"prozesscode.a": (2, 4)}, basis, messung="neu")
+    assert not schlechter
+    assert neu == {"prozesscode.a": {"getoetet": 2, "beurteilbar": 4, "messung": "neu"}}
+    assert any("neu gesetzt" in z and "alt" in z and "neu" in z for z in zeilen)
+
+
+def test_baseline_ohne_messung_gilt_als_andere_messung():
+    """Die Einträge von vor der Kennung sind alle mit einem älteren mutmut gemessen."""
+    basis = {"prozesscode.a": {"getoetet": 3, "beurteilbar": 4}}
+    _zeilen, schlechter, neu = mr.ratchet({"prozesscode.a": (2, 4)}, basis, messung="neu")
+    assert not schlechter and neu["prozesscode.a"]["messung"] == "neu"
+
+
+def test_gleiche_messung_vergleicht_wie_bisher():
+    """GEGENPROBE: Bei gleichem Instrument bleibt die Klinke scharf."""
+    basis = {"prozesscode.a": {"getoetet": 3, "beurteilbar": 4, "messung": "m"}}
+    _zeilen, schlechter, neu = mr.ratchet({"prozesscode.a": (2, 4)}, basis, messung="m")
+    assert schlechter and neu is None
+
+
+def test_messung_nennt_mutmut_version_und_wertung(tmp_path, monkeypatch):
+    (tmp_path / "lib" / "python3.12" / "site-packages" / "mutmut-3.8.0.dist-info").mkdir(
+        parents=True)
+    monkeypatch.setattr(mr, "MUTMUT", tmp_path / "bin" / "mutmut")
+    assert mr.messung() == f"mutmut 3.8.0, Wertung {mr.WERTUNG_STAND}"
+
+
+def test_der_aufrufpfad_traegt_die_messung_ein(tmp_path, monkeypatch):
+    import subprocess
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    monkeypatch.setattr(mr, "BASELINE", tmp_path / "b.json")
+    monkeypatch.setattr(mr, "messung", lambda: "m-test")
+    monkeypatch.setattr(mr, "_laufe", lambda *argv: subprocess.CompletedProcess(argv, 0, "", ""))
+    monkeypatch.setattr(mr, "lies_ergebnisse", lambda _a=None: [
+        ("prozesscode.a.x_f__mutmut_1", "killed")])
+    assert mr.main(["--mutate", "prozesscode.a", "--ratchet"]) == 0
+    assert mr.lies_baseline()["prozesscode.a"]["messung"] == "m-test"
 
 
 def test_offene_mutanten_werden_je_modul_gezaehlt():

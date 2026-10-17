@@ -85,8 +85,18 @@ def _eintrag(eintrag_id, beschreibung="x", benannt=False) -> dict:
 @pytest.mark.aufrufpfad("merke-rueckgaben")
 def test_start_im_hintergrund_knuepft_einen_eintrag(monkeypatch, capsys):
     for start in (AGENT_START, TEAMMATE_START, BASH_HINTERGRUND):
-        assert _hook(monkeypatch, capsys, start) == ""
+        _hook(monkeypatch, capsys, start)
     assert _ids() == {"a571eb0b10d33a5f3", "aprobe-agent-e887fb6ec7d2f518", "bywy2nlc5"}
+
+
+def test_start_nennt_den_befehl_zum_abhaken(monkeypatch, capsys):
+    """Der Hinweis kommt beim Start, nicht erst beim Stop: Wer das Ergebnis verarbeitet, weiß
+    dann schon, dass es abzuhaken ist – und mit welcher ID. Der Stop-Hook allein käme zu spät:
+    Abgehakt würde losgelöst vom Verarbeiten, im Turn danach."""
+    ausgabe = json.loads(_hook(monkeypatch, capsys, BASH_HINTERGRUND))["hookSpecificOutput"]
+    assert ausgabe["hookEventName"] == "PostToolUse"
+    assert ("python3 -m prozesscode.rueckgaben erledigt bywy2nlc5 --ausgang"
+            in ausgabe["additionalContext"])
 
 
 def test_eintrag_nennt_art_und_beschreibung(monkeypatch, capsys):
@@ -207,6 +217,7 @@ def test_ausfall_beim_stop_wird_einmal_sichtbar(monkeypatch, capsys):
     ausfall = json.loads(_hook(monkeypatch, capsys, stop()))
     assert ausfall["decision"] == "block"
     assert "ausgefallen (PermissionError: Zugriff verweigert)" in ausfall["reason"]
+    assert f"ls {rueckgaben.VERZEICHNIS}" in ausfall["reason"]  # der Ausweg, nicht nur der Befund
     assert _hook(monkeypatch, capsys, stop(aktiv=True)) == ""  # keine Dauerschleife
 
     # Außerhalb des Stops: fail-open, nur die stderr-Zeile.

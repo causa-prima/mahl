@@ -39,7 +39,8 @@ user-invocable: true
      `obs add --aufschubgrund` verlangt) – nicht erst beim Erfassen. Ohne Aufschubgrund ist es keine
      Beobachtung, sondern eine Behebung: dann jetzt beheben und das so vorschlagen. Zerfällt ein Punkt
      in einen behebbaren und einen aufzuschiebenden Teil, den behebbaren jetzt erledigen und nur den
-     Rest erfassen.
+     Rest erfassen. **Spricht nur der Umfang gegen das Beheben, das so sagen** – ob er einen
+     Aufschub trägt, bewertet der User; sein „später" wird `User – Umfang: …`.
    - Falls nichts anzupassen / keine Beobachtung: direkt mit dem [Schreiben der Learnings](#CLS-lessons) weitermachen.
 
 3. <a id="CLS-doku-umsetzen"></a>Dokumentations-Änderungen umsetzen (falls User zugestimmt hat):

@@ -46,7 +46,7 @@ FELDER = dict(
     beobachtung="Etwas fiel auf.",
     bezug=None,
     zusammen="keiner",
-    aufschubgrund="Umfang – eigener Umbau",
+    aufschubgrund="User – eigener Umbau, auf später gelegt",
 )
 
 
@@ -479,13 +479,13 @@ def test_set_changes_both_fields_at_once():
 # --- Aufschubgrund und feste Wertebereiche (S133) ---------------------------------
 def test_neuer_eintrag_traegt_den_aufschubgrund_als_eigene_zeile():
     eintrag = oe.format_entry("OBS-S114-1", **FELDER)
-    assert "\n- Aufschubgrund: Umfang – eigener Umbau\n" in eintrag
+    assert "\n- Aufschubgrund: User – eigener Umbau, auf später gelegt\n" in eintrag
     oe.pruefe_wohlgeformt("OBS-S114-1", eintrag)
 
 
 def test_ohne_tragenden_aufschubgrund_entsteht_kein_eintrag():
     with pytest.raises(ValueError):
-        oe.format_entry("OBS-S114-1", **{**FELDER, "aufschubgrund": "Umfang"})
+        oe.format_entry("OBS-S114-1", **{**FELDER, "aufschubgrund": "User"})
 
 
 def test_unbekannte_quelle_wird_abgewiesen():
@@ -549,7 +549,7 @@ def test_der_fall_aus_s125_laesst_sich_in_einem_aufruf_korrigieren():
 
 def test_set_fuegt_den_aufschubgrund_vor_der_entscheidung_ein():
     neu = oe.set_fields(BESTAND, "OBS-S110-1", zusammen="keiner",
-                        aufschubgrund="Umfang – eigener Umbau")
+                        aufschubgrund="User – eigener Umbau, auf später gelegt")
     folge = _feldfolge(oe.get(neu, "OBS-S110-1"))
     # Position wie bei neuen Einträgen: Zusammen-erledigen, Aufschubgrund, Entscheidung.
     assert folge.index("- Zusammen-erledigen") + 1 == folge.index("- Aufschubgrund") \
@@ -557,7 +557,7 @@ def test_set_fuegt_den_aufschubgrund_vor_der_entscheidung_ein():
 
 
 def test_set_ersetzt_einen_vorhandenen_aufschubgrund():
-    text = oe.set_fields(BESTAND, "OBS-S110-1", aufschubgrund="Umfang – eigener Umbau")
+    text = oe.set_fields(BESTAND, "OBS-S110-1", aufschubgrund="User – eigener Umbau, auf später gelegt")
     neu = oe.set_fields(text, "OBS-S110-1", aufschubgrund="User – später entschieden")
     eintrag = oe.get(neu, "OBS-S110-1")
     assert "- Aufschubgrund: User – später entschieden" in eintrag

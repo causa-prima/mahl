@@ -28,7 +28,7 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
     // damit sie nicht von der Deployment-DB divergieren kann (LL-S105-1).
     // Kein DisposeAsync auf dem Container: Das würde ihn stoppen und die Wiederverwendung zunichtemachen.
 #pragma warning disable CA2213 // bewusst nicht freigegeben, siehe Kommentar darüber
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:15-alpine")
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
         .WithEnvironment("POSTGRES_INITDB_ARGS", PostgresTestConfig.InitdbArgs)
         .WithLabel("reuse-id", "mahl-server-tests")
         // Der Container läuft dauerhaft mit Standard-Zugangsdaten – sein Port gehört nur an localhost, nicht

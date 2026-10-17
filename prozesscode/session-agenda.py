@@ -308,14 +308,14 @@ def modul_retro() -> Block:
     )
 
 
-DURCHSICHT_TRAILER = "Abhängigkeiten-Durchsicht"
+DURCHSICHT_TRAILER = "Dependency-Check"
 
 
 def modul_abhaengigkeiten(root: Path = ROOT, heute: date | None = None) -> Block:
     """Monatliche Durchsicht der Paket- und Werkzeug-Updates; erledigt per Commit-Trailer.
 
     Das Gedächtnis ist die git-Historie, keine Datei: Fällig bleibt die Durchsicht, bis ein
-    Commit des laufenden Monats die Zeile `Abhängigkeiten-Durchsicht: JJJJ-MM` trägt. Ein
+    Commit des laufenden Monats die Zeile `Dependency-Check: JJJJ-MM` trägt. Ein
     Auslöser „letzter Commit im Vormonat" verfiele still, sobald die erste Session des Monats
     die Durchsicht nicht macht – und träfe nach einer Pause von zwei Monaten gar nicht.
     `--grep` statt `%(trailers:…)`, weil es nicht davon abhängt, dass die Zeile im letzten

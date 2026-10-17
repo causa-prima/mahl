@@ -1,0 +1,5 @@
+{
+  "name": "tracker-diff",
+  "version": "0.0.1",
+  "description": "Zeigt bei Tracker-Schreibbefehlen den Diff in der Zeile des Tool-Aufrufs (Versuch)"
+}

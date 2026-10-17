@@ -19,7 +19,7 @@ def _td(
     problem: str | None = "Irgendwas ist Schuld.",
     behebung: str | None = "Irgendwie beheben.",
     extra: str = "",
-    aufschub: str | None = "Umfang – eigener Umbau",
+    aufschub: str | None = "User – eigener Umbau, auf später gelegt",
 ) -> str:
     """Minimaler, formatgetreuer TD-Block."""
     lines = [f"## {tid} — Kurztitel"]
@@ -250,3 +250,70 @@ def test_check_simulates_an_edit(tmp_path):
     }
     reason = hook.check(payload)
     assert reason is not None and "ist leer" in reason
+
+
+# --- check(): was es aus dem Repo neben der Datei holt --------------------------
+# `check()` reicht AGENT_MEMORY und den Anker-Kontext an die Prüfung durch. Fällt eins davon
+# weg, prüft der Hook gegen nichts – und lässt durch, was er blocken soll, oder umgekehrt.
+def _repo(tmp_path, memory: str | None = None):
+    td = tmp_path / "docs" / "tech-debt.md"
+    td.parent.mkdir()
+    td.write_text("", encoding="utf-8")
+    if memory is not None:
+        (td.parent / "AGENT_MEMORY.md").write_text(memory, encoding="utf-8")
+    return td
+
+
+def test_check_liest_agent_memory_neben_der_datei(tmp_path):
+    td = _repo(tmp_path, memory="- TD-S120-1 · Done: erledigt")
+    assert hook.check(_payload(str(td), _td(faellig="jetzt"))) is None
+
+
+def test_check_ohne_eintrag_in_agent_memory_blockt_jetzt(tmp_path):
+    """Gegenstück: Dieselbe Datei ohne den Punkt – der Unterschied liegt am gelesenen Text."""
+    td = _repo(tmp_path, memory="- TD-S999-9 · Done: anderes")
+    grund = hook._JETZT_OHNE_MEMORY.format(td_id="TD-S120-1", memory=hook.MEMORY_FILE)
+    assert grund in hook.check(_payload(str(td), _td(faellig="jetzt")))
+
+
+def test_check_loest_td_anker_gegen_den_neuen_inhalt_auf(tmp_path):
+    """Der Anker zeigt auf einen Eintrag, den derselbe Write erst anlegt."""
+    td = _repo(tmp_path)
+    inhalt = _td("TD-S120-1", faellig="TD-S120-2 – danach") + _td("TD-S120-2")
+    assert hook.check(_payload(str(td), inhalt)) is None
+
+
+def test_check_meldet_den_verweis_auf_sich_selbst(tmp_path):
+    td = _repo(tmp_path)
+    grund = hook.check(_payload(str(td), _td(faellig="TD-S120-1, Phase:MVP – Kreis")))
+    assert "verweist auf sich selbst" in grund
+
+
+def test_check_nennt_jeden_verletzenden_eintrag_auf_eigener_zeile(tmp_path):
+    td = _repo(tmp_path)
+    grund = hook.check(_payload(str(td), _td("TD-S120-1", faellig=None) + _td("TD-S120-2", faellig=None)))
+    zeilen = grund.splitlines()
+    assert [z.split(":")[0] for z in zeilen[1:3]] == ["  - TD-S120-1", "  - TD-S120-2"]
+
+
+def test_mehrere_gruende_eines_eintrags_stehen_getrennt():
+    grund = hook.find_violations("", _td(problem=None, behebung=None), "")
+    assert grund == [("TD-S120-1", hook._PFLICHT_FEHLT.format(name="Problem") + " · "
+                      + hook._PFLICHT_FEHLT.format(name="Behebung"))]
+
+
+def test_abgeschafftes_feld_nennt_den_grund():
+    grund = hook.check_entry("TD-S120-1", _td(extra="**Priorität:** Hoch"), "")
+    assert grund == [hook._ABGESCHAFFT.format(name="Priorität", why=hook.RETIRED_FIELDS["Priorität"])]
+
+
+def test_jetzt_mit_eintrag_in_agent_memory_blockt_nicht():
+    assert hook.find_violations("", _td(faellig="jetzt"), "- TD-S120-1 · Done: x") == []
+
+
+@pytest.mark.parametrize("pfad, wurzel", [
+    ("docs/tech-debt.md", "."),
+    ("/home/u/repo/docs/tech-debt.md", "/home/u/repo"),
+])
+def test_repo_wurzel_aus_dem_pfad(pfad, wurzel):
+    assert hook.repo_root_for(pfad) == hook.Path(wurzel)

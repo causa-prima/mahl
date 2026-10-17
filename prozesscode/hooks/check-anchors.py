@@ -21,10 +21,8 @@ Zeilen-Ausnahme: `anchor-ok` in der betreffenden Zeile (bewusst offener Verweis,
 Beispiel im Fließtext, das kein reales Ziel hat).
 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt.
-Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
+Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
-import json
-import sys
 from pathlib import Path
 
 
@@ -45,8 +43,9 @@ def betrifft(file_path: str) -> bool:
 
 
 def _ohne_ausnahmen(text: str) -> str:
-    """Zeilen mit `anchor-ok` ausblenden, damit ihre Verweise nicht mitgeprüft werden."""
-    return "\n".join(z for z in text.splitlines() if _ANCHOR_OK not in z)
+    """Zeilen mit `anchor-ok` leeren, damit ihre Verweise nicht mitgeprüft werden – geleert,
+    nicht entfernt: Sonst nennte die Meldung für jeden späteren Verweis eine falsche Zeile."""
+    return "\n".join("" if _ANCHOR_OK in z else z for z in text.splitlines())
 
 
 def check(data: dict) -> str | None:
@@ -67,15 +66,7 @@ def check(data: dict) -> str | None:
         zeilen = "\n".join(
             f"  - `{anker}` ← " + ", ".join(f"{d}:{n}" for d, n in stellen[:_MAX_HITS])
             for anker, stellen in verwaist)
-        return (
-            "❌ Anker-Verweise (Poka-Yoke): Ein Anker soll verschwinden, auf den noch "
-            f"verwiesen wird:\n{zeilen}\n"
-            "  Der Anker trägt die Identität des Abschnitts – ohne ihn ist der Verweis von "
-            "außen nicht mehr auflösbar.\n"
-            "  Pass zuerst die Fundstellen an (auf den neuen Anker umhängen oder den Verweis "
-            "auflösen), dann den Anker entfernen.\n"
-            f"  Bewusst offener Verweis → `{_ANCHOR_OK}` in die betreffende Zeile."
-        )
+        return f"{_KOPF_VERWAIST}{zeilen}\n{_HINWEIS_VERWAIST}"
 
     # Vorwärts: Verweise dieser Datei, deren Ziel nirgends definiert ist.
     geprueft = {**andere, rel: _ohne_ausnahmen(post)}
@@ -84,16 +75,8 @@ def check(data: dict) -> str | None:
            if ziel not in bekannt]
     if tot:
         zeilen = "\n".join(f"  - Zeile {nr}: `{ziel}`" for ziel, nr in tot[:_MAX_HITS])
-        mehr = f"\n  … und {len(tot) - _MAX_HITS} weitere" if len(tot) > _MAX_HITS else ""
-        return (
-            f"❌ Anker-Verweise (Poka-Yoke): {len(tot)} Verweis(e) ohne Ziel:\n{zeilen}{mehr}\n"
-            '  Ein Anker wird als `<a id="ANKER"></a>` über der Überschrift definiert und als '
-            "`[ANKER](pfad/datei.md#ANKER)` referenziert; Bestand: "
-            "`python3 -m prozesscode.anchors list`.\n"
-            "  Entweder ist der Zielabschnitt noch nicht mit einem Anker versehen, oder der "
-            "Verweis ist vertippt.\n"
-            f"  Bewusst offener Verweis (Beispiel im Fließtext) → `{_ANCHOR_OK}` in die Zeile."
-        )
+        mehr = _MEHR.format(n=len(tot) - _MAX_HITS) if len(tot) > _MAX_HITS else ""
+        return f"{_KOPF_TOT.format(n=len(tot))}{zeilen}{mehr}\n{_HINWEIS_TOT}"
 
     # Pfad: Der Anker existiert, aber nicht in der verlinkten Datei. Ohne diese Prüfung
     # meldete der Hook „alles gut", während der Klick ins Leere ginge – und Klickbarkeit ist
@@ -104,27 +87,32 @@ def check(data: dict) -> str | None:
     zeilen = "\n".join(
         f"  - Zeile {nr}: `{ziel}` verlinkt {gemeint}, liegt aber in {echt}"
         for _d, nr, ziel, gemeint, echt in falsch[:_MAX_HITS])
-    return (
-        f"❌ Anker-Verweise (Poka-Yoke): {len(falsch)} Link(s) auf die falsche Datei:\n"
-        f"{zeilen}\n"
-        "  Der Anker existiert, aber nicht dort – der Klick geht ins Leere, obwohl der "
-        "Verweis auflösbar aussieht.\n"
-        "  Pfad ist relativ zur verweisenden Datei. Fundort: "
-        "`python3 -m prozesscode.anchors list`."
-    )
+    return f"{_KOPF_FALSCH.format(n=len(falsch))}{zeilen}\n{_HINWEIS_FALSCH}"
 
 
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-        grund = check(data)
-    except Exception:  # noqa: BLE001 – fail-open: ein Hook-Fehler blockt nie einen Edit
-        sys.exit(0)
-    if grund:
-        print(grund, file=sys.stderr)
-        sys.exit(2)
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+_KOPF_VERWAIST = ("❌ Anker-Verweise (Poka-Yoke): Ein Anker soll verschwinden, auf den noch "
+                  "verwiesen wird:\n")
+_HINWEIS_VERWAIST = (
+    "  Der Anker trägt die Identität des Abschnitts – ohne ihn ist der Verweis von "
+    "außen nicht mehr auflösbar.\n"
+    "  Pass zuerst die Fundstellen an (auf den neuen Anker umhängen oder den Verweis "
+    "auflösen), dann den Anker entfernen.\n"
+    f"  Bewusst offener Verweis → `{_ANCHOR_OK}` in die betreffende Zeile."
+)
+_KOPF_TOT = "❌ Anker-Verweise (Poka-Yoke): {n} Verweis(e) ohne Ziel:\n"
+_MEHR = "\n  … und {n} weitere"
+_HINWEIS_TOT = (
+    '  Ein Anker wird als `<a id="ANKER"></a>` über der Überschrift definiert und als '
+    "`[ANKER](pfad/datei.md#ANKER)` referenziert; Bestand: "
+    "`python3 -m prozesscode.anchors list`.\n"
+    "  Entweder ist der Zielabschnitt noch nicht mit einem Anker versehen, oder der "
+    "Verweis ist vertippt.\n"
+    f"  Bewusst offener Verweis (Beispiel im Fließtext) → `{_ANCHOR_OK}` in die Zeile."
+)
+_KOPF_FALSCH = "❌ Anker-Verweise (Poka-Yoke): {n} Link(s) auf die falsche Datei:\n"
+_HINWEIS_FALSCH = (
+    "  Der Anker existiert, aber nicht dort – der Klick geht ins Leere, obwohl der "
+    "Verweis auflösbar aussieht.\n"
+    "  Pfad ist relativ zur verweisenden Datei. Fundort: "
+    "`python3 -m prozesscode.anchors list`."
+)

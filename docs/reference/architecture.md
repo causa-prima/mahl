@@ -120,7 +120,7 @@ Kein `InternalsVisibleTo` – das erzwingt, dass Tests ausschließlich über die
 - **React Query** für Daten-Caching
 
 ### Datenbank
-- **PostgreSQL 15+** via Docker Compose
+- **PostgreSQL 18** via Docker Compose
 - **Keine** PostgreSQL-spezifischen Features (JSONB, Arrays) in V1 – DB-Provider soll austauschbar bleiben
 - Alle Queries über EF Core LINQ (kein Raw SQL außer Performance-kritisch)
 

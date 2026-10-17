@@ -176,3 +176,63 @@ def test_check_blocks_entry_without_due_field(tmp_path):
                         "tool_input": {"file_path": str(target),
                                        "old_string": old, "new_string": new}})
     assert grund and "fehlt" in grund
+
+
+# --- check(): Anker-Kontext aus dem Repo neben der Datei --------------------------
+# `check()` lädt den Kontext aus dem Repo der bearbeiteten Datei. Fällt er weg, gilt jeder
+# `TD-`-Anker als unbekannt – und eine gültige Frage blockt.
+def _mit_tech_debt(tmp_path, td_text: str):
+    (tmp_path / "docs").mkdir(exist_ok=True)
+    (tmp_path / "docs" / "tech-debt.md").write_text(td_text, encoding="utf-8")
+
+
+def test_check_prueft_nur_die_oq_datei(tmp_path):
+    """Ein formwidriger OQ-Block in einer anderen Datei ist nicht Sache dieses Hooks."""
+    andere = tmp_path / "docs" / "notizen.md"
+    andere.parent.mkdir()
+    assert hook.check({"tool_name": "Write",
+                       "tool_input": {"file_path": str(andere), "content": oq("OQ-S001-1")}}) is None
+
+
+def test_check_kennt_die_td_eintraege_des_repos(tmp_path):
+    _mit_tech_debt(tmp_path, "## TD-S120-1 — Schuld\n**Fällig:** Phase:MVP\n\n---\n")
+    target = _write_tracker(tmp_path, "")
+    inhalt = oq("OQ-S001-1", faellig="TD-S120-1 – sobald die Schuld weg ist")
+    assert hook.check({"tool_name": "Write",
+                       "tool_input": {"file_path": str(target), "content": inhalt}}) is None
+
+
+def test_check_meldet_unbekannten_td_anker(tmp_path):
+    """Gegenstück: derselbe Anker, aber das Repo kennt den Eintrag nicht."""
+    _mit_tech_debt(tmp_path, "")
+    target = _write_tracker(tmp_path, "")
+    inhalt = oq("OQ-S001-1", faellig="TD-S120-1 – sobald die Schuld weg ist")
+    grund = hook.check({"tool_name": "Write",
+                        "tool_input": {"file_path": str(target), "content": inhalt}})
+    assert "existiert nicht" in grund
+
+
+def test_check_nennt_jeden_verletzenden_eintrag_auf_eigener_zeile(tmp_path):
+    target = _write_tracker(tmp_path, "")
+    inhalt = oq("OQ-S001-1") + oq("OQ-S001-2")
+    zeilen = hook.check({"tool_name": "Write",
+                         "tool_input": {"file_path": str(target), "content": inhalt}}).splitlines()
+    assert [z.split(":")[0] for z in zeilen[1:3]] == ["  - OQ-S001-1", "  - OQ-S001-2"]
+
+
+def test_mehrere_gruende_eines_eintrags_stehen_getrennt():
+    assert hook.find_violations("", oq("OQ-S001-1", aufschub=None)) == [
+        ("OQ-S001-1", hook._FAELLIG_FEHLT + " · " + hook.aufschub_verstoss(None))]
+
+
+def test_kontext_ist_optional():
+    assert hook.check_entry("OQ-S001-1", "**Fällig:** S140 – Termin\n") == []
+    assert hook.find_violations("", oq("OQ-S001-1", faellig="S140 – Termin")) == []
+
+
+@pytest.mark.parametrize("pfad, wurzel", [
+    ("docs/open-questions.md", "."),
+    ("/home/u/repo/docs/open-questions.md", "/home/u/repo"),
+])
+def test_repo_wurzel_aus_dem_pfad(pfad, wurzel):
+    assert hook.repo_root_for(pfad) == hook.Path(wurzel)

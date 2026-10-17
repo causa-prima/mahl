@@ -33,11 +33,9 @@ Entscheidung („wir bauen X nicht") und wären als Aufschub-Marker Fehlalarm-Qu
 Unterschied liegt nicht im Sparsamkeits-Argument, sondern in der Zeitaussage.
 
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt und prüft ihn.
-Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
+Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
-import json
 import re
-import sys
 from pathlib import Path
 
 from ._hook_io import edit_zustand
@@ -87,10 +85,7 @@ def parse_adr_entries(content: str) -> dict[str, str]:
 
 def deferral_hits(body: str) -> list[str]:
     """Gefundene Aufschub-Wendungen, ohne Dubletten und in Fundreihenfolge."""
-    seen: dict[str, None] = {}
-    for match in _DEFERRAL_RE.finditer(body):
-        seen.setdefault(match.group(0), None)
-    return list(seen)
+    return list(dict.fromkeys(m.group(0) for m in _DEFERRAL_RE.finditer(body)))
 
 
 def find_violations(pre: str, post: str) -> list[tuple[str, list[str]]]:
@@ -157,18 +152,7 @@ def check(data: dict) -> str | None:
 
     fremde = falsche_session(pre, post, _laufende_session(file_path))
     if fremde:
-        return (
-            "❌ ADR-Erfassung (Poka-Yoke): neu erfasste ADR trägt nicht die laufende "
-            f"Session-Nummer:\n  - {', '.join(fremde)}\n"
-            "  Die ID nennt die Session, in der die Entscheidung fällt – nicht die jüngste "
-            "bestehende Serie. Die Git-Historie zeigt die letzte ABGESCHLOSSENE Session; wer "
-            "von dort weiterzählt, liegt um eins daneben (LL-S106-2: zwei Subagenten, "
-            "Umnummerierung über ~7 Referenzen).\n"
-            "  Laufende Nummer: `python3 -m prozesscode.session-agenda` oder der höchste "
-            "Trailer `Session-Ende: <NNN>` in `git log` + 1.\n"
-            "  Bewusster Einzelfall (Nachtrag zu einer alten Serie) → `adr-ok`-Marker in den "
-            "Eintrag."
-        )
+        return f"{_KOPF_SESSION}  - {', '.join(fremde)}\n{_HINWEIS_SESSION}"
 
     violations = find_violations(pre, post)
     if not violations:
@@ -177,41 +161,33 @@ def check(data: dict) -> str | None:
     lines = "\n".join(
         f"  - {aid}: {', '.join(f'„{h}“' for h in hits)}" for aid, hits in violations
     )
-    return (
-        "❌ ADR-Erfassung (Poka-Yoke): neu erfasste ADR trägt Aufschub-Vokabular:\n"
-        f"{lines}\n"
-        "  Eine ADR trägt keinen Aufschub. Operativer Test: „Ist die Sache erledigt – bleibt "
-        "dann etwas zu erklären übrig, das ohne diesen Eintrag unverständlich wäre?“\n"
-        "  - Ja → ADR. Der Eintrag wird `Superseded` und bleibt stehen.\n"
-        "  - Nein → `docs/tech-debt.md`. Der Eintrag verschwindet mit der Behebung ersatzlos.\n"
-        "  Ist die Entscheidung teils terminal, teils aufgeschoben, wird der Aufschub-Teil ein "
-        "eigener TD-Eintrag; die ADR behält nur den terminalen Rest. Bleibt kein terminaler "
-        "Rest, war es nie eine ADR.\n"
-        "  Kanonisch: `AGENTS.md#CLA-ablage` („Ablage: in welchen Tracker gehört dieser Eintrag?“). Präzedenz: "
-        "ADR-S083-1 und ADR-S083-2 waren genau solche Hybride und wurden in S119 nach "
-        "`tech-debt.md` umgehängt.\n"
-        "  Bewusster Einzelfall (z.B. eine ADR, die den Aufschub eines anderen Artefakts nur "
-        "zitiert) → `adr-ok`-Marker irgendwo in den Eintrag."
-    )
+    return f"{_KOPF_AUFSCHUB}{lines}\n{_HINWEIS_AUFSCHUB}"
 
 
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        sys.exit(0)  # kein parsbarer Input → nichts blocken
-
-    try:
-        reason = check(data)
-        if reason:
-            print(reason, file=sys.stderr)
-            sys.exit(2)  # exit 2 = Edit blockieren
-    except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
-        print(f"check-adr-capture: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)
-        sys.exit(0)
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+_KOPF_SESSION = ("❌ ADR-Erfassung (Poka-Yoke): neu erfasste ADR trägt nicht die laufende "
+                 "Session-Nummer:\n")
+_HINWEIS_SESSION = (
+    "  Die ID nennt die Session, in der die Entscheidung fällt – nicht die jüngste "
+    "bestehende Serie. Die Git-Historie zeigt die letzte ABGESCHLOSSENE Session; wer "
+    "von dort weiterzählt, liegt um eins daneben (LL-S106-2: zwei Subagenten, "
+    "Umnummerierung über ~7 Referenzen).\n"
+    "  Laufende Nummer: `python3 -m prozesscode.session-agenda` oder der höchste "
+    "Trailer `Session-Ende: <NNN>` in `git log` + 1.\n"
+    "  Bewusster Einzelfall (Nachtrag zu einer alten Serie) → `adr-ok`-Marker in den "
+    "Eintrag."
+)
+_KOPF_AUFSCHUB = "❌ ADR-Erfassung (Poka-Yoke): neu erfasste ADR trägt Aufschub-Vokabular:\n"
+_HINWEIS_AUFSCHUB = (
+    "  Eine ADR trägt keinen Aufschub. Operativer Test: „Ist die Sache erledigt – bleibt "
+    "dann etwas zu erklären übrig, das ohne diesen Eintrag unverständlich wäre?“\n"
+    "  - Ja → ADR. Der Eintrag wird `Superseded` und bleibt stehen.\n"
+    "  - Nein → `docs/tech-debt.md`. Der Eintrag verschwindet mit der Behebung ersatzlos.\n"
+    "  Ist die Entscheidung teils terminal, teils aufgeschoben, wird der Aufschub-Teil ein "
+    "eigener TD-Eintrag; die ADR behält nur den terminalen Rest. Bleibt kein terminaler "
+    "Rest, war es nie eine ADR.\n"
+    "  Kanonisch: `AGENTS.md#CLA-ablage` („Ablage: in welchen Tracker gehört dieser Eintrag?“). Präzedenz: "
+    "ADR-S083-1 und ADR-S083-2 waren genau solche Hybride und wurden in S119 nach "
+    "`tech-debt.md` umgehängt.\n"
+    "  Bewusster Einzelfall (z.B. eine ADR, die den Aufschub eines anderen Artefakts nur "
+    "zitiert) → `adr-ok`-Marker irgendwo in den Eintrag."
+)

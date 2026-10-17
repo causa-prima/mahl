@@ -63,7 +63,7 @@ def test_remove_entfernt_nur_den_eintrag():
 
 
 # --- Anker-Grammatik ---------------------------------------------------------
-AUFSCHUB = "Umfang – eigener Umbau"
+AUFSCHUB = "User – eigener Umbau, auf später gelegt"
 
 
 def test_add_weist_untragfaehigen_anker_ab():

@@ -129,3 +129,78 @@ def test_check_ignoriert_dateien_ausserhalb_von_specs_und_features():
     daten = {"tool_name": "Write",
              "tool_input": {"file_path": "Client/src/x.ts", "content": "// Szenario: egal\n"}}
     assert hook.check(daten) is None
+
+
+# --- Kommentar über dem Testfall ---------------------------------------------------
+@pytest.mark.parametrize("quelle, fehlt", [
+    # Leerzeilen und weitere Kommentare dazwischen sind erlaubt.
+    ("// Szenario: Zutat anlegen\n// noch ein Kommentar\n\ntest('a', () => {})\n", []),
+    # Code dazwischen beendet den Kommentarblock.
+    ("// Szenario: Zutat anlegen\nconst x = 1\ntest('a', () => {})\n", ["a"]),
+    # Ohne lesbaren Namen nennt die Meldung die Zeile.
+    ("const n = 'a'\n\ntest(n, () => {})\n", ["Zeile 3"]),
+])
+def test_kommentarblock_ueber_dem_testfall(quelle, fehlt):
+    assert hook.tests_missing_comment(quelle) == fehlt
+
+
+# --- Titel aus den Verzeichnissen ---------------------------------------------------
+@pytest.fixture
+def repo(tmp_path, monkeypatch):
+    features, e2e = tmp_path / "features", tmp_path / "Client" / "e2e"
+    (features / "sub").mkdir(parents=True)
+    e2e.mkdir(parents=True)
+    (features / "sub" / "zutaten.feature").write_text(FEATURE_SRC, encoding="utf-8")
+    (features / "andere.feature").write_text(
+        "Feature: X\n\n  Scenario: Rezept anlegen\n    When a\n", encoding="utf-8")
+    (e2e / "zutaten.spec.ts").write_text(
+        "// Szenario: Zutat anlegen\ntest('a', () => {})\n", encoding="utf-8")
+    (e2e / "rezept.spec.ts").write_text(
+        "// Szenario: Rezept anlegen\ntest('b', () => {})\n", encoding="utf-8")
+    monkeypatch.setattr(hook, "_FEATURES_DIR", features)
+    monkeypatch.setattr(hook, "_E2E_DIR", e2e)
+    return tmp_path
+
+
+def test_titel_aus_allen_dateien_oder_ohne_die_bearbeitete(repo):
+    assert hook._feature_titles() == FEATURE_TITLES | {"Rezept anlegen"}
+    assert hook._feature_titles(ausser=str(repo / "features" / "andere.feature")) == FEATURE_TITLES
+    assert hook._spec_titles() == {"Zutat anlegen", "Rezept anlegen"}
+    assert hook._spec_titles(ausser=str(repo / "Client" / "e2e" / "rezept.spec.ts")) == {"Zutat anlegen"}
+
+
+def test_ohne_verzeichnisse_keine_titel(tmp_path, monkeypatch):
+    monkeypatch.setattr(hook, "_FEATURES_DIR", tmp_path / "fehlt")
+    monkeypatch.setattr(hook, "_E2E_DIR", tmp_path / "fehlt")
+    assert hook._feature_titles() == hook._spec_titles() == set()
+
+
+def test_check_feature_umbenennung_verwaist_einen_e2e_kommentar(repo):
+    ziel = repo / "features" / "andere.feature"
+    grund = hook.check({"tool_name": "Write", "tool_input": {
+        "file_path": str(ziel), "content": "Feature: X\n\n  Scenario: Rezept neu\n    When a\n"}})
+    assert grund == (f"{hook._KOPF}  - {hook._VERWAIST.format(titel='Rezept anlegen')}\n"
+                     f"{hook._HINWEIS}")
+
+
+def test_check_feature_ohne_folgen_fuer_e2e_passiert(repo):
+    ziel = repo / "features" / "andere.feature"
+    inhalt = "Feature: X\n\n  Scenario: Rezept anlegen\n    When b\n"
+    assert hook.check({"tool_name": "Write",
+                       "tool_input": {"file_path": str(ziel), "content": inhalt}}) is None
+
+
+def test_check_spec_doppelter_titel_aus_einer_anderen_spec(repo):
+    ziel = repo / "Client" / "e2e" / "neu.spec.ts"
+    inhalt = "// Szenario: Zutat anlegen\ntest('c', () => {})\n"
+    grund = hook.check({"tool_name": "Write",
+                        "tool_input": {"file_path": str(ziel), "content": inhalt}})
+    assert grund == f"{hook._KOPF}  - {hook._DOPPELT.format(titel='Zutat anlegen')}\n{hook._HINWEIS}"
+
+
+def test_check_spec_eigener_titel_ist_kein_doppel(repo):
+    """Die bearbeitete Spec zählt nicht gegen sich selbst."""
+    ziel = repo / "Client" / "e2e" / "zutaten.spec.ts"
+    inhalt = "// Szenario: Zutat anlegen\ntest('a2', () => {})\n"
+    assert hook.check({"tool_name": "Write",
+                       "tool_input": {"file_path": str(ziel), "content": inhalt}}) is None

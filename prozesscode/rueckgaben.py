@@ -143,6 +143,12 @@ def _zeilen(eintraege: list[dict]) -> str:
                      for e in eintraege)
 
 
+def hinweis_beim_start(eintrag: dict) -> str:
+    return (f"Rückgabe {eintrag['id']} geknüpft. Sobald ihr Ergebnis verarbeitet ist (jedes Finding "
+            "umgesetzt, verworfen oder dem User vorgelegt), im selben Zug abhaken: "
+            + ABHAKEN.replace("<id>", eintrag["id"]))
+
+
 def erinnerung(fertig: list[dict], laufend: list[dict]) -> str:
     text = ("Rückgaben fertig, aber nicht abgehakt – ist alles daraus verarbeitet (jedes Finding "
             "umgesetzt, verworfen oder dem User vorgelegt)?\n" + _zeilen(fertig)

@@ -10,11 +10,9 @@ nie auf ein nicht existierendes Szenario zeigt. Beide Richtungen:
 
 Mechanik: PreToolUse läuft VOR der Anwendung – die Datei auf Platte ist noch der Vor-Edit-Stand.
 Der Hook simuliert den Post-Edit-Inhalt (Datei lesen + Edit anwenden bzw. Write-Content) und
-prüft diesen. Exit 2 = blockieren. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
+prüft diesen. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
-import json
 import re
-import sys
 from pathlib import Path
 
 from ._hook_io import edit_zustand
@@ -56,15 +54,12 @@ def tests_missing_comment(post_content: str) -> list[str]:
 
 def _has_szenario_comment_above(lines: list[str], index: int) -> bool:
     """Läuft ab `index` rückwärts über Leerzeilen/Kommentare; True bei `// Szenario:`."""
-    j = index - 1
-    while j >= 0:
-        stripped = lines[j].strip()
-        if stripped == "" or stripped.startswith("//"):
-            if _SZENARIO_LINE_RE.search(lines[j]):
-                return True
-            j -= 1
-            continue
-        break  # erste Nicht-Kommentar-/Nicht-Leerzeile → Kommentarblock zu Ende
+    for zeile in reversed(lines[:index]):
+        stripped = zeile.strip()
+        if stripped and not stripped.startswith("//"):
+            return False  # erste Nicht-Kommentar-/Nicht-Leerzeile → Kommentarblock zu Ende
+        if _SZENARIO_LINE_RE.search(zeile):
+            return True
     return False
 
 
@@ -77,15 +72,13 @@ def validate(
     (b) Gültigkeit: jeder Kommentar matcht ein Feature-Szenario.
     (c) Eindeutigkeit: kein Titel doppelt über E2E-Specs hinweg.
     """
-    violations: dict[str, None] = {}
-    for test_name in tests_missing_comment(post_content):
-        violations[f"Test „{test_name}“ hat keinen `// Szenario:`-Kommentar (für DONE-Erkennung nötig)."] = None
+    violations = [_OHNE_KOMMENTAR.format(test=name) for name in tests_missing_comment(post_content)]
     for title in scenario_comment_titles(post_content):
         if title not in feature_titles:
-            violations[f"// Szenario: „{title}“ verweist auf kein Szenario in features/."] = None
+            violations.append(_OHNE_SZENARIO.format(titel=title))
         elif title in other_spec_titles:
-            violations[f"// Szenario: „{title}“ ist bereits in einer anderen E2E-Spec vergeben (doppelt)."] = None
-    return list(violations)
+            violations.append(_DOPPELT.format(titel=title))
+    return list(dict.fromkeys(violations))
 
 
 def validate_feature(
@@ -93,49 +86,27 @@ def validate_feature(
 ) -> list[str]:
     """Verstöße, wenn ein Feature-Edit bestehende `// Szenario:`-Kommentare verwaisen lässt."""
     valid = {s["title"] for s in parse_scenarios(post_feature_content)} | set(other_feature_titles)
-    orphaned = [t for t in spec_titles if t not in valid]
-    return [
-        f"Umbenennung/Entfernung verwaist den E2E-Kommentar „{t}“ – kein gleichnamiges Szenario in features/ mehr."
-        for t in dict.fromkeys(sorted(orphaned))
-    ]
+    return [_VERWAIST.format(titel=t) for t in sorted(set(spec_titles) - valid)]
 
 
-def _feature_titles() -> set[str]:
-    titles: set[str] = set()
-    if _FEATURES_DIR.exists():
-        for path in _FEATURES_DIR.glob("**/*.feature"):
-            titles |= {s["title"] for s in parse_scenarios(path.read_text(encoding="utf-8"))}
-    return titles
+def _texte(verzeichnis: Path, muster: str, ausser: str | None) -> list[str]:
+    """Inhalt jeder Datei nach `muster` unter `verzeichnis` – ohne die bearbeitete (`ausser`):
+    Deren Stand vor dem Edit stünde sonst neben dem neuen."""
+    if not verzeichnis.exists():
+        return []
+    ausgenommen = Path(ausser).resolve() if ausser else None
+    return [p.read_text(encoding="utf-8") for p in sorted(verzeichnis.glob(muster))
+            if p.resolve() != ausgenommen]
 
 
-def _other_spec_titles(edited_path: str) -> frozenset[str]:
-    edited = Path(edited_path).resolve()
-    titles: set[str] = set()
-    if _E2E_DIR.exists():
-        for path in _E2E_DIR.glob("**/*.spec.ts"):
-            if path.resolve() == edited:
-                continue
-            titles.update(scenario_comment_titles(path.read_text(encoding="utf-8")))
-    return frozenset(titles)
+def _feature_titles(ausser: str | None = None) -> set[str]:
+    return {s["title"] for text in _texte(_FEATURES_DIR, "**/*.feature", ausser)
+            for s in parse_scenarios(text)}
 
 
-def _other_feature_titles(edited_path: str) -> frozenset[str]:
-    edited = Path(edited_path).resolve()
-    titles: set[str] = set()
-    if _FEATURES_DIR.exists():
-        for path in _FEATURES_DIR.glob("**/*.feature"):
-            if path.resolve() == edited:
-                continue
-            titles |= {s["title"] for s in parse_scenarios(path.read_text(encoding="utf-8"))}
-    return frozenset(titles)
-
-
-def _all_spec_titles() -> set[str]:
-    titles: set[str] = set()
-    if _E2E_DIR.exists():
-        for path in _E2E_DIR.glob("**/*.spec.ts"):
-            titles.update(scenario_comment_titles(path.read_text(encoding="utf-8")))
-    return titles
+def _spec_titles(ausser: str | None = None) -> set[str]:
+    return {t for text in _texte(_E2E_DIR, "**/*.spec.ts", ausser)
+            for t in scenario_comment_titles(text)}
 
 
 def check(data: dict) -> str | None:
@@ -150,9 +121,9 @@ def check(data: dict) -> str | None:
     file_path, _pre, post = zustand
 
     if is_e2e_spec(file_path):
-        violations = validate(post, _feature_titles(), _other_spec_titles(file_path))
+        violations = validate(post, _feature_titles(), _spec_titles(ausser=file_path))
     elif is_feature(file_path):
-        violations = validate_feature(post, _other_feature_titles(file_path), _all_spec_titles())
+        violations = validate_feature(post, _feature_titles(ausser=file_path), _spec_titles())
     else:
         return None
 
@@ -160,31 +131,16 @@ def check(data: dict) -> str | None:
         return None
 
     lines = "\n".join(f"  - {v}" for v in violations)
-    return (
-        "❌ E2E-Szenario-Mapping (Poka-Yoke):\n"
-        f"{lines}\n"
-        "  Feature-Szenario-Titel und E2E-`// Szenario:`-Kommentare müssen gleich sein "
-        "(Szenario via /gherkin-workshop anlegen/umbenennen; seltenen Rename-Deadlock per Hand-Edit lösen)."
-    )
+    return f"{_KOPF}{lines}\n{_HINWEIS}"
 
 
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        sys.exit(0)  # kein parsbarer Input → nichts blocken
-
-    try:
-        reason = check(data)
-        if reason:
-            print(reason, file=sys.stderr)
-            sys.exit(2)  # exit 2 = Edit blockieren
-    except Exception as exc:  # noqa: BLE001 – Hook-Fehler darf nie einen Edit blockieren (fail-open)
-        print(f"check-e2e-scenario-ref: Fehler ({exc}) – Edit nicht blockiert.", file=sys.stderr)
-        sys.exit(0)
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+_OHNE_KOMMENTAR = "Test „{test}“ hat keinen `// Szenario:`-Kommentar (für DONE-Erkennung nötig)."
+_OHNE_SZENARIO = "// Szenario: „{titel}“ verweist auf kein Szenario in features/."
+_DOPPELT = "// Szenario: „{titel}“ ist bereits in einer anderen E2E-Spec vergeben (doppelt)."
+_VERWAIST = ("Umbenennung/Entfernung verwaist den E2E-Kommentar „{titel}“ – kein gleichnamiges "
+             "Szenario in features/ mehr.")
+_KOPF = "❌ E2E-Szenario-Mapping (Poka-Yoke):\n"
+_HINWEIS = (
+    "  Feature-Szenario-Titel und E2E-`// Szenario:`-Kommentare müssen gleich sein "
+    "(Szenario via /gherkin-workshop anlegen/umbenennen; seltenen Rename-Deadlock per Hand-Edit lösen)."
+)

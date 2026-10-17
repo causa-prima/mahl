@@ -1,0 +1,4 @@
+{
+  "description": "tracker-diff hooks module",
+  "modules": ["./register.js"]
+}
