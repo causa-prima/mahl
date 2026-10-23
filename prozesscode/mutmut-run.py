@@ -13,9 +13,9 @@ Verwendung:
 deshalb liegt der Prozess-Code seit S129 in einem Paket – unter `.claude/` war er für
 mutmut unerreichbar, weil `.claude` wegen des führenden Punkts kein gültiger Paketname ist.
 
-**Warum kein Gate:** wie bei der Coverage (siehe `coding-guideline-python.md`, „Was nicht
-gilt"). Ein Volllauf mutiert 15.000 Zeilen gegen eine 1.000er-Suite; das ist eine Sichtung
-für die Retro oder für eine gezielte Frage an ein Modul, kein Hook.
+**Der Volllauf ist kein Gate** (siehe `coding-guideline-python.md`, „Was nicht gilt"): Er
+mutiert 15.000 Zeilen gegen eine 1.000er-Suite; das ist eine Sichtung für die Retro oder für
+eine gezielte Frage an ein Modul. Gate ist nur die Sperrklinke je geändertem Modul (unten).
 
 **`--ratchet` – die Sperrklinke.** Ein einzelner Lauf sagt, dass 34 Mutanten überleben,
 aber nicht, ob es beim letzten Mal 12 waren. `--ratchet` hält den Score je Modul in
@@ -30,14 +30,15 @@ Güteverlust (S133: Feldwert-Regex aus zwei Capture-Hooks nach `eintrag_felder`)
 Überlebenden vor/nach vergleichen und, wenn sie gleich sind, `mutation-baseline.json` von Hand
 auf den neuen Stand setzen – mit Begründung in der Commit-Nachricht.
 
-Bewusst **kein Gate** – kein Hook, kein Commit-Zwang; Grund und Laufzeiten in
-`docs/process/dev-workflow.md#DEV-python-werkzeuge`. Die Klinke greift, wenn jemand
-sie zieht.
+**Pflicht vor jedem Commit**, der ein Modul des Prozess-Codes ändert (Skill `committing`),
+aber kein Hook je Edit; Grund und Laufzeiten in `docs/process/dev-workflow.md#DEV-python-werkzeuge`.
 
 **Was die Statusarten bedeuten** – die Unterscheidung trägt die ganze Aussage:
   survived   Der Mutant lief, alle Tests blieben grün. Eine Lücke im Test, nicht im Code.
   no tests   Kein Test berührt die Stelle. Eine Lücke in der Abdeckung.
-  timeout    Der Mutant erzeugte eine Endlosschleife o.ä. Sagt nichts über die Testgüte.
+  timeout    Der Mutant erzeugte eine Endlosschleife o.ä. – oder die Tests liefen länger als
+             mutmut schätzte (Grenze: `timeout_constant` in setup.cfg). Sagt nichts über die
+             Testgüte; häufen sich Timeouts bei grünen Mutanten, ist die Grenze zu knapp.
   suspicious Lief ungewöhnlich lange, ohne zu scheitern. Wie timeout: kein Befund.
 """
 import argparse
@@ -63,28 +64,29 @@ BASELINE = Path(__file__).resolve().parent / "mutation-baseline.json"
 # Hochzählen, sobald der Wrapper anders wertet, welche Mutanten zählen – wie ein mutmut-Update
 # ändert das den Nenner, und die Klinke muss neu ansetzen statt zu vergleichen (s. `ratchet`).
 # Stand 2: jeder Mutant zählt; Ausnahmen stehen im Code (Modulkonstante, Pragma).
-WERTUNG_STAND = 2
+# Stand 3: SIGXCPU (-24) ist ein Timeout wie bei mutmut 3.8, kein getöteter Mutant.
+WERTUNG_STAND = 3
 
 # Ein Volllauf kann Stunden dauern; der Deckel ist eine Reißleine, keine Erwartung.
 TIMEOUT_S = 4 * 60 * 60
 
 MAX_ZEILEN = 15
 
-# Exit-Code eines Mutantenlaufs → Status. Nachbau von `mutmut.__main__.status_by_exit_code`,
-# bewusst hier und nicht importiert: Das CLI-Modul zöge beim Import die halbe mutmut-Laufzeit
-# mit, und der Grund für diesen Nachbau ist gerade eine Lücke DARIN (s. -9 unten).
+# Exit-Code eines Mutantenlaufs → Status. Nachbau von `mutmut.stats.status_by_exit_code`,
+# bewusst hier und nicht importiert: mutmut liegt im venv, die Werkzeuge laufen auch unter dem
+# System-Python – und vor 3.8 fehlte in mutmuts Tabelle -9, `results` starb daran mitten in der
+# Ausgabe. Der Nachbau altert mit der Version; ein Test hält ihn gegen die installierte Tabelle.
 STATUS_JE_EXIT_CODE: dict[int | None, str] = {
-    1: "killed", 3: "killed", -24: "killed",
+    1: "killed", 3: "killed",
     0: "survived",
     5: "no tests", 33: "no tests",
     2: "check was interrupted by user",
     34: "skipped", 35: "suspicious",
-    36: "timeout", 24: "timeout", 152: "timeout", 255: "timeout",
-    # SIGKILL – der Kernel hat den Mutanten hart beendet, meist wegen einer Endlosschleife
-    # oder eines Speicherfraßes, den die Mutation erzeugt hat. mutmut kennt diesen Code
-    # NICHT: `results` stirbt daran mit `KeyError: -9`, mitten in der Ausgabe. Wie ein
-    # Timeout gewertet – über die Tests sagt er nichts.
-    -9: "timeout",
+    36: "timeout", 255: "timeout",
+    -24: "timeout", 24: "timeout", 152: "timeout",   # SIGXCPU – Zeitlimit, kein Testbefund
+    37: "caught by type check",
+    # Hart beendet (Endlosschleife, Speicherfraß) – über die Tests sagt das nichts.
+    -11: "segfault", -9: "segfault",
     None: "not checked",
 }
 
@@ -143,7 +145,13 @@ def lies_ergebnisse(ausschnitt: str | None = None) -> list[tuple[str, str]]:
 
     if ausschnitt is None:
         return paare
-    return [(name, status) for name, status in paare if name.startswith(ausschnitt + ".")]
+    return [(name, status) for name, status in paare
+            if name == ausschnitt or name.startswith(ausschnitt + ".")]
+
+
+def _ist_mutantenname(ausschnitt: str) -> bool:
+    """`…x_f__mutmut_3` benennt genau einen Mutanten, `prozesscode.anchors` einen Namensraum."""
+    return "__mutmut_" in ausschnitt
 
 
 def baue_verdikt(eintraege: list[tuple[str, str]],
@@ -488,21 +496,28 @@ def main(argv: list[str] | None = None) -> int:
     # ohne diesen Weg zeigte das Verdikt auf eine Sackgasse.
     parser.add_argument("--show", metavar="MUTANT",
                         help="Diff eines Mutanten zeigen (Name aus dem Verdikt), kein Lauf")
+    # Springt ein Mutant zwischen zwei Läufen um, wackelt einer der Tests, die mutmut für ihn
+    # auswählt – nur mutmut weiß, welche das sind.
+    parser.add_argument("--tests-for", metavar="MUTANT",
+                        help="Tests nennen, die mutmut für diesen Mutanten auswählt, kein Lauf")
     args = parser.parse_args(argv)
 
     if not MUTMUT.is_file():
         print(_FEHLT.format(pfad=MUTMUT))
         return 2
 
-    if args.show:
-        gezeigt = _laufe("show", args.show)
+    if args.show or args.tests_for:
+        gezeigt = (_laufe("show", args.show) if args.show
+                   else _laufe("tests-for-mutant", args.tests_for))
         print(gezeigt.stdout + gezeigt.stderr, end="")
         return gezeigt.returncode
 
     if args.frisch:
         raeume_baum()
 
-    filter_ = [f"{args.mutate}.*"] if args.mutate else []
+    filter_ = []
+    if args.mutate:
+        filter_ = [args.mutate if _ist_mutantenname(args.mutate) else f"{args.mutate}.*"]
     lauf = _laufe("run", *filter_)
     lauf_ausgabe = lauf.stdout + lauf.stderr
 

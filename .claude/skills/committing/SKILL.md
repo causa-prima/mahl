@@ -60,6 +60,14 @@ Datei für Datei aus dem Gedächtnis. Vier Fragen, Befunde sofort beheben und ne
   sonst fehlt der Inhalt des ersetzten Commits). Jeder Treffer wird angesehen; die Suche findet
   Kandidaten, sie entscheidet nicht.
 
+**Prozess-Code geändert → Sperrklinke je Modul.** Für jedes Modul unter `prozesscode/`, das der
+Commit ändert (`git diff --cached --name-only -- prozesscode/`, Pfad als Modulname:
+`prozesscode/hooks/check-anchors.py` → `prozesscode.hooks.check-anchors`):
+`python3 -m prozesscode.mutmut-run --mutate <modul> --ratchet` – mit `--frisch`, wenn der
+Commit auch Tests ändert. `✗` heißt: Die Testgüte ist gesunken, erst beheben. `⚠ ohne Aussage`
+einmal wiederholen; bleibt es dabei, dem User melden statt als belegt zu behandeln. Grund und
+Laufzeiten: [Python-Werkzeuge](../../../docs/process/dev-workflow.md#DEV-python-werkzeuge).
+
 <a id="CMT-befehl"></a>
 ## Stagen und Befehl
 
@@ -82,7 +90,9 @@ EOF
   endet der Heredoc nicht.
 - `<MODELLNAME>` kommt aus dem System-Kontext.
 - Ohne aufrufenden Workflow (ad hoc): Betreff sagt, was sich geändert hat; der Rumpf ist nicht
-  leer. Der `commit-msg`-Hook prüft Betreff-Länge und – falls vorhanden – die Session-Marke.
+  leer. Der `commit-msg`-Hook prüft Betreff-Länge, Ursache und Folge je Abweichung oder
+  Sackgasse ([Umwege](../closing-session/SKILL.md#CLS-umwege)) und – falls vorhanden – die
+  Session-Marke.
 
 <a id="CMT-amend-push"></a>
 ## Amend und Push

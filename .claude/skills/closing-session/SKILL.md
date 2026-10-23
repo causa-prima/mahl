@@ -77,6 +77,10 @@ user-invocable: true
    ```
    Bestehende Einträge nachlesen: `python3 -m prozesscode.lessons get LL-SNNN-N`.
 
+   **Vor MITTEL oder GERING die Gegenfrage aus [„Impact richtig bemessen"](../../../docs/kaizen/process.md#KPR-impact-kategorien)
+   stellen:** Hätte die Klasse, unbemerkt, eine User-Entscheidung, ein Gate oder einen Datenbestand
+   verfälscht? Dann HOCH – die Einstufung beim Erfassen fällt erfahrungsgemäß zu niedrig aus.
+
    **`--cm-bezug` ist für KRITISCH und HOCH Pflicht**, bei MITTEL/GERING optional – gibt es dort
    einen Bezug, gern eintragen; sonst weglassen. Zulässig ist eine in `countermeasures.md`
    existierende CM-ID oder `neu`, falls keine bestehende Maßnahme passt. Der Anschluss entsteht
@@ -111,7 +115,34 @@ user-invocable: true
    - **Ausgelagert (nicht in AGENT_MEMORY, eigene Datei pflegen):** Technische Schuld → `docs/tech-debt.md`; offene Fragen/geparkte Diskussionen → `docs/open-questions.md`. Beide haben eigene Eintrag-Formate (Header der jeweiligen Datei).
    - **Story- und Phasenwechsel nicht von Hand eintragen:** Hat die erreichte Phase Stories ohne Feature-Datei oder ist sie abgeschlossen, meldet das `{{NEXT_RUN}}` und stellt es die Agenda als nächste Aufgabe (`next_run.py --phase-status`). `**Phase:**` erst nach dem Phasen-Review umstellen – die Meldung hält sich bis dahin.
 
-6. <a id="CLS-abschluss-commit"></a>Abschluss-Commit – **Pflicht, letzter Schritt**:
+6. <a id="CLS-umwege"></a>Umwege – **jede Abweichung und Sackgasse der Session**, bevor sie in
+   die Commit-Nachricht kommt. Ein notierter Umweg ohne Ursachenprüfung wiederholt sich: Die
+   mutmut-Sperrklinke stand in vier Session-Commits nacheinander als Abweichung, untersucht wurde
+   sie nie – behoben hat es ein Versions-Update. Je Umweg drei Fragen:
+
+   1. **Bekannt?** Nach dem *Ort* suchen – Werkzeug, Modul, Datei –, unabhängig davon, ob dort
+      schon eine Ursache steht:
+      ```
+      git log -i --grep=<Ort> --format='--- %h S%(trailers:key=Session-Ende,valueonly,separator=)%n%B' | grep -i -e '^--- ' -e '<Ort>'
+      grep -rn -i <Ort> docs/kaizen/observations.md docs/kaizen/archive/ docs/tech-debt.md
+      ```
+      Ein Treffer heißt: Der Umweg ist wiederholt – aufgeschoben wird er dann nur, wenn der User
+      es entscheidet.
+   2. **Ursache?** Klären, nicht vermuten: Läuft die aktuelle Version, nennen Changelog oder
+      Issue-Tracker den Fehler? Bei Laufzeit die Zeit je Einheit und Ausgang aufschlüsseln; sonst
+      den Code lesen. Festgehalten als `Ursache: <…> (geprüft: …)` oder
+      `Ursache: ungeklärt (geprüft: …)`. Das „geprüft" ist Pflicht: „Das Werkzeug kann das nicht"
+      ist auch eine Ursache – eine, die nichts geprüft hat.
+   3. **Folge?** `Folge: behoben` (jetzt – der Normalfall bei verstandener Ursache),
+      `Folge: <OBS-/TD-ID>` (dort erzwingt der `Aufschubgrund` das Warum; Ablage nach der
+      [Ablage-Tabelle](../../../AGENTS.md#CLA-ablage)) oder `Folge: entfällt: <Grund>` (etwa eine
+      Sackgasse, die ein anderer Weg erledigt hat und die nichts hinterlässt).
+
+   Der `commit-msg`-Hook blockt jeden Punkt unter „Abweichung(en):" und „Sackgasse(n):" ohne
+   `Ursache:` und `Folge:` – er prüft, dass die Felder dastehen, nicht ob sie taugen. Subagenten
+   liefern dieselben Felder in ihrem Abschnitt „Prozessverbesserung" (`implementing-scenario`).
+
+7. <a id="CLS-abschluss-commit"></a>Abschluss-Commit – **Pflicht, letzter Schritt**:
    Der Commit **ist** die Session-Historie. Committet wird über den Skill `committing` –
    Gesamtprüfung des Diffs, Befehl, Freigabe. Die Nachricht hat diese Form:
    ```
@@ -132,7 +163,7 @@ user-invocable: true
    `git log --format='%(trailers:key=Session-Ende,valueonly=true)'` unsichtbar – der Abruf
    lieferte still leer, während die grep-basierte Nummernableitung weiterliefe. Ein
    `commit-msg`-Hook prüft das mit, dazu Betreff-Länge, Schreibweise, Eindeutigkeit und Nummer
-   der Marke sowie einen nicht-leeren Rumpf.
+   der Marke, einen nicht-leeren Rumpf und Ursache und Folge je Umweg.
 
    **Inhaltsregel.** In den Rumpf gehört, was in dieser Session entstand und **in keiner Datei
    gelandet ist**. Detailtiefe richtet sich nach der Bedeutung, nicht nach dem Aufwand – genau
@@ -152,8 +183,8 @@ user-invocable: true
    Der Rumpf beginnt immer mit einem **kurzen Absatz Orientierung** – worum ging es, warum war
    es eine Session wert. Danach, sofern es vorkam:
 
-   - **Sackgassen mit Kosten:** was versucht wurde und woran es scheiterte
-   - **Abweichungen** von den Voraussetzungen oben: roter Test, übersprungenes Gate, bewusst nicht gelaufene Prüfung
+   - **Sackgassen mit Kosten:** was versucht wurde und woran es scheiterte – mit Ursache und Folge ([Umwege](#CLS-umwege))
+   - **Abweichungen** von den Voraussetzungen oben: roter Test, übersprungenes Gate, bewusst nicht gelaufene Prüfung – ebenso
    - **Bewusst Weggelassenes** unterhalb der TD/OQ-Schwelle
    - **Ein Urteil des Users, das Richtung setzt**, aber weder Regel noch Tracker-Eintrag ist –
      einschließlich eines abgelehnten Review-Findings, wenn die Ablehnung nicht trivial war

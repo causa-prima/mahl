@@ -79,8 +79,9 @@ Was stattdessen gilt – vier Dinge:
    Bedingung des Guards von einem Test gehalten wird – und ob das schlechter geworden ist
    als beim letzten Mal. Grün heißt fertig, rot nennt die Stellen; `⚠ ohne Aussage` heißt,
    der Lauf kam nicht durch – einmal wiederholen, bleibt es dabei, dem User melden statt als
-   belegt zu behandeln. Rechne mit Sekunden je Hook-Modul, beim Bash-Guard mit rund zweieinhalb
-   Minuten; nur für Guards, nicht für jedes Werkzeug.
+   belegt zu behandeln. Laufzeiten: [Python-Werkzeuge](../../../docs/process/dev-workflow.md#DEV-python-werkzeuge)
+   (Bash-Guard rund siebeneinhalb Minuten). Während der Arbeit nur für Guards; vor dem Commit für **jedes** geänderte Modul
+   ([`committing`](../committing/SKILL.md#CMT-gesamtpruefung)).
 3. **Verdikt statt Rohausgabe.** Werkzeuge laufen über ihre Wrapper in `prozesscode`, und
    eine Meldung nennt den Ausweg, nicht nur den Befund.
 4. **Review nach eigenen Stufen.** Selbstcheck gegen

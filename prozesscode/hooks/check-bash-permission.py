@@ -1638,7 +1638,7 @@ _PROJECT_TASK_SCRIPTS: list[str] = [
     "Python-Linter:       python3 -m prozesscode.ruff-run [--fix] [--verbose]",
     "Python-Coverage:     python3 -m prozesscode.coverage-run [--verbose]  (Metrik, kein Gate)",
     "Python-Mutation:     python3 -m prozesscode.mutmut-run --mutate prozesscode.anchors "
-    "[--ratchet]  (Sichtung, kein Gate)",
+    "[--ratchet]  (--ratchet je geändertem Modul: Pflicht vor dem Commit)",
     "Duplikate (jscpd):   python3 -m prozesscode.jscpd-run [--verbose]",
 ]
 
@@ -1793,9 +1793,9 @@ def _print_allow_list() -> None:
 def _build_allow_output(command: str) -> dict:
     """Baut den allow-`hookSpecificOutput`.
 
-    Enthält die Normalisierung einen geänderten Befehl (außer bei # --allow-once),
-    werden `updatedInput` (umgeschriebener Befehl) und `additionalContext` (Hinweis)
-    ergänzt, damit Claude Code den relativen Befehl ausführt und der Agent lernt,
+    Enthält die Normalisierung einen geänderten Befehl (außer bei # --allow-once und bei
+    einem Befehl mit Heredoc), werden `updatedInput` (umgeschriebener Befehl) und
+    `additionalContext` (Hinweis) ergänzt, damit Claude Code den relativen Befehl ausführt und der Agent lernt,
     künftig relative Pfade zu nutzen.
     """
     hso: dict = {
@@ -1803,24 +1803,27 @@ def _build_allow_output(command: str) -> dict:
         "permissionDecision": "allow",
         "permissionDecisionReason": _ALLOW_REASON,
     }
-    if ONE_TIME_MARKER not in command:
-        rewritten, changed = normalize_repo_paths(command)
-        hint = _NORMALIZE_HINT if changed else ""
+    # Nie einen Befehl mit Heredoc umschreiben: Dessen Text ist Daten – ein Pfad darin ist
+    # Inhalt, kein Aufruf, und ein Filter-Strip träfe Fließtext. Geprüft wird trotzdem die
+    # normalisierte Fassung (check_command); ausgeführt das Original, in dem ein absoluter
+    # Repo-Pfad vom Arbeitsverzeichnis Repo-Root aus gleichwertig ist.
+    if ONE_TIME_MARKER in command or strip_heredoc_bodies(command) != command:
+        return hso
 
-        # Filter-Strip auf dem bereits normalisierten Befehl: so greift das Wrapper-Muster
-        # auch bei absolut geschriebenen Pfaden, und beide Rewrites landen in EINEM
-        # updatedInput (zwei würden sich gegenseitig überschreiben).
-        # Nie in einem Befehl mit Heredoc: Dessen Text ist Daten, und Wrapper mit Filter
-        # plus Heredoc lehnt check_command ohnehin ab.
-        if strip_heredoc_bodies(rewritten) == rewritten:
-            rewritten, filtered = strip_wrapper_filter(rewritten)
-            if filtered:
-                changed = True
-                hint = (hint + "\n\n" if hint else "") + _FILTER_STRIPPED_HINT
+    rewritten, changed = normalize_repo_paths(command)
+    hint = _NORMALIZE_HINT if changed else ""
 
-        if changed:
-            hso["updatedInput"] = {"command": rewritten}
-            hso["additionalContext"] = hint
+    # Filter-Strip auf dem bereits normalisierten Befehl: so greift das Wrapper-Muster auch
+    # bei absolut geschriebenen Pfaden, und beide Rewrites landen in EINEM updatedInput (zwei
+    # würden sich gegenseitig überschreiben).
+    rewritten, filtered = strip_wrapper_filter(rewritten)
+    if filtered:
+        changed = True
+        hint = (hint + "\n\n" if hint else "") + _FILTER_STRIPPED_HINT
+
+    if changed:
+        hso["updatedInput"] = {"command": rewritten}
+        hso["additionalContext"] = hint
     return hso
 
 

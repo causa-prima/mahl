@@ -60,4 +60,5 @@ TDD-Abweichung (Test nach Code) ist ein Prozess-Fehler → sofort STOP und melde
 - Prozessverbesserung:
   - Was hat nicht wie erwartet funktioniert (Tooling-Fehler, schlechte Fehlermeldungen)?
   - Welche Schritte haben unnötig Zeit gekostet und hätten durch besseres Tooling oder klarere Anweisungen vermieden werden können?
+  - Je Punkt `Ursache: <…> (geprüft: Version/Changelog/Issue, Messung, Code)` oder `Ursache: ungeklärt (geprüft: …)` und `Folge: behoben` oder `Folge: offen – <warum nicht behoben>`. Ein Umweg ohne geprüfte Ursache wiederholt sich im nächsten Lauf.
   - Falls nichts aufgefallen ist: explizit "Keine Auffälligkeiten" schreiben.

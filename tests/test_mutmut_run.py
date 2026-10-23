@@ -52,6 +52,47 @@ def test_show_gibt_die_mutation_aus_statt_einen_lauf_zu_starten(tmp_path, monkey
     assert "+ neu" in capsys.readouterr().out
 
 
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_tests_for_nennt_die_tests_eines_mutanten_statt_einen_lauf_zu_starten(
+        tmp_path, monkeypatch, capsys):
+    """Ein Mutant, der zwischen zwei Läufen umspringt, wird von einem selbst wackelnden Test
+    bewertet – welcher Test das ist, sagt nur mutmut. Der Rohaufruf ist per Hook gesperrt."""
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    aufrufe = []
+
+    def fake_laufe(*argv):
+        aufrufe.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="tests/test_a.py::test_b\n", stderr="")
+
+    monkeypatch.setattr(mr, "_laufe", fake_laufe)
+    assert mr.main(["--tests-for", "prozesscode.anchors.x_f__mutmut_3"]) == 0
+    assert aufrufe == [("tests-for-mutant", "prozesscode.anchors.x_f__mutmut_3")]
+    assert "tests/test_a.py::test_b" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("ausschnitt, filter_", [
+    ("prozesscode.anchors", "prozesscode.anchors.*"),
+    ("prozesscode.anchors.x_f__mutmut_3", "prozesscode.anchors.x_f__mutmut_3"),
+])
+def test_ein_voller_mutantenname_laeuft_ohne_platzhalter(tmp_path, monkeypatch, ausschnitt, filter_):
+    """Mit angehängtem `.*` träfe mutmut keinen Mutanten und bräche ab."""
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    aufrufe = []
+
+    def fake_laufe(*argv):
+        aufrufe.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(mr, "_laufe", fake_laufe)
+    monkeypatch.setattr(mr, "lies_ergebnisse", lambda _m: [(f"{ausschnitt}.x__mutmut_1", "killed")])
+    mr.main(["--mutate", ausschnitt])
+    assert aufrufe == [("run", filter_)]
+
+
 # --- Abgebrochener Lauf --------------------------------------------------------
 # Schluss einer echten Ausgabe von mutmut 3.8: Sammelfehler beim Testimport.
 _ABBRUCH_SAMMELN = """\

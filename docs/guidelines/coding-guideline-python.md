@@ -119,6 +119,8 @@ Drei konkrete Formen, jede mit ihrer Regel:
   Exit-Code und hat mindestens einen Test gegen eine **echte, gespeicherte** Ausgabe.
   Handgeschriebene Fixtures prüfen den eigenen Parser, nicht die Schnittstelle. (S129: ein
   Abbruch von `mutmut results` mitten in der Ausgabe wurde als vollständiges Ergebnis gelesen.)
+  Die gespeicherte Ausgabe altert mit der Werkzeug-Version – nach einem Update wird sie
+  erneuert ([Abhängigkeits-Durchsicht](../process/dev-workflow.md#DEV-abhaengigkeiten-durchsicht)).
 - **Form des Bestands.** Eine Fixture hat die Form der echten Datei: mehrere Einträge, wenn
   die Datei viele hat, und den Header mit seinen Beispielzeilen, wenn sie einen trägt.
   (S131: bei genau einem Eintrag ist ein dateiweites dict vom eintragsweisen nicht zu
@@ -190,7 +192,7 @@ niemand sie später als Versehen nachrüstet:
 |---|---|
 | **User Stories / Gherkin-Szenarien** | Es gibt keinen externen Nutzer. Das Sollverhalten steht in `docs/process/` und den Skills; Szenarien wären eine zweite Ablage, die driftet. |
 | **100 % Branch-Coverage als Gate** | Coverage misst berührte Zeilen. Klasse STUMM hat 100 % Coverage und wirkt trotzdem nicht – die Zahl beantwortet die Frage nicht, die hier zählt. Als *Metrik* ist sie zulässig, um Testlücken zu finden; als *Gate* nicht. |
-| **100 % Mutation Score als Gate** | Ein Volllauf mutiert 11.606 Stellen gegen eine 1.100er-Suite: Stunden, also kein Hook. Die *Sichtung* dagegen ist wertvoll – und trifft, anders als hier bis S128 vermutet, genau Klasse STUMM: Ein überlebender Mutant in einem Guard heißt, dessen Prüfung lässt sich ändern, ohne dass ein Test es merkt. In S129 direkt gemessen, sobald der Code als Paket erreichbar war: In `check-td-capture` überlebten 10 von 105 bewerteten Mutanten, 11 weitere Stellen berührt **kein** Test – darunter die `main()` **jedes** Hooks, also die Funktion, die stdin liest und den Exit-Code setzt. Meldungstexte erzeugen keine Mutanten, wenn sie als Modulkonstante stehen ([Meldungen](#CGP-meldungen)). Werkzeug: `python3 -m prozesscode.mutmut-run --mutate <modul> [--ratchet]`. |
+| **100 % Mutation Score als Gate** | Ein Volllauf mutiert 11.606 Stellen gegen eine 1.100er-Suite: Stunden, also kein Hook. Die *Sichtung* dagegen ist wertvoll – und trifft, anders als hier bis S128 vermutet, genau Klasse STUMM: Ein überlebender Mutant in einem Guard heißt, dessen Prüfung lässt sich ändern, ohne dass ein Test es merkt. In S129 direkt gemessen, sobald der Code als Paket erreichbar war: In `check-td-capture` überlebten 10 von 105 bewerteten Mutanten, 11 weitere Stellen berührt **kein** Test – darunter die `main()` **jedes** Hooks, also die Funktion, die stdin liest und den Exit-Code setzt. Meldungstexte erzeugen keine Mutanten, wenn sie als Modulkonstante stehen ([Meldungen](#CGP-meldungen)). Werkzeug: `python3 -m prozesscode.mutmut-run --mutate <modul> [--ratchet]`. Gate ist allein die **Sperrklinke** – kein Rückschritt je geändertem Modul, vor jedem Commit ([`committing`](../../.claude/skills/committing/SKILL.md#CMT-gesamtpruefung)). |
 | **Stil-Linting** (Import-Sortierung, Modernisierung) | Erzeugt Diff-Rauschen an Dateien, die sonst niemand anfasst, ohne je einen Fehler zu verhindern. |
 
 ---

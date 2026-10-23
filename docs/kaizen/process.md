@@ -270,6 +270,13 @@ die Agenda läuft weiter. Ein Totalausfall wäre von „nichts zu tun" ununtersc
 - **Klasse, nicht Einzelfall:** Bemessen wird die Problem-**Klasse**, falls sie **unbemerkt** bliebe – nicht der zufällig abgefangene Einzelfall (LLs werden ohnehin auf Klassen-Ebene formuliert).
 - **„Schnell bemerkt" ist kein Impact-Kriterium:** Ein still-grüner/maskierter Fehler ist gerade *nicht* schnell bemerkt; „bemerkt" ≠ „geringer Schaden".
 
+**Gegenfrage vor MITTEL oder GERING:** *Hätte die Klasse, unbemerkt, eine User-Entscheidung, ein
+Gate oder einen Guard oder einen Datenbestand verfälscht?* Ja → HOCH. Grund: Die Einstufung beim
+Erfassen fällt systematisch zu niedrig aus – sie entsteht in derselben Session, in der der Fall
+gerade aufgefallen und behoben ist, und bemisst dann den Einzelfall statt der Klasse. In einem
+blinden Durchgang mit drei Bewertern lagen 9 von 19 Einträgen eine Stufe zu niedrig, keiner zu hoch.
+Eine zu niedrige Einstufung umgeht zudem die Pflicht zum `CM-Bezug`, die erst ab HOCH greift.
+
 ---
 
 <a id="KPR-bereichs-kategorien"></a>
@@ -422,7 +429,7 @@ Der Jenga-Score startet automatisch neu – `jenga_score.py` liest immer nur die
 
 **Default: die Maßnahme in derselben Retro definieren.** Das Abwägen der Kandidaten für ein LL-Muster gehört laut Evaluierungs-Gate ([„Gefahr & Kandidaten-Bewertung"](#KPR-gefahr)) ausdrücklich in die **CM-Wahl**, also hierher – nicht in den Drain. Ist sie definiert (konkreter nächster Schritt + überprüfbares Done-Kriterium), bekommt sie einen Punkt unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md`, als **Kurzzusammenfassung mit Verweis** auf `countermeasures.md` – keine Kopie, das Dokument wird bei jedem Session-Start vollständig injiziert.
 
-**Ausnahme, begründungspflichtig:** Steht nicht die Umsetzung aus, sondern die **Antwort selbst** – es gibt mehrere ernsthafte Kandidaten, deren Abwägung eigene Recherche braucht –, bleibt die CM auf OFFEN und die Ausgestaltung geht als Eintrag in `docs/kaizen/observations.md` (mit `Bezug:` auf die CM) in den Drain. Der Grund ist im CM-Eintrag zu notieren; „ist noch nicht definiert" allein zählt nicht, sonst wird die Ausnahme zum bequemen Standardweg. **Preis dieser Route bewusst mitdenken:** Der Drain ist ratenbegrenzt und nach Impact × Häufigkeit priorisiert – ein Eintrag kann dort viele Sessions liegen. Für KRITISCH/HOCH-Findings, die laut „Wann gehört etwas wohin?" *sofort* eine Maßnahme verlangen, ist das in aller Regel zu langsam.
+**Ausnahme, begründungspflichtig:** Steht nicht die Umsetzung aus, sondern die **Antwort selbst** – es gibt mehrere ernsthafte Kandidaten, deren Abwägung eigene Recherche braucht –, bleibt die CM auf OFFEN und die Ausgestaltung geht als Eintrag in `docs/kaizen/observations.md` (mit `Bezug:` auf die CM) in den Drain. Der Grund ist im CM-Eintrag zu notieren; „ist noch nicht definiert" allein zählt nicht, sonst wird die Ausnahme zum bequemen Standardweg. Ebenso wenig zählen mehrere Kandidaten, die sich ohne Recherche abwägen lassen: Der User sitzt in der Retro – sie werden ihm mit Empfehlung vorgelegt und jetzt entschieden. **Preis dieser Route bewusst mitdenken:** Der Drain ist ratenbegrenzt und nach Impact × Häufigkeit priorisiert – ein Eintrag kann dort viele Sessions liegen. Für KRITISCH/HOCH-Findings, die laut „Wann gehört etwas wohin?" *sofort* eine Maßnahme verlangen, ist das in aller Regel zu langsam.
 
 **Nicht** nach `AGENT_MEMORY.md` gehört eine unfertige Maßnahme: Die Datei hat außer der Injektion **keinen** Wiedervorlage-Mechanismus, ein Punkt ohne nächsten Schritt belastet dort nur die Prioritätenliste – das verwechselt Sichtbarkeit mit Wiedervorlage. (Diese Unterscheidung fehlte bis S116; die Regel stammt aus der Zeit vor dem kontinuierlichen Drain und kannte nur einen Ablageort.)
 

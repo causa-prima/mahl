@@ -11,8 +11,11 @@ Der Mutant ist deterministisch, `--frisch` hilft also nicht. Die `.meta`-Dateien
 dieselbe Quelle, die `results` liest – nur ohne den Absturz und ohne einen Subprozess über
 11.000 Zeilen.
 """
+import ast
 import json
 from importlib import import_module
+
+import pytest
 
 mr = import_module("prozesscode.mutmut-run")
 
@@ -39,11 +42,35 @@ def test_liest_status_aus_den_exit_codes(tmp_path, monkeypatch):
     }
 
 
+def _mutmut_tabelle() -> dict:
+    """`status_by_exit_code` der installierten mutmut-Version, aus ihrem Quelltext gelesen –
+    die echte Tabelle, nicht eine Abschrift. Import scheidet aus: mutmut liegt im venv, die
+    Suite läuft auch unter dem System-Python."""
+    pfade = sorted((mr.ROOT / ".venv" / "lib").glob("python*/site-packages/mutmut/stats.py"))
+    if not pfade:
+        pytest.skip("kein venv mit mutmut – Herstellung: dev-workflow.md, DEV-python-werkzeuge")
+    for knoten in ast.walk(ast.parse(pfade[0].read_text(encoding="utf-8"))):
+        if (isinstance(knoten, ast.Assign) and isinstance(knoten.targets[0], ast.Name)
+                and knoten.targets[0].id == "status_by_exit_code"):
+            return ast.literal_eval(knoten.value.args[1])
+    raise AssertionError("status_by_exit_code nicht gefunden – mutmut hat die Tabelle verlegt")
+
+
+def test_der_nachbau_stimmt_mit_der_installierten_mutmut_tabelle_ueberein():
+    """Der Nachbau altert mit der mutmut-Version. Unter 3.8 wertet mutmut SIGXCPU (-24) als
+    Timeout, der Nachbau zählte es als getötet – ein Timeout hob den Score, ohne dass ein
+    Test etwas gefunden hatte (S140)."""
+    abweichend = {code: (status, mr.STATUS_JE_EXIT_CODE.get(code))
+                  for code, status in _mutmut_tabelle().items()
+                  if mr.STATUS_JE_EXIT_CODE.get(code) != status}
+    assert abweichend == {}
+
+
 def test_sigkill_gilt_als_ausser_wertung():
     """Exit -9 heißt: Der Kernel hat den Mutanten hart beendet – meist eine Endlosschleife
     oder ein Speicherfraß, den die Mutation erzeugt hat. Das sagt nichts über die Tests,
-    also gehört er wie ein Timeout aus dem Bruch. mutmut selbst kennt den Code nicht."""
-    assert mr.STATUS_JE_EXIT_CODE[-9] == "timeout"
+    also gehört er wie ein Timeout aus dem Bruch. mutmut vor 3.8 kannte den Code nicht."""
+    assert mr.score([("a.x__mutmut_1", mr.STATUS_JE_EXIT_CODE[-9])]) == (0, 0)
 
 
 def test_ein_unbekannter_exit_code_reisst_den_lauf_nicht_mit(tmp_path, monkeypatch):
@@ -62,6 +89,14 @@ def test_der_ausschnitt_filtert_auch_hier(tmp_path, monkeypatch):
     monkeypatch.setattr(mr, "ROOT", meta(tmp_path, x_f__mutmut_1=1))
     assert mr.lies_ergebnisse(ausschnitt="prozesscode.anderes") == []
     assert mr.lies_ergebnisse(ausschnitt="prozesscode.beispiel") != []
+
+
+def test_ein_voller_mutantenname_ist_ein_ausschnitt_aus_genau_einem(tmp_path, monkeypatch):
+    """Ein einzelner Mutant lässt sich wiederholt bewerten – der Weg, einen wackelnden zu
+    finden. `_1` darf dabei nicht `_10` mitnehmen."""
+    monkeypatch.setattr(mr, "ROOT", meta(tmp_path, x_f__mutmut_1=0, x_f__mutmut_10=1))
+    assert mr.lies_ergebnisse(ausschnitt="prozesscode.beispiel.x_f__mutmut_1") == [
+        ("prozesscode.beispiel.x_f__mutmut_1", "survived")]
 
 
 def test_ohne_mutantenbaum_keine_ergebnisse(tmp_path, monkeypatch):

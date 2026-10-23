@@ -169,10 +169,16 @@ Mit `--ratchet` hält es den Score je Modul in `prozesscode/mutation-baseline.js
 meldet einen Rückschritt als `✗`; Gleichstand geht durch, eine Verbesserung zieht die
 Baseline nach. Kommt mutmut in einem Modul nicht durch alle Mutanten, wird es nicht verglichen,
 und das Verdikt lautet `⚠ Sperrklinke ohne Aussage` (Exit 1) – kein Beleg für die Tests.
-Auch das ist **kein Gate**: Ein Hook-Modul braucht gemessen Sekunden, der Bash-Guard rund
-zweieinhalb Minuten – ein Zwang je Edit erzeugte trotzdem den Druck, unter dem er umgangen
-wird. `--frisch` wirft `mutants/` weg; nötig nach geänderten **Tests**, weil mutmut
-die Test-zu-Funktion-Zuordnung nur ergänzt und nie bereinigt.
+**Pflicht vor jedem Commit, der Prozess-Code ändert** – je geändertem Modul, im Skill
+[`committing`](../../.claude/skills/committing/SKILL.md#CMT-gesamtpruefung). Bewusst einmal je
+Commit und nicht je Edit: Ein Hook-Modul braucht Sekunden bis gut eine Minute, der Bash-Guard
+gemessen siebeneinhalb Minuten – je Edit erzeugte das den Druck, unter dem ein Zwang umgangen
+wird. Den Großteil kosten Mutanten, die eine echte Endlosschleife erzeugen: Sie laufen bis an das
+Zeitlimit (`timeout_constant` in `setup.cfg`, dort auch, warum es nicht knapper sein darf). Ohne
+jeden Zwang dagegen lagen die zwölf Dispatcher-Checks bei 37–70 %, und erst das Schließen
+dieser Lücken fand neun echte Fehler in Guards und Wrappern. `--frisch` wirft `mutants/` weg;
+nötig nach geänderten **Tests**, weil mutmut die Test-zu-Funktion-Zuordnung nur ergänzt und
+nie bereinigt.
 
 Zusätzlich läuft ruff **automatisch** über jede geänderte Python-Datei des Prozess-Codes
 (PostToolUse, `checks/ruff_lint.py`, nicht-blockierend). Fehlt das venv, sagt der Check das –
@@ -310,6 +316,11 @@ erscheinen im Folgemonat wieder; ihre Gründe stehen im Rumpf des letzten Durchs
    (läuft mit pytest und pytest-cov aus dem venv; `python3 -m pytest` nimmt das pytest des
    System-Pythons und prüft ein Update nicht) und `python3 -m prozesscode.ruff-run`. Nach einem mutmut-Update setzt die Sperrklinke ihre
    Baselines je Modul selbst neu (Messkennung in `mutation-baseline.json`).
+   **Wertet ein Wrapper die Ausgabe eines aktualisierten Werkzeugs aus** (mutmut, Stryker,
+   Playwright …), den Wrapper einmal echt laufen lassen und die gespeicherte echte Ausgabe in
+   seinen Tests durch die der neuen Version ersetzen. Sie altert mit der Version: Unter mutmut
+   3.8 änderte sich ein Meldungstext, `mutmut-run` meldete falsch grün, und die Tests gegen die
+   alte gespeicherte Ausgabe blieben grün (S139).
 4. Den abschließenden Commit mit `Dependency-Check: JJJJ-MM` im Trailer-Absatz
    versehen – auch wenn nichts aktualisiert wurde. Fehlt die Zeile, legt die Agenda die
    Durchsicht erneut vor. Der Rumpf nennt die abgelehnten Updates mit Grund – Schritt 1 des

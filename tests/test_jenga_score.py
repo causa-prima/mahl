@@ -58,6 +58,33 @@ def test_parse_zaehlt_beispiel_eintrag_im_header_kommentar_nicht_mit(tmp_path):
     assert [f["impact"] for f in findings] == ["MITTEL"]
 
 
+def test_parse_zaehlt_jede_session_der_periode(tmp_path):
+    """Form des Bestands: Eine echte Periode hat viele Sessions. Mit nur einer wäre ein
+    Zähler, der auf 1 setzt statt hochzuzählen, nicht vom richtigen zu unterscheiden – der
+    Score und damit die Fälligkeit der Retro hängen an dieser Zahl."""
+    datei = tmp_path / "lessons_learned.md"
+    datei.write_text(
+        "# Lessons Learned\n\n"
+        "## Session 201 – 2026-01-01\n\n"
+        "- **[HOCH] [AGENT] [Kommunikation] LL-S201-1 – a**\n\n"
+        "## Session 202 – 2026-01-02\n\n"
+        "- **[MITTEL] [PROZESS] [Doku] LL-S202-1 – b**\n\n"
+        "## Session 203 – 2026-01-03\n\n"
+        "- **[GERING] [TOOLING] [Hook/Script] LL-S203-1 – c**\n",
+        encoding="utf-8",
+    )
+
+    sessions, findings = js.parse(str(datei))
+
+    assert sessions == 3
+    assert [f["impact"] for f in findings] == ["HOCH", "MITTEL", "GERING"]
+
+
+def test_compute_score_zieht_sessions_und_findings_vom_startwert_ab():
+    erwartet = js.START_SCORE - 2 * js.SESSION_DEDUCTION - js.IMPACT_WEIGHTS["HOCH"]
+    assert js.compute_score(2, [{"impact": "HOCH"}]) == erwartet
+
+
 # --- Exit-Code: Report, kein Gate --------------------------------------------
 # jenga_score.py ist ein Report-Script wie obs-drain.py oder td_due.py: Sein Befund steht
 # im stdout, der Exit-Code sagt nur, ob der Lauf gelang. Meldete es „Retro fällig" per

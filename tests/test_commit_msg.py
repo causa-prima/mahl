@@ -237,7 +237,94 @@ def test_the_hook_reads_a_message_with_umlauts(monkeypatch, tmp_path, capsys):
     ]
 
 
+# --- Umwege: Abweichungen und Sackgassen tragen Ursache und Folge -------------
+# Ein notierter Umweg ohne Ursachenprüfung wiederholt sich: Die mutmut-Sperrklinke stand in vier
+# Session-Commits als Abweichung, untersucht wurde sie nie (LL-S139-1). Der Hook erzwingt die
+# Frage dort, wo jede Session vorbeikommt.
+GANZ = "Ursache: X (geprüft: Version) Folge: behoben"
+
+# Echter Abschnitt aus dem S136-Commit (30e4ea1), gekürzt – Form des Bestands: Liste mit
+# Fortsetzungszeilen, zwei Abschnitte, Fließtext dazwischen.
+S136 = ("Doku-Review in drei Läufen\n\nDrei Läufe.\n\n"
+        "Sackgassen:\n"
+        "- InMemory-Paket als tot entfernt: 54 von 56 Backend-Tests scheiterten zur\n"
+        "  Laufzeit, das Paket hatte eine EF-Core-Versionsschere kaschiert.\n"
+        "- DisableTransitiveProjectReferences eingeschaltet: Server baut nicht mehr.\n\n"
+        "Abweichungen:\n"
+        "- Die mutmut-Sperrklinke kommt auf check-bash-permission nicht über 266 von 672\n"
+        "  Mutanten.\n\n"
+        "Session-Ende: 126\n")
+
+
+def umweg_befunde(text: str) -> list[str]:
+    return [b for b in pruefe(text) if b.startswith("Umweg")]
+
+
+def test_a_real_closing_message_without_causes_is_rejected_per_item():
+    assert len(umweg_befunde(S136)) == 3
+
+
+def test_items_with_cause_and_consequence_pass():
+    text = (S136.replace("kaschiert.\n", f"kaschiert. {GANZ}\n")
+                .replace("nicht mehr.\n", f"nicht mehr. {GANZ}\n")
+                .replace("  Mutanten.\n", f"  Mutanten. {GANZ}\n"))
+    assert umweg_befunde(text) == []
+
+
+def test_a_continuation_line_belongs_to_its_item():
+    text = f"Titel\n\nAbweichungen:\n- Lauf unvollständig.\n  {GANZ}\n"
+    assert umweg_befunde(text) == []
+
+
+def test_an_inline_section_is_one_item():
+    text = "Titel\n\nAbweichung: Die Klinke kam nicht durch,\nalso nur Handproben.\n"
+    assert umweg_befunde(text) == [commit_msg._UMWEG_OHNE.format(
+        felder="`Ursache:` und `Folge:`", anfang="Die Klinke kam nicht durch,")]
+
+
+def test_a_section_with_words_before_the_colon_counts():
+    """„Sackgasse mit Kosten:" stand so in S135 – eine Überschrift mit Zusatz entgeht sonst."""
+    assert umweg_befunde("Titel\n\nSackgasse mit Kosten: Der Entwurf war zu tief.\n")
+
+
+def test_the_missing_field_is_named():
+    text = "Titel\n\nAbweichungen:\n- Klinke ohne Aussage. Ursache: ungeklärt (geprüft: Version)\n"
+    assert umweg_befunde(text) == [commit_msg._UMWEG_OHNE.format(
+        felder="`Folge:`", anfang="Klinke ohne Aussage. Ursache: ungeklärt (geprüft: …")]
+
+
+def test_a_blank_line_after_the_heading_does_not_hide_the_items():
+    assert umweg_befunde("Titel\n\nAbweichungen:\n\n- Klinke ohne Aussage.\n") == [
+        commit_msg._UMWEG_OHNE.format(felder="`Ursache:` und `Folge:`",
+                                      anfang="Klinke ohne Aussage.")]
+
+
+def test_an_empty_section_at_the_end_has_no_items():
+    assert umweg_befunde("Titel\n\nAbweichungen:\n\n") == []
+
+
+def test_a_section_right_below_the_subject_counts_but_the_subject_does_not():
+    befunde = umweg_befunde("Abweichung: Titel\nSackgassen:\n- Entwurf zu tief.")
+    assert [b.split("“")[0] for b in befunde] == ["Umweg ohne `Ursache:` und `Folge:`: „Entwurf zu tief."]
+
+
+def test_a_start_of_exactly_the_maximum_length_is_not_shortened():
+    punkt = "x" * commit_msg.ANFANG_MAX
+    assert umweg_befunde(f"Titel\n\nAbweichung: {punkt}\n") == [commit_msg._UMWEG_OHNE.format(
+        felder="`Ursache:` und `Folge:`", anfang=punkt)]
+
+
+def test_prose_mentioning_a_deviation_is_not_a_section():
+    assert umweg_befunde("Titel\n\nDie Abweichung vom Plan war gewollt, siehe oben.\n") == []
+
+
+def test_the_hook_blocks_a_commit_with_an_unexplained_detour(monkeypatch, tmp_path, capsys):
+    assert _hook(monkeypatch, tmp_path, "Titel\n\nAbweichungen:\n- Ohne Klinke.\n") == 1
+    assert commit_msg._KOPF in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("konstante, ausweg", [
+    ("_UMWEG_OHNE", "entfällt: <Grund>"),
     ("_VERTIPPT", "`Session-Ende: <NNN>`"),
     ("_NICHT_ZULETZT", "`Co-Authored-By:`"),
     ("_KEIN_TRAILER", "in den Rumpf verschieben"),

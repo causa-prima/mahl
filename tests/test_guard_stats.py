@@ -18,6 +18,17 @@ def test_definierte_guards_kommen_aus_beiden_dispatchern():
     assert "ruff_lint" in namen
 
 
+def test_direkt_protokollierende_hooks_gelten_als_definiert():
+    """Nicht jeder Guard läuft über einen Dispatcher – manche Hooks rufen guard_log selbst.
+    Ohne sie stünden lebende Guards als „nicht mehr definiert" im Report und könnten nie als
+    stumm auffallen (S140)."""
+    namen = stats.definierte_guards()
+    assert "check-agent-start" in namen
+    assert "merke-rueckgaben" in namen
+    text = "\n".join(stats.bericht({"check-agent-start": 1}, seit="2026-01-01T00:00:00"))
+    assert stats.MARKE_UNBEKANNT not in text
+
+
 def test_bericht_weist_jede_ausloesung_aus():
     zeilen = stats.bericht({"check-anchors": 3, "tooling_tests": 1}, seit="2026-01-01T00:00:00")
     text = "\n".join(zeilen)

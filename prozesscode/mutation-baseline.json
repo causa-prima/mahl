@@ -8,13 +8,18 @@
     "getoetet": 125
   },
   "prozesscode.commit_msg": {
-    "beurteilbar": 162,
-    "getoetet": 160,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "beurteilbar": 228,
+    "getoetet": 226,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.eintrag_felder": {
     "beurteilbar": 21,
     "getoetet": 20
+  },
+  "prozesscode.guard-stats": {
+    "beurteilbar": 99,
+    "getoetet": 68,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.hooks.check-adr-capture": {
     "beurteilbar": 83,
@@ -31,9 +36,9 @@
     "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-bash-permission": {
-    "beurteilbar": 1228,
-    "getoetet": 1206,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "beurteilbar": 1171,
+    "getoetet": 1149,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.hooks.check-code-quality-blocking": {
     "beurteilbar": 15,
@@ -109,6 +114,16 @@
     "beurteilbar": 115,
     "getoetet": 115,
     "messung": "mutmut 3.8.0, Wertung 2"
+  },
+  "prozesscode.jenga_score": {
+    "beurteilbar": 236,
+    "getoetet": 66,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
+  "prozesscode.mutmut-run": {
+    "beurteilbar": 652,
+    "getoetet": 457,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.ordinale": {
     "beurteilbar": 105,

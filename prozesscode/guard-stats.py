@@ -14,12 +14,15 @@ zu unterscheiden, weshalb dieser Report den Befund meldet, statt ihn zu deuten. 
 (`allowed-commands.log` / `denied-commands.log`); dessen Auswertung ist `tool-usage.py`. Hier
 stehen die Guards der beiden Edit/Write-Dispatcher.
 
-**Die Liste der Guards wird gelesen, nicht gepflegt** – aus den Dispatchern selbst. Eine
+**Die Liste der Guards wird gelesen, nicht gepflegt** – aus den Dispatchern selbst und aus den
+Hooks, die `guard_log` direkt mit ihrem Namen aufrufen. Eine
 gepflegte Kopie driftet, und zwar in die gefährliche Richtung: Sie sähe weiterhin vollständig
 aus, während ein neuer Guard fehlt.
 """
+import re
 import sys
 from importlib import import_module
+from pathlib import Path
 
 from .hooks.checks import guard_log
 
@@ -34,6 +37,13 @@ GENUG_AUSLOESUNGEN = 100
 HINWEIS_DUENN = ("Noch zu wenige Auslösungen: 'nie gefeuert' ist hier eine Aussage über das "
                  "Alter des Protokolls, nicht über den Guard.")
 
+GRUPPE_EIGENSTAENDIG = "eigenständig (Hook protokolliert selbst)"
+
+# Hooks außerhalb der Dispatcher rufen guard_log mit ihrem Namen als Literal. Die Dispatcher
+# übergeben eine Variable und fallen damit nicht unter das Muster – sie werden oben gelesen.
+_EIGENER_AUFRUF = re.compile(r'guard_log\.protokolliere\("([^"]+)"\)')
+_HOOKS = Path(__file__).resolve().parent / "hooks"
+
 
 def definierte_guards() -> dict[str, str]:
     """{Guard-Name: Dispatcher} – aus den Dispatchern gelesen."""
@@ -46,6 +56,10 @@ def definierte_guards() -> dict[str, str]:
     nichtblockierend = import_module("prozesscode.hooks.check-code-quality-nonblocking")
     for fn in nichtblockierend.CHECKS:
         namen[fn.__module__.rsplit(".", 1)[-1]] = "Hinweis (check-code-quality-nonblocking)"
+
+    for hook in sorted(_HOOKS.glob("*.py")):
+        for name in _EIGENER_AUFRUF.findall(hook.read_text(encoding="utf-8")):
+            namen[name] = GRUPPE_EIGENSTAENDIG
 
     return namen
 

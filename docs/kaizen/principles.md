@@ -146,12 +146,20 @@ Größe berichtet („Die berichtete Größe ist die gemessene").
   bei Arbeit, die solche Marker nie setzt). Gegenfrage vor jeder Aussage: *Hätte dieses Ergebnis
   anders ausgesehen, wenn der Fehler vorläge?*
 
-- **Vollständige Zerlegung vor Schluss/Empfehlung.**
+- **Vollständige Zerlegung vor Schluss/Empfehlung – umso gründlicher, je mehr daran hängt.**
   Bevor ein Schluss, eine Empfehlung oder eine abgeleitete Anforderung steht, den relevanten
-  Raum **explizit zerlegen** und jede Dimension prüfen – nicht den auffälligsten Teil für das
-  Ganze nehmen. Konkrete Auslöser: Quantoren in Akzeptanzkriterien („alle", „jeder") sind eine
-  **eigene** Prüfdimension; bei Kosten-/Trade-off-Vergleichen **alle** Pfade aufzählen
-  (z.B. Injektion + Lesen + Schreiben), bevor eine Empfehlung steht.
+  Raum **explizit zerlegen** und jede Dimension prüfen und bewerten – nicht den auffälligsten
+  Teil für das Ganze nehmen. Was bisher fehlte, war fast immer eine von vier Arten:
+  **Quellen** (welche Daten, Logs, Dokumente gibt es – schreibt der Schreiber noch dorthin?),
+  **Formen und Pfade** (in welchen Varianten tritt der Fall auf, wer liest die Stelle noch?),
+  **Optionen** (trifft ein Argument die anderen Optionen genauso?), **Zeitraum und
+  Betriebsart** (enthält das Fenster jede Phase, über die die Aussage spricht?). Die vier sind
+  ein Anfang, kein Abschluss – zuletzt fragen, welche Dimension *dieser* Fall darüber hinaus
+  hat. Quantoren („alle", „nie", „selten") sind Allaussagen und brauchen den ganzen Raum.
+  **Die Gründlichkeit skaliert mit der Folge:** Trägt die Aussage eine User-Entscheidung, das
+  Design eines Guards oder etwas schwer Umkehrbares, wird jede Dimension mit einem Beleg
+  geprüft (Lauf, Datei, Log), nicht mit einem Argument; was sich nicht prüfen lässt, wird als
+  ungeprüft benannt.
 
 - **Die berichtete Größe ist die gemessene – sonst ist es keine Messung mehr.**
   Erhoben wurde korrekt, berichtet wird eine andere Größe – unauffällig, weil beide Zahlen

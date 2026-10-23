@@ -839,6 +839,23 @@ def test_path_normalization() -> int:
         print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] unerwartetes updatedInput: {out_plain}")
         failures += 1
 
+    # Heredoc-Text ist Daten: Ein Pfad darin ist Inhalt, kein Aufruf. Umgeschrieben verlor ein
+    # JSON-Body für eine Hook-Probe seinen absoluten Pfad, und die Probe lief still ins Leere
+    # (S140). Ein Befehl mit Heredoc wird deshalb gar nicht umgeschrieben – auch nicht auf der
+    # Operatorzeile; dort ist der absolute Pfad vom Repo-Root aus ohnehin gleichwertig.
+    heredoc_cmd = (f"python3 -m prozesscode.commit_msg {R}/x <<'EOF'\n"
+                   f'{{"file_path": "{R}/Server.Tests/A.cs"}}\nEOF')
+    out_heredoc = build_allow_output(heredoc_cmd)
+    if "updatedInput" not in out_heredoc and "additionalContext" not in out_heredoc:
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [output     ] Befehl mit Heredoc bleibt unverändert")
+    else:
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [output     ] Heredoc umgeschrieben: {out_heredoc}")
+        failures += 1
+    # Gegenprobe: Die Entscheidung prüft weiter den normalisierten Befehl.
+    if not assert_decision(f"cat {R}/docs/AGENT_MEMORY.md <<'EOF'\n{R}/x\nEOF", "allow",
+                           "absoluter Pfad + Heredoc → weiterhin allow"):
+        failures += 1
+
     return failures
 
 

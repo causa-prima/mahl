@@ -366,7 +366,7 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
 ## Abschluss
 
 1. **Offene Punkte mit dem User triagieren:** Sammle aus dem gesamten Ablauf alles, was nicht in den Szenario-Code eingeflossen ist – nichts darf nur in der Konversation hängen bleiben oder ungefragt irgendwo eingetragen werden:
-   - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return durchsehen und **pro Subagent explizit ausweisen**, ob er Feedback gab (Inhalt) oder nicht („keine"). Wird daraus ein OBS/LL erfasst, die **Quelle präzise** eintragen (`Subagent` vs. `Orchestrator`), damit später beobachtbar bleibt, woher das Feedback stammt.
+   - **Improvement-Vorschläge aus den Subagenten-Returns** (Schicht-Implementer melden am Ende einen „Prozessverbesserung"-/Vorschlags-Abschnitt) – jeden Return durchsehen und **pro Subagent explizit ausweisen**, ob er Feedback gab (Inhalt) oder nicht („keine"). Wird daraus ein OBS/LL erfasst, die **Quelle präzise** eintragen (`Subagent` vs. `Orchestrator`), damit später beobachtbar bleibt, woher das Feedback stammt. Punkte mit `Folge: offen` oder `Ursache: ungeklärt` durchlaufen den [Umwege-Schritt](../closing-session/SKILL.md#CLS-umwege) (bekannt? Ursache? Folge?), bevor sie als Abweichung in einen Commit gehen.
    - **Review-Findings einer späteren Phase** aus dem [Review-Loop](#IMP-review-loop) (nicht gebaut, Vorschlag: Schuld mit Phasen-Auslöser).
    - **Während des Ablaufs entdeckte technische Schuld / Tooling-Reibung.**
    - **TD-Abgleich (mechanisch, nicht aus dem Gedächtnis):**

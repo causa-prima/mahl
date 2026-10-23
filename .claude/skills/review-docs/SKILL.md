@@ -311,7 +311,12 @@ Den folgenden Loop durchlaufen bis alle Einträge abgearbeitet sind oder der Use
 
    **Vor dem Umsetzen den `grill-me`-Skill (via Skill-Tool) aufrufen wenn:** (a) unklar ist ob die gewählte Lösung mit den Guidelines vereinbar ist, oder (b) das Zielbild des Users nicht vollständig verstanden wurde. Besonders bei (b) nicht voreilig umsetzen – lieber einmal zu viel nachfragen als in die falsche Richtung ändern.
 
-4. **Umsetzen** der gewählten Lösung (Dateien bearbeiten).
+4. **Umsetzen** der gewählten Lösung (Dateien bearbeiten). **Ändert sie eine Regel** (nicht
+   nur deren Formulierung), vorher repo-weit nach allen Stellen suchen, die diese Regel
+   wiedergeben, verkürzen oder als Beispiel zeigen – Schlüsselbegriffe, Beispielcode,
+   Agent-Definitionen, Checklisten – und sie im selben Zug nachziehen. Der Review findet nur,
+   was er liest; die Reste der eigenen Änderung tauchen sonst erst im nächsten Lauf auf (einmal
+   zwei zusätzliche Läufe mit je vier Agenten, darunter ein HOCH-Befund).
 
 5. **Kurze Bestätigung** was geändert wurde, dann automatisch weiter mit dem nächsten Eintrag.
 

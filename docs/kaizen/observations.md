@@ -162,15 +162,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: keiner
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S130-1 – Mutationssichtung bewertet im größten Guard-Modul nur 41 % der Mutanten
-- Quelle: Orchestrator
-- Status: UMGESETZT (S139)
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: Gemessen in S130: 'mutmut-run --mutate prozesscode.hooks.check-bash-permission' bewertet je Lauf nur rund 241 von 583 Mutanten; der Rest bleibt 'not checked'. Drei aufeinanderfolgende Laeufe lieferten 237, 242 und 241 - der Ausschnitt schwankt, und der Hinweis 'weiterer Lauf noetig' fuehrt nicht zum Ziel, weil auch Wiederholungen nicht weiterkommen. Ursache ist ein Abbruch in mutmut selbst: Mit --verbose endet der Lauf mit 'KeyError: -9' in calculate_summary_stats (mutmut/__main__.py:866). -9 ist SIGKILL, also ein Mutanten-Prozess, den Timeout oder System getoetet hat; mutmut kennt diesen Exit-Code in status_by_exit_code nicht und stirbt beim Zusammenrechnen. Ohne --verbose faengt der Wrapper den Abbruch ab. Modulspezifisch: check-dangling-refs laeuft mit 84 von 84 Mutanten sauber durch. Folge: Fuer ausgerechnet den groessten und meistgenutzten Guard liefert die Sichtung ueber die Haelfte der Stellen keine Aussage - die Klinke meldet dort seit S130 ehrlich 'Lauf unvollstaendig' (vorher meldete sie einen erfundenen Rueckschritt von 53.5 auf 53.0 Prozent, das ist behoben), aber sie prueft dort eben auch nichts. Unklar und ungeprueft ist die Ursache des SIGKILL. Ein naheliegender Verdacht ist die Rekursion in check_command: Der --allow-once-Zweig ruft die Funktion erneut auf, und ein Mutant am replace-Aufruf koennte daraus eine Endlosschleife machen. Das ist eine Vermutung, keine Messung. Nachtrag S136: unverändert – drei Läufe hintereinander blieben bei 266 von 672 Mutanten stehen (das Modul ist seither gewachsen), einer endete erneut mit KeyError: -9. Der Wrapper meldete dabei trotzdem „✓ Sperrklinke gehalten“ mit Exit 0, obwohl er das Modul gar nicht verglich; das ist in S136 behoben (Verdikt jetzt „⚠ Sperrklinke ohne Aussage“, Exit 1). Offen bleibt die Ursache des Abbruchs – für check-bash-permission gibt es weiterhin keine maschinelle Absicherung über die Handprobe hinaus. Nachtrag S137: weiterhin unverändert. Fünf Läufe nach dem Umbau des Wrapper-Filters (mit und ohne --frisch, als Fortsetzung) blieben zwischen 175 und 482 von bis zu 894 Mutanten stehen; die Sperrklinke meldete jedes Mal „ohne Aussage“. Ersatzweise wurde ein Mutant von Hand eingesetzt und als gekillt bestätigt. Ein Zuschnitt auf einzelne Funktionen, der den Abbruch umgehen könnte, bietet der Wrapper nicht an. Da jede Änderung an diesem Guard auf die Sperrklinke angewiesen wäre, tritt der Ausfall bei jeder solchen Änderung auf, nicht nur gelegentlich.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: Ursache war mutmut selbst: Version 3.8.0 behandelt unbekannte Exit-Codes (kein KeyError -9 mehr) und bewertet im Modul alle 1379 Mutanten. Kein Umbau am Wrapper nötig; die Sperrklinke trägt seither eine Messkennung und setzt nach einem mutmut-Update die Baseline neu, statt über Versionen hinweg zu vergleichen.
-
 ## OBS-S133-1 – Die Logik in main() der Prozess-Werkzeuge ist nur an der Verdrahtung getestet
 - Quelle: User + Orchestrator
 - Status: NEU
@@ -245,16 +236,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Aufschubgrund: User – Vorgabe des Users: Fälle, die nie vorkommen, werden nicht behandelt, wenn das den Code komplexer oder schwerer wartbar macht.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S138-1 – mutmut-run meldet Abstürze als harmlosen Teillauf
-- Quelle: Orchestrator
-- Status: UMGESETZT (S139)
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: In S138 kamen zwei verschiedene Fehlschläge beim Wrapper nur als '0 Mutanten bewertet, N offen (weiterer Lauf nötig)' an: ein Sammelfehler beim Testimport (ModuleNotFoundError: tests.conftest – mutmut bricht die Testsammlung ab) und ein Absturz von mutmut selbst (KeyError: -9 in mutmut, als ein Mutant mit SIGKILL endete). Die Ursache zeigte erst --verbose. Die Meldung legt einen unvollständigen, aber gesunden Lauf nahe; der Skill write-code sagt dazu 'einmal wiederholen, bleibt es dabei, dem User melden' – ein Wiederholen ändert an beiden Ursachen nichts, und der eine Fall (Importfehler im Test) ist ein Fehler im eigenen Testcode, den der Lauf verschweigt. Ob die dauerhaft unvollständigen Läufe von check-bash-permission (S138: 148 bewertet, 613 offen) dieselbe Ursache haben, ist nicht geprüft.
-- Zusammen-erledigen: OBS-S130-1
-- Aufschubgrund: Umfang – braucht gespeicherte echte Absturzausgaben als Fixtures (CGP-echtes-artefakt) und zuerst die Klärung, woher das -9 kommt (Timeout oder Speicher)
-- Entscheidung/Maßnahme: Den Absturz (KeyError -9) behebt mutmut 3.8. Den Sammelfehler erkannte der Wrapper an einem Meldungstext, den mutmut 3.8 anders formuliert – unter 3.8 meldete er dadurch sogar ein falsches Grün aus den alten Ergebnissen im Mutantenbaum (Gegenprobe mit kaputtem Testimport). Jetzt entscheidet der Exit-Code: Alle Abbruchpfade von mutmut enden mit 1, ein normaler Lauf mit 0 (im Quellcode nachgesehen, an beiden Fällen gegengeprüft). Die Meldung nennt die letzte Zeile und --frisch für Dateien, die nur noch im Baum liegen.
-
 ## OBS-S138-2 – argparse ergänzt in den Prozess-Werkzeugen Optionspräfixe still
 - Quelle: Orchestrator
 - Status: NEU
@@ -276,13 +257,3 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: LL-S139-2
 
-## OBS-S139-2 – Die Begründung, Mutation sei kein Gate, stützt sich auf eine überholte Laufzeit
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: dauerhaft
-- Kategorie: PROZESS    Kontext: Mutation-Testing
-- Beobachtung: dev-workflow.md (DEV-python-werkzeuge), mutmut-run.py und der write-code-Skill begründeten 'kein Gate' mit gemessen 84 s je Modul. Diese Laufzeit kam überwiegend von Core-Dumps hängender Mutanten (LL-S139-3); seit mutmut-run.py sie unterdrückt, dauert ein Hook-Modul Sekunden, der Bash-Guard rund 2,5 Minuten, alle zwölf Dispatcher-Checks zusammen 75 s. Die Begründung im Text wurde in S139 auf 'Zwang je Edit erzeugt trotzdem Druck' umgestellt – ob sie mit diesen Zahlen noch trägt, ist offen. In S139 lagen zehn der Dispatcher-Checks zwischen 37 und 70 %, sechs davon nie vermessen: Ohne Gate blieben Guard-Lücken über viele Sessions unbemerkt.
-- Zusammen-erledigen: keiner
-- Aufschubgrund: User – Grundsatzfrage für die fällige Retro
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: LL-S139-3

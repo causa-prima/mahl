@@ -4,7 +4,8 @@
 Der Trailer `Session-Ende: <NNN>` markiert das Ende einer Session und ist die Quelle jeder
 Tracker-ID (`repo_kontext.current_session`). Eine vertippte, doppelte oder falsch nummerierte
 Marke bricht die Ableitung still – deshalb prüft der Hook die Marke selbst und nicht bloß
-Längen. Nicht jeder Commit beendet eine Session: Ohne Trailer werden nur Betreff-Regeln geprüft.
+Längen. Nicht jeder Commit beendet eine Session: Ohne Trailer werden nur Betreff-Regeln geprüft
+– und bei jedem Commit, dass Abweichungen und Sackgassen Ursache und Folge nennen.
 
 Der Hook läuft über `core.hooksPath` (s. `hooks/commit-msg`), also bei JEDEM Commit – auch bei
 einem von Hand getippten. Ein PreToolUse-Hook auf `git commit` sähe nur die Kommandozeile und
@@ -32,6 +33,11 @@ VERDACHT_RE = re.compile(r"^\s*Session[-\s]?Ende\s*:", re.IGNORECASE)
 # unsere Trailer brauchen beides nicht.
 TRAILER_ZEILE_RE = re.compile(r"^[A-Za-z0-9-]+\s*:")
 SCHERE = "# ------------------------ >8 ------------------------"
+# Überschrift eines Umweg-Abschnitts, auch mit Zusatz („Sackgasse mit Kosten:"). Steht danach
+# Text, ist der Absatz ein einziger Punkt; sonst folgt eine Liste.
+UMWEG_RE = re.compile(r"^(?:Abweichung|Sackgasse)(?:en|n)?\b[^:\n]{0,30}:(.*)$", re.IGNORECASE)
+UMWEG_FELDER = ("Ursache:", "Folge:")
+ANFANG_MAX = 50
 
 _BETREFF_FEHLT = "Betreff fehlt – die erste Zeile ist leer."
 _BETREFF_LANG = ("Betreff ist {laenge} Zeichen lang, erlaubt sind {maximum} "
@@ -53,6 +59,10 @@ _RUMPF_LEER = ("Der Rumpf ist leer. Die Marke allein ist keine Session-Historie 
 _NUMMER_FALSCH = ("`Session-Ende: {nummer}` – erwartet ist {erwartet}. Die Nummer zählt von "
                   "der letzten ABGESCHLOSSENEN Session weiter, nicht von der jüngsten bestehenden "
                   "Tracker-Serie. Bewusster Einzelfall → `{marker}` in die Nachricht.")
+_UMWEG_OHNE = ("Umweg ohne {felder}: „{anfang}“ – jeder Punkt unter Abweichungen und Sackgassen "
+               "nennt `Ursache: … (geprüft: …)` oder `Ursache: ungeklärt (geprüft: …)` und "
+               "`Folge: behoben | <OBS-/TD-ID> | entfällt: <Grund>`. Ablauf: "
+               ".claude/skills/closing-session/SKILL.md#CLS-umwege")
 _AUFRUF = "Aufruf: commit_msg.py <nachrichtendatei>"
 _KOPF = "❌ Commit-Nachricht (Poka-Yoke):"
 
@@ -74,6 +84,7 @@ def befunde(roh: str, erwartete_session=None, head_session=None) -> list[str]:
         ergebnis.append(_BETREFF_FEHLT)
     elif len(betreff) > BETREFF_MAX:
         ergebnis.append(_BETREFF_LANG.format(laenge=len(betreff), maximum=BETREFF_MAX))
+    ergebnis += umwege_ohne_ursache(zeilen[1:])   # nur der Rumpf – der Betreff ist kein Abschnitt
 
     marken = [(i, int(m.group(1))) for i, z in enumerate(zeilen)
               if (m := re.match(TRAILER_RE, z))]
@@ -114,6 +125,42 @@ def befunde(roh: str, erwartete_session=None, head_session=None) -> list[str]:
         ergebnis.append(_NUMMER_FALSCH.format(nummer=nummer, erwartet=erwartete_session,
                                               marker=MARKER))
     return ergebnis
+
+
+def umwege_ohne_ursache(zeilen: list[str]) -> list[str]:
+    """Je Punkt unter „Abweichungen:"/„Sackgassen:" ein Befund, wenn Ursache oder Folge fehlt.
+    Ein notierter Umweg ohne Ursachenprüfung wird zur Gewohnheit statt zum Befund."""
+    befunde_ = []
+    for punkt in _umweg_punkte(zeilen):
+        fehlend = [f"`{feld}`" for feld in UMWEG_FELDER if not any(feld in z for z in punkt)]
+        if fehlend:
+            anfang = punkt[0] if len(punkt[0]) <= ANFANG_MAX else punkt[0][:ANFANG_MAX] + "…"
+            befunde_.append(_UMWEG_OHNE.format(felder=" und ".join(fehlend), anfang=anfang))
+    return befunde_
+
+
+def _umweg_punkte(zeilen: list[str]) -> list[list[str]]:
+    """Die Punkte aller Umweg-Abschnitte, je Punkt seine Zeilen (Fortsetzungen eingeschlossen)."""
+    punkte: list[list[str]] = []
+    i = 0
+    while i < len(zeilen):
+        treffer = UMWEG_RE.match(zeilen[i])
+        i += 1
+        if not treffer:
+            continue
+        inline = treffer.group(1).strip()
+        abschnitt = [[inline]] if inline else []
+        while not inline and i < len(zeilen) and not zeilen[i].strip():
+            i += 1                       # Leerzeile zwischen Überschrift und Liste
+        while i < len(zeilen) and zeilen[i].strip():
+            zeile = zeilen[i]
+            if zeile.startswith("- ") or not abschnitt:
+                abschnitt.append([zeile.removeprefix("- ").strip()])
+            else:
+                abschnitt[-1].append(zeile.strip())
+            i += 1
+        punkte += abschnitt
+    return punkte
 
 
 def _head_session(root: Path):
