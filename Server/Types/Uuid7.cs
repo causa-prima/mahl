@@ -6,10 +6,11 @@ namespace mahl.Server.Types;
 // Abwesenheit gehört out-of-band, das
 // leistet IngredientId).
 //
-// Bewusst ohne validierendes Create(Guid) -> OneOf: die einzige Guid-Quelle im Schreibpfad ist
-// Guid.CreateVersion7(), ein UUIDv7-Prädikat hätte hier also einen unerreichbaren Fehlerzweig.
-// Sein Aufrufer ist der Lesepfad aus der DB, der einen eigenen Fehlerzweig (DB-Inkonsistenz)
-// einführt – der entsteht mit dem DB-Inkonsistenz-Szenario.
+// Zwei Quellen: New() vergibt die Identität im Schreibpfad (Guid.CreateVersion7()), Create(Guid)
+// übernimmt eine bereits gespeicherte aus der DB (Lesepfad, z.B. die Zutat einer Rezeptzeile).
+// Create(Guid) prüft bewusst NICHT, ob die Guid gültig ist (nicht default, Version 7): ein solches
+// Prädikat brächte einen Fehlerzweig (DB-Inkonsistenz -> 500) mit, den noch kein Szenario ausübt.
+// Er entsteht mit dem DB-Inkonsistenz-Szenario; bis dahin vertraut der Lesepfad der DB.
 internal readonly record struct Uuid7
 {
     private readonly Guid _value;
@@ -32,4 +33,7 @@ internal readonly record struct Uuid7
 
     // ADR-S030-1: UUIDv7, serverseitig vergeben.
     public static Uuid7 New() => new(Guid.CreateVersion7());
+
+    // Lesepfad: nicht validierend, s. Kommentar am Typ.
+    public static Uuid7 Create(Guid stored) => new(stored);
 }

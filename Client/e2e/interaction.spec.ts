@@ -175,6 +175,9 @@ LIST_PAGES.forEach((definition) => {
       // Then: der Eintrag steht wieder in der Liste – mit allen angezeigten Werten (entry.row), weil
       //   der Restore dieselbe Zeile reaktiviert und nicht nur einen gleichnamigen Eintrag anlegt.
       await expect(entry.row).toBeVisible()
+      // Then: der Toast "<label> gelöscht" ist nicht mehr sichtbar – er schließt mit dem Restore, nicht
+      //   erst nach Ablauf der Rückgängig-Zeit (die liegt über dem Assertion-Timeout).
+      await expect(page.getByText(`${entry.label} gelöscht`)).toBeHidden()
     })
 
     // Szenario: Undo-Toast bleibt bei einem Klick daneben erhalten

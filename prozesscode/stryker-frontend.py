@@ -54,9 +54,10 @@ def main() -> None:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--mutate", metavar="GLOB[,GLOB…]",
+    # append: Ein wiederholtes Flag ergänzt, statt das vorige still zu überschreiben.
+    parser.add_argument("--mutate", metavar="GLOB[,GLOB…]", action="append",
                         help="Datei(en) oder Glob(s) relativ zu Client/ (z.B. src/pages/Foo.tsx "
-                             "oder src/a.ts,src/b.tsx)")
+                             "oder src/a.ts,src/b.tsx); wiederholbar")
     parser.add_argument("--verbose", action="store_true",
                         help="Alle nicht-getöteten Mutanten anzeigen (via stryker-summary.py)")
     args = parser.parse_args()
@@ -65,7 +66,7 @@ def main() -> None:
     if args.mutate:
         # StrykerJS parst --mutate selbst als Kommaliste (createSplitter(',') in stryker-cli.js);
         # ein zweites --mutate-Flag würde das erste überschreiben → EIN Argument übergeben.
-        patterns = resolve_mutate(args.mutate, _CLIENT_DIR, _REPO_ROOT)
+        patterns = resolve_mutate(",".join(args.mutate), _CLIENT_DIR, _REPO_ROOT)
         stryker_args += ["--mutate", ",".join(patterns)]
 
     _TMP_FILE.parent.mkdir(parents=True, exist_ok=True)

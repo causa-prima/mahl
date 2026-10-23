@@ -1,4 +1,5 @@
 import { ResultAsync } from 'neverthrow'
+import { toUnexpectedError } from '../types/apiError'
 import type { ApiError } from '../types/apiError'
 
 type CacheEntry = { readonly etag: string; readonly body: unknown }
@@ -36,8 +37,5 @@ async function requestJson<T>(url: string, cached: CacheEntry | undefined): Prom
 }
 
 export function conditionalGetJson<T>(url: string): ResultAsync<T, ApiError> {
-  return ResultAsync.fromPromise(requestJson<T>(url, cache.get(url)), (e) => ({
-    kind: 'Unexpected',
-    message: String(e),
-  }))
+  return ResultAsync.fromPromise(requestJson<T>(url, cache.get(url)), toUnexpectedError)
 }

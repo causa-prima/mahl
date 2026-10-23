@@ -36,7 +36,7 @@ export default defineConfig([
     settings: {
       immutability: {
         overrides: [
-          { type: /^(IngredientId|IngredientName|Unit|ETag)$/, to: 'Immutable' },
+          { type: /^(IngredientId|IngredientName|Unit|ETag|RecipeId|RecipeTitle|IngredientsText|StepInstruction)$/, to: 'Immutable' },
         ],
       },
     },

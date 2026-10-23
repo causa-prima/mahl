@@ -238,15 +238,6 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** Der case-insensitive Unique-Index `IX_Ingredients_Name_Lower` (ADR-S105-2) steht als handgeschriebener `migrationBuilder.Sql(...)`-Block in der Migration, weil ein funktionaler Index über `LOWER("Name")` nicht per Fluent-API ausdrückbar ist. Er ist damit **nicht Teil des EF-Modells** – und die Projektphase sieht vor, die Migration bei Schema-Änderungen zu verwerfen und neu zu generieren (`dev-workflow.md`, „Drop + Recreate"). Genau das ist in S120 passiert: Die neu generierte Datei enthielt den Block nicht, der Build blieb grün, und erst der vollständige Testlauf zeigte den Verlust als sechs fehlschlagende Duplikat-Tests. Der Block wurde von Hand übertragen.
 **Behebung:** Den Index ins Modell holen, damit `migrations add` ihn reproduziert – als persistierte generierte Spalte plus gewöhnlichen Unique-Index darauf (`HasComputedColumnSql("LOWER(\"Name\")", stored: true)` + `HasIndex(...).IsUnique()`). **Nicht verifiziert:** ob diese Kombination mit Npgsql sauber durchläuft und ob der Index denselben Namen behält, auf den `E2ETestSupport` sich bezieht. Preis ist eine zusätzliche Spalte; die Aussage in ADR-S105-2, das sei per Fluent-API nicht ausdrückbar, gilt dann nur noch für den funktionalen Index und wäre nachzuziehen.
 
----
-
-## TD-S120-4 — Kein Test-Data-Builder für `IngredientDbType`
-**Fällig:** Szenario:„Rezept anlegen", Phase:MVP – die nächste Entität mit eigenen Tests macht den Aufwand sichtbar; spätestens ab MVP, weil die Zahl der Berührungspunkte sonst weiter wächst.
-**Problem:** `IngredientDbType` wird in jedem Test inline per Objekt-Initializer gebaut; `EndpointsTestsBase` enthält keinen `AnIngredient(...)`-Helper. [Test-Data-Builder](process/tdd-process.md#TDD-test-data-builder) sieht solche Builder ausdrücklich als Schutz vor Schemaänderungen vor. Die Kosten wurden in S120 messbar: Die Umbenennung eines einzigen Feldes berührte 67 Stellen in einer Testdatei – mit Builder wären es wenige gewesen.
-**Behebung:** Builder-Methode in `EndpointsTestsBase` nach dem Muster in `tdd-process.md`. Gemeldet vom Implementer während des S120-Renames, bewusst außerhalb des damaligen Scopes gehalten.
-
----
-
 ## TD-S120-5 — Regel für Analyzer-Suppressionen steht nirgends
 **Fällig:** TD-S120-2 – die Aufräumarbeit dort braucht das Kriterium als Maßstab; umgekehrt wäre die Regel ohne den ersten Anwendungsfall unbelegt. Wer zuerst drankommt, schreibt beides.
 **Problem:** Für **Stryker**-Suppressionen ist alles geregelt ([`csharp-stryker.md` – Inline-Suppressions](guidelines/csharp-stryker.md#STK-suppressions): inline, Zeile davor, Begründung nach Doppelpunkt, nur äquivalente Mutanten, jede zusätzlich in `adr.md`). Für **Analyzer**-Suppressionen gibt es keine einzige Regel – nur gelebte Praxis und einen normativen Halbsatz in ADR-S040-1 („S3060 pro Sum-Type-Datei unterdrücken") zu genau einer Diagnose (S3060). Folge: Die Ablage entscheidet jeder neu, und zwar nach Gefühl. In S120 wurde MA0048 im selben Zug auf zwei Wegen unterdrückt (inline in `IngredientName.cs`/`Unit.cs`, per `.editorconfig` für `StringConstraints.cs`), bevor die Frage überhaupt gestellt wurde; ein Reviewer hat die Inkonsistenz unabhängig gemeldet.
@@ -289,3 +280,83 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Aufschubgrund:** User – Regel gilt, Umsetzung erst im MVP; der SKELETON-Zerleger, der das unbegrenzte Zitat erzeugt, wird dort ohnehin ersetzt.
 
 ---
+
+---
+
+## TD-S141-1 — Frontend: Conditional-GET-Cache ist nicht an den Nutzer gebunden
+**Fällig:** Phase:MVP – mit der Einführung von Login/Logout (Auth-Gate) entsteht erst ein Nutzerwechsel im selben Tab
+**Problem:** conditionalGetJson (Client/src/services/conditionalGet.ts, ADR-S084-3) hält einen modul-lokalen Cache URL → { etag, body } für die gesamte Lebensdauer des Tabs. Er kennt keinen Nutzer. Meldet sich nach Einführung von Auth ein anderer Nutzer im selben Tab an, könnte eine 304-Antwort den gecachten Body des vorigen Nutzers ausliefern. Heute ohne Wirkung: SKELETON hat keine Anmeldung. Quelle: security-auditor, Review US-602 run-1.
+**Behebung:** Beim Login und Logout resetConditionalGetCache() aufrufen (existiert bereits) – oder den Cache-Schlüssel um die Nutzerkennung erweitern; Entscheidung mit dem Auth-Design.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-1 mit allen drei Optionen vorgelegt; ohne Auth nicht umsetzbar
+
+---
+
+## TD-S141-2 — Rezeptseiten laufen nicht durch die Querschnitts-Suite (Bedienbarkeit per Finger)
+**Fällig:** Szenario:„Felder sind beim Öffnen des Formulars leer" – mit run-5 „Formular·Öffnen" ist das Formular vollständig, der Lauf ist Frontend-only und klein
+**Problem:** features/recipes.feature deklariert @NFR-accessibility-touch für Rezept-Liste, Formular samt Nachfrage und Detailansicht, „gemessen über deren Page Objects". Die Querschnitts-Suite (Client/e2e/accessibility.spec.ts, interaction.spec.ts) läuft aber nur über LIST_PAGES (Client/e2e/pages/listPages.ts), und das Page-Object-Interface ListPage verlangt Anlege-Dialog und Löschen mit Undo-Toast – beides hat die Rezept-Liste nicht. Seit US-602 run-1 existiert /recipes, ist aber nicht eingetragen; kein Lauf plant den Umbau. Die Migrationsschritte (4)–(6) aus ADR-S112-5 und die Fähigkeits-Deklaration je Seite stehen damit aus.
+**Behebung:** Page-Object-Interface nach Fähigkeiten aufteilen (ADR-S112-5, Ebene Geltungsbereich): Touch-Targets als eigene Fähigkeit, die jede Seite liefert; Anlege-Dialog/Löschen als optionale Fähigkeiten. Rezept-Liste, Formular und Detailansicht eintragen; die Suite fragt je Test die benötigte Fähigkeit ab.
+**Aufschubgrund:** User – beim Architektur-Check von US-602 run-2 auf run-5 umgehängt, weil run-2 ohnehin groß ist
+
+---
+
+## TD-S141-3 — Backend: Rezept-Zutat liest die Zutat-Id ohne Prüfung aus der DB
+**Fällig:** Phase:MVP – mit dem DB-Inkonsistenz-Verhalten (docs/reference/architecture.md#ARC-db-inkonsistenz), gemeinsam mit TD-S083-5
+**Problem:** US-602 run-2 braucht für die Rezept-Zutat die Id einer bestehenden Zutat aus der DB. Uuid7 und IngredientId hatten bewusst nur New(); für den Lesepfad entstand ein nicht validierendes IngredientId.Create(Guid) über Uuid7.Create(Guid). Eine aus der DB gelesene Id, die kein gültiges UUIDv7 ist (manueller Eingriff, fehlerhafte Migration), wird damit ungeprüft übernommen – der Fehlerzweig, den der Kommentar in Uuid7.cs für den Lesepfad vorsieht, fehlt.
+**Behebung:** Mit dem DB-Inkonsistenz-Szenario Create(Guid) validierend machen (UUIDv7-Prädikat, OneOf) und den Fehlerzweig auf die Regel aus ARC-db-inkonsistenz abbilden (Liste: überspringen + loggen, Einzel-Endpoint: 500).
+**Aufschubgrund:** User – beim Architektur-Check von US-602 run-2 ist der Lesepfad ohne Prüfung als Zwischenschritt gewählt; ein validierender Zweig wäre ohne Szenario ungetestet
+
+---
+
+## TD-S141-4 — Frontend-Test: Labels im Rezeptformular werden exakt abgefragt
+**Fällig:** Szenario:„Pflichtfelder im Formular sind als solche markiert" – dann hängt MUI über required ein „ *“ an die Labels
+**Problem:** Client/src/pages/RecipesPage.test.tsx fragt die Felder exakt ab (findByLabelText('Titel'), getByLabelText('Zutaten'), 'Schritt 1', 'Schritt 2' in fillAndSavePancakes und im Submit-Test). Sobald die Felder required tragen, finden die Abfragen nichts mehr – alle Tests, die das Formular füllen, brechen, ohne dass sich das Verhalten ändert. Die Zutaten-Tests umgehen das bereits mit /^Name/ (IngredientsPage.test.tsx).
+**Behebung:** Die Label-Abfragen auf Präfix-Regex umstellen (/^Titel/, /^Zutaten/, /^Schritt 1/) bzw. in einen Helfer kapseln, sobald das endgültige Label feststeht (auch das Schrittfeld-Label kann sich mit „Jedes Schrittfeld zeigt seine Nummer“ ändern).
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 als Hinweis für run-5 entschieden; das endgültige Label legt erst run-5 fest
+
+---
+
+## TD-S141-5 — Frontend-Test: Rezept anlegen prüft die Adresse der Detailansicht ohne Szenario
+**Fällig:** Szenario:„Rezept per Direktlink aufrufen" – erstes Szenario, das die Adresse /recipes/{id} fordert
+**Problem:** Der Komponententest zu „Rezept anlegen“ (Client/src/pages/RecipesPage.test.tsx) prüft über die Testhilfe CurrentPath (<output data-testid="current-path">), dass nach dem Speichern /recipes/{id} angezeigt wird. Kein Kriterium des Szenarios „Rezept anlegen“ fordert die Adresse; sie folgt aus ADR-S135-5 (eigene Adresse je Rezept). Die Assertion nimmt damit ein späteres Szenario vorweg.
+**Behebung:** Die Adress-Prüfung mit dem Direktlink-Szenario dorthin übernehmen, wo sie gefordert ist, und sie hier streichen – samt CurrentPath, falls dann kein Test mehr sie braucht.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 für run-4 entschieden
+
+---
+
+## TD-S141-6 — Detailansicht: Schrittliste als geordnete Liste, Abschnittsüberschrift in der Baseline
+**Fällig:** Szenario:„Rezept aus der Rezept-Liste öffnen" – dort wird die Detailansicht ohnehin umgebaut
+**Problem:** Client/src/pages/RecipeDetailPage.tsx zeigt die Schritte als ul mit der Nummer im Text („1. …“). Eine mehrzeilige Anweisung läuft unter die Nummer zurück, sodass Schritte beim Wiederfinden am Handy optisch verschwimmen; ein Screenreader sagt keine Reihenfolge an. Außerdem sind die Abschnittsüberschriften „Zutaten“ und „Zubereitung“ (Typography h6/h2, ohne gutterBottom) nicht in der Visuellen Baseline festgelegt, und ihr Abstand zur vorherigen Liste ist ungeprüft.
+**Behebung:** Schrittliste als List component="ol" mit der Nummer als eigenem Element und hängendem Einzug; den Abschnittsüberschriften-Stil (Ebene, Abstand) in docs/guidelines/coding-guideline-ux.md#CGU-visuelle-baseline festlegen und bei 375 px im Browser prüfen. Komponententest und E2E prüfen die Schrittnummer bereits tolerant (/^1\D+…/).
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 für run-4 entschieden
+
+---
+
+## TD-S141-7 — Backend: xmin-Lese-Idiom mehrfach kopiert
+**Fällig:** Szenario:„Rezept per Direktlink aufrufen" – GET /api/recipes/{id} liest den xmin ein weiteres Mal
+**Problem:** (uint) db.Entry(row).Property("xmin").CurrentValue! steht wörtlich in IngredientsEndpoints.cs (drei Stellen) und RecipesEndpoints.cs; dazu kommen das Schreiben über OriginalValue und EF.Property<uint>(…, "xmin") im Lesen. Ein Fehler im String-Literal oder im Cast fiele an keiner Stelle auf. Die Guideline docs/guidelines/coding-guideline-csharp.md#CGC-endpoints-etag schreibt das Idiom wörtlich vor.
+**Behebung:** Einen Helfer extrahieren, der Literal und Cast an einer Stelle hält, und den Ort entscheiden: XminETag (Server/Middleware) ist bewusst ein HTTP-Format-Werkzeug ohne EF-Abhängigkeit, daher eher eine Extension am Infrastructure-/DbContext-Rand. Die Guideline auf den Helfer umstellen.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 als eigener Refactoring-Schritt entschieden
+
+---
+
+## TD-S141-8 — E2E: Rezept-Liste nach dem Anlegen nur nach Neuladen geprüft
+**Fällig:** Szenario:„Von der Rezepte-Seite zur Zutaten-Seite navigieren" – mit der Navigationsleiste gibt es den Weg zur Liste innerhalb der App
+**Problem:** Client/e2e/recipes.spec.ts prüft „steht genau einmal in der Rezept-Liste“ per page.goto('/recipes'), also nach einem vollständigen Neuladen. Ein veralteter React-Query-Cache der Liste nach dem Anlegen bliebe so unsichtbar; CreateRecipePage invalidiert ['recipes'] nicht, es hilft nur staleTime 0. Mit Collection-ETag und Caching ab dem Sortier-Lauf ist das die wahrscheinlichste Stelle für eine stille Regression.
+**Behebung:** Im E2E nach dem Speichern über die Navigationsleiste zur Rezept-Liste wechseln statt neu zu laden; ggf. ['recipes'] nach dem Anlegen invalidieren, falls der Test es verlangt.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden; heute fehlt ein Weg zur Liste innerhalb der App
+
+---
+
+## TD-S141-9 — Backend: Rezept-POST ohne Pflichtfelder endet in 500
+**Fällig:** Szenario:„Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig" – erster Lauf mit Pflichtfeld-Prüfung
+**Problem:** Ein Body ohne ingredients oder steps bindet CreateRecipeDto mit null, weil die Felder nicht required sind; RecipesEndpoints.CreateRecipe wirft dann NullReferenceException (500). Erreichbar nur per direktem API-Aufruf – die Szenarien gehen alle über die Oberfläche, die die Felder immer sendet. Ein Stack-Trace in Development ist durch ADR-S112-1 (Handler ab MVP) abgedeckt, nicht aber der Statuscode.
+**Behebung:** DTO-Felder als required markieren, sodass fehlende Felder als 400 abgelehnt werden statt als 500; im Pflichtfeld-Lauf mit einem Integrationstest belegen.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 für run-8 entschieden
+
+---
+
+## TD-S141-10 — Rezept-Eingaben ohne Obergrenze für Zutatentext, Zeilen- und Schrittzahl
+**Fällig:** Phase:MVP – im Workshop der MVP-Stufe von US-602 als Szenario festlegen, ggf. später
+**Problem:** POST /api/recipes begrenzt weder die Länge des Zutatentexts noch die Zahl der Zutatenzeilen oder Schritte; die Spalten sind text ohne Constraint, die einzige Schranke ist Kestrels Default-Body-Grenze (30 MB). features/recipes.feature begrenzt nur Titel (100) und Schritt-Anweisung (1000). Versehentlich unsinnige Eingaben (z.B. eingefügter Großtext) werden so ungeprüft gespeichert.
+**Behebung:** Fachliche Obergrenzen als Szenario festlegen – Zweck wie bei den Zutaten-Namen: versehentliche unsinnige Eingaben abfangen, nicht Lastschutz (der liegt bei TD-S102-1) – und mit Meldung am Feld umsetzen.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden: für den SKELETON egal, frühestens MVP

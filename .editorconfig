@@ -273,12 +273,11 @@ dotnet_diagnostic.CA1000.severity = none
 #         irrelevant outside native-interop scenarios.
 dotnet_diagnostic.MA0008.severity = none
 
-# --- Recipe.cs: RecipeIngredient and RecipeStep are co-located intentionally ---
-[Server/Domain/Recipe.cs]
-# MA0048: File name must match type name – RecipeIngredient and RecipeStep are semantically
-#         inseparable parts of the Recipe aggregate; splitting them into separate files would
-#         fragment the aggregate without improving readability (documented decision).
-dotnet_diagnostic.MA0048.severity = none
+# --- Quantity.cs: Sum-Type (ADR-S020-1) ---
+[Server/Domain/Quantity.cs]
+# S3060: Offload type-test code to subclass – Match<T> dispatcht per `this switch` mit
+#        `_ => SumType.Unreachable<T>()`; polymorpher Dispatch ist bewusst verworfen (ADR-S040-1).
+dotnet_diagnostic.S3060.severity = none
 
 # --- Endpoint registration methods ---
 [Server/Endpoints/*.cs]

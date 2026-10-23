@@ -67,3 +67,25 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Ich habe die Kette Erfassen → Ursache prüfen → Behebung entscheiden nicht zerlegt, sondern die sichtbarste Eigenschaft der Fälle (Wiederholung über Sessions) zum Ansatzpunkt gemacht. Der Gegenbeleg lag in meiner eigenen Analyse und wurde nicht gegen den Vorschlag gehalten.
   Regel: Bevor eine Maßnahme vorgeschlagen wird: die Kette vom Auftreten bis zur Behebung in ihre Glieder zerlegen und für jedes Glied am Fall prüfen, ob es gerissen ist. Ein Beleg, dass ein Glied hielt, schließt es als Ansatzpunkt aus.
   CM-Bezug: CM-S095-2
+
+## Session 141 – 2026-10-24
+
+- **[HOCH] [PROZESS] [Kommunikation] LL-S141-1 – Triage-Vorlage ohne ausgeschriebene Alternativen**
+  Quelle: User
+  Was: In S141 legte der Orchestrator dem User die Abschluss-Triage zweimal unvollständig vor: in run-1 mit nur zwei Optionen („vermerken oder nicht“), in run-2 als Liste mit Empfehlung je Punkt, deren Alternativen nur pauschal im Kopf standen. Der User musste beide Male die Alternativen nachfordern; zwischendurch wäre eine Entscheidung allein auf Basis der Empfehlung möglich gewesen.
+  Warum: Der Skill implementing-scenario verlangte nur „jeden Punkt mit Kontext und begründeter Empfehlung“; die drei Optionen standen als Rahmen im Skill, aber keine Regel verlangte, sie je Punkt konkret auszuschreiben. Bei vielen Punkten verdichtete der Orchestrator auf die Empfehlung.
+  Regel: Triage per AskUserQuestion, je Punkt alle drei Optionen als eigene, konkret beschriebene Antwort, Empfehlung zuerst; gleichthematische Punkte bündeln (seit S141 in implementing-scenario, Abschluss).
+  CM-Bezug: neu
+
+- **[HOCH] [PROZESS] [Kommunikation] LL-S141-2 – Aufschubgrund „User“ ohne Entscheidung des Users gesetzt**
+  Quelle: User (bemerkt, vom Orchestrator eingeräumt)
+  Was: In S141 setzte der Orchestrator zweimal beim Erfassen eines Tracker-Eintrags den Aufschubgrund „User – …“, obwohl der User zu diesem Punkt nicht gefragt worden war bzw. nicht „später“ entschieden hatte. Der User bemerkte es; der Orchestrator räumte es ein und korrigierte.
+  Warum: Das Pflichtfeld bietet nur zwei Werte (User, Recherche); trifft keiner zu, wäre die Konsequenz „jetzt beheben“ oder „den User fragen“. „User“ lag als bequemer Wert nahe, weil der User die Session insgesamt steuerte – die Zuschreibung wurde aus dem Gesamtkontext abgeleitet statt an eine konkrete Antwort gebunden. Damit wird genau die Prüfung ausgehebelt, für die das Feld existiert, und der Tracker trägt eine falsche Begründung.
+  Regel: Aufschubgrund „User“ nur mit einer konkreten Antwort des Users zu genau diesem Punkt in dieser Session; sonst fragen oder beheben.
+  CM-Bezug: CM-S133-2
+
+- **[MITTEL] [PROZESS] [Mutation-Testing] LL-S141-3 – Freigabe-Anker ohne -w berechnet – Blob nicht auflösbar**
+  Quelle: Orchestrator (gemeldet vom Subagenten)
+  Was: Beim Review-Fix in US-602 run-2 berechnete der Orchestrator den Test-Freigabe-Anker mit git hash-object ohne -w. Der Blob landete nicht im Objektspeicher; der Subagent konnte den Diff gegen den Anker nicht bilden (bad object) und gab die ganze Datei aus. Der Orchestrator wich auf den letzten gültigen Anker aus und prüfte den Gesamt-Diff.
+  Warum: Der Skill nennt git hash-object -w, der Orchestrator rief den Befehl aber in einer Sammelzeile zusammen mit reinen Lese-Hashes auf und ließ -w weg. Kein Mechanismus prüft beim Übergeben des Ankers, ob er auflösbar ist (OBS-S141-3).
+  Regel: Freigabe-Anker immer in einem eigenen Aufruf mit -w schreiben; Lese-Hashes zum Vergleichen getrennt halten.

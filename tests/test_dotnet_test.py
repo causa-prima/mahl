@@ -4,8 +4,12 @@ Zwei Eigenschaften tragen das Gate: Die Ausschlüsse sind dieselben wie bei Stry
 nicht zwei Listen), und ein Report zählt nur, wenn er eindeutig aus diesem Lauf stammt –
 coverlet.MTP hängt einen Zeitstempel an den Dateinamen, ein fester Pfad ist nicht vorgebbar.
 """
+import os
+import sys
 from importlib import import_module
 from pathlib import Path
+
+import pytest
 
 dt = import_module("prozesscode.dotnet-test")
 
@@ -143,6 +147,90 @@ def test_failure_report_drops_framework_frames_and_log_noise():
 def test_failure_report_is_none_without_failed_tests():
     """Kein Testblock (z.B. Build-Fehler) → der Aufrufer fällt auf den Rohfilter zurück."""
     assert dt.failure_report("Build FAILED.\nerror CS1002: ; expected") is None
+
+
+# Echte Ausgabe (S141, gekürzt auf das Ende): alle Tests grün, danach stürzt der Test-Host beim
+# Entladen ab – coverlet.MTP legt einen benannten Mutex an, .NET sucht ihn unter einem
+# XDG_RUNTIME_DIR, das es nicht gibt. Exit 7, kein `failed …`-Block.
+MTP_HOST_CRASH = """\
+  info: Microsoft.Hosting.Lifetime[0]
+        Application is shutting down...
+  Error output: Unhandled exception. System.IO.IOException: The system cannot open the device or file specified. : 'mahl_Mutex'. One or more system calls failed: lstat("/run/user/1000", ...) == -1; errno == ENOENT;
+     at System.Threading.Mutex.CreateMutexCore(Boolean initiallyOwned, String name, NamedWaitHandleOptionsInternal options, Boolean& createdNew)
+     at Coverlet.Core.Instrumentation.Tracker.mahl.Server_22aa6570-671a-4caf-8865-fd03680dad5c.UnloadModule(Object, EventArgs)
+
+        Failed executing DbCommand (1ms) [Parameters=[@p0='?' (DbType = Guid)], CommandType='Text']
+Test run summary: Failed!
+  error: 1
+
+  total: 57
+  failed: 0
+  succeeded: 57
+  skipped: 0
+  duration: 9s 164ms
+Test run completed with non-success exit code: 7 (see: https://aka.ms/testingplatform/exitcodes)
+"""
+
+
+def test_host_error_report_names_the_crash_after_green_tests():
+    """Ohne diesen Bericht fiel der Wrapper auf den Rohfilter zurück und zeigte nur die
+    `Failed executing DbCommand`-Logzeilen – die Ursache stand nirgends (S141)."""
+    report = dt.host_error_report(MTP_HOST_CRASH)
+
+    assert report.startswith("✗ Test-Host-Fehler – 57 von 57 Backend-Tests grün")
+    assert "lstat(\"/run/user/1000\", ...) == -1; errno == ENOENT" in report
+    assert "Coverlet.Core.Instrumentation.Tracker" in report
+    assert "DbCommand" not in report
+
+
+def test_cli_shows_the_host_error_instead_of_log_lines(monkeypatch, capsys):
+    """Über den Aufrufpfad: Der Bericht muss im Wrapper ankommen, nicht nur existieren."""
+    monkeypatch.setattr(dt, "run_dotnet", lambda _argumente: (MTP_HOST_CRASH, 7))
+    monkeypatch.setattr(sys, "argv", ["dotnet-test", "--filter", "X"])
+    with pytest.raises(SystemExit) as beendet:
+        dt.main()
+
+    ausgabe = capsys.readouterr().out
+    assert beendet.value.code == 7
+    assert "Test-Host-Fehler" in ausgabe
+    assert "DbCommand" not in ausgabe
+
+
+def test_host_error_report_is_none_without_error_output():
+    assert dt.host_error_report(MTP_FAILED) is None
+    assert dt.host_error_report(MTP_SUMMARY) is None
+
+
+def test_runtime_dir_that_does_not_exist_is_dropped_for_the_test_host(monkeypatch, tmp_path: Path):
+    """Ein XDG_RUNTIME_DIR ohne Verzeichnis (WSL ohne User-Session) lässt den Test-Host nach dem
+    letzten Test abstürzen; ohne die Variable weicht .NET auf sein Standardverzeichnis aus."""
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "fehlt"))
+    gesehen = _cli_env_beim_lauf(monkeypatch)
+
+    assert "XDG_RUNTIME_DIR" not in gesehen
+
+
+def test_existing_runtime_dir_is_kept(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    gesehen = _cli_env_beim_lauf(monkeypatch)
+
+    assert gesehen["XDG_RUNTIME_DIR"] == str(tmp_path)
+
+
+def _cli_env_beim_lauf(monkeypatch) -> dict[str, str]:
+    """Startet den Wrapper über seinen Aufrufpfad (gefiltert, ohne Coverage) und liefert die
+    Umgebung, die der dotnet-Prozess zu sehen bekäme."""
+    gesehen: dict[str, str] = {}
+
+    def fake_run(_argumente):
+        gesehen.update(os.environ)
+        return MTP_SUMMARY, 0
+
+    monkeypatch.setattr(dt, "run_dotnet", fake_run)
+    monkeypatch.setattr(sys, "argv", ["dotnet-test", "--filter", "X"])
+    with pytest.raises(SystemExit):
+        dt.main()
+    return gesehen
 
 
 def _option_values(args: list[str], option: str) -> list[str]:

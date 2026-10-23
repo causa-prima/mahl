@@ -99,7 +99,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the ingredient is persisted (full-state DB assertion) with the server-generated id
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = "Tomaten", BaseUnit = "Stück" }]);
+            [AnIngredient(name: "Tomaten", unit: "Stück", id: body.Id)]);
     }
 
     [Fact]
@@ -153,10 +153,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     {
         // Given: one active ingredient and one soft-deleted ingredient (DeletedAt set directly in the DB)
         var (active, _) = await CreateIngredientAsync("Petersilie", "Bund");
-        Db.Ingredients.Add(new IngredientDbType
-        {
-            Id = Guid.CreateVersion7(), Name = "Basilikum", BaseUnit = "Stück", DeletedAt = DateTimeOffset.UtcNow,
-        });
+        Db.Ingredients.Add(AnIngredient(name: "Basilikum", unit: "Stück", deletedAt: DateTimeOffset.UtcNow));
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // When: the ingredient list is requested
@@ -192,7 +189,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the persisted row stores the trimmed values (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = "Oregano", BaseUnit = "g" }]);
+            [AnIngredient(name: "Oregano", unit: "g", id: body.Id)]);
     }
 
     // Same invariant ("Pflichtfeld leer oder nur Whitespace -> 422 feld-keyed"), nur Input variiert
@@ -280,7 +277,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the ingredient is persisted (full-state DB assertion) with the server-generated id
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = name, BaseUnit = "g" }]);
+            [AnIngredient(name: name, unit: "g", id: body.Id)]);
     }
 
     // @US-904-edge-case: die Längengrenze misst den GETRIMMTEN Wert (ADR-S051-3 "nach Trimming gemessen"),
@@ -308,7 +305,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the persisted row stores the trimmed 30-character value (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = name, BaseUnit = "g" }]);
+            [AnIngredient(name: name, unit: "g", id: body.Id)]);
     }
 
     // @US-904-error: Server-seitige Max-Length-Validierung (ADR-S051-3: baseUnit max. 20 Zeichen, nach
@@ -360,7 +357,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the ingredient is persisted (full-state DB assertion) with the server-generated id
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = "Salz", BaseUnit = unit }]);
+            [AnIngredient(name: "Salz", unit: unit, id: body.Id)]);
     }
 
     // @US-904-edge-case: Einheiten-Gegenstück zum Namens-Fall oben – dieselbe Invariante (Grenze misst den
@@ -386,7 +383,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the persisted row stores the trimmed 20-character value (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = body.Id, Name = "Salz", BaseUnit = unit }]);
+            [AnIngredient(name: "Salz", unit: unit, id: body.Id)]);
     }
 
     // @US-904-error: Drei Gherkin-Szenarien testen dieselbe fachliche Invariante (Eindeutigkeit case-insensitiv,
@@ -403,7 +400,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         string existingName, string existingUnit, string requestName, string requestUnit, string expectedNameInMessage)
     {
         // Given: an ingredient with the existing name already exists
-        var existing = new IngredientDbType { Id = Guid.CreateVersion7(), Name = existingName, BaseUnit = existingUnit };
+        var existing = AnIngredient(name: existingName, unit: existingUnit);
         Db.Ingredients.Add(existing);
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -494,7 +491,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Then: the row is soft-deleted – physically retained, DeletedAt set (ADR-S000-6)
-        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Pfeffer", BaseUnit = "g" });
+        await AssertSoftDeletedAsync(AnIngredient(name: "Pfeffer", unit: "g", id: created.Id));
     }
 
     // @US-904-edge-case: "Bereits gelöschte Zutat erneut löschen schlägt fehl". Sendet bewusst dasselbe
@@ -519,7 +516,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.ErrorCode.Should().Be("INGREDIENT_NOT_FOUND");
 
         // Then: die Zeile bleibt unverändert soft-deleted – keine weitere Mutation (full-state DB assertion)
-        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Pfeffer", BaseUnit = "g" });
+        await AssertSoftDeletedAsync(AnIngredient(name: "Pfeffer", unit: "g", id: created.Id));
     }
 
     // ADR-S058-1: mutierende Single-Resource-Endpoints verlangen If-Match. Nicht durch das Gherkin-Szenario
@@ -539,7 +536,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
         // Then: nichts wird soft-deleted (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
-        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Salz", BaseUnit = "g" }]);
+        persisted.Should().BeEquivalentTo([AnIngredient(name: "Salz", unit: "g", id: created.Id)]);
     }
 
     // ADR-S058-1/ADR-S058-3: stale If-Match auf eine aktive Zeile -> 412 (EF Core prüft xmin beim
@@ -558,7 +555,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
         // Then: nichts wird soft-deleted (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
-        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Muskat", BaseUnit = "g" }]);
+        persisted.Should().BeEquivalentTo([AnIngredient(name: "Muskat", unit: "g", id: created.Id)]);
     }
 
     // Ein If-Match-Wert, der wie ein ETag AUSSIEHT, aber nicht zu einem xmin geparst werden kann
@@ -588,7 +585,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
         // Then: nichts wird soft-deleted (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
-        persisted.Should().BeEquivalentTo([new IngredientDbType { Id = created.Id, Name = "Kardamom", BaseUnit = "g" }]);
+        persisted.Should().BeEquivalentTo([AnIngredient(name: "Kardamom", unit: "g", id: created.Id)]);
     }
 
     // Pinnt die 404-Dominanz aus dem ADR-S000-5-Addendum GEGEN den If-Match-Check, auch wenn dieser
@@ -620,7 +617,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.ErrorCode.Should().Be("INGREDIENT_NOT_FOUND");
 
         // Then: die Zeile bleibt unverändert soft-deleted – keine weitere Mutation (full-state DB assertion)
-        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Wacholder", BaseUnit = "g" });
+        await AssertSoftDeletedAsync(AnIngredient(name: "Wacholder", unit: "g", id: created.Id));
     }
 
     // ADR-S108-1: GET /api/ingredients liefert je Zeile den xmin-ETag im Body (etag-Feld) – die
@@ -690,7 +687,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the row is active again – DeletedAt cleared, name/unit unchanged (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = created.Id, Name = "Rosmarin", BaseUnit = "g" }]);
+            [AnIngredient(name: "Rosmarin", unit: "g", id: created.Id)]);
     }
 
     // ADR-S108-2/ADR-S111-1: eine nie existente id liefert 404 mit demselben Body wie DELETE
@@ -742,7 +739,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the row is unchanged (full-state DB assertion) – validation runs before the DB write
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = created.Id, Name = "Kurkuma", BaseUnit = "g" }]);
+            [AnIngredient(name: "Kurkuma", unit: "g", id: created.Id)]);
     }
 
     // Protokoll-/Infrastruktur-Mechanik (ADR-S106-3): kein treibendes Gherkin-Szenario –Restore ist seit
@@ -776,8 +773,8 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
             [
-                new IngredientDbType { Id = mehl.Id, Name = "Mehl", BaseUnit = "g" },
-                new IngredientDbType { Id = zucker.Id, Name = "Zucker", BaseUnit = "g" },
+                AnIngredient(name: "Mehl", unit: "g", id: mehl.Id),
+                AnIngredient(name: "Zucker", unit: "g", id: zucker.Id),
             ],
             o => o.Excluding(x => x.DeletedAt)); // Zucker bleibt soft-deleted – exakter Zeitstempel nicht Teil des Szenarios
         persisted.Single(i => i.Id == zucker.Id).DeletedAt.Should().NotBeNull();
@@ -796,10 +793,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         string existingName, string requestName)
     {
         // Given: a soft-deleted ingredient with the existing (possibly differently cased) name
-        var deleted = new IngredientDbType
-        {
-            Id = Guid.CreateVersion7(), Name = existingName, BaseUnit = "g", DeletedAt = DateTimeOffset.UtcNow,
-        };
+        var deleted = AnIngredient(name: existingName, unit: "g", deletedAt: DateTimeOffset.UtcNow);
         Db.Ingredients.Add(deleted);
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -831,10 +825,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         string storedName, string storedUnit, string requestName, string requestUnit)
     {
         // Given: a soft-deleted ingredient with the stored name/unit
-        var deleted = new IngredientDbType
-        {
-            Id = Guid.CreateVersion7(), Name = storedName, BaseUnit = storedUnit, DeletedAt = DateTimeOffset.UtcNow,
-        };
+        var deleted = AnIngredient(name: storedName, unit: storedUnit, deletedAt: DateTimeOffset.UtcNow);
         Db.Ingredients.Add(deleted);
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
         // The restore request runs against a DIFFERENT (request-scoped) DbContext instance – clear the
@@ -855,7 +846,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the row is active again with the request values (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = deleted.Id, Name = requestName, BaseUnit = requestUnit }]);
+            [AnIngredient(name: requestName, unit: requestUnit, id: deleted.Id)]);
     }
 
     // @US-904-edge-case: "Reaktivierung gelingt auch wenn Zutat parallel mit denselben Daten
@@ -883,7 +874,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: the row remains unchanged and active (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = created.Id, Name = "Koriander", BaseUnit = "Bund" }]);
+            [AnIngredient(name: "Koriander", unit: "Bund", id: created.Id)]);
     }
 
     // @US-904-error: "Reaktivierung meldet Konflikt wenn die Zutat parallel mit anderen Daten
@@ -920,7 +911,7 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         // Then: nothing was overwritten – the saved values stay unchanged (full-state DB assertion)
         var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
         persisted.Should().BeEquivalentTo(
-            [new IngredientDbType { Id = created.Id, Name = "Koriander", BaseUnit = "Töpfchen" }]);
+            [AnIngredient(name: "Koriander", unit: "Töpfchen", id: created.Id)]);
     }
 
     // ADR-S108-1: IngredientDto.etag ist ausdrücklich die If-Match-Quelle für ein nachfolgendes DELETE.
@@ -950,6 +941,6 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Then: the row is soft-deleted again (full-state DB assertion)
-        await AssertSoftDeletedAsync(new IngredientDbType { Id = created.Id, Name = "Liebstöckel", BaseUnit = "Bund" });
+        await AssertSoftDeletedAsync(AnIngredient(name: "Liebstöckel", unit: "Bund", id: created.Id));
     }
 }

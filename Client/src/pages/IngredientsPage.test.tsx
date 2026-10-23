@@ -299,6 +299,25 @@ describe('IngredientsPage – Zutat anlegen', () => {
     expect(captured.current?.contentType).toBe('application/json')
   })
 
+  // Szenario: Zutat anlegen
+  // Ohne Unterdrückung des nativen Submits lädt der echte Browser beim Absenden die Seite neu – das
+  // Anlegen funktionierte nicht. fireEvent.submit liefert false, wenn preventDefault aufgerufen wurde.
+  it('US904_HappyPath_CreateDialog_Submit_NativeFormSubmitIsPrevented', async () => {
+    // Given: der Dialog ist offen (POST antwortet 422, die Antwort ist hier nicht Thema)
+    useEmptyNameRejectingHandlers()
+    renderWithProviders(<IngredientsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    const form = screen.getByRole('dialog').closest('form')
+    expect(form).not.toBeNull()
+
+    // When: das Formular abgesendet wird
+    const notPrevented = fireEvent.submit(form as HTMLFormElement)
+
+    // Then: der native Submit wurde unterdrückt
+    expect(notPrevented).toBe(false)
+  })
+
   // Szenario: Speichern-Button ist während des Speicherns deaktiviert
   it('US904_HappyPath_SaveInFlight_SaveButtonIsDisabled', async () => {
     // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper) – so ist das
@@ -534,7 +553,7 @@ describe('IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit)', () =
   })
 })
 
-describe('IngredientsPage – Reopen nach fehlgeschlagenem Speichern und Abbrechen', () => {
+describe('IngredientsPage – Reopen nach fehlgeschlagenem Speichern', () => {
   // Szenario: Nach fehlgeschlagenem Speichern und Abbrechen ist der Dialog beim erneuten Öffnen fehlerfrei
   it('US904_EdgeCase_ReopenDialogAfterFailedSaveAndCancel_IsErrorFree', async () => {
     // Given: bestehende Zutat (Salz); leerer Name -> Backend antwortet 422 (Bug R1: der
@@ -567,6 +586,44 @@ describe('IngredientsPage – Reopen nach fehlgeschlagenem Speichern und Abbrech
     // Then: keine Fehlermeldung sichtbar (der alte Fehlerzustand ist zurückgesetzt)
     expect(screen.queryByText('Name darf nicht leer sein.')).not.toBeInTheDocument()
     // Then: das Name-Feld ist nicht als ungültig markiert (aria-invalid zurückgesetzt)
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
+  })
+
+  // Szenario: Nach fehlgeschlagenem und dann erfolgreichem Speichern ist der Dialog beim erneuten Öffnen fehlerfrei
+  it('US904_EdgeCase_ReopenDialogAfterFailedThenSuccessfulSave_IsErrorFree', async () => {
+    // Given: POST mit leerem Namen -> 422, mit Namen -> 201 (GET bleibt leer, die Liste ist hier nicht Thema)
+    server.use(
+      http.get('/api/ingredients', () => HttpResponse.json([])),
+      http.post('/api/ingredients', async ({ request }) => {
+        const body = (await request.json()) as { name: string }
+        return body.name === ''
+          ? HttpResponse.json({ status: 422, errors: { name: ['Name darf nicht leer sein.'] } }, { status: 422 })
+          : HttpResponse.json(mehl, { status: 201, headers: { Location: `/api/ingredients/${mehl.id}` } })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<IngredientsPage />)
+
+    // When: ich "g" als Einheit eingebe, speichere und die Fehlermeldung erscheint
+    fireEvent.click(await screen.findByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+    await user.type(screen.getByLabelText(/^Einheit/), 'g')
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    await screen.findByText('Name darf nicht leer sein.')
+
+    // When: ich "Mehl" als Name eingebe und erneut speichere -> Dialog schließt
+    await user.type(screen.getByLabelText(/^Name/), 'Mehl')
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    // When: ich erneut auf "Zutat anlegen" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Zutat anlegen' }))
+    await awaitDialogAutofocus()
+
+    // Then: keine Fehlermeldung sichtbar, das Name-Feld ist nicht als ungültig markiert
+    expect(screen.queryByText('Name darf nicht leer sein.')).not.toBeInTheDocument()
     expect(screen.getByLabelText(/^Name/)).toHaveAttribute('aria-invalid', 'false')
   })
 })
@@ -683,6 +740,11 @@ describe('IngredientsPage – Zutat löschen', () => {
     const restoredList = await screen.findByTestId('ingredient-list')
     expect(await within(restoredList).findByText('Mehl')).toBeInTheDocument()
     expect(within(restoredList).getByText('g')).toBeInTheDocument()
+    // Then: der Toast "Mehl gelöscht" ist nicht mehr sichtbar (autoHide 6000 ms > waitFor-Default,
+    //   das Verschwinden geht also auf das Schließen nach dem Restore zurück, nicht auf den Timer)
+    await waitFor(() => {
+      expect(screen.queryByText('Mehl gelöscht')).not.toBeInTheDocument()
+    })
   })
 })
 
@@ -848,6 +910,22 @@ describe('IngredientsPage – Löschen·Pending', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('ingredient-list')).not.toBeInTheDocument()
     })
+  })
+
+  // Szenario: Löschen-Button ist während des Löschens deaktiviert
+  // (nur WÄHREND – kehrt die Zeile per Undo zurück, ist ihr Löschen-Button wieder bedienbar)
+  it('US904_HappyPath_UndoDelete_RestoredRow_DeleteButtonIsEnabledAgain', async () => {
+    // Given: nur die Zutat "Mehl" (g) existiert
+    const list = await renderWithDeletableMehl()
+    expect(within(list).getByText('Mehl')).toBeInTheDocument()
+
+    // When: ich "Mehl" lösche und im Toast auf "Rückgängig" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Mehl löschen' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }))
+
+    // Then: "Mehl" steht wieder in der Liste und sein Löschen-Button ist nicht gesperrt
+    const restoredList = await screen.findByTestId('ingredient-list')
+    expect(await within(restoredList).findByRole('button', { name: 'Mehl löschen' })).toBeEnabled()
   })
 })
 

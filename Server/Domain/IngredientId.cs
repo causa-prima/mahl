@@ -26,4 +26,8 @@ internal readonly record struct IngredientId
 
     // ADR-S030-1: UUIDv7, serverseitig vergeben.
     public static IngredientId New() => new(Uuid7.New());
+
+    // Lesepfad: die Identität einer gespeicherten Zutat (z.B. für eine Rezept-Zutat) – nicht
+    // validierend, der DB-Inkonsistenz-Zweig fehlt noch (s. Uuid7).
+    public static IngredientId Create(Guid stored) => new(Uuid7.Create(stored));
 }

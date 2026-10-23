@@ -244,6 +244,7 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
 - **Fließtext und Leerzustand:** `Typography` mit `gutterBottom`, damit der Abstand zum folgenden
   Button dem einer Liste entspricht.
 - **Formularfelder im Dialog:** `fullWidth` und `margin="dense"`.
+- **Formularfelder auf einer eigenen Seite** (z. B. „Rezept anlegen", ADR-S135-4): `fullWidth` und `margin="normal"` – eine Seite mit vielen, teils mehrzeiligen Feldern braucht am Handy mehr Abstand zwischen den Feldern als ein Dialog mit zweien. Eine Hilfsaktion („Schritt hinzufügen") steht direkt unter den Feldern, zu denen sie gehört; die Hauptaktion („Speichern") ist davon per `Stack spacing={2}` abgesetzt – derselbe Theme-Abstand wie im Seitenrumpf.
 - **Farbe:** Die Primärfarbe trägt die Hauptaktion einer Ansicht (`variant="contained"`, etwa
   „Zutat anlegen", „Speichern"). Aktionen auf dunklem Grund (Snackbar) übernehmen dessen
   Textfarbe (`color="inherit"`) – Primärblau erreicht dort nicht die geforderten 4,5:1.

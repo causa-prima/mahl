@@ -12,6 +12,7 @@ Threshold: 100% Branch + Line. Unterschreitung → Exit-Code 1.
 """
 import argparse
 import json
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -199,6 +200,40 @@ def failure_report(output: str) -> str | None:
     return kopf + "\n\n" + "\n\n".join(blocks)
 
 
+_HOST_ERROR_HEAD = "✗ Test-Host-Fehler – {passed} von {total} Backend-Tests grün, der Lauf trotzdem rot"
+_HOST_ERROR_HINT = "   Vollständige Ausgabe: python3 -m prozesscode.dotnet-test --verbose"
+
+
+def host_error_report(output: str) -> str | None:
+    """Bericht für einen Lauf, dessen Tests grün sind, dessen Test-Host aber danach scheitert –
+    oder None ohne `Error output:`. Ohne ihn fiele der Aufrufer auf den Rohfilter zurück, der
+    nur Log-Zeilen wie `Failed executing DbCommand` trifft."""
+    lines = output.splitlines()
+    start = next((i for i, line in enumerate(lines) if "Error output:" in line), None)
+    if start is None:
+        return None
+    error = [lines[start].strip()]
+    for folge in lines[start + 1:]:
+        if not folge.strip().startswith("at "):
+            break
+        error.append("  " + folge.strip())
+    counts = re.search(r"total: (\d+)\s+failed: \d+\s+succeeded: (\d+)", output)
+    total, passed = counts.groups() if counts else ("?", "?")
+    return "\n".join([_HOST_ERROR_HEAD.format(passed=passed, total=total), *error, _HOST_ERROR_HINT])
+
+
+def drop_dangling_runtime_dir() -> None:
+    """Entfernt ein XDG_RUNTIME_DIR, dessen Verzeichnis fehlt (WSL ohne User-Session).
+
+    coverlet.MTP legt beim Entladen einen benannten Mutex an; .NET sucht ihn unter dieser
+    Variable und lässt den Test-Host nach dem letzten Test mit Exit 7 abstürzen. Ohne die
+    Variable weicht .NET auf sein Standardverzeichnis aus.
+    """
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_dir and not Path(runtime_dir).is_dir():
+        del os.environ["XDG_RUNTIME_DIR"]
+
+
 def _report_coverage(totals: dict[str, float], gaps: list[FileGap]) -> bool:
     sep = "─" * 60
     print(f"\n{sep}")
@@ -254,9 +289,10 @@ def main() -> None:
 
     # MTP-Modus von `dotnet test` (global.json): Test-App-Argumente direkt, ohne VSTest-`--`.
     dotnet_args = ["test", "--project", _TEST_PROJECT, *app_args]
+    drop_dangling_runtime_dir()
     output, exit_code = run_dotnet(dotnet_args)
 
-    summary = verdict(output) or failure_report(output)
+    summary = verdict(output) or failure_report(output) or host_error_report(output)
     if args.verbose or not output.strip():
         print(output)
     elif summary:

@@ -116,6 +116,28 @@ def test_stryker_frontend_uebergibt_mutate_als_eine_kommaliste(
     assert "keinen Report" in capsys.readouterr().err
 
 
+@pytest.mark.aufrufpfad("stryker-frontend")
+def test_stryker_frontend_wiederholtes_mutate_flag_verliert_kein_muster(
+        tmp_path, monkeypatch, stryker_lauf, capsys):
+    """`--mutate a --mutate b` überschrieb still `a` – mutiert wurde nur `b` (S141)."""
+    modul = _stryker_modul("stryker-frontend", tmp_path, monkeypatch)
+    monkeypatch.setattr(modul, "_STRYKER_TMP", tmp_path / "stryker-tmp")
+    monkeypatch.setattr(modul, "_STRYKER_SRC", tmp_path / "keine-reports")
+    cli_aufruf(monkeypatch, modul, "--mutate", "src/a.ts", "--mutate", "src/b.tsx,src/c.ts")
+    assert stryker_lauf[0] == ["npx", "stryker", "run", "--mutate", "src/a.ts,src/b.tsx,src/c.ts"]
+
+
+@pytest.mark.aufrufpfad("dotnet-stryker")
+def test_dotnet_stryker_wiederholtes_mutate_flag_verliert_kein_muster(
+        tmp_path, monkeypatch, stryker_lauf, capsys):
+    modul = _stryker_modul("dotnet-stryker", tmp_path, monkeypatch)
+    monkeypatch.setattr(modul, "_snapshot_run_dirs", lambda: set())
+    monkeypatch.setattr(modul, "_move_new_run", lambda _vorher: None)
+    cli_aufruf(monkeypatch, modul, "--mutate", "Domain/A.cs", "--mutate", "Domain/B.cs")
+    assert stryker_lauf[0] == ["dotnet", "stryker", "--mutate", "Domain/A.cs",
+                               "--mutate", "Domain/B.cs"]
+
+
 @pytest.mark.aufrufpfad("dotnet-stryker")
 def test_dotnet_stryker_uebergibt_mutate_je_datei_als_eigenes_flag(
         tmp_path, monkeypatch, stryker_lauf, capsys):

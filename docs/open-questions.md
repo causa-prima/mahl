@@ -65,7 +65,7 @@ Eintrag-Format:
 
 ## OQ-S094-1 — Client-seitige Validierung (Instant-Feedback) einführen?
 **Frage:** Lohnt eine client-seitige Validierung (Instant-Feedback *vor* dem Speichern) – und wenn ja, drift-frei wie?
-**Fällig:** Phase:V1, S140 – der tragende Trigger ist das Ereignis (siehe „Trigger zum Wiederaufgreifen" unten), nicht das Alter; `Phase:V1` drückt ihn aus, `S140` bleibt als Backstop stehen, falls die Phase sich verschiebt.
+**Fällig:** Phase:V1 – der tragende Trigger ist das Ereignis (siehe „Trigger zum Wiederaufgreifen" unten). Das Rezeptformular ist zwar ein zweites großes Formular, seine Spec legt aber „Alle Meldungen kommen vom Server" fest – der Konsistenzdruck-Trigger greift damit nicht.
 **Hintergrund:** Diese Abwägung kam schon mehrfach auf. Die maßgebliche, _front-loaded_ Argumentkette steht stabil in **ADR-S090-1** (Abschnitt „Validierung bleibt server-only / Client-Validierung aufgeschoben", alle Punkte dieses Abschnitts) – bitte zuerst dort lesen, damit die Argumente nicht erneut von vorn aufgerollt werden. Kurzfassung: nur **Required** lohnt; Drift ist via backend-getriebener Metadaten lösbar (aber YAGNI); Fokus-aufs-Fehlerfeld bleibt ohnehin custom. **Aktueller Stand:** aufgeschoben aus YAGNI. **Trigger zum Wiederaufgreifen:** ein UX-Szenario fordert explizit Instant-Feedback, oder mehrere große Formulare entstehen parallel (Konsistenzdruck).
 
 ---
@@ -93,7 +93,7 @@ Eintrag-Format:
 
 ## OQ-S119-4 — Gilt „Regeln in den Typ, Meldungen an die Grenze" auch im Frontend?
 **Frage:** Wird der Frontend-Fehlertyp `ValidationError = { readonly message: string }` auf Fehler**fälle** statt Meldungstexte umgestellt – oder gilt die Regel bewusst nur backend-seitig?
-**Fällig:** Phase:V1, S140 – User-Entscheid S122: gekoppelt an **OQ-S094-1** (client-seitige Validierung) und darum auf dessen Anker gesetzt, damit beide zusammen entschieden werden. Begründung: Solange das Frontend keine Regeln prüft (ADR-S112-4), entstehen dort keine Fehler**fälle** – die Frage nach deren Typform hat bis dahin keinen Gegenstand. Vorherige Fassungen (`S132`, dann `jetzt` nach ADR-S120-1) hingen am Backend-Vorbild; maßgeblich ist aber, ob es im Frontend überhaupt etwas zu typisieren gibt.
+**Fällig:** Phase:V1 – User-Entscheid S122: gekoppelt an **OQ-S094-1** (client-seitige Validierung) und darum auf dessen Anker gesetzt, damit beide zusammen entschieden werden. Begründung: Solange das Frontend keine Regeln prüft (ADR-S112-4), entstehen dort keine Fehler**fälle** – die Frage nach deren Typform hat bis dahin keinen Gegenstand.
 
 **Hintergrund:** Aufgekommen im S119-Review beim Verankern von „Domänentyp und Constraint-Typ". [Domain Modeling](reference/architecture.md#ARC-domain-modeling) erklärt das Domain-Modeling-Kapitel ausdrücklich für „C# und TypeScript gleichermaßen" gültig und verweist für die Ausformulierung auf die sprachspezifischen Guidelines. Die dort in den [die Regeln dazu](guidelines/coding-guideline-csharp.md#CGC-domaenentyp-regeln) verankerte Regel **„Meldungen an die Grenze"** lautet: „Ein Domänentyp gibt einen Fehler**fall** zurück, nie einen Meldungstext" (ADR-S051-2: die Zuordnung Fall → deutscher Text lebt an der API-Grenze). `coding-guideline-typescript.md` schreibt aber das Gegenteil vor: `ValidationError` trägt ein `message: string` als einziges Feld.
 
@@ -142,3 +142,11 @@ Eintrag-Format:
 **Fällig:** Phase:V1 – erst mit dem Produktivbetrieb müssen Logs Redeploys überstehen; vorher reicht stdout in der Entwicklung
 **Hintergrund:** S137: Serilog (AspNetCore, Sinks.Console, Sinks.File) war referenziert, aber nie angeschlossen, und wurde vom User entfernt. ADR-S054-7 schließt Serilog aus dem MVP-Scope aus. Die Observability-Anforderung (docs/process/nfr.md, Abschnitt Observability) legt stdout als Ausgabeziel fest und überlässt Persistenz der Laufzeitumgebung. Falle (aus Docker-Wissen, nicht verifiziert): Der Standard-Log-Treiber json-file hält Logs pro Container; sie verschwinden, wenn der Container beim Redeploy neu erzeugt wird – also gerade nach dem Update, das ein Problem verursacht haben könnte. Der User will in V1 nachvollziehen können, was Probleme verursacht hat.
 **Aufschubgrund:** User – der User hat entschieden, die Frage mit V1 zu klären
+
+---
+
+## OQ-S141-1 — Rückmeldung bei Server- oder Netzwerkfehler beim Speichern eines Rezepts
+**Frage:** Was sieht der Nutzer, wenn POST /api/recipes mit 5xx antwortet oder das Netz fehlt – Meldung wo und mit welchem Text, bleiben die Eingaben erhalten, gibt es einen Weg zum erneuten Versuch?
+**Fällig:** Phase:MVP – mit dem globalen Exception-Handler aus ADR-S112-1 liefert der Server dann ProblemDetails, auf die das Frontend reagieren muss
+**Hintergrund:** Security- und Korrektheits-Review US-602 run-2: createRecipe (Client/src/services/recipesApi.ts) wertet den Status nicht aus. Die Läufe run-8 bis run-12 bauen nur die 422-Pfade (FieldErrors); für 5xx/Netzwerkfehler gibt es in features/recipes.feature kein Szenario. Die technische Meldung aus toUnexpectedError darf laut docs/process/nfr.md (Reliability) nicht ungefiltert angezeigt werden.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 als offene Frage mit Phase MVP entschieden

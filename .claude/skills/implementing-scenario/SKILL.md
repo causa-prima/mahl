@@ -382,6 +382,12 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
    2. **Vermerken** → in das passende Dokument bzw. die passenden Dokumente eintragen. Welches Dokument wofür zuständig ist, steht in der `AGENTS.md`-Navigationstabelle (single source of truth – hier bewusst NICHT dupliziert, damit nichts driftet).
    3. **Ignorieren** → bewusst verwerfen.
 
+   **Form der Vorlage:** per `AskUserQuestion`, je Punkt eine Frage mit **allen drei** Optionen als
+   eigene, konkret beschriebene Antwort (was „direkt" hier hieße, wohin „vermerken" ginge, was
+   „ignorieren" in Kauf nimmt) – die Empfehlung zuerst und markiert. Punkte gleichen Themas dürfen
+   zu einer Frage gebündelt werden. Grund: Eine Empfehlung ohne sichtbare Alternativen lässt den User
+   auf unvollständiger Grundlage entscheiden.
+
    Erst eintragen/umsetzen, NACHDEM der User entschieden hat. Kein stilles Eintragen, kein stilles Vergessen.
 
    Wann die als „vermerken" entschiedenen Punkte geschrieben werden, hängt am nächsten Schritt –

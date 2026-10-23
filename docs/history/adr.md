@@ -645,6 +645,8 @@ Generierungslogik: `Unspecified` = 0 bei Aggregation; wenn alle `Unspecified` �
 **Verworfen:** `Quantity = 0` als Sentinel – 0 ist ein valider Eingabefehler, kein fachlicher Zustand.
 **Verworfen:** `decimal?` als Domain-Property-Typ – verletzt "Make Illegal States Unrepresentable".
 
+**Addendum (S141) – Einheit nicht Teil von `Quantity`:** Seit ADR-S135-2 ist die Einheit einer Rezept-Zutat immer die Basiseinheit der Zutat. Sie ist damit keine eigene Angabe der Rezept-Zutat mehr: `Quantity` trägt nur den Zahlwert (`Specified(decimal)` | `Unspecified`), eine Einheiten-Spalte gibt es nicht, und `Unit` „ist NOT NULL, wenn eine Menge da ist" gilt über die Basiseinheit der referenzierten Zutat. Ein eigener Constraint-Typ für den Zahlwert entsteht mit den Mengenregeln (> 0, Nachkommastellen, Maximum), vorher hätte er keine Regel. Verworfen: Einheit in `Quantity` mitführen – eine zweite Quelle für einen Wert, der aus der Zutat folgt, und ein ungetesteter Fehlerzweig beim Aufbau aus der Zeile.
+
 ---
 
 ### ADR-S012-1: RecipeSource: Mutual Exclusion zwischen URL und Bild

@@ -91,6 +91,7 @@ Eine Mengenangabe, bestehend aus einer positiven Zahl und einer Einheit – oder
 *   **Varianten:** `Specified(value: decimal > 0, unit: NonEmptyTrimmedString)` | `Unspecified`
 *   **Verwendung:** Rezept-Zutaten, Einkaufslisten-Einträge, Basis-Portion.
 *   **Code-Typ:** `Quantity` (Sum-Type im Domain-Layer)
+*   **In der Rezept-Zutat:** Die Einheit ist die Basiseinheit der Zutat (ADR-S135-2); der Code-Typ trägt dort nur den Zahlwert (ADR-S020-1, Addendum S141).
 
 <a id="GLO-rezept-zutat"></a>
 ### Rezept-Zutat (Recipe Ingredient)
@@ -112,6 +113,7 @@ Ein *Rezept*, das in einem anderen Rezept als *Rezept-Zutat* referenziert wird.
 Ein atomarer Teil der Zubereitungsanleitung.
 *   **Anweisung (Instruction):** Der Text eines Schritts. In Meldungen heißt sie „Schritt-Anweisung", damit klar ist, welches Feld gemeint ist.
 *   **Nummer:** Ergibt sich aus der Position im Rezept, lückenlos ab 1 (ADR-S027-1).
+*   **Zubereitung:** Überschrift der Schrittliste in der Detailansicht eines Rezepts. Sie benennt den Abschnitt, nicht den einzelnen Schritt – in Feldern, Buttons und Meldungen heißt es weiter „Schritt".
 *   **Verknüpfung:** Kann mit einer Teilmenge der *Rezept-Zutaten* verknüpft sein (für "Kochmodus").
 
 <a id="GLO-basis-portion"></a>

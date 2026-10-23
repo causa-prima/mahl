@@ -9,3 +9,5 @@ export type ApiError =
   | { readonly kind: 'FieldErrors'; readonly fields: Readonly<Record<string, readonly string[]>> }
   // Netzwerk/sonstige Fehler (GET-Pfad, POST-catch) tragen eine technische Meldung.
   | { readonly kind: 'Unexpected'; readonly message: string }
+
+export const toUnexpectedError = (e: unknown): ApiError => ({ kind: 'Unexpected', message: String(e) })

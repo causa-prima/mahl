@@ -11,4 +11,10 @@
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     </ItemGroup>
 
+    <ItemGroup>
+        <IndirectCompileReference Include="Microsoft.EntityFrameworkCore.Abstractions"
+            Reason="Von dotnet ef generierter Migrations-/Snapshot-Code nutzt DeleteBehavior für
+                    Fremdschlüssel (CS0012/CS0103); der eigene Code referenziert das Paket nicht." />
+    </ItemGroup>
+
 </Project>

@@ -59,9 +59,10 @@ def main() -> None:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--mutate", metavar="GLOB[,GLOB…]",
+    # append: Ein wiederholtes Flag ergänzt, statt das vorige still zu überschreiben.
+    parser.add_argument("--mutate", metavar="GLOB[,GLOB…]", action="append",
                         help="Datei(en) mutieren, relativ zu Server/ (z.B. Domain/Foo.cs "
-                             "oder Domain/Foo.cs,Endpoints/Bar.cs)")
+                             "oder Domain/Foo.cs,Endpoints/Bar.cs); wiederholbar")
     parser.add_argument("--verbose", action="store_true",
                         help="Alle nicht-getöteten Mutanten (Survived/Ignored/Timeout/NoCoverage) "
                              "mit Status, StatusReason, Zeile, Spalte")
@@ -69,7 +70,7 @@ def main() -> None:
 
     stryker_args = ["dotnet", "stryker"]
     if args.mutate:
-        for pattern in resolve_mutate(args.mutate, _PROJECT_DIR, _REPO_ROOT):
+        for pattern in resolve_mutate(",".join(args.mutate), _PROJECT_DIR, _REPO_ROOT):
             stryker_args += ["--mutate", pattern]
 
     _TMP_FILE.parent.mkdir(parents=True, exist_ok=True)

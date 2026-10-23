@@ -316,6 +316,10 @@ erscheinen im Folgemonat wieder; ihre Gründe stehen im Rumpf des letzten Durchs
    (läuft mit pytest und pytest-cov aus dem venv; `python3 -m pytest` nimmt das pytest des
    System-Pythons und prüft ein Update nicht) und `python3 -m prozesscode.ruff-run`. Nach einem mutmut-Update setzt die Sperrklinke ihre
    Baselines je Modul selbst neu (Messkennung in `mutation-baseline.json`).
+   Danach einmal die ganze Kette, auch für Werkzeuge ohne eigenen Bump: E2E
+   (`python3 -m prozesscode.playwright-test`) und beide Mutationsläufe (`python3 -m prozesscode.dotnet-stryker`,
+   `python3 -m prozesscode.stryker-frontend`). Ein Update kann neue Mutanten mitbringen – Stryker 10
+   brachte den Mutator `CallExpression`, vier Testlücken fielen erst im nächsten Lauf auf.
    **Wertet ein Wrapper die Ausgabe eines aktualisierten Werkzeugs aus** (mutmut, Stryker,
    Playwright …), den Wrapper einmal echt laufen lassen und die gespeicherte echte Ausgabe in
    seinen Tests durch die der neuen Version ersetzen. Sie altert mit der Version: Unter mutmut
@@ -392,6 +396,14 @@ docker rm -f -v $(docker ps -aq --filter label=reuse-id=mahl-server-tests)
 > **`--project` = `Infrastructure`, `--startup-project` = `Server`:** DbContext und Migrationen liegen
 > im `Infrastructure`-Projekt (ADR-S041-2), die DI-/Host-Konfiguration in `Server`. `dotnet ef` braucht
 > beide Angaben – nur `--project Server` scheitert mit „target project doesn't match migrations assembly".
+
+> **Erster Fremdschlüssel im Modell:** Der generierte Migrations- und Snapshot-Code nutzt dann
+> `DeleteBehavior` aus `Microsoft.EntityFrameworkCore.Abstractions`, das `Infrastructure` nur
+> indirekt bezieht. Der Build scheitert mit CS0012/CS0103, weil der Compiler nur direkt
+> referenzierte Pakete sieht. Ausweg ist ein `IndirectCompileReference` mit `Reason` in
+> `Infrastructure/mahl.Infrastructure.csproj` ([Abhängigkeiten](../reference/dependencies.md)) – die
+> `.csproj` trägt der User ein. Für `DeleteBehavior` ist er eingetragen; erneut nötig nur, wenn
+> generierter Code ein weiteres indirektes Paket verlangt.
 
 ```bash
 dotnet ef database drop --force --project Infrastructure --startup-project Server   # drop ist deny → # --allow-once anhängen

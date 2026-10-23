@@ -192,10 +192,37 @@ test.describe('US904_EdgeCase: Zutaten verwalten', () => {
     // When: ich erneut auf "Zutat anlegen" klicke
     await page.getByRole('button', { name: 'Zutat anlegen' }).click()
 
+    // Then: das Name-Feld ist nicht als ungültig markiert (aria-invalid zurückgesetzt). Zuerst, weil
+    //   diese Assertion auf den wieder geöffneten Dialog wartet – toHaveCount(0) davor wäre schon
+    //   erfüllt, solange der Dialog noch gar nicht steht.
+    await expect(page.getByLabel('Name')).toHaveAttribute('aria-invalid', 'false')
     // Then: keine Fehlermeldung sichtbar (der alte Fehlerzustand ist zurückgesetzt)
     await expect(page.getByText('Name darf nicht leer sein.')).toHaveCount(0)
-    // Then: das Name-Feld ist nicht als ungültig markiert (aria-invalid zurückgesetzt)
+  })
+
+  // Szenario: Nach fehlgeschlagenem und dann erfolgreichem Speichern ist der Dialog beim erneuten Öffnen fehlerfrei
+  test('US904_EdgeCase_ReopenDialogAfterFailedThenSuccessfulSave_IsErrorFree', async ({ page }) => {
+    // When: Dialog öffnen, nur Einheit "g" eingeben (Name bleibt leer), speichern
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+    await page.getByLabel('Einheit').fill('g')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+
+    // When: die Fehlermeldung "Name darf nicht leer sein." erscheint (realer 422 vom Backend)
+    await expect(page.getByText('Name darf nicht leer sein.')).toBeVisible()
+
+    // When: ich "Mehl" als Name eingebe und erneut speichere -> Dialog schließt (Close-Transition abwarten)
+    await page.getByLabel('Name').fill('Mehl')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    // When: ich erneut auf "Zutat anlegen" klicke
+    await page.getByRole('button', { name: 'Zutat anlegen' }).click()
+
+    // Then: das Name-Feld ist nicht als ungültig markiert (aria-invalid zurückgesetzt) – zuerst, weil
+    //   diese Assertion auf den wieder geöffneten Dialog wartet (s. Abbrechen-Variante oben)
     await expect(page.getByLabel('Name')).toHaveAttribute('aria-invalid', 'false')
+    // Then: keine Fehlermeldung sichtbar (der Fehlerzustand des ersten Speicherns ist zurückgesetzt)
+    await expect(page.getByText('Name darf nicht leer sein.')).toHaveCount(0)
   })
 
   // Szenario: Name mit exakt 30 Zeichen wird akzeptiert

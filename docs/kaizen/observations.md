@@ -257,3 +257,42 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: LL-S139-2
 
+## OBS-S141-1 – Bash-Hook blockt Heredoc, sed -i und cat >> bei Layer-Subagenten
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: AGENT    Kontext: Bash/Permission
+- Beobachtung: In S141 meldeten drei Layer-Subagenten (Frontend run-2, Backend run-2, Frontend Review-Fixes) unabhängig, dass der Bash-Hook python3-Heredocs, sed -i, cat >> (Redirect) und einen Heredoc-Edit mit anschließendem Wrapper-Aufruf im selben Befehl blockt. Alle wichen ohne Folgen auf Edit aus, verloren dabei aber je einen oder mehrere Versuche und meldeten den Punkt als Prozess-Auffälligkeit im Return. Offen ist, ob die Agent-Definitionen den Weg (Dateien per Edit/Write ändern) so klar nennen, dass der erste Versuch schon richtig ist.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S141-2 – Analyzer-Kollisionen und -Grenzen im Backend nicht dokumentiert
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: QUALITÄT    Kontext: C#-Code
+- Beobachtung: Der Backend-Subagent von US-602 run-2 und sein Review-Fix-Nachfolger stießen auf drei Analyzer-Stellen, die keine Guideline erklärt: (1) CA1859 (konkreten Typ statt Interface verwenden) kollidiert mit dem Immutability-Hook, der unveränderliche Schnittstellentypen verlangt; (2) die Grenze von MA0051 (Methode zu lang, 60 Zeilen) steht nirgends, obwohl die Guideline von etwa 20 Zeilen spricht; (3) Sonar S1144 (ungenutztes privates Member) meldet eine Deconstruct-Erweiterung fälschlich als ungenutzt. Jeder Fall kostete Suche, und welche Regel bei (1) gewinnt, ist ungeklärt.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden; die Auflösung braucht Analyse
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S141-3 – qa-check --approved-tests prüft nicht, ob der Freigabe-Blob existiert
+- Quelle: Orchestrator + Subagent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: In S141 berechnete der Orchestrator einen Test-Freigabe-Anker mit git hash-object ohne -w. Der Blob landete nicht im Objektspeicher; der Subagent konnte den Diff gegen den Anker nicht bilden (git show: bad object) und gab stattdessen die ganze Datei aus. Aufgefallen ist es nur, weil der Subagent es meldete – qa-check akzeptiert --approved-tests pfad=sha, ohne die Auflösbarkeit zu prüfen, und der Fehler wäre erst beim Verify sichtbar geworden. Der Orchestrator musste auf den letzten gültigen Anker ausweichen.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S141-4 – qa-check Check 1 übersieht geänderte Test-Hilfsdateien
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: In S141 war Server.Tests/Helpers/EndpointsTestsBase.cs laut git geändert (neue Test-Data-Builder) und per --approved-tests freigegeben, erschien aber nicht unter „CHECK 1: GEÄNDERTE TEST-DATEIEN“. Der Test-Freigabe-Audit meldete nur „freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf (committet/zurückgesetzt?)“ – eine irreführende Vermutung. Eine Änderung an einer Hilfsdatei, die alle Integrationstests trägt, läuft so am Audit vorbei.
+- Zusammen-erledigen: OBS-S141-3
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

@@ -1,4 +1,5 @@
 using mahl.Infrastructure;
+using mahl.Infrastructure.DatabaseTypes;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -21,6 +22,24 @@ public class EndpointsTestsBase : IAsyncLifetime
     {
         _postgres = postgres;
     }
+
+    // Test-Data-Builder (docs/process/tdd-process.md#TDD-test-data-builder): kommt ein Pflichtfeld
+    // hinzu, wird nur der Builder angepasst. Ohne id eine frische UUIDv7 wie im Schreibpfad (ADR-S030-1);
+    // mit id für Expected-Objekte, deren Id aus Response oder DB stammt.
+    protected static IngredientDbType AnIngredient(
+        string name = "Butter", string unit = "g", DateTimeOffset? deletedAt = null, Guid? id = null) =>
+        new() { Id = id ?? Guid.CreateVersion7(), Name = name, BaseUnit = unit, DeletedAt = deletedAt };
+
+    protected static RecipeDbType ARecipe(string title = "Pfannkuchen", Guid? id = null) =>
+        new() { Id = id ?? Guid.CreateVersion7(), Title = title };
+
+    // Kind-Zeilen des Rezepts: ohne eigene Id, der Schlüssel ist (Rezept, Position/Nummer).
+    protected static RecipeIngredientDbType ARecipeIngredient(
+        Guid recipeId, int position, Guid ingredientId, decimal? quantity = null) =>
+        new() { RecipeId = recipeId, Position = position, IngredientId = ingredientId, Quantity = quantity };
+
+    protected static StepDbType AStep(Guid recipeId, int stepNumber, string instruction = "Teig rühren.") =>
+        new() { RecipeId = recipeId, StepNumber = stepNumber, Instruction = instruction };
 
     public async ValueTask InitializeAsync()
     {

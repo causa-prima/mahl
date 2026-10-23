@@ -1,4 +1,5 @@
 import { ResultAsync, errAsync } from 'neverthrow'
+import { toUnexpectedError } from '../types/apiError'
 import type { ApiError } from '../types/apiError'
 import type { ETag, Ingredient, IngredientId, IngredientName, NewIngredient, Unit } from '../domain/ingredient'
 import { conditionalGetJson } from './conditionalGet'
@@ -47,7 +48,7 @@ export function createIngredient(ingredient: NewIngredient): ResultAsync<CreateI
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ingredient),
     }),
-    (e): ApiError => ({ kind: 'Unexpected', message: String(e) }),
+    toUnexpectedError,
   ).andThen((response) => toCreateIngredientResult(response, ingredient))
 }
 
@@ -59,7 +60,7 @@ export function deleteIngredient(id: IngredientId, etag: ETag): ResultAsync<Resp
       method: 'DELETE',
       headers: { 'If-Match': etag },
     }),
-    (e): ApiError => ({ kind: 'Unexpected', message: String(e) }),
+    toUnexpectedError,
   )
 }
 
@@ -73,7 +74,7 @@ export function restoreIngredient(id: IngredientId, name: IngredientName, baseUn
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, baseUnit }),
     }),
-    (e): ApiError => ({ kind: 'Unexpected', message: String(e) }),
+    toUnexpectedError,
   ).andThen(toRestoreOutcome)
 }
 

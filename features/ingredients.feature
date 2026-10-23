@@ -102,6 +102,7 @@ Feature: Zutaten verwalten
     When ich bei "Mehl" auf Löschen klicke
     And ich im Toast auf "Rückgängig" klicke
     Then sehe ich "Mehl" in der Zutaten-Liste mit Einheit "g"
+    And ist der Toast "Mehl gelöscht" nicht mehr sichtbar
 
   # @run-8 · Löschen·Success · Full-Stack
   @US-904-edge-case
@@ -305,6 +306,19 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     And die Fehlermeldung "Name darf nicht leer sein." erscheint
     And ich auf "Abbrechen" klicke
+    And ich auf "Zutat anlegen" klicke
+    Then ist keine Fehlermeldung sichtbar
+    And ist das Name-Feld nicht als ungültig markiert
+
+  # @run-2 · Anlegen·Dialog-Verhalten · Frontend-only
+  @US-904-edge-case
+  Scenario: Nach fehlgeschlagenem und dann erfolgreichem Speichern ist der Dialog beim erneuten Öffnen fehlerfrei
+    When ich auf "Zutat anlegen" klicke
+    And ich "g" als Einheit eingebe
+    And ich auf "Speichern" klicke
+    And die Fehlermeldung "Name darf nicht leer sein." erscheint
+    And ich "Mehl" als Name eingebe
+    And ich auf "Speichern" klicke
     And ich auf "Zutat anlegen" klicke
     Then ist keine Fehlermeldung sichtbar
     And ist das Name-Feld nicht als ungültig markiert

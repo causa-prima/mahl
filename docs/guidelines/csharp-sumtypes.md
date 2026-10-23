@@ -104,6 +104,7 @@ public static class ShoppingListExtensions
 - `Match<T>` ist **public** für Wert-Träger-Sum-Types (reine Zustands-Container, Mapping-Layer benötigt Zugriff). `Match<T>` ist **internal** für operationale Sum-Types.
 - Konvertierungsoperatoren: **`implicit`** wenn verlustfrei und reversibel. **`explicit`** wenn Information verloren geht oder die Konvertierung nicht umkehrbar ist.
 - Der `_`-Arm in `Match<T>` ist immer `SumType.Unreachable<T>()` (ADR-S040-1) – kein eigenes `throw`, keine eigene Stryker-Suppression; beides sitzt einmal in `Server/Types/SumType.cs`.
+- **S3060 je Sum-Type-Datei unterdrücken:** SonarAnalyzer S3060 meldet den `this switch` in `Match<T>`, weil er polymorphen Dispatch will – der ist bewusst verworfen (ADR-S040-1). Pro Sum-Type-Datei einen `[<pfad>]`-Block mit `dotnet_diagnostic.S3060.severity = none` in `.editorconfig` anlegen (Vorlage: Block für `Server/Domain/Quantity.cs`), **nicht** projektweit – außerhalb von Sum-Types sind S3060-Treffer legitim.
 - **Ausnahme:** `OneOf<T, <Konzept>Error>` als Rückgabewert einer Operation, die fehlschlagen kann (`Create`, Zustandsübergang) – ad-hoc Union ohne benannten Basistyp ([Regeln in den Domänentyp, Meldungen an die Grenze](coding-guideline-csharp.md#CGC-regel-meldungen-an-die-grenze)).
 
 Wenn ein Typ mehr als einen konzeptuell unterschiedlichen Zustand repräsentieren kann, ist ein Sum Type die richtige Modellierung.

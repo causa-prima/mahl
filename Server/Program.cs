@@ -24,6 +24,7 @@ var app = builder.Build();
 // Umgebungs-Zweig oben – und E2E übt denselben Fehlerpfad aus wie Produktion.
 app.UseCollectionETag();
 app.MapIngredientsEndpoints();
+app.MapRecipesEndpoints();
 
 // E2E-Test-Isolation (ADR-S084-4 Addendum): NUR in der E2E-Umgebung. Die E2E läuft gegen eine eigene DB
 // (appsettings.E2E.json -> mahl_e2e), nie gegen dev/prod. Provisioniert das Schema pro Lauf und mappt

@@ -12,6 +12,16 @@
     "getoetet": 226,
     "messung": "mutmut 3.8.0, Wertung 3"
   },
+  "prozesscode.dotnet-stryker": {
+    "beurteilbar": 176,
+    "getoetet": 55,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
+  "prozesscode.dotnet-test": {
+    "beurteilbar": 508,
+    "getoetet": 177,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
   "prozesscode.eintrag_felder": {
     "beurteilbar": 21,
     "getoetet": 20
@@ -132,6 +142,11 @@
   "prozesscode.rueckgaben": {
     "beurteilbar": 119,
     "getoetet": 108
+  },
+  "prozesscode.stryker-frontend": {
+    "beurteilbar": 191,
+    "getoetet": 65,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.td": {
     "beurteilbar": 177,
