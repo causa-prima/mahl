@@ -28,14 +28,16 @@ internal static class IngredientsEndpoints
         group.MapGet(
             "",
             // ADR-S000-6: soft-deleted Zeilen werden ausgeblendet.
-            // ADR-S084-1: deterministische Sortierung (OrderBy(Name)) ist Voraussetzung für einen
+            // ADR-S084-1: deterministische Sortierung ist Voraussetzung für einen
             // stabilen Collection-Content-Hash-ETag (die Middleware hasht den serialisierten Body).
+            // ADR-S142-1: Sortierung in der DB mit expliziter ICU-Collation – die Default-Collation
+            // sortiert auf postgres:18-alpine nach Bytes.
             async (MahlDbContext db) =>
                 Results.Ok(await db.Ingredients
                     .Where(i => i.DeletedAt == null)
-                    .OrderBy(i => i.Name)
+                    .OrderBy(i => EF.Functions.Collate(i.Name, Collations.German))
                     // ADR-S108-1: per-Zeile xmin-ETag im Body – If-Match-Quelle für ein DELETE aus der Liste.
-                    .Select(i => new IngredientDto(i.Id, i.Name, i.BaseUnit, XminETag.Format(EF.Property<uint>(i, "xmin"))))
+                    .Select(i => new IngredientDto(i.Id, i.Name, i.BaseUnit, XminETag.Format(EF.Property<uint>(i, XminExtensions.ColumnName))))
                     .ToListAsync()));
 
         group.MapPost(
@@ -68,7 +70,7 @@ internal static class IngredientsEndpoints
 
                 // ADR-S058-3: xmin als Concurrency-Token setzen – EF Core prüft ihn beim SaveChangesAsync
                 // gegen den aktuellen DB-Wert und wirft DbUpdateConcurrencyException bei Mismatch.
-                db.Entry(ingredient).Property("xmin").OriginalValue = xmin;
+                db.SetOriginalXmin(ingredient, xmin);
                 ingredient.DeletedAt = DateTimeOffset.UtcNow;
                 try
                 {
@@ -138,7 +140,7 @@ file static class IngredientMappings
                 // Client ihn als If-Match auf ein späteres DELETE/PUT/PATCH mitschicken kann.
                 // ADR-S108-1: derselbe xmin füllt zusätzlich das DTO-Feld etag – einmal gelesen,
                 // für Header UND Body verwendet (kein doppelter xmin-Read).
-                var xmin = (uint) db.Entry(dbType).Property("xmin").CurrentValue!;
+                var xmin = db.ReadXmin(dbType);
                 httpContext.Response.Headers.ETag = XminETag.Format(xmin);
                 return ingredient.ToDto(xmin);
             })
@@ -271,7 +273,7 @@ file static class IngredientMappings
     // WERTE identisch" – deshalb Ordinal, nicht die case-insensitive Namensgleichheit.
     private static Task<OneOf<IngredientDto, IResult>> RestoreActiveRow(IngredientDbType row, IngredientValues requested, MahlDbContext db)
     {
-        var xmin = (uint) db.Entry(row).Property("xmin").CurrentValue!;
+        var xmin = db.ReadXmin(row);
         var isUnchanged = string.Equals(row.Name, requested.Name.Value, StringComparison.Ordinal)
             && string.Equals(row.BaseUnit, requested.BaseUnit.Value, StringComparison.Ordinal);
 
@@ -337,7 +339,7 @@ file static class IngredientMappings
             await db.Entry(row).ReloadAsync();
             return await RestoreActiveRow(row, requested, db);
         }
-        var xmin = (uint) db.Entry(row).Property("xmin").CurrentValue!;
+        var xmin = db.ReadXmin(row);
         return row.ToDto(xmin);
     }
 

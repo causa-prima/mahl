@@ -17,9 +17,9 @@ export default function CreateRecipePage() {
   const [title, setTitle] = useState('')
   const [ingredients, setIngredients] = useState('')
   const [steps, setSteps] = useState<readonly string[]>([''])
-  // Nach dem Speichern zeigt die Detailansicht das Rezept aus der 201-Antwort (Router-State).
+  // Die Detailansicht lädt das Rezept selbst über die Adresse (ADR-S142-2).
   const [save] = useResultMutation(createRecipe, (created: Recipe) => {
-    void navigate(`/recipes/${created.id}`, { state: created })
+    void navigate(`/recipes/${created.id}`)
   })
 
   const changeStep = (index: number, instruction: string) => {

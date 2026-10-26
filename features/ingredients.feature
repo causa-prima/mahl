@@ -87,6 +87,22 @@ Feature: Zutaten verwalten
     And ich auf "Speichern" klicke
     Then zeigt die Zutaten-Liste in dieser Reihenfolge: "Apfel", "Mehl", "Zwiebel"
 
+  # Die Zutaten-Liste ist alphabetisch sortiert (deutsches Locale, ohne Unterschied der
+  # Groß-/Kleinschreibung) – wie die Rezept-Liste. Ein Umlaut zählt wie sein Grundbuchstabe
+  # (Ö wie O, nicht wie „oe" und nicht ans Ende): „Möhre" steht zwischen „Mohn" und „Mohrrübe".
+  # @run-12 · Liste·Sortierung · Full-Stack · Singleton
+  @US-904-happy-path
+  Scenario: Zutaten mit Umlaut oder Kleinbuchstaben erscheinen alphabetisch einsortiert
+    Given die Zutat "Zwiebel" mit Einheit "Stück" existiert
+    And die Zutat "Mohrrübe" mit Einheit "Stück" existiert
+    And die Zutat "Öl" mit Einheit "ml" existiert
+    And die Zutat "basilikum" mit Einheit "Bund" existiert
+    And die Zutat "Möhre" mit Einheit "Stück" existiert
+    And die Zutat "Mohn" mit Einheit "g" existiert
+    And die Zutat "Apfel" mit Einheit "Stück" existiert
+    When ich die Zutaten-Liste betrachte
+    Then zeigt die Zutaten-Liste in dieser Reihenfolge: "Apfel", "basilikum", "Mohn", "Möhre", "Mohrrübe", "Öl", "Zwiebel"
+
   # @run-8 · Löschen·Success · Full-Stack
   @US-904-happy-path
   Scenario: Zutat löschen

@@ -19,11 +19,7 @@ public class MahlDbContext(DbContextOptions<MahlDbContext> options) : DbContext(
         // If-Match automatisch. Kein UseXminAsConcurrencyToken()-Helper in
         // Npgsql.EntityFrameworkCore.PostgreSQL 10.0.1 vorhanden -> Shadow-Property manuell
         // konfiguriert (ADR-S106-1, offizielles Npgsql-Fallback-Muster).
-        modelBuilder.Entity<IngredientDbType>()
-            .Property<uint>("xmin")
-            .HasColumnType("xid")
-            .ValueGeneratedOnAddOrUpdate()
-            .IsConcurrencyToken();
+        modelBuilder.Entity<IngredientDbType>().ConfigureXmin();
 
         ConfigureRecipe(modelBuilder);
     }
@@ -36,11 +32,7 @@ public class MahlDbContext(DbContextOptions<MahlDbContext> options) : DbContext(
     private static void ConfigureRecipe(ModelBuilder modelBuilder)
     {
         // ADR-S106-1: Muster wie bei IngredientDbType – xmin ist der ETag des Rezepts.
-        modelBuilder.Entity<RecipeDbType>()
-            .Property<uint>("xmin")
-            .HasColumnType("xid")
-            .ValueGeneratedOnAddOrUpdate()
-            .IsConcurrencyToken();
+        modelBuilder.Entity<RecipeDbType>().ConfigureXmin();
 
         var recipeIngredient = modelBuilder.Entity<RecipeIngredientDbType>();
         recipeIngredient.HasKey(ri => new { ri.RecipeId, ri.Position });

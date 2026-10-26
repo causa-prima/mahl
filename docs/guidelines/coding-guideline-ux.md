@@ -241,6 +241,18 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
   `disableGutters`, damit ihr Text bündig mit Überschrift und Buttons steht.
 - **Hierarchie:** Genau ein Seitentitel je Seite, `Typography variant="h5" component="h1"
   gutterBottom` – `h5` für die Größe auf dem Handy, `h1` für die Dokumentstruktur.
+- **Abschnittsüberschriften** innerhalb einer Seite (z. B. „Zutaten", „Zubereitung" der Rezept-Detailansicht):
+  `Typography variant="h6" component="h2" gutterBottom` – eine Ebene unter dem Seitentitel, mit demselben
+  Abstand zur folgenden Liste wie dieser.
+- **Nummerierte Schritte** (Rezept-Detailansicht): `List component="ol"`, damit ein Screenreader die Reihenfolge
+  ansagt. Jeder Eintrag ist ein `ListItem alignItems="flex-start"` mit der Nummer als eigenem Element
+  (`ListItemIcon`, Text „1.") und dem Text daneben (`ListItemText`) – so läuft eine mehrzeilige Anweisung unter
+  den Text statt unter die Nummer (hängender Einzug). Die Nummer steht im sichtbaren Text, nicht in einem
+  CSS-Marker.
+- **Listeneinträge, die zu einer Detailansicht führen** (Rezept-Liste): `ListItem disableGutters disablePadding`
+  um einen `ListItemButton component={RouterLink} disableGutters` – die ganze Zeile ist der Link, das
+  Touch-Ziel mindestens 44px hoch, der Text bündig mit Überschrift. Die Hauptaktion der Seite („Rezept
+  anlegen") steht über der Liste, per `Stack spacing={2}` von ihr abgesetzt.
 - **Fließtext und Leerzustand:** `Typography` mit `gutterBottom`, damit der Abstand zum folgenden
   Button dem einer Liste entspricht.
 - **Formularfelder im Dialog:** `fullWidth` und `margin="dense"`.

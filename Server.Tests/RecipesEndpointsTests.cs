@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using AwesomeAssertions;
+using mahl.Infrastructure;
 using mahl.Infrastructure.DatabaseTypes;
 using mahl.Server.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,7 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
     private sealed record RecipeResponse(
         Guid Id, string Title, IReadOnlyList<RecipeIngredientResponse> Ingredients, IReadOnlyList<StepPayload> Steps);
     private sealed record RecipeSummaryResponse(Guid Id, string Title);
+    private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
 #pragma warning restore CA1812
 
     // Helper: legt Zutaten an und leert danach den Tracker – folgende Full-State-Abfragen lesen so die
@@ -129,11 +131,17 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
 
         // Then: 201 Created mit dem xmin der Rezeptzeile als ETag (ADR-S058-3: hex-kodiert, quoted)
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var xmin = await Db.Recipes
-            .Select(r => EF.Property<uint>(r, "xmin"))
-            .SingleAsync(TestContext.Current.CancellationToken);
         response.Headers.ETag.Should().NotBeNull();
-        response.Headers.ETag.Tag.Should().Be($"\"{xmin:x8}\"");
+        response.Headers.ETag.Tag.Should().Be(await ExpectedXminETagAsync(Db.Recipes));
+    }
+
+    // Helper: der erwartete ETag der einen Rezeptzeile, die die Abfrage liefert – hex-kodierter, gequoteter xmin.
+    private static async Task<string> ExpectedXminETagAsync(IQueryable<RecipeDbType> recipe)
+    {
+        var xmin = await recipe
+            .Select(r => EF.Property<uint>(r, XminExtensions.ColumnName))
+            .SingleAsync(TestContext.Current.CancellationToken);
+        return $"\"{xmin:x8}\"";
     }
 
     // @US-602-happy-path „Rezept anlegen", letzter Then-Schritt: das Rezept steht genau einmal in der
@@ -153,5 +161,213 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<RecipeSummaryResponse[]>(TestContext.Current.CancellationToken);
         body.Should().BeEquivalentTo([new RecipeSummaryResponse(Id: recipe.Id, Title: "Pfannkuchen")]);
+    }
+
+    // @US-602-happy-path „Mehrere Rezepte erscheinen alphabetisch sortiert": ADR-S142-1, deutsches Locale ohne
+    // Rang-Unterschied der Schreibweise, Umlaut wie Grundbuchstabe. Insertion-Order, Byte-Order (Brot,
+    // Mohnkuchen, Mohrrübeneintopf, Möhrensuppe, Zwiebelkuchen, apfelstrudel, Ölkuchen) und ICU-Order sind bei
+    // diesen Titeln paarweise verschieden – ein schlichtes OrderBy bleibt rot. Mohnkuchen/Möhrensuppe/
+    // Mohrrübeneintopf pinnen zudem, dass Ö wie O zählt (nicht wie „oe", nicht ans Ende).
+    // Die Byte-Order gilt für die Default-Collation des gepinnten postgres:18-alpine (musl, ADR-S142-1); auf
+    // einem glibc-Image sortierte ein schlichtes OrderBy schon richtig und dieser Test verlöre seine Trennschärfe.
+    [Fact]
+    public async Task US602_HappyPath_GetRecipes_MultipleRecipes_ReturnsAlphabeticallySorted()
+    {
+        // Given: sieben Rezepte, in nicht-alphabetischer Reihenfolge angelegt – je ein Save, damit die
+        //   Insert-Reihenfolge feststeht und ein unsortierter Endpoint sie sichtbar durchreicht
+        foreach (var title in new[]
+                 { "Zwiebelkuchen", "Mohrrübeneintopf", "Ölkuchen", "apfelstrudel", "Möhrensuppe", "Brot", "Mohnkuchen" })
+        {
+            Db.Recipes.Add(ARecipe(title));
+            await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // When: die Rezept-Liste wird abgerufen
+        var response = await Client.GetAsync("/api/recipes", TestContext.Current.CancellationToken);
+
+        // Then: 200 OK, Titel in deutscher Alphabet-Reihenfolge
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<RecipeSummaryResponse[]>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Select(r => r.Title).Should().Equal(
+            "apfelstrudel", "Brot", "Mohnkuchen", "Möhrensuppe", "Mohrrübeneintopf", "Ölkuchen", "Zwiebelkuchen");
+    }
+
+    // Helper: legt Rezept samt Kind-Zeilen direkt in der DB an. Die Kind-Zeilen gehen absteigend nach
+    // Position/Nummer und je mit eigenem Save hinein – ein GET ohne Sortierung gäbe sie sichtbar in
+    // falscher Reihenfolge zurück.
+    private async Task SeedRecipeAsync(
+        RecipeDbType recipe, RecipeIngredientDbType[] ingredients, StepDbType[] steps)
+    {
+        Db.Recipes.Add(recipe);
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        foreach (var row in ingredients.OrderByDescending(i => i.Position))
+        {
+            Db.RecipeIngredients.Add(row);
+            await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        foreach (var row in steps.OrderByDescending(s => s.StepNumber))
+        {
+            Db.Steps.Add(row);
+            await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        Db.ChangeTracker.Clear();
+    }
+
+    // Die beiden Rezepte aus dem Feature-Kommentar: „Brot" steht vor „Pfannkuchen", und „500 g Weizenmehl"
+    // erscheint, wenn die Kind-Zeilen nicht nach Rezept gefiltert werden. Pfannkuchen hat zusätzlich eine
+    // Zeile ohne Menge und einen zweiten Schritt, damit Reihenfolge und Null-Menge mitgeprüft sind: Die
+    // Detailansicht lädt auch nach dem Anlegen per GET (ADR-S142-2), deshalb fordert das Szenario „Rezept
+    // anlegen" (Zutaten in eingegebener Reihenfolge, „Salz" ohne Menge) beides vom GET.
+    private async Task<Guid> SeedPfannkuchenAndBrotAsync()
+    {
+        var mehl = AnIngredient("Mehl", "g");
+        var salz = AnIngredient("Salz", "g");
+        var weizenmehl = AnIngredient("Weizenmehl", "g");
+        await SeedIngredientsAsync(mehl, salz, weizenmehl);
+        var brot = ARecipe("Brot");
+        await SeedRecipeAsync(
+            brot,
+            [ARecipeIngredient(brot.Id, position: 1, ingredientId: weizenmehl.Id, quantity: 500m)],
+            [AStep(brot.Id, stepNumber: 1, instruction: "Teig kneten.")]);
+        var pfannkuchen = ARecipe("Pfannkuchen");
+        await SeedRecipeAsync(
+            pfannkuchen,
+            [
+                ARecipeIngredient(pfannkuchen.Id, position: 1, ingredientId: salz.Id),
+                ARecipeIngredient(pfannkuchen.Id, position: 2, ingredientId: mehl.Id, quantity: 250m),
+            ],
+            [
+                AStep(pfannkuchen.Id, stepNumber: 1, instruction: "Teig rühren."),
+                AStep(pfannkuchen.Id, stepNumber: 2, instruction: "Ausbacken."),
+            ]);
+        return pfannkuchen.Id;
+    }
+
+    // @US-602-happy-path „Rezept aus der Rezept-Liste öffnen" und „Rezept per Direktlink aufrufen": die
+    // Detailansicht lädt das Rezept über seine Id – genau dieses, mit seinen Zutaten und Schritten (ADR-S142-2).
+    [Fact]
+    public async Task US602_HappyPath_GetRecipe_TwoRecipes_ReturnsOnlyRequestedRecipeInPositionOrderIncludingIngredientWithoutQuantity()
+    {
+        // Szenario: Rezept aus der Rezept-Liste öffnen
+        // Szenario: Rezept per Direktlink aufrufen
+        // Given: die Rezepte "Pfannkuchen" und "Brot" existieren
+        var pfannkuchenId = await SeedPfannkuchenAndBrotAsync();
+
+        // When: das Rezept "Pfannkuchen" wird über seine Id abgerufen
+        var response = await Client.GetAsync($"/api/recipes/{pfannkuchenId}", TestContext.Current.CancellationToken);
+
+        // Then: 200 OK mit genau diesem Rezept – Zutaten in Zeilenreihenfolge, Schritte in Reihenfolge,
+        //   nichts vom Rezept "Brot" (ADR-S135-2, ADR-S027-1)
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<RecipeResponse>(TestContext.Current.CancellationToken);
+        body.Should().BeEquivalentTo(
+            new RecipeResponse(
+                Id: pfannkuchenId, Title: "Pfannkuchen",
+                Ingredients:
+                [
+                    new RecipeIngredientResponse(Name: "Salz", Quantity: null, Unit: null),
+                    new RecipeIngredientResponse(Name: "Mehl", Quantity: 250m, Unit: "g"),
+                ],
+                Steps: [new StepPayload("Teig rühren."), new StepPayload("Ausbacken.")]),
+            o => o.WithStrictOrdering());
+    }
+
+    // Fest statt zufällig, damit der Test reproduzierbar ist; kein Seed-Rezept trägt sie.
+    private static readonly Guid UnknownRecipeId = Guid.Parse("00000000-0000-7000-8000-00000000dead");
+
+    // @US-602-error „Direktlink auf ein Rezept, das es nicht gibt", Beispiel „gültig aufgebaute, unbekannte
+    // Kennung": 404 mit ProblemDetails (ADR-S142-2).
+    [Fact]
+    public async Task US602_Error_GetRecipe_UnknownGuid_Returns404ProblemDetails()
+    {
+        // Szenario: Direktlink auf ein Rezept, das es nicht gibt
+        // Given: ein Rezept existiert, die abgefragte Id gehört aber keinem Rezept
+        await SeedPfannkuchenAndBrotAsync();
+
+        // When: die unbekannte Id wird abgerufen
+        var response = await Client.GetAsync($"/api/recipes/{UnknownRecipeId}", TestContext.Current.CancellationToken);
+
+        // Then: 404 mit der fixen deutschen Meldung und maschinenlesbarem errorCode (wie ADR-S054-6)
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.Content.Headers.ContentType.Should().NotBeNull();
+        response.Content.Headers.ContentType.MediaType.Should().Be("application/problem+json");
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(TestContext.Current.CancellationToken);
+        body.Should().BeEquivalentTo(new ProblemDetailsResponse(Detail: "Rezept wurde nicht gefunden.", ErrorCode: "RECIPE_NOT_FOUND"));
+    }
+
+    // @US-602-error „Direktlink auf ein Rezept, das es nicht gibt", Beispiel „ungültige Kennung": die
+    // Route-Constraint {id:guid} beantwortet es mit 404 (ADR-S142-2).
+    [Fact]
+    public async Task US602_Error_GetRecipe_NonGuid_Returns404()
+    {
+        // Szenario: Direktlink auf ein Rezept, das es nicht gibt
+        // Given: kein Rezept nötig – die Route greift vor jedem Zugriff auf die Daten
+        // When: eine Kennung, die keine GUID ist, wird abgerufen
+        var response = await Client.GetAsync("/api/recipes/kein-guid", TestContext.Current.CancellationToken);
+
+        // Then: 404 Not Found
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // Kategorie „Protokoll-/Infrastruktur-Mechanik" (ADR-S106-3, kein US-Tag): der GET liefert den xmin der
+    // Rezeptzeile als ETag (ADR-S142-2, ADR-S058-3) – nicht den Content-Hash der Middleware (ADR-S084-1).
+    [Fact]
+    public async Task GetRecipe_ExistingRecipe_ReturnsXminETagHeader()
+    {
+        // Given: ein Rezept existiert
+        var recipeId = await SeedPfannkuchenAndBrotAsync();
+
+        // When
+        var response = await Client.GetAsync($"/api/recipes/{recipeId}", TestContext.Current.CancellationToken);
+
+        // Then: der ETag ist der hex-kodierte, gequotete xmin der Rezeptzeile
+        response.Headers.ETag.Should().NotBeNull();
+        response.Headers.ETag.Tag.Should().Be(await ExpectedXminETagAsync(Db.Recipes.Where(r => r.Id == recipeId)));
+    }
+
+    // Kategorie „Protokoll-/Infrastruktur-Mechanik" (ADR-S106-3, kein US-Tag): ein If-None-Match, das dem
+    // xmin-ETag gleicht, ergibt 304 ohne Body (ADR-S142-2).
+    [Fact]
+    public async Task GetRecipe_IfNoneMatchEqualsETag_Returns304WithoutBody()
+    {
+        // Given: ein Rezept und sein xmin-ETag aus der DB – unabhängig vom Endpoint, den der Test prüft
+        var recipeId = await SeedPfannkuchenAndBrotAsync();
+        var etag = await ExpectedXminETagAsync(Db.Recipes.Where(r => r.Id == recipeId));
+
+        // When: der GET mit genau diesem ETag als If-None-Match wiederholt wird
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/recipes/{recipeId}");
+        request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        // Then: 304 ohne Body, der Antwort-ETag ist der angefragte
+        response.StatusCode.Should().Be(HttpStatusCode.NotModified);
+        (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+        response.Headers.ETag.Should().NotBeNull();
+        response.Headers.ETag.Tag.Should().Be(etag);
+    }
+
+    // Xmin 0 ist in Postgres die ungültige Transaktions-Id (InvalidTransactionId); eine echte Zeile trägt
+    // nie 0, dieser ETag kann also nie dem eines Rezepts gleichen.
+    private const string ForeignETag = "\"00000000\"";
+
+    // Kategorie „Protokoll-/Infrastruktur-Mechanik" (ADR-S106-3, kein US-Tag): ein anderer If-None-Match
+    // ergibt 200 mit dem Rezept (ADR-S142-2).
+    [Fact]
+    public async Task GetRecipe_IfNoneMatchStaleETag_Returns200WithBody()
+    {
+        // Given: ein Rezept
+        var recipeId = await SeedPfannkuchenAndBrotAsync();
+
+        // When: der GET mit einem fremden ETag als If-None-Match
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/recipes/{recipeId}");
+        request.Headers.TryAddWithoutValidation("If-None-Match", ForeignETag);
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        // Then: 200 OK mit dem Rezept
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<RecipeResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Id.Should().Be(recipeId);
     }
 }

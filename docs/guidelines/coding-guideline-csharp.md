@@ -401,7 +401,8 @@ Alle Endpoints implementieren ETag-Support.
 Entscheidung + Begründung: `docs/history/adr.md` → Sektion "HTTP-Caching & Optimistic Concurrency".
 
 **ETag-Quelle:**
-- Single-Resource-Endpoint: `xmin`-Wert des Rows (PostgreSQL, via Npgsql `UseXminAsConcurrencyToken()`), hex-kodiert: `$"\"{xmin:x8}\""`. Zugriff: `(uint)db.Entry(row).Property("xmin").CurrentValue!`
+- Single-Resource-Endpoint: `xmin`-Wert des Rows (PostgreSQL; Shadow-Property, manuell konfiguriert – ADR-S106-1), hex-kodiert über `XminETag.Format(xmin)` (`$"\"{xmin:x8}\""`). Zugriff nur über die Helfer in `Infrastructure/XminExtensions.cs`: `entity.ConfigureXmin()` (Modellkonfiguration je Entity in `OnModelCreating`), `db.ReadXmin(row)` (lesen), `db.SetOriginalXmin(row, xmin)` (Concurrency-Token setzen), `EF.Property<uint>(row, XminExtensions.ColumnName)` (in Queries). Spaltenname und Cast stehen nur dort – kein wörtliches `"xmin"` im Endpoint-Code.
+- Hat die Antwort bereits einen `ETag` (Single Resource), lässt die Middleware ihn stehen und beantwortet `If-None-Match` mit ihm (ADR-S142-2).
 - Collection-Endpoint: **voller** SHA-256-Hash der serialisierten Response-Body, gebildet von einer generischen Middleware (ADR-S084-1). Format & Vergleich (ADR-S084-2): `$"\"{Convert.ToHexString(SHA256.HashData(body))}\""` (Uppercase-Hex aus dem Encoder, **keine** Truncation, **kein** nachgelagerter `.ToUpper()/.ToLower()`-Call); `If-None-Match` ordinal/verbatim vergleichen (nie case-insensitive). Gründe: vermeidet un-killbare Stryker-Survivor (Casing-Normalisierung + Magic-Number-Truncation). **Voraussetzung:** Collection deterministisch sortieren – sonst variiert der Hash und 304 feuert nie.
 
 **Pflicht-Verhalten:**
@@ -413,7 +414,7 @@ Entscheidung + Begründung: `docs/history/adr.md` → Sektion "HTTP-Caching & Op
 | PUT/PATCH/DELETE | `If-Match` stimmt nicht | `If-Match` ≠ aktuellem ETag | 412 |
 | PUT/PATCH/DELETE | `If-Match` stimmt | EF Core prüft `xmin` beim `SaveChanges` nochmals | – |
 
-`UseXminAsConcurrencyToken()` in `OnModelCreating` konfigurieren, bevor der erste GET-Endpoint für eine Entity gebaut wird.
+xmin als Shadow-Property über `ConfigureXmin()` in `OnModelCreating` konfigurieren (`UseXminAsConcurrencyToken()` existiert in Npgsql EF 10 nicht, ADR-S106-1), bevor der erste GET-Endpoint für eine Entity gebaut wird.
 
 <a id="CGC-test-code"></a>
 ## Test-Code – Struktur und Assertions

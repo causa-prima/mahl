@@ -47,7 +47,10 @@ PRÜFPUNKTE:
 
 Abschluss: Zusammenfassung (Anzahl ❌/⚠️/✅) + konkrete Verbesserungsvorschläge.
 
-Kontext (lese diese Dateien ZUERST, bevor du reviewst):
+Kontext (lese diese Dateien ZUERST und vollständig, bevor du reviewst – mit dem Read-Tool, je Datei ein
+Aufruf, nicht per Bash `cat`/`head`: eine große Bash-Ausgabe, erst recht gebündelt mit einem Diff, legt
+Claude Code in einer Datei ab und zeigt nur eine kurze Vorschau. Steht dort „Output too large … saved to
+<pfad>", lies `<pfad>` mit Read):
 - Kernprinzipien: [Design Philosophy](../../docs/reference/architecture.md#ARC-design-philosophy)
 - C#-Tests: docs/guidelines/coding-guideline-csharp.md
 - TypeScript-Tests: docs/guidelines/coding-guideline-typescript.md

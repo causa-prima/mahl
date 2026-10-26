@@ -58,6 +58,7 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 
 - [ ] KISS eingehalten? Keine Abstraktion für hypothetische Zukunft? Keine clever-überkomplexe Lösung?
 - [ ] Naming aus `docs/reference/glossary.md`? Namen selbsterklärend ohne Kommentar?
+- [ ] Magic Value – technischer Bezeichner oder Grenzwert als nacktes Literal statt benannter Konstante ([Naming](../guidelines/coding-guideline-general.md#CGG-naming))?
 
 <a id="RCL-domain-modeling"></a>
 ## Domain Modeling

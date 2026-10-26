@@ -259,7 +259,7 @@ Gegen diesen Anker prüft [Orchestrator-Check](#IMP-orchestrator-check), dass na
 
 - **Full-State-Assertions:** Bei `BeEquivalentTo` / `toEqual` (C#) bzw. `toEqual` / `toMatchObject` (TypeScript): Sind alle Properties durch ein Gherkin-Kriterium gedeckt? Gibt es `Excluding(...)` oder Partial-Matches? → müssen mit Kommentar begründet sein; unchecked oder excluded Properties sind Gold-Plating-Signal für den Produktionscode.
 
-- **Given/When-Struktur:** Neue Tests sollen durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Fehlen diese → Finding melden (nicht blockierend).
+- **Given/When-Struktur:** Neue Tests sollen durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Fehlen diese → Finding melden (im Test-Review nicht blockierend; der Übergabelauf von `qa-check` bricht dann vor Stryker ab, die Lücke muss also bis zur Übergabe geschlossen sein).
 
 <a id="IMP-orchestrator-check"></a>
 ## Orchestrator-Check

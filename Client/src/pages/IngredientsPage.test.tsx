@@ -94,6 +94,32 @@ function useCreateTomatenHandlers(): { current: CapturedPost | undefined } {
 }
 
 describe('IngredientsPage', () => {
+  // Szenario: Zutaten mit Umlaut oder Kleinbuchstaben erscheinen alphabetisch einsortiert
+  // Guard zu ADR-S142-1 (Invariante „Frontend sortiert nicht selbst"), kein Test, der Code treibt: Die
+  // Sortierung ist Sache des Servers (DB-Collation); die Seite zeigt die gelieferte Reihenfolge
+  // unverändert. Der Server liefert hier bewusst eine nicht-alphabetische Reihenfolge – nur so fällt
+  // eine Client-Sortierung auf, die mit der Server-Collation konkurrieren würde.
+  it('US904_HappyPath_IngredientsPage_MultipleIngredients_RendersServerOrderUnchanged', async () => {
+    // Given: der Server liefert vier Zutaten in einer bestimmten Reihenfolge
+    const serverIngredients = [
+      { id: '3f2b8c1e-0000-4000-8000-000000000201', name: 'Zwiebel', baseUnit: 'Stück', etag: '"00000201"' },
+      { id: '3f2b8c1e-0000-4000-8000-000000000202', name: 'Öl', baseUnit: 'ml', etag: '"00000202"' },
+      { id: '3f2b8c1e-0000-4000-8000-000000000203', name: 'basilikum', baseUnit: 'Bund', etag: '"00000203"' },
+      { id: '3f2b8c1e-0000-4000-8000-000000000204', name: 'Apfel', baseUnit: 'Stück', etag: '"00000204"' },
+    ] as const
+    server.use(http.get('/api/ingredients', () => HttpResponse.json(serverIngredients)))
+
+    // When: ich die Zutaten-Seite betrachte
+    renderWithProviders(<IngredientsPage />)
+
+    // Then: die Liste zeigt die Zutaten in genau der gelieferten Reihenfolge – geprüft am Namen, nicht an
+    //   der Form, in der die Zeile Name und Einheit zusammensetzt
+    const items = await within(await screen.findByTestId('ingredient-list')).findAllByRole('listitem')
+    const shownNames = items.map((item) =>
+      serverIngredients.find((ingredient) => item.textContent.startsWith(ingredient.name))?.name)
+    expect(shownNames).toEqual(serverIngredients.map((ingredient) => ingredient.name))
+  })
+
   it('US904_HappyPath_IngredientsPage_EmptyDb_ShowsEmptyList', async () => {
     // Given + When: keine Zutaten vorhanden, Zutaten-Seite geöffnet
     await renderEmptyIngredientsPage()

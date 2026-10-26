@@ -145,6 +145,37 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.Select(i => i.Name).Should().Equal("Apfel", "Mehl", "Zwiebel");
     }
 
+    // @US-904-happy-path „Zutaten mit Umlaut oder Kleinbuchstaben erscheinen alphabetisch einsortiert":
+    // ADR-S142-1, deutsches Locale ohne Rang-Unterschied der Schreibweise, Umlaut wie Grundbuchstabe. Die
+    // Byte-Order der Default-Collation (Apfel, Mohn, Mohrrübe, Möhre, Zwiebel, basilikum, Öl) weicht von der
+    // ICU-Order und von der Insert-Reihenfolge ab – ein schlichtes OrderBy bleibt rot. Mohn/Möhre/Mohrrübe
+    // pinnen zudem, dass Ö wie O zählt (nicht wie „oe", nicht ans Ende). Die Byte-Order gilt für die
+    // Default-Collation des gepinnten postgres:18-alpine (musl, ADR-S142-1); auf einem glibc-Image sortierte ein
+    // schlichtes OrderBy schon richtig und dieser Test verlöre seine Trennschärfe.
+    [Fact]
+    public async Task US904_HappyPath_GetIngredients_UmlautAndLowercaseNames_ReturnsAlphabeticallySorted()
+    {
+        // Given: sieben Zutaten, in nicht-alphabetischer Reihenfolge angelegt – je ein Aufruf, damit die
+        //   Insert-Reihenfolge feststeht
+        await CreateIngredientAsync("Zwiebel", "Stück");
+        await CreateIngredientAsync("Mohrrübe", "Stück");
+        await CreateIngredientAsync("Öl", "ml");
+        await CreateIngredientAsync("basilikum", "Bund");
+        await CreateIngredientAsync("Möhre", "Stück");
+        await CreateIngredientAsync("Mohn", "g");
+        await CreateIngredientAsync("Apfel", "Stück");
+
+        // When: die Zutaten-Liste wird abgerufen
+        var response = await Client.GetAsync("/api/ingredients", TestContext.Current.CancellationToken);
+
+        // Then: 200 OK, Namen in deutscher Alphabet-Reihenfolge
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse[]>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Select(i => i.Name).Should().Equal(
+            "Apfel", "basilikum", "Mohn", "Möhre", "Mohrrübe", "Öl", "Zwiebel");
+    }
+
     // @US-904-edge-case (run-7 „Liste"): eine soft-deleted Zutat erscheint nicht in der Zutaten-Liste
     // (ADR-S000-6). Der soft-deleted Zustand wird direkt in der DB hergestellt (statt über POST+DELETE),
     // um den GET-Test von der Korrektheit des DELETE-Endpoints zu isolieren.

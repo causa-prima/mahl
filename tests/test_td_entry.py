@@ -9,6 +9,7 @@ Zwei Dinge sind hier eigen, alles Übrige liegt in `tracker_entry.py`:
      bewegt nichts. Bisher wurde der Punkt von Hand dupliziert; `check-td-capture.py` blockt
      zwar das Fehlen, erzeugt ihn aber nicht.
 """
+import argparse
 from importlib import import_module
 
 import pytest
@@ -208,6 +209,26 @@ def test_aufloesen_uebernimmt_die_faelligkeit_aus_tech_debt():
     `Phase:V1`, was in der AGENT_MEMORY-Zeile nirgends steht."""
     kurz = KURZ.replace("TD-S089-1 · Done: Gate ist grün.", "TD-S044-1 · Done: 400 statt 500.")
     assert "`Fällig: Phase:V1`" in td.memory_aufloesen(kurz, BESTAND)
+
+
+def test_aufloesen_behaelt_den_gedankenstrich_im_szenario_titel():
+    """Ein abgeschnittener Titel in der AGENT_MEMORY-Zeile wäre für next_run ein unbekannter Anker."""
+    bestand = BESTAND.replace("**Fällig:** Phase:V1 – URI-Felder.",
+                              '**Fällig:** Szenario:„A – B" – dort prüfen.')
+    kurz = KURZ.replace("TD-S089-1 · Done: Gate ist grün.", "TD-S044-1 · Done: 400 statt 500.")
+    assert '`Fällig: Szenario:„A – B"`' in td.memory_aufloesen(kurz, bestand)
+
+
+def test_td_list_zeigt_den_vollen_szenario_titel(monkeypatch, tmp_path, capsys):
+    # // Given ein Eintrag, dessen Szenario-Anker einen Gedankenstrich trägt
+    datei = tmp_path / "tech-debt.md"
+    datei.write_text(BESTAND.replace("**Fällig:** Phase:V1 – URI-Felder.",
+                                     '**Fällig:** Szenario:„A – B" – dort prüfen.'), encoding="utf-8")
+    monkeypatch.setattr(td, "td_path", lambda: datei)
+    # // When `td list` läuft
+    import_module("prozesscode.td").cmd_list(argparse.Namespace(jetzt=False))
+    # // Then steht der volle Titel in der Übersicht
+    assert 'Szenario:„A – B"' in capsys.readouterr().out
 
 
 def test_zusatzzeilen_bleiben_erhalten():

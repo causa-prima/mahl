@@ -532,9 +532,9 @@ test.describe('US904_EdgeCase: Löschen·Konflikt', () => {
   })
 })
 
-// @US-904-happy-path: run-7 „Liste". Die alphabetische Sortierung ist Backend-Verhalten
-// (GET /api/ingredients OrderBy(name), TD-S084-2 – macht zugleich den Collection-Content-Hash-
-// ETag erstmals deterministisch, ADR-S084-1/-2). Das Frontend rendert die Liste unverändert in
+// @US-904-happy-path: run-7 „Liste" und run-12 „Liste·Sortierung". Die alphabetische Sortierung ist
+// Backend-Verhalten (GET /api/ingredients sortiert mit ICU-Collation, ADR-S142-1 – macht zugleich den
+// Collection-Content-Hash-ETag deterministisch, ADR-S084-1/-2). Das Frontend rendert die Liste unverändert in
 // der vom Server gelieferten Reihenfolge; die DOM-Reihenfolge ist die einzige E2E-beobachtbare
 // Stelle der Sortierung. Seed VOR page.goto, damit der initiale GET die Zutaten enthält – daher
 // eigenes describe ohne goto-beforeEach (analog zum Duplikat-Block).
@@ -565,6 +565,28 @@ test.describe('US904_HappyPath: Zutaten-Liste sortiert', () => {
     //   den Namen als Substring des ListItem-Textes (der zusätzlich die Einheit enthält).
     const items = page.getByTestId('ingredient-list').getByRole('listitem')
     await expect(items).toHaveText([/Apfel/, /Mehl/, /Zwiebel/])
+  })
+
+  // Szenario: Zutaten mit Umlaut oder Kleinbuchstaben erscheinen alphabetisch einsortiert
+  // Anlege-Reihenfolge ≠ erwartete Reihenfolge, und die Namen trennen jede Lesart der Regel: Nach Bytes
+  // stünden "basilikum" und "Öl" am Ende und "Möhre" hinter "Mohrrübe"; mit Ö als „oe" stünde "Möhre"
+  // vor "Mohn". Seed VOR page.goto, damit der initiale GET alle Zutaten enthält.
+  test('US904_HappyPath_GetIngredients_UmlautAndLowercaseNames_AppearAlphabeticallySorted', async ({ page, request }) => {
+    // Given: die Zutaten "Zwiebel", "Mohrrübe", "Öl", "basilikum", "Möhre", "Mohn" und "Apfel" existieren
+    const seeds = [['Zwiebel', 'Stück'], ['Mohrrübe', 'Stück'], ['Öl', 'ml'], ['basilikum', 'Bund'],
+      ['Möhre', 'Stück'], ['Mohn', 'g'], ['Apfel', 'Stück']] as const
+    await seeds.reduce(async (previous, [name, unit]) => {
+      await previous
+      await seedIngredientViaApi(request, name, unit)
+    }, Promise.resolve())
+
+    // When: ich die Zutaten-Liste betrachte
+    await page.goto('/ingredients')
+
+    // Then: die Zutaten-Liste zeigt genau diese Einträge in dieser Reihenfolge (Regex: der Eintrag
+    //   enthält zusätzlich die Einheit)
+    await expect(page.getByTestId('ingredient-list').getByRole('listitem'))
+      .toHaveText([/^Apfel/, /^basilikum/, /^Mohn/, /^Möhre/, /^Mohrrübe/, /^Öl/, /^Zwiebel/])
   })
 })
 

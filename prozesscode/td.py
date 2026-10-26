@@ -24,6 +24,7 @@ import argparse
 import sys
 
 
+from . import td_anchors  # noqa: E402
 from . import td_entry as tde  # noqa: E402
 from .eintrag_felder import AUFSCHUB_HILFE, AUFSCHUB_HILFE_SET  # noqa: E402
 from .tracker_entry import kuerzungen  # noqa: E402
@@ -42,8 +43,7 @@ def cmd_list(args) -> int:
         return 0
     for tid in ids:
         eintrag = tde.get(text, tid) or ""
-        termin = next((z.split("**Fällig:**", 1)[1].split("–")[0].strip()
-                       for z in eintrag.splitlines() if z.startswith("**Fällig:**")), "–")
+        termin = td_anchors.faelligkeitskopf(eintrag) or "–"
         if args.jetzt and not tde.braucht_memory_punkt(termin):
             continue
         print(f"{tid:<14} [{termin:<16}] {tde.titel(text, tid)}")

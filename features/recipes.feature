@@ -65,7 +65,8 @@ Feature: Rezepte erfassen
   # Schritt zu entfernen. Die Detailansicht zeigt jeden Schritt als eigenen Eintrag mit seiner
   # Nummer, lückenlos gezählt; Abstand und Form legt der UI-Entwurf fest.
   # Die Rezept-Liste ist alphabetisch sortiert (deutsches Locale, ohne Unterschied der
-  # Groß-/Kleinschreibung).
+  # Groß-/Kleinschreibung). Ein Umlaut zählt wie sein Grundbuchstabe (Ö wie O, nicht wie „oe"
+  # und nicht ans Ende): „Möhrensuppe" steht zwischen „Mohnkuchen" und „Mohrrübeneintopf".
   #
   # Leerraum und unsichtbare Zeichen: Titel, Anweisung und jede Zutatenzeile werden nach der
   # querschnittlichen Regel normalisiert (features/text-input.feature). Als Eingabe für die
@@ -219,11 +220,14 @@ Feature: Rezepte erfassen
   @US-602-happy-path
   Scenario: Mehrere Rezepte erscheinen alphabetisch sortiert
     Given das Rezept "Zwiebelkuchen" existiert
+    And das Rezept "Mohrrübeneintopf" existiert
     And das Rezept "Ölkuchen" existiert
     And das Rezept "apfelstrudel" existiert
+    And das Rezept "Möhrensuppe" existiert
     And das Rezept "Brot" existiert
+    And das Rezept "Mohnkuchen" existiert
     When ich zur Rezepte-Seite navigiere
-    Then zeigt die Rezept-Liste in dieser Reihenfolge: "apfelstrudel", "Brot", "Ölkuchen", "Zwiebelkuchen"
+    Then zeigt die Rezept-Liste in dieser Reihenfolge: "apfelstrudel", "Brot", "Mohnkuchen", "Möhrensuppe", "Mohrrübeneintopf", "Ölkuchen", "Zwiebelkuchen"
 
   # Zwei Rezepte, damit ein falsch geladenes Rezept auffällt: „Brot" steht in der Liste vor
   # „Pfannkuchen" (wer das erste lädt statt des angeklickten, zeigt Brot), und „500 g Weizenmehl"

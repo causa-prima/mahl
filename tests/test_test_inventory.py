@@ -145,6 +145,30 @@ def test_typescript_handles_modifiers_like_it_each():
     assert "parametrisiert %i" in namen
 
 
+def test_typescript_multiline_each_takes_the_name_from_the_closing_line():
+    """Mehrzeilige Tabelle, Name erst in der schließenden Zeile – Form aus RecipesPage.test.tsx (S142):
+    das Inventar listete 11 statt 12 Tests, der Fehlerfall der Scenario Outline fehlte."""
+    mehrzeilig = """
+describe('Fehlerfälle', () => {
+  it.each([
+    ['einer unbekannten Kennung', '3f2b8c1e', () => HttpResponse.json({ status: 404 }, { status: 404 })],
+    ['einer ungültigen Kennung', 'keine-guid', () => new HttpResponse(null, { status: 404 })],
+  ])('US602_Error_OpenRecipe_UnknownLink_ShowsNotFoundAndWayBack (%s)', async (_kennung, id, notFound) => {
+    renderApp(`/recipes/${id}`)
+  })
+
+  it('danach', () => {
+  })
+})
+"""
+    eintraege = parse_typescript(_lines(mehrzeilig))
+    assert [(e.name, e.start, e.end) for e in eintraege] == [
+        ("Fehlerfälle", 1, 11),
+        ("US602_Error_OpenRecipe_UnknownLink_ShowsNotFoundAndWayBack (%s)", 2, 7),
+        ("danach", 9, 10),
+    ]
+
+
 def test_typescript_playwright_describe_is_a_suite():
     """Playwright schreibt `test.describe(…)` – das Wort vorn ist `test`, die Art steckt im Modifikator.
     S132: `ingredients.spec.ts` meldete dadurch 53 Tests statt 41 (die 12 Suiten mitgezählt)."""
@@ -261,6 +285,8 @@ def test_real_project_files_are_parsed(tmp_path):
     repo = Path(__file__).resolve().parents[1]
     for pfad, mindestens in (("Server.Tests/IngredientsEndpointsTests.cs", 20),
                              ("Client/src/pages/IngredientsPage.test.tsx", 20),
+                             # 12 inklusive des mehrzeiligen it.each (ohne dessen Erkennung: 11)
+                             ("Client/src/pages/RecipesPage.test.tsx", 12),
                              ("tests/test_next_run.py", 20)):
         datei = repo / pfad
         if not datei.exists():

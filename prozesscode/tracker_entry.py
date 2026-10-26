@@ -36,8 +36,14 @@ class TrackerSpec:
         return re.compile(
             rf"^## ({self.praefix}-S(\d{{3}})-(\d+))\s+[—–-]\s+(.+)$", re.M)
 
-    def feldzeile(self, feld: str) -> re.Pattern[str]:
-        return re.compile(rf"^\*\*{re.escape(feld)}:\*\*.*$", re.M)
+    def feldblock(self, feld: str) -> re.Pattern[str]:
+        """Die Feldzeile samt Folgezeilen – bis zur nächsten Feldzeile, Leerzeile oder `---`.
+
+        Ein Wert darf mehrzeilig sein (etwa „(a) …", „(b) …" unter **Problem:**). Nur die erste
+        Zeile zu ersetzen, ließe die alte Fortsetzung unter der neuen stehen.
+        """
+        return re.compile(
+            rf"^\*\*{re.escape(feld)}:\*\*.*(?:\n(?!\*\*[^:*\n]+:\*\*|---[ \t]*$|[ \t]*$).*)*", re.M)
 
 
 def entry_spans(spec: TrackerSpec, text: str) -> dict[str, tuple[int, int]]:
@@ -207,7 +213,7 @@ def set_fields(spec: TrackerSpec, text: str, eid: str, werte: dict[str, str],
     for feld, wert in werte.items():
         if wert is None:
             continue
-        muster = spec.feldzeile(feld)
+        muster = spec.feldblock(feld)
         if not muster.search(block):
             raise ValueError(f"{eid} hat kein Feld `**{feld}:**` – Datei von Hand prüfen.")
         # Ersetzung als Funktion, nicht als String: Ein String wäre ein Regex-Template, in

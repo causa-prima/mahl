@@ -88,6 +88,16 @@ def test_feldzeile_im_wert_kapert_die_struktur_nicht():
 
 
 # --- Ändern ------------------------------------------------------------------
+def test_set_ersetzt_ein_mehrzeiliges_feld_ganz():
+    """Folgezeilen ohne eigenes Feld-Präfix („(a) …", „(b) …") gehören zum Feld. Ersetzte `set` nur die
+    erste Zeile, stünde die alte Fassung danach unter der neuen – so geschehen bei `td set --problem`."""
+    mehrzeilig = BESTAND.replace("**Alpha:** eins\n", "**Alpha:** eins\n(a) alt eins\n(b) alt zwei\n")
+    neu = te.set_fields(SPEC, mehrzeilig, "XX-S100-1", {"Alpha": "neu\n(a) neu eins"})
+    eintrag = te.get(SPEC, neu, "XX-S100-1")
+    assert "alt" not in eintrag
+    assert "**Alpha:** neu\n(a) neu eins\n**Beta:** zwei" in eintrag
+
+
 def test_set_laesst_nachbarn_unberuehrt():
     neu = te.set_fields(SPEC, BESTAND, "XX-S100-1", {"Alpha": "neu"})
     assert te.get(SPEC, neu, "XX-S100-2") == te.get(SPEC, BESTAND, "XX-S100-2")

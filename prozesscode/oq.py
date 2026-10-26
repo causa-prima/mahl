@@ -34,6 +34,7 @@ from .oq_entry import (  # noqa: E402
     remove,
     set_fields,
 )
+from . import td_anchors  # noqa: E402
 from .eintrag_felder import AUFSCHUB_HILFE, AUFSCHUB_HILFE_SET  # noqa: E402
 from .tracker_entry import kuerzungen
 
@@ -68,8 +69,7 @@ def cmd_list(args) -> int:
     for oid in ids:
         eintrag = get(text, oid) or ""
         titel = eintrag.splitlines()[0].split("—", 1)[-1].strip()
-        termin = next((z.split("**Fällig:**", 1)[1].split("–")[0].strip()
-                       for z in eintrag.splitlines() if z.startswith("**Fällig:**")), "–")
+        termin = td_anchors.faelligkeitskopf(eintrag) or "–"
         print(f"{oid:<14} [{termin:<12}] {titel}")
     print(f"\n{len(ids)} offen.")
     return 0

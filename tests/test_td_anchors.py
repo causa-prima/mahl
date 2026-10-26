@@ -26,6 +26,44 @@ def test_head_only_when_there_is_no_prose():
     assert ta.kopf_und_prosa("jetzt") == ("jetzt", "")
 
 
+def test_dash_inside_a_scenario_title_does_not_end_the_head():
+    """Szenario-Titel tragen Gedankenstriche („Titel existiert bereits – unabhängig von …")."""
+    kopf, prosa = ta.kopf_und_prosa('Szenario:„A – B", Phase:MVP – erst dann')
+    assert kopf == 'Szenario:„A – B", Phase:MVP'
+    assert prosa == "erst dann"
+    anker, fehler = ta.parse('Szenario:"A – B" – gerade Anführungszeichen ebenso')
+    assert fehler == []
+    assert [(a.art, a.wert) for a in anker] == [(ta.SZENARIO, "A – B")]
+
+
+def test_dash_only_inside_the_title_leaves_no_prose():
+    assert ta.kopf_und_prosa('Szenario:„A – B"') == ('Szenario:„A – B"', "")
+
+
+def test_straight_quoted_title_protects_its_dash_in_the_split():
+    assert ta.kopf_und_prosa('Szenario:"A – B" – Prosa') == ('Szenario:"A – B"', "Prosa")
+
+
+def test_unclosed_title_falls_back_to_the_first_dash():
+    """Ohne schließendes Anführungszeichen ist es kein Titel – der erste Gedankenstrich trennt, und
+    `parse` meldet den Kopf als unbekannten Anker statt ihn still zu verschlucken."""
+    assert ta.kopf_und_prosa('Szenario:„A – B') == ("Szenario:„A", "B")
+    assert ta.parse('Szenario:„A – B')[1]
+
+
+def test_faelligkeitskopf_reads_the_head_of_an_entry():
+    """Gemeinsamer Leser für `td list`, `oq list` und die AGENT_MEMORY-Auflösung – eine Wahrheit."""
+    eintrag = ('## TD-S142-1 — Titel\n**Fällig:** Szenario:„Titel existiert bereits – unabhängig von '
+               'Schreibweise und Leerraum" – dort prüfen\n**Problem:** x')
+    assert ta.faelligkeitskopf(eintrag) == 'Szenario:„Titel existiert bereits – unabhängig von Schreibweise und Leerraum"'
+    assert ta.faelligkeitskopf("## TD-S1-1 — ohne Feld\n**Problem:** x") is None
+
+
+def test_quoted_dash_in_the_prose_does_not_move_the_split():
+    """Gegenprobe: Nur ein Szenario-Titel im Kopf schützt seinen Gedankenstrich, kein Zitat in der Prosa."""
+    assert ta.kopf_und_prosa('Phase:MVP – siehe „X – Y" dort') == ("Phase:MVP", 'siehe „X – Y" dort')
+
+
 # --- parse: Vokabular --------------------------------------------------------
 def test_parses_every_anchor_kind():
     anker, fehler = ta.parse('jetzt, Phase:MVP, S130, Szenario:„Titel", US-602, TD-S089-1')

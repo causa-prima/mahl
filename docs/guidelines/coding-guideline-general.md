@@ -16,7 +16,7 @@ kritische-regeln:
 |-----------|--------|------------|
 | [Code-Beispiele lesen](#CGG-code-beispiele) | Beispiele zeigen Regeln, nicht den Bestand und keinen Bauauftrag | Bevor du ein Beispiel aus einer Guideline übernimmst |
 | [KISS](#CGG-kiss) | Einfachste Lösung wählen, keine vorzeitigen Abstraktionen | Immer – vor jedem Feature |
-| [Naming](#CGG-naming) | Glossar-Begriffe, selbsterklärende Namen, Kommentare = Warum | Immer – beim Benennen von Typen/Methoden |
+| [Naming](#CGG-naming) | Glossar-Begriffe, selbsterklärende Namen, Kommentare = Warum, keine Magic Values | Immer – beim Benennen von Typen/Methoden |
 | [Komplexität & Refactoring](#CGG-komplexitaet) | Max. ~20 Zeilen/Methode, max. 3 Verschachtelungsebenen, kein toter Code | Bei Umstrukturierung oder wachsenden Methoden |
 | [Übergreifende Paradigmen](#CGG-paradigmen) | Tabelle: Immutability, Value Objects, ROP, Pure Functions – C# vs. TypeScript | Als Orientierung vor dem Lesen der sprachspezifischen Guideline |
 ---
@@ -74,6 +74,15 @@ Wähle immer die einfachste Lösung, die den Anforderungen genügt.
 - Verwende ausschließlich Begriffe aus `docs/reference/glossary.md` für Domänenkonzepte.
 - Variablen-, Methoden- und Typnamen sollen selbsterklärend sein – kein Name, der einen erklärenden Kommentar benötigt.
 - Kommentare beschreiben das **Warum**, nicht das **Was**. Code erklärt das Was.
+- **Keine Magic Values:** Ein Literal, dessen Bedeutung sich nicht aus ihm selbst ergibt – ein
+  technischer Bezeichner (Collation-, Header-, Format-Name) oder ein Grenzwert –, bekommt eine
+  benannte Konstante, auch wenn es nur an einer Stelle steht. Der Name sagt, *was* der Wert ist
+  (`Collations.German`), der Wert selbst bleibt das *Wie*. Gilt die Vereinbarung an mehreren
+  Stellen, ist die Konstante deren einzige Quelle. Stryker.NET mutiert keine `const`-Felder: Der Wert
+  einer Konstante braucht deshalb einen Test, der ihn über das Verhalten pinnt, und eine Gegenprobe
+  (Wert brechen → Test rot) – ein Mutation-Score von 100 % belegt ihn nicht. Ausgenommen sind Literale, die wörtlich die
+  Spec wiedergeben: Testdaten und Erwartungswerte in Tests (spiegeln das Szenario) und
+  Meldungstexte, die ein Szenario festlegt.
 
 ---
 

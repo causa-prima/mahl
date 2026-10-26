@@ -244,6 +244,67 @@ def test_check_new_suppressions_in_untracked(tmp_path, monkeypatch):
     assert any("Stryker disable" in line for _, line in found)
 
 
+# --- Test-Struktur (Given/When/Then, Pflicht laut CGC-/CGT-given-when-then) ---
+
+_UNSTRUCTURED_FACT = (
+    "public class FooTests {\n"
+    "    [Fact]\n"
+    "    public async Task Foo_Bar_Baz()\n"
+    "    {\n"
+    "        // When: abgerufen\n"
+    "        var x = 1;\n"
+    "        // Then: 1\n"
+    "        x.Should().Be(1);\n"
+    "    }\n"
+    "}\n"
+)
+
+
+def _repo_with_new_backend_test(tmp_path, monkeypatch, content):
+    g = _init_repo(tmp_path)
+    _write(tmp_path, "Server/app.cs", "x\n")
+    g("add", ".")
+    g("commit", "-qm", "init")
+    _write(tmp_path, "Server.Tests/FooTests.cs", content)
+    monkeypatch.chdir(tmp_path)
+
+
+def test_check_test_structure_flags_new_test_without_given(tmp_path, monkeypatch):
+    # // Given ein neuer Backend-Test ohne // Given
+    _repo_with_new_backend_test(tmp_path, monkeypatch, _UNSTRUCTURED_FACT)
+    # // When die Struktur geprüft wird
+    findings = qa.check_test_structure("backend")
+    # // Then nennt der Befund Datei und fehlendes Stück
+    assert findings == [("Server.Tests/FooTests.cs", "[Fact]  →  fehlt: // Given")]
+
+
+def test_check_test_structure_accepts_structured_test(tmp_path, monkeypatch):
+    # // Given ein neuer Backend-Test mit Given-, When- und Then-Kommentar
+    _repo_with_new_backend_test(tmp_path, monkeypatch,
+                                _UNSTRUCTURED_FACT.replace("// When", "// Given: nichts\n        // When"))
+    # // When / // Then kein Befund
+    assert qa.check_test_structure("backend") == []
+
+
+def test_structure_fast_fail_reports_before_stryker(tmp_path, monkeypatch):
+    # // Given ein neuer Test ohne // Given – S142: der Befund kam erst nach dem minutenlangen Stryker-Lauf
+    _repo_with_new_backend_test(tmp_path, monkeypatch, _UNSTRUCTURED_FACT)
+    # // When der Fast-Fail vor Stryker prüft
+    message = qa.structure_fast_fail("backend")
+    # // Then nennt die Meldung den Befund und dass Stryker deshalb nicht lief
+    assert message is not None
+    assert "Server.Tests/FooTests.cs" in message and "fehlt: // Given" in message
+    assert "vor Stryker" in message
+
+
+def test_structure_fast_fail_is_silent_for_structured_tests(tmp_path, monkeypatch):
+    # // Given ein vollständig strukturierter neuer Test
+    _repo_with_new_backend_test(tmp_path, monkeypatch,
+                                _UNSTRUCTURED_FACT.replace("// When", "// Given: nichts\n        // When"))
+    # // When / // Then kein Abbruch
+    assert qa.structure_fast_fail("backend") is None
+
+
 # --- Test-Freigabe-Audit (OBS-S090-4: nur erlaubte Änderungen nach Freigabe) ---
 
 def _hash_object(path, rel):
@@ -283,6 +344,27 @@ def test_audit_approved_tests_shows_what_changed(tmp_path, monkeypatch):
     # // Then wird die Abweichung samt konkretem Diff (WAS geändert wurde) gemeldet
     assert findings == 1
     assert "999" in "\n".join(lines)
+
+
+def test_audit_approved_tests_names_missing_blob_and_way_out(tmp_path, monkeypatch):
+    # // Given ein Anker, der ohne -w berechnet wurde (Blob nicht in der Objektdatenbank), und eine
+    #    danach geänderte Test-Datei
+    g = _init_repo(tmp_path)
+    _write(tmp_path, "Client/src/app.ts", "x\n")
+    g("add", ".")
+    g("commit", "-qm", "init")
+    _write(tmp_path, "Client/src/foo.spec.ts", "it('a', () => { expect(x).toBe(1) })\n")
+    monkeypatch.chdir(tmp_path)
+    sha = subprocess.run(["git", "hash-object", "Client/src/foo.spec.ts"], cwd=tmp_path,
+                         capture_output=True, text=True).stdout.strip()
+    _write(tmp_path, "Client/src/foo.spec.ts", "it('a', () => { expect(x).toBe(999) })\n")
+    # // When gegen diesen Anker geprüft wird
+    findings, lines = qa.audit_approved_tests("frontend", {"Client/src/foo.spec.ts": sha})
+    # // Then zählt die Abweichung, und die Meldung nennt den fehlenden Blob samt Ausweg statt eines leeren Diffs
+    assert findings == 1
+    text = "\n".join(lines)
+    assert "nicht in der Objektdatenbank" in text
+    assert "git hash-object -w" in text
 
 
 def test_audit_approved_tests_flags_unapproved(tmp_path, monkeypatch):
@@ -407,3 +489,156 @@ def test_tsc_gate_runs_typecheck(monkeypatch):
     assert rc == 0
     assert "typecheck" in calls["cmd"]
     assert calls["cwd"].endswith("Client")
+
+
+# --- ESLint-Meldung (Check 4) und Hash-Warnung bei rotem Check ---
+
+# Echte Ausgabe von `python3 -m prozesscode.eslint-run` (S142) mit zwei Fehlern in einer
+# Wegwerfdatei. Die letzte Zeile ist der Wrapper-Hinweis – genau sie meldete Check 4 früher als Befund.
+_ESLINT_RUN_FEHLER = """\
+{root}/Client/e2e/api/zz-gegenprobe.ts
+  2:3  error  Unexpected let, use const instead           functional/no-let
+  3:3  error  Unexpected loop, use map or reduce instead  functional/no-loop-statements
+
+{root}/Client/e2e/ingredients.spec.ts
+  32:1  warning  Async function 'restoreInFlightBeforeClientRestore' has too many parameters (5). Maximum allowed is 4  max-params
+
+{root}/Client/src/pages/CreateRecipePage.tsx
+  15:16  warning  Function 'CreateRecipePage' has too many lines (52). Maximum allowed is 50  max-lines-per-function
+
+✖ 4 problems (2 errors, 2 warnings)
+
+✗ ESLint: 2 Fehler, 2 Warnung(en) – oben aufgelistet
+   (vollständiger Output: --verbose)
+"""
+
+
+def _fake_eslint(monkeypatch, stdout: str, returncode: int):
+    class R:
+        pass
+    r = R()
+    r.stdout, r.stderr, r.returncode = stdout, "", returncode
+    monkeypatch.setattr(qa, "_changed_paths", lambda _paths: ["Client/e2e/api/zz-gegenprobe.ts"])
+    monkeypatch.setattr(qa.subprocess, "run", lambda *_a, **_kw: r)
+
+
+def test_check_eslint_reports_each_error_with_file_position_and_rule(monkeypatch):
+    # // Given eslint-run scheitert mit seiner echten Ausgabe: zwei Fehler, zwei Warnungen
+    _fake_eslint(monkeypatch, _ESLINT_RUN_FEHLER.format(root=qa._REPO_ROOT), 1)
+    # // When Check 4 läuft
+    status, code = qa.check_eslint("frontend")
+    # // Then nennt die Meldung jeden Fehler mit repo-relativer Datei, Position und Regel –
+    #    nicht die Warnungen und nicht den Wrapper-Hinweis als Befund
+    assert code == 1
+    lines = status.splitlines()
+    assert "  Client/e2e/api/zz-gegenprobe.ts:2:3 functional/no-let – Unexpected let, use const instead" in lines
+    assert ("  Client/e2e/api/zz-gegenprobe.ts:3:3 functional/no-loop-statements – "
+            "Unexpected loop, use map or reduce instead") in lines
+    assert str(qa._REPO_ROOT) not in status
+    assert "max-params" not in status
+    assert "(vollständiger Output: --verbose)" not in status
+
+
+def test_check_eslint_without_parsable_error_lines_reports_output_before_wrapper_trailer(monkeypatch):
+    # // Given eslint-run scheitert ohne Fehlerzeilen im bekannten Format (ESLint-Absturz). Der Absturztext
+    #    ist nachgebildet; die Schlusszeilen haben die echte Form von _wrapper_output.emit – genau sie
+    #    meldete der Rückfall früher als Befund.
+    crash = ("Oops! Something went wrong! :(\n\nESLint: 9.39.1\n\nTypeError: x is undefined\n"
+             "    at Object.create (rule.js:1:1)\n    at lint (linter.js:2:2)\n    at run (cli.js:3:3)\n"
+             f"\n✗ ESLint: Abbruch\n{qa.VERBOSE_HINT}\n")
+    _fake_eslint(monkeypatch, crash, 2)
+    # // When Check 4 läuft
+    status, code = qa.check_eslint("frontend")
+    # // Then ist der Anfang der Ausgabe der Befund – nicht Verdikt oder --verbose-Hinweis des Wrappers,
+    #    und der Stacktrace ist abgeschnitten (vollständig zeigt ihn eslint-run selbst)
+    assert code == 2
+    assert "TypeError: x is undefined" in status
+    assert "✗ ESLint: Abbruch" not in status
+    assert qa.VERBOSE_HINT not in status
+    assert "at run (cli.js:3:3)" not in status
+
+
+def test_check_eslint_short_fallback_output_drops_wrapper_trailer(monkeypatch):
+    # // Given ein kurzer Absturz: Befund und Wrapper-Schlusszeilen passen zusammen in den gezeigten Ausschnitt
+    _fake_eslint(monkeypatch, f"Oops! Something went wrong! :(\nTypeError: x is undefined\n\n"
+                              f"✗ ESLint: Abbruch\n{qa.VERBOSE_HINT}\n", 2)
+    # // When Check 4 läuft
+    status, _ = qa.check_eslint("frontend")
+    # // Then stehen beide Befundzeilen je für sich da, Verdikt und --verbose-Hinweis des Wrappers nicht
+    lines = status.splitlines()
+    assert "  Oops! Something went wrong! :(" in lines
+    assert "  TypeError: x is undefined" in lines
+    assert "  ✗ ESLint: Abbruch" not in lines
+    assert qa.VERBOSE_HINT not in status
+
+
+def test_check_eslint_without_any_output_says_so(monkeypatch):
+    # // Given eslint-run scheitert ohne jede Ausgabe
+    _fake_eslint(monkeypatch, "", 2)
+    # // When Check 4 läuft
+    status, code = qa.check_eslint("frontend")
+    # // Then nennt die Meldung das Fehlen der Ausgabe statt still leer zu bleiben
+    assert code == 2
+    assert qa.ESLINT_NO_OUTPUT in status
+
+
+# Echte Ausgabe von eslint-run (S142) bei einem Parsing-Fehler: die Fehlerzeile trägt keinen Regelnamen.
+_ESLINT_RUN_PARSING_ERROR = """\
+{root}/Client/e2e/api/zz-gegenprobe.ts
+  1:23  error  Parsing error: Expression expected
+
+{root}/Client/src/pages/CreateRecipePage.tsx
+  15:16  warning  Function 'CreateRecipePage' has too many lines (52). Maximum allowed is 50  max-lines-per-function
+
+✖ 2 problems (1 error, 1 warning)
+
+✗ ESLint: 1 Fehler, 1 Warnung(en) – oben aufgelistet
+   (vollständiger Output: --verbose)
+"""
+
+
+def test_check_eslint_reports_parsing_error_without_rule(monkeypatch):
+    # // Given eslint-run scheitert an einem Parsing-Fehler (Fehlerzeile ohne Regelnamen)
+    _fake_eslint(monkeypatch, _ESLINT_RUN_PARSING_ERROR.format(root=qa._REPO_ROOT), 1)
+    # // When Check 4 läuft
+    status, _ = qa.check_eslint("frontend")
+    # // Then wird auch dieser Fehler mit Datei und Position gemeldet, statt still zu fehlen
+    assert "  Client/e2e/api/zz-gegenprobe.ts:1:23 – Parsing error: Expression expected" in status.splitlines()
+
+
+def test_check_eslint_flags_incomplete_list_when_summary_counts_more_errors(monkeypatch):
+    # // Given die echte Ausgabe, in der eine der zwei Fehlerzeilen ein unbekanntes Format hat (Position
+    #    ohne Spalte) – ESLints Zusammenfassung zählt weiter zwei Fehler
+    output = _ESLINT_RUN_FEHLER.format(root=qa._REPO_ROOT).replace(
+        "  2:3  error  Unexpected let", "  2  error  Unexpected let")
+    _fake_eslint(monkeypatch, output, 1)
+    # // When Check 4 läuft
+    status, _ = qa.check_eslint("frontend")
+    # // Then meldet Check 4 den erkannten Fehler und dass die Liste unvollständig ist
+    assert "FEHLER – 1 Fehler:" in status
+    assert qa.ESLINT_INCOMPLETE.format(reported=2, parsed=1) in status.splitlines()
+
+
+def test_check_eslint_complete_list_has_no_incomplete_note(monkeypatch):
+    # // Given / When: echte Ausgabe, alle Fehlerzeilen im bekannten Format
+    _fake_eslint(monkeypatch, _ESLINT_RUN_FEHLER.format(root=qa._REPO_ROOT), 1)
+    status, _ = qa.check_eslint("frontend")
+    # // Then fehlt der Unvollständig-Hinweis
+    assert "unvollständig" not in status
+
+
+def test_red_checks_names_failed_lint_and_adr_checks():
+    # // Given / When / Then: nur ein Exit-Code > 0 ist rot; -1 heißt „übersprungen"
+    assert qa.red_checks(lint_code=1, adr_code=0) == [qa.CHECK_ESLINT_TITLE]
+    assert qa.red_checks(lint_code=-1, adr_code=1) == [qa.CHECK_ADR_TITLE]
+    assert qa.red_checks(lint_code=0, adr_code=-1) == []
+
+
+def test_red_check_warning_names_red_checks_or_is_absent():
+    # // Given / When / Then: die Warnzeile nennt jeden roten Check; ohne roten Check gibt es keine.
+    #    Dass main() sie hinter den Hash schreibt, belegt die Gegenprobe (S142: Wegwerfdatei mit
+    #    ESLint-Fehler, voller qa-check-Lauf zeigte die Warnzeile).
+    warning = qa.red_check_warning(lint_code=1, adr_code=2)
+    assert warning is not None
+    assert f"Rot: {qa.CHECK_ESLINT_TITLE}, {qa.CHECK_ADR_TITLE}." in warning
+    assert qa.red_check_warning(lint_code=0, adr_code=-1) is None

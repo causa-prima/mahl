@@ -21,16 +21,23 @@ internal static class RecipesEndpoints
         // Stryker disable once Statement,String : Tag name has no routing or behavioral impact (ADR-S136-1)
         group.WithTags("Recipes");
 
-        // Noch unsortiert: die alphabetische Sortierung – und mit ihr ein stabiler Collection-ETag
-        // (ADR-S084-1) – kommt mit dem Szenario „Mehrere Rezepte erscheinen alphabetisch sortiert".
+        // ADR-S142-1: Sortierung in der DB mit expliziter ICU-Collation – die Default-Collation sortiert auf
+        // postgres:18-alpine nach Bytes. Zugleich die deterministische Reihenfolge für den Collection-ETag (ADR-S084-1).
         group.MapGet(
             "",
             async (MahlDbContext db) =>
-                Results.Ok(await db.Recipes.Select(r => new RecipeSummaryDto(r.Id, r.Title)).ToListAsync()));
+                Results.Ok(
+                    await db.Recipes
+                        .OrderBy(r => EF.Functions.Collate(r.Title, Collations.German))
+                        .Select(r => new RecipeSummaryDto(r.Id, r.Title))
+                        .ToListAsync()));
 
         // Handler-Logik ausgelagert wie IngredientsEndpoints.CreateIngredient – diese Methode bleibt
         // eine Routentabelle.
         group.MapPost("", RecipeMappings.CreateRecipe);
+
+        // ADR-S142-2: {id:guid} – eine Kennung, die keine GUID ist, beantwortet die Route-Constraint mit 404.
+        group.MapGet("/{id:guid}", RecipeMappings.GetRecipe);
     }
 }
 
@@ -54,10 +61,59 @@ file static class RecipeMappings
         await db.SaveChangesAsync(CancellationToken.None);
 
         // ADR-S106-1/ADR-S000-12: der xmin der neu angelegten Rezeptzeile geht als ETag mit dem 201 heraus.
-        var xmin = (uint) db.Entry(recipeRow).Property("xmin").CurrentValue!;
+        var xmin = db.ReadXmin(recipeRow);
         httpContext.Response.Headers.ETag = XminETag.Format(xmin);
         return Results.Created($"/api/recipes/{recipe.Id.Value}", recipe.ToDto(id => ingredientsById[id.Value]));
     }
+
+    // ADR-S142-2: dasselbe Rezept-DTO wie der 201 beim Anlegen, dazu der xmin der Rezeptzeile als ETag.
+    // Die Middleware (ADR-S084-1) lässt den gesetzten ETag stehen und beantwortet If-None-Match damit.
+    // Ohne Validierung der Zeilen (korrupte Daten: TD-S141-3). Der ETag deckt Zeilen, Schritte und
+    // Zutatendaten nicht ab, und die Abfragen laufen ohne gemeinsamen Snapshot (TD-S142-2).
+    internal static async Task<IResult> GetRecipe(Guid id, MahlDbContext db, HttpContext httpContext)
+    {
+        // Bewusst ohne RequestAborted: Das Backend reicht Abbruch nirgends durch (Sonar S8949 verlangt die explizite Wahl).
+        var recipe = await db.Recipes.SingleOrDefaultAsync(r => r.Id == id, CancellationToken.None);
+        if (recipe is null)
+            return NotFoundProblem();
+
+        var ingredients = await LoadIngredientsAsync(id, db);
+        var steps = await LoadStepsAsync(id, db);
+
+        httpContext.Response.Headers.ETag = XminETag.Format(db.ReadXmin(recipe));
+        return Results.Ok(new RecipeDto(recipe.Id, recipe.Title, ingredients, steps));
+    }
+
+    // ADR-S135-2: Zeilenreihenfolge = Position.
+    private static async Task<IReadOnlyList<RecipeIngredientDto>> LoadIngredientsAsync(Guid recipeId, MahlDbContext db)
+    {
+        var rows = await db.RecipeIngredients
+            .Where(ri => ri.RecipeId == recipeId)
+            .OrderBy(ri => ri.Position)
+            .Join(db.Ingredients, ri => ri.IngredientId, i => i.Id, (ri, i) => new { i.Name, ri.Quantity, i.BaseUnit })
+            .ToListAsync(CancellationToken.None);
+        return [.. rows.Select(row => ToIngredientDto(row.Name, row.Quantity, row.BaseUnit))];
+    }
+
+    // ADR-S027-1: Schritt-Reihenfolge = StepNumber.
+    private static async Task<IReadOnlyList<StepDto>> LoadStepsAsync(Guid recipeId, MahlDbContext db) =>
+        await db.Steps
+            .Where(s => s.RecipeId == recipeId)
+            .OrderBy(s => s.StepNumber)
+            .Select(s => new StepDto(s.Instruction))
+            .ToListAsync(CancellationToken.None);
+
+    // Einzige Abbildung der Zutatenzeile auf das DTO (Lesen und Anlegen): mit Menge ist die Einheit die
+    // Basiseinheit der Zutat; ohne Menge sind Menge und Einheit null (ADR-S135-2, ADR-S020-1).
+    private static RecipeIngredientDto ToIngredientDto(string name, decimal? quantity, string baseUnit) =>
+        new(name, quantity, quantity is null ? null : baseUnit);
+
+    // ADR-S054-6-Muster wie IngredientMappings.NotFoundProblem: fixe deutsche Meldung + errorCode.
+    private static IResult NotFoundProblem() =>
+        Results.Problem(
+            detail: "Rezept wurde nicht gefunden.",
+            statusCode: StatusCodes.Status404NotFound,
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["errorCode"] = "RECIPE_NOT_FOUND" });
 
     // Der Lookup Name -> Zutat-Id kommt als Funktion herein: die Zerlegung kennt keine DB.
     private static Recipe ToRecipe(CreateRecipeDto dto, RecipeId id, Func<string, Guid> ingredientIdByName) =>
@@ -111,10 +167,6 @@ file static class RecipeMappings
             [.. recipe.Ingredients.Select(ingredient => ingredient.ToDto(ingredientRow(ingredient.Ingredient)))],
             [.. recipe.Steps.Select(step => new StepDto(step.Value))]);
 
-    // ADR-S135-2: mit Menge ist die Einheit die Basiseinheit der Zutat; ohne Menge sind Menge und
-    // Einheit null (ADR-S020-1).
     private static RecipeIngredientDto ToDto(this RecipeIngredient ingredient, IngredientDbType row) =>
-        ingredient.Quantity.Match(
-            amount => new RecipeIngredientDto(row.Name, amount, row.BaseUnit),
-            () => new RecipeIngredientDto(row.Name, Quantity: null, Unit: null));
+        ToIngredientDto(row.Name, ingredient.Quantity.Match<decimal?>(amount => amount, () => null), row.BaseUnit);
 }

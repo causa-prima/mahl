@@ -30,6 +30,10 @@ CS_METHOD = re.compile(r"^\s*(?:public|private|internal|protected)[\w\s<>,\[\]]*
 TS_BLOCK = re.compile(
     r"""^(\s*)(describe|it|test)\b((?:\.\w+)*)\s*\((?:.*\)\s*\(\s*)?\s*(['"`])(.+?)\4"""
 )
+# Dieselbe Form mit mehrzeiliger Tabelle: `it.each([` öffnet, der Name steht erst in der Zeile,
+# die die Tabelle schließt (`])('name', …)`).
+TS_EACH_OPEN = re.compile(r"^(\s*)(it|test)((?:\.\w+)*\.each)\s*\(")
+TS_EACH_NAME = re.compile(r"""^\s*\]\s*\)\s*\(\s*(['"`])(.+?)\1""")
 
 # Python/pytest: Testfunktion = `def test_…`. Async-Tests eingeschlossen.
 PY_TEST = re.compile(r"^\s*(?:async\s+)?def\s+(test_\w*)\s*\(")
@@ -95,12 +99,19 @@ def parse_typescript(lines: list[str]) -> list[Eintrag]:
     eintraege = []
     for idx, line in enumerate(lines):
         treffer = TS_BLOCK.match(line)
-        if not treffer:
+        if treffer:
+            einrueckung, art, modifikatoren, _, name = treffer.groups()
+            ist_suite = art == "describe" or ".describe" in modifikatoren
+            eintraege.append(Eintrag(name, idx + 1, block_ende(lines, idx) + 1,
+                                     len(einrueckung) // 2, ist_suite))
             continue
-        einrueckung, art, modifikatoren, _, name = treffer.groups()
-        ist_suite = art == "describe" or ".describe" in modifikatoren
-        eintraege.append(Eintrag(name, idx + 1, block_ende(lines, idx) + 1,
-                                 len(einrueckung) // 2, ist_suite))
+        offen = TS_EACH_OPEN.match(line)
+        if offen:
+            ende = block_ende(lines, idx)
+            name = next((m.group(2) for folge in lines[idx + 1:ende + 1]
+                         if (m := TS_EACH_NAME.match(folge))), None)
+            if name is not None:
+                eintraege.append(Eintrag(name, idx + 1, ende + 1, len(offen.group(1)) // 2, False))
     return eintraege
 
 

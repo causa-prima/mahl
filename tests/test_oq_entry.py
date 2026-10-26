@@ -32,6 +32,19 @@ BESTAND = """# Offene Fragen
 """
 
 
+def test_oq_list_zeigt_den_vollen_szenario_titel(monkeypatch, tmp_path, capsys):
+    # // Given eine Frage, deren Szenario-Anker einen Gedankenstrich trägt
+    datei = tmp_path / "open-questions.md"
+    datei.write_text(BESTAND.replace("**Fällig:** Phase:V1 – weil Y", '**Fällig:** Szenario:„A – B" – weil Y'),
+                     encoding="utf-8")
+    cli = import_module("prozesscode.oq")
+    monkeypatch.setattr(cli, "oq_path", lambda: datei)
+    # // When `oq list` läuft
+    cli.cmd_list(None)
+    # // Then steht der volle Titel in der Übersicht
+    assert 'Szenario:„A – B"' in capsys.readouterr().out
+
+
 # --- Lesen -------------------------------------------------------------------
 def test_get_liefert_den_ganzen_eintrag():
     eintrag = oq.get(BESTAND, "OQ-S094-1")

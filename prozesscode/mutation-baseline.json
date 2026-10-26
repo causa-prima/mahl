@@ -3,6 +3,11 @@
     "beurteilbar": 155,
     "getoetet": 149
   },
+  "prozesscode._test_inventory": {
+    "beurteilbar": 248,
+    "getoetet": 209,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
   "prozesscode.anchors": {
     "beurteilbar": 216,
     "getoetet": 125
@@ -135,9 +140,19 @@
     "getoetet": 457,
     "messung": "mutmut 3.8.0, Wertung 3"
   },
+  "prozesscode.oq": {
+    "beurteilbar": 436,
+    "getoetet": 72,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
   "prozesscode.ordinale": {
     "beurteilbar": 105,
     "getoetet": 97
+  },
+  "prozesscode.qa-check": {
+    "beurteilbar": 1062,
+    "getoetet": 377,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.rueckgaben": {
     "beurteilbar": 119,
@@ -149,7 +164,23 @@
     "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.td": {
-    "beurteilbar": 177,
-    "getoetet": 0
+    "beurteilbar": 528,
+    "getoetet": 143,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
+  "prozesscode.td_anchors": {
+    "beurteilbar": 392,
+    "getoetet": 319,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
+  "prozesscode.td_entry": {
+    "beurteilbar": 239,
+    "getoetet": 194,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
+  "prozesscode.tracker_entry": {
+    "beurteilbar": 291,
+    "getoetet": 220,
+    "messung": "mutmut 3.8.0, Wertung 3"
   }
 }

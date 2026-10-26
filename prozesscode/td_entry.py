@@ -140,11 +140,7 @@ def memory_aufloesen(memory_text: str, td_text: str) -> str:
             return (f"- **⚠ {tid} steht nicht in {TD_FILE}** — Platzhalter ohne Eintrag "
                     f"· Done: {done}")
         kurztitel = titel(td_text, tid) or tid
-        faellig = "?"
-        for zeile in eintrag.splitlines():
-            if zeile.startswith("**Fällig:**"):
-                faellig = zeile.split("**Fällig:**", 1)[1].split("–")[0].strip()
-                break
+        faellig = td_anchors.faelligkeitskopf(eintrag) or "?"
         return (f"- **{kurztitel} ({tid})** — `Fällig: {faellig}` · Quelle: `{TD_FILE}` "
                 f"→ {tid} · Done: {done}")
 

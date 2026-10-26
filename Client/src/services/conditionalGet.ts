@@ -1,4 +1,5 @@
-import { ResultAsync } from 'neverthrow'
+import { err, ok, ResultAsync } from 'neverthrow'
+import type { Result } from 'neverthrow'
 import { toUnexpectedError } from '../types/apiError'
 import type { ApiError } from '../types/apiError'
 
@@ -23,19 +24,23 @@ function cache200(url: string, body: unknown, etag: string | null): void {
   if (etag) cache.set(url, { etag, body })
 }
 
-async function requestJson<T>(url: string, cached: CacheEntry | undefined): Promise<T> {
+async function requestJson<T>(url: string, cached: CacheEntry | undefined): Promise<Result<T, ApiError>> {
   // If-None-Match nur senden, wenn ein gecachter ETag existiert (verbatim, RFC 7232).
   const headers = cached ? { 'If-None-Match': cached.etag } : undefined
   const response = await fetch(url, { headers })
   // 304 kommt real nur, wenn wir If-None-Match aus einem Cache-Eintrag gesendet haben –
   // daher ist `cached` in diesem Zweig per Design vorhanden (YAGNI: kein Defensiv-Pfad).
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- 304 impliziert Cache-Eintrag
-  if (response.status === 304) return cached!.body as T
+  if (response.status === 304) return ok(cached!.body as T)
+  // Ein 404 trägt je nach Quelle ProblemDetails oder keinen Body (Route-Constraint) – vor dem Parsen abfangen.
+  if (response.status === 404) return err({ kind: 'NotFound' })
   const body = (await response.json()) as T
   cache200(url, body, response.headers.get('ETag'))
-  return body
+  return ok(body)
 }
 
+// requestJson liefert erwartete Ausgänge (304, 404, 200) als Result; fromPromise fängt nur, was dabei
+// wirft (Netzwerk, JSON-Parse), als Unexpected – andThen flacht die beiden Ebenen zu einem Result ab.
 export function conditionalGetJson<T>(url: string): ResultAsync<T, ApiError> {
-  return ResultAsync.fromPromise(requestJson<T>(url, cache.get(url)), toUnexpectedError)
+  return ResultAsync.fromPromise(requestJson<T>(url, cache.get(url)), toUnexpectedError).andThen((result) => result)
 }

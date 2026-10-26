@@ -279,13 +279,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S141-3 – qa-check --approved-tests prüft nicht, ob der Freigabe-Blob existiert
 - Quelle: Orchestrator + Subagent
-- Status: NEU
+- Status: UMGESETZT (S142)
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
 - Beobachtung: In S141 berechnete der Orchestrator einen Test-Freigabe-Anker mit git hash-object ohne -w. Der Blob landete nicht im Objektspeicher; der Subagent konnte den Diff gegen den Anker nicht bilden (git show: bad object) und gab stattdessen die ganze Datei aus. Aufgefallen ist es nur, weil der Subagent es meldete – qa-check akzeptiert --approved-tests pfad=sha, ohne die Auflösbarkeit zu prüfen, und der Fehler wäre erst beim Verify sichtbar geworden. Der Orchestrator musste auf den letzten gültigen Anker ausweichen.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: Im Abschluss von US-602 run-4 nach Wiederholung behoben: audit_approved_tests prüft per git cat-file, ob der Freigabe-Blob existiert; fehlt er, zählt die Datei als geändert und die Meldung nennt den Ausweg git hash-object -w statt eines still leeren Diffs (Test test_audit_approved_tests_names_missing_blob_and_way_out). Früher als beim Verify prüfbar ist es nicht – erst dort erreichen die Anker qa-check.
 
 ## OBS-S141-4 – qa-check Check 1 übersieht geänderte Test-Hilfsdateien
 - Quelle: Orchestrator
@@ -295,4 +295,14 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: In S141 war Server.Tests/Helpers/EndpointsTestsBase.cs laut git geändert (neue Test-Data-Builder) und per --approved-tests freigegeben, erschien aber nicht unter „CHECK 1: GEÄNDERTE TEST-DATEIEN“. Der Test-Freigabe-Audit meldete nur „freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf (committet/zurückgesetzt?)“ – eine irreführende Vermutung. Eine Änderung an einer Hilfsdatei, die alle Integrationstests trägt, läuft so am Audit vorbei.
 - Zusammen-erledigen: OBS-S141-3
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S142-1 – Sichtprüfung bei Handybreite hat keinen regulären Weg
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Die UX-Guideline und mehrere TD-Einträge verlangen, eine Ansicht bei 375 px im Browser zu prüfen. Dafür gibt es kein Werkzeug: Ein eigener Playwright-Spec für Screenshots wird vom E2E-Szenario-Hook geblockt (kein // Szenario:-Kommentar), ein Script im Scratchpad müsste Backend und Vite selbst starten und braucht eine Einzelfreigabe. In S142 (US-602 run-4) half nur, eine bestehende Spec vorübergehend um setViewportSize und page.screenshot zu erweitern, aus einer Sicherung im Scratchpad zurückzuspielen und den Blob-Hash zu vergleichen – zweimal in derselben Session, mit dem Risiko, die Test-Datei verändert zurückzulassen. Eine frühere Session (2026-09-29, Zutaten-Seite, accessibility.spec.ts) ging denselben Umweg.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – im Abschluss von US-602 run-4 entschieden: weder schnell noch riskant, eigener Schritt mit Entwurf
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

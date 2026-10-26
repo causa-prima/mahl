@@ -38,6 +38,8 @@ python3 -m prozesscode.test-inventory <Datei> --grep <Stichwort>
 ```
 Sie listet jeden Test **mit Zeilenbereich**. Willst du einen konkreten Test genauer ansehen, lies **nur dessen Zeilen** (`Read` mit `offset`/`limit`). Der Vorteil wächst mit der Dateigröße: Die Inventur wächst nur mit der Zahl der Tests, die Datei mit deren Inhalt – bei einer kleinen Datei lohnt der Umweg nicht, bei einer über Läufe gewachsenen deutlich.
 
+**Dateien ändern und Wrapper aufrufen – je ein eigener Schritt:** Code und Tests änderst du mit Edit/Write, nie per Heredoc- oder Python-Skript im Bash-Aufruf. Wrapper (`dotnet-test`, `dotnet-stryker`, `qa-check`) laufen in einem eigenen Bash-Aufruf ohne Verkettung: Der Permission-Hook blockt einen Wrapper im selben Befehl wie ein Heredoc oder Filter.
+
 **Test-Einschränkung (Ausnahmen nur nach explizitem Orchestrator-Auftrag):**
 Erlaubt: ausschließlich HTTP-Integrationstests via WebApplicationFactory.
 Verbleibende Stryker-Survivors behandelst du nach [Welcher Survivor bekommt welche Reaktion?](../../docs/process/tdd-process.md#TDD-survivor-entscheidung): Suppression nur, wenn eine bestehende ADR genau diese Klasse erlaubt (die Begründung nennt sie); jeden anderen nicht über HTTP tötbaren Survivor meldest du im Return an den Orchestrator, statt ihn zu suppressen. Das QA-Script listet alle Suppressionen im Check „Neue Suppressionen"; der Orchestrator prüft die Begründungen.

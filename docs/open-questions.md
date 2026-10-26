@@ -150,3 +150,11 @@ Eintrag-Format:
 **Fällig:** Phase:MVP – mit dem globalen Exception-Handler aus ADR-S112-1 liefert der Server dann ProblemDetails, auf die das Frontend reagieren muss
 **Hintergrund:** Security- und Korrektheits-Review US-602 run-2: createRecipe (Client/src/services/recipesApi.ts) wertet den Status nicht aus. Die Läufe run-8 bis run-12 bauen nur die 422-Pfade (FieldErrors); für 5xx/Netzwerkfehler gibt es in features/recipes.feature kein Szenario. Die technische Meldung aus toUnexpectedError darf laut docs/process/nfr.md (Reliability) nicht ungefiltert angezeigt werden.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 als offene Frage mit Phase MVP entschieden
+
+---
+
+## OQ-S142-1 — Seitentitel je Ansicht (Querschnitt)
+**Frage:** Soll jede Ansicht einen eigenen Browser-Tab-/Lesezeichen-Titel tragen (z. B. „Pfannkuchen – Mahl", „Zutaten – Mahl", „Rezept nicht gefunden – Mahl"), und wird das als Querschnittsvertrag aller Seiten (ADR-S112-5) spezifiziert – mit Ansage des Seitenwechsels für Screenreader?
+**Fällig:** Phase:MVP – UI-Feinschliff gehört nach Entscheidung des Users ab MVP dazu
+**Hintergrund:** UX-Review US-602 run-4: Client/index.html setzt fest „Mahl", kein document.title in Client/src. Alle Tabs und Lesezeichen heißen gleich; gerade Lesezeichen auf Rezepte (ADR-S135-5) sind so nicht unterscheidbar. Der User sieht es als Querschnittsthema für alle Seiten, das auch die Rezept-Detailansicht betrifft.
+**Aufschubgrund:** User – im Review von US-602 run-4 als Querschnittsthema eingeordnet; neues Verhalten braucht erst ein Szenario (gherkin-workshop)

@@ -1,10 +1,13 @@
+import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Container from '@mui/material/Container'
 import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
+import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
+import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
-import { useNavigate } from 'react-router'
+import { Link as RouterLink, useNavigate } from 'react-router'
 import { useResultQuery } from '../hooks/useResultQuery'
 import { fetchRecipes } from '../services/recipesApi'
 
@@ -18,18 +21,25 @@ export default function RecipesPage() {
   return (
     <Container component="main" maxWidth="sm">
       <Typography variant="h5" component="h1" id="recipes-heading" gutterBottom>Rezepte</Typography>
-      {recipes.length === 0 ? (
-        <Typography gutterBottom>Noch keine Rezepte angelegt.</Typography>
-      ) : (
-        <List aria-labelledby="recipes-heading">
-          {recipes.map((recipe) => (
-            <ListItem key={recipe.id} disableGutters>
-              <ListItemText primary={recipe.title} />
-            </ListItem>
-          ))}
-        </List>
-      )}
-      <Button variant="contained" onClick={() => { void navigate('/recipes/new') }}>Rezept anlegen</Button>
+      <Stack spacing={2}>
+        {/* Über der Liste, damit man für "Rezept anlegen" nicht durch die ganze Liste scrollt. */}
+        <Box>
+          <Button variant="contained" onClick={() => { void navigate('/recipes/new') }}>Rezept anlegen</Button>
+        </Box>
+        {recipes.length === 0 ? (
+          <Typography>Noch keine Rezepte angelegt.</Typography>
+        ) : (
+          <List aria-labelledby="recipes-heading" disablePadding>
+            {recipes.map((recipe) => (
+              <ListItem key={recipe.id} disableGutters disablePadding>
+                <ListItemButton component={RouterLink} to={`/recipes/${recipe.id}`} disableGutters>
+                  <ListItemText primary={recipe.title} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Stack>
     </Container>
   )
 }

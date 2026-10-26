@@ -4,8 +4,10 @@ namespace mahl.Server.Middleware;
 
 // ADR-S058-1/-2/-3, ADR-S000-12, ADR-S084-1/-2: GET-Collection-Endpoints liefern einen
 // Content-Hash-ETag (SHA-256 des serialisierten Response-Body) und beantworten If-None-Match
-// mit 304. Bewusst nur Single-Tag-Vergleich (ordinal/verbatim) – kein RFC-7232-Listen-/`*`-
-// Support (YAGNI): der einzige Konsument (conditionalGet.ts) sendet stets genau einen ETag.
+// mit 304. ADR-S142-2: Hat ein Single-Resource-Endpoint seinen xmin-ETag schon gesetzt, bleibt
+// dieser stehen und die Middleware entscheidet das 304 damit. Bewusst nur Single-Tag-Vergleich
+// (ordinal/verbatim) – kein RFC-7232-Listen-/`*`-Support (YAGNI): der einzige Konsument
+// (conditionalGet.ts) sendet stets genau einen ETag.
 internal static class ETagMiddleware
 {
     public static void UseCollectionETag(this WebApplication app) =>
@@ -31,8 +33,14 @@ internal static class ETagMiddleware
     {
         if (context.Response.StatusCode == StatusCodes.Status200OK)
         {
-            var etag = $"\"{Convert.ToHexString(SHA256.HashData(buffer.ToArray()))}\"";
-            context.Response.Headers.ETag = etag;
+            // ADR-S142-2: ein Single-Resource-Endpoint setzt seinen xmin-ETag selbst – er bleibt stehen,
+            // der Content-Hash entsteht nur für die übrigen Antworten.
+            var etag = context.Response.Headers.ETag.ToString();
+            if (etag.Length == 0)
+            {
+                etag = $"\"{Convert.ToHexString(SHA256.HashData(buffer.ToArray()))}\"";
+                context.Response.Headers.ETag = etag;
+            }
 
             if (context.Request.Headers.IfNoneMatch == etag)
             {

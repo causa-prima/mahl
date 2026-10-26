@@ -92,7 +92,7 @@ Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
 ## TD-S083-1 — Frontend GET-Pfad: kein `response.ok`-Check, Err wird verschluckt
 **Fällig:** Szenario:„Backend nicht erreichbar beim Laden einer Seite", Szenario:„Backend liefert Serverfehler beim Laden einer Seite", Phase:MVP – die beiden `@NFR-resilience`-„Laden"-Szenarien existieren, sind aber keinem Lauf zugeordnet; daher der Phasen-Backstop.
 **Problem:** Zwei Lücken im GET-Pfad (der POST/Mutation-Pfad ist davon nicht betroffen):
-(a) **Kein `response.ok`-Check.** `conditionalGet.ts` parst die Antwort unbedingt – ein 4xx/5xx-Body wird als Erfolg geparst und als Daten zurückgegeben. Nicht gecacht: `cache200` schreibt nur bei vorhandenem ETag-Header, und `ETagMiddleware` setzt den ausschließlich bei Status 200. Zusätzlich `cached!` im 304-Pfad (YAGNI).
+(a) **Kein `response.ok`-Check.** `conditionalGet.ts` parst die Antwort unbedingt – ein 4xx/5xx-Body wird als Erfolg geparst und als Daten zurückgegeben (ausgenommen 404, das als `NotFound` abgefangen wird). Nicht gecacht: `cache200` schreibt nur bei vorhandenem ETag-Header, und `ETagMiddleware` setzt den ausschließlich bei Status 200. Zusätzlich `cached!` im 304-Pfad (YAGNI). Auf der Rezept-Detailansicht wird ein 5xx-Body mit JSON (z. B. ProblemDetails) so zu „Found" und die Seite stürzt an `recipe.ingredients.map` ab, statt still leer zu bleiben.
 (b) **`useResultQuery` schluckt den `Err`** via `unwrapOr(undefined as TData)` (Type-Lie) → ein GET-Fehler ist nicht von „noch keine Daten"/Leerzustand unterscheidbar.
 **Behebung:** GET-Fehlerpfad einführen: `response.ok`-Check in `conditionalGet`, GET-Err in `useResultQuery` als beobachtbaren Fehlerzustand statt Leerzustand.
 
@@ -101,10 +101,10 @@ Grammatik und Auflösung kanonisch in `prozesscode/td_anchors.py`):
 **Problem:** Feuert der POST/`invalidateQueries`, während der initiale Listen-GET noch in-flight ist, koalesziert react-query und nutzt das stale leere Ergebnis (kein zweiter GET) → gerade angelegte Zutat erscheint nicht. Nur bei kaltem Server / langsamem erstem GET (warm: unkritisch). **Vorher nicht umsetzbar:** `useResultQuery` liefert ausschließlich `TData | undefined` und exponiert keinerlei Lade-/Fehlerzustand – die Seite *kann* nicht wissen, ob der initiale GET gesettled ist.
 **Behebung:** Speichern sperren, solange die Ingredients-Query nicht gesettled ist. **Achtung:** Das vorhandene `disabled={isPending}` löst das nicht – dessen `isPending` stammt aus `useCreateIngredientWithReactivation` und ist der Zustand der *POST-Mutation*, greift also erst, nachdem der POST bereits feuerte.
 
-## TD-S083-5 — Backend Read-Pfad: `GET /api/ingredients` mappt DB→DTO direkt, ohne `ToDomain()`
+## TD-S083-5 — Backend Read-Pfade: Zutaten und Rezepte mappen DB→DTO direkt, ohne `ToDomain()`
 **Fällig:** Phase:MVP – der tragende Auslöser ist ein dediziertes DB-Inkonsistenz-Szenario, das den Fehlerzweig erstmals ausübt; es existiert in `features/` noch nicht und lässt sich deshalb nicht als Anker setzen. Vorher umzubauen erzeugt einen Zweig, den kein Szenario ausübt → Survivor → Suppression außerhalb des treibenden Szenarios. Spätestens zum MVP muss der Read-Pfad stimmen.
-**Problem:** `GET /api/ingredients` projiziert `IngredientDbType` **direkt** auf `IngredientDto` (`db.Ingredients.Select(i => new IngredientDto(i.Id, i.Name, i.BaseUnit))`), statt den kanonischen Read-Pfad `DbType → ToDomain() → OneOf<Ingredient, Error<string>> → DTO` zu gehen ([SKELETON-Scope-Constraints](reference/architecture.md#ARC-skeleton-constraints), [Domain-Typen](guidelines/coding-guideline-csharp.md#CGC-domain-typen)). Weder `ToDomain()` noch das Skip-/Log-Verhalten für korrupte DB-Zeilen existieren auf diesem Pfad. Die Domäne sieht die DB-Daten also nicht – ihre Zusicherung „ein Wert dieses Typs ist garantiert gültig" trägt hier nicht. Dieselbe Abweichung an zweiter Stelle: der Restore-Pfad in `IngredientsEndpoints.cs` (dort mit eigener Begründung, ADR-S108-1).
-**Behebung:** Read-Pfad auf `ToDomain()` umstellen (Skip+Log bei Listen, 500 bei Einzel-Ressource). Die Zielsemantik ist für Recipes bereits entschieden – ADR-S039-3: 500 + `application/problem+json` bei korrupter DB-Zeile, kein silent `null`. Das [kanonische Beispiel](guidelines/coding-guideline-csharp.md#CGC-kanonisches-beispiel) zeigt die Zielform inklusive Fehlersammlung.
+**Problem:** Die Lesepfade projizieren DB-Zeilen **direkt** auf DTOs, statt den kanonischen Read-Pfad `DbType → ToDomain() → OneOf<Domain, Error<string>> → DTO` zu gehen ([SKELETON-Scope-Constraints](reference/architecture.md#ARC-skeleton-constraints), [Domain-Typen](guidelines/coding-guideline-csharp.md#CGC-domain-typen)): `GET /api/ingredients` (`db.Ingredients.Select(i => new IngredientDto(…))`), `GET /api/recipes` (`Select(r => new RecipeSummaryDto(r.Id, r.Title))`) und `GET /api/recipes/{id}` (`RecipeMappings.GetRecipe`: Rezeptzeile, Zutatenzeilen per Join und Schritte direkt aufs `RecipeDto`). Weder `ToDomain()` noch das Skip-/Log- bzw. 500-Verhalten für korrupte DB-Zeilen existieren auf diesen Pfaden. Die Domäne sieht die DB-Daten also nicht – ihre Zusicherung „ein Wert dieses Typs ist garantiert gültig" trägt hier nicht. Dieselbe Abweichung zusätzlich im Restore-Pfad in `IngredientsEndpoints.cs` (dort mit eigener Begründung, ADR-S108-1).
+**Behebung:** Read-Pfade auf `ToDomain()` umstellen (Skip+Log bei Listen, 500 bei Einzel-Ressource), für Rezepte zusammen mit TD-S141-3 (Zutat-Id ungeprüft). Die Zielsemantik ist für Recipes bereits entschieden – ADR-S039-3: 500 + `application/problem+json` bei korrupter DB-Zeile, kein silent `null`. Das [kanonische Beispiel](guidelines/coding-guideline-csharp.md#CGC-kanonisches-beispiel) zeigt die Zielform inklusive Fehlersammlung.
 **Herkunft:** War bis S119 als ADR-S083-1 abgelegt. Umgehängt, weil der Eintrag ein Hybrid ohne terminalen Rest ist: Ist der Read-Pfad umgestellt, gibt es keine Abweichung mehr, die zu erklären wäre – der Eintrag verschwindet ersatzlos. Was terminal ist (Zielsemantik bei korrupter DB), steht schon in ADR-S039-3; ADR-S083-1 trug nur den Aufschub, und den trägt eine ADR nicht.
 
 ---
@@ -313,32 +313,6 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Behebung:** Die Label-Abfragen auf Präfix-Regex umstellen (/^Titel/, /^Zutaten/, /^Schritt 1/) bzw. in einen Helfer kapseln, sobald das endgültige Label feststeht (auch das Schrittfeld-Label kann sich mit „Jedes Schrittfeld zeigt seine Nummer“ ändern).
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 als Hinweis für run-5 entschieden; das endgültige Label legt erst run-5 fest
 
----
-
-## TD-S141-5 — Frontend-Test: Rezept anlegen prüft die Adresse der Detailansicht ohne Szenario
-**Fällig:** Szenario:„Rezept per Direktlink aufrufen" – erstes Szenario, das die Adresse /recipes/{id} fordert
-**Problem:** Der Komponententest zu „Rezept anlegen“ (Client/src/pages/RecipesPage.test.tsx) prüft über die Testhilfe CurrentPath (<output data-testid="current-path">), dass nach dem Speichern /recipes/{id} angezeigt wird. Kein Kriterium des Szenarios „Rezept anlegen“ fordert die Adresse; sie folgt aus ADR-S135-5 (eigene Adresse je Rezept). Die Assertion nimmt damit ein späteres Szenario vorweg.
-**Behebung:** Die Adress-Prüfung mit dem Direktlink-Szenario dorthin übernehmen, wo sie gefordert ist, und sie hier streichen – samt CurrentPath, falls dann kein Test mehr sie braucht.
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 für run-4 entschieden
-
----
-
-## TD-S141-6 — Detailansicht: Schrittliste als geordnete Liste, Abschnittsüberschrift in der Baseline
-**Fällig:** Szenario:„Rezept aus der Rezept-Liste öffnen" – dort wird die Detailansicht ohnehin umgebaut
-**Problem:** Client/src/pages/RecipeDetailPage.tsx zeigt die Schritte als ul mit der Nummer im Text („1. …“). Eine mehrzeilige Anweisung läuft unter die Nummer zurück, sodass Schritte beim Wiederfinden am Handy optisch verschwimmen; ein Screenreader sagt keine Reihenfolge an. Außerdem sind die Abschnittsüberschriften „Zutaten“ und „Zubereitung“ (Typography h6/h2, ohne gutterBottom) nicht in der Visuellen Baseline festgelegt, und ihr Abstand zur vorherigen Liste ist ungeprüft.
-**Behebung:** Schrittliste als List component="ol" mit der Nummer als eigenem Element und hängendem Einzug; den Abschnittsüberschriften-Stil (Ebene, Abstand) in docs/guidelines/coding-guideline-ux.md#CGU-visuelle-baseline festlegen und bei 375 px im Browser prüfen. Komponententest und E2E prüfen die Schrittnummer bereits tolerant (/^1\D+…/).
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 für run-4 entschieden
-
----
-
-## TD-S141-7 — Backend: xmin-Lese-Idiom mehrfach kopiert
-**Fällig:** Szenario:„Rezept per Direktlink aufrufen" – GET /api/recipes/{id} liest den xmin ein weiteres Mal
-**Problem:** (uint) db.Entry(row).Property("xmin").CurrentValue! steht wörtlich in IngredientsEndpoints.cs (drei Stellen) und RecipesEndpoints.cs; dazu kommen das Schreiben über OriginalValue und EF.Property<uint>(…, "xmin") im Lesen. Ein Fehler im String-Literal oder im Cast fiele an keiner Stelle auf. Die Guideline docs/guidelines/coding-guideline-csharp.md#CGC-endpoints-etag schreibt das Idiom wörtlich vor.
-**Behebung:** Einen Helfer extrahieren, der Literal und Cast an einer Stelle hält, und den Ort entscheiden: XminETag (Server/Middleware) ist bewusst ein HTTP-Format-Werkzeug ohne EF-Abhängigkeit, daher eher eine Extension am Infrastructure-/DbContext-Rand. Die Guideline auf den Helfer umstellen.
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 als eigener Refactoring-Schritt entschieden
-
----
-
 ## TD-S141-8 — E2E: Rezept-Liste nach dem Anlegen nur nach Neuladen geprüft
 **Fällig:** Szenario:„Von der Rezepte-Seite zur Zutaten-Seite navigieren" – mit der Navigationsleiste gibt es den Weg zur Liste innerhalb der App
 **Problem:** Client/e2e/recipes.spec.ts prüft „steht genau einmal in der Rezept-Liste“ per page.goto('/recipes'), also nach einem vollständigen Neuladen. Ein veralteter React-Query-Cache der Liste nach dem Anlegen bliebe so unsichtbar; CreateRecipePage invalidiert ['recipes'] nicht, es hilft nur staleTime 0. Mit Collection-ETag und Caching ab dem Sortier-Lauf ist das die wahrscheinlichste Stelle für eine stille Regression.
@@ -360,3 +334,35 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** POST /api/recipes begrenzt weder die Länge des Zutatentexts noch die Zahl der Zutatenzeilen oder Schritte; die Spalten sind text ohne Constraint, die einzige Schranke ist Kestrels Default-Body-Grenze (30 MB). features/recipes.feature begrenzt nur Titel (100) und Schritt-Anweisung (1000). Versehentlich unsinnige Eingaben (z.B. eingefügter Großtext) werden so ungeprüft gespeichert.
 **Behebung:** Fachliche Obergrenzen als Szenario festlegen – Zweck wie bei den Zutaten-Namen: versehentliche unsinnige Eingaben abfangen, nicht Lastschutz (der liegt bei TD-S102-1) – und mit Meldung am Feld umsetzen.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden: für den SKELETON egal, frühestens MVP
+
+---
+
+## TD-S142-1 — Rezept-Liste: kein Tie-Breaker bei byte-identischen Titeln
+**Fällig:** Szenario:„Titel existiert bereits – unabhängig von Schreibweise und Leerraum" – mit der Titel-Eindeutigkeit gibt es keine byte-identischen Titel mehr; dort prüfen und schließen
+**Problem:** GET /api/recipes sortiert per Collate(title, de-x-icu) ohne Tie-Breaker (ADR-S142-1). de-x-icu ist deterministisch und ordnet verschiedene Titel immer fest; nur byte-identische Titel – heute noch anlegbar – stehen in unbestimmter Reihenfolge. Folge: Der Collection-Content-Hash-ETag (ADR-S084-1) kann zwischen Abfragen wechseln, 304 feuert dann nicht (Caching-Effekt, kein falsches Ergebnis). Zutaten sind nicht betroffen: der LOWER(name)-Unique-Index schließt identische Namen aus.
+**Behebung:** Mit der Titel-Eindeutigkeit (Unique-Index auf den normalisierten Titel) verschwindet der Fall: bestätigen, dass der Index byte-identische Titel ausschließt, dann Eintrag entfernen. Ein ThenBy(Id) wäre danach toter Code.
+**Aufschubgrund:** User – in der Abschluss-Triage von run-3/run-12 entschieden: TD mit Szenario-Anker statt ThenBy(Id), weil dessen Test nach der Titel-Eindeutigkeit kein Szenario mehr hätte
+
+---
+
+## TD-S142-2 — Rezept-Detail: ETag und Abfragen decken Rezeptzeilen, Schritte und Zutatendaten nicht ab
+**Fällig:** Phase:MVP – Backstop; eigentlicher Auslöser ist das erste Szenario, das Rezeptzeilen, Schritte oder Name/Einheit einer verwendeten Zutat ändert (bisher keins spezifiziert)
+**Problem:** GET /api/recipes/{id} (Server/Endpoints/RecipesEndpoints.cs, GetRecipe) setzt als ETag den xmin der Rezeptzeile (ADR-S142-2). Die Antwort enthält aber auch Zutatenname und -einheit (Tabelle Ingredients), die Rezeptzeilen und die Schritte; deren Änderung lässt den Rezept-xmin unverändert, ein If-None-Match bekäme 304 mit veraltetem Inhalt, und der Frontend-Cache (ADR-S084-3) zeigte ihn weiter. Zudem laufen die drei Abfragen (Rezept, Zeilen, Schritte) ohne gemeinsamen Snapshot: Ein Schreibvorgang dazwischen ergäbe einen Mischzustand. Heute folgenlos – es gibt keinen Schreibweg auf diese Daten außer der Reaktivierung einer gelöschten Zutat mit anderer Einheit, und ein Rezept mit gelöschter Zutat ist eine hingenommene SKELETON-Grenze (features/recipes.feature, Bekannte Grenzen).
+**Behebung:** Mit dem ersten solchen Schreibweg die ETag-Quelle anpassen (z. B. Rezeptzeile bei jeder Änderung an Zeilen/Schritten mitschreiben, damit ihr xmin wechselt; für Zutatendaten Hash oder Kombination) und die Abfragen in einer Transaktion mit Snapshot-Isolation lesen; ein Server-Test belegt, dass nach der Änderung kein 304 mehr kommt.
+**Aufschubgrund:** User – im Review von US-602 run-4 als TD statt Sofort-Fix entschieden, weil noch kein Schreibweg existiert
+
+---
+
+## TD-S142-3 — Rezeptseiten: Listenzeilen ohne Klick-Hinweis, Zutatenliste der Detailansicht zu locker
+**Fällig:** Phase:MVP – im SKELETON ist die Gestaltung nachrangig (User)
+**Problem:** Client/src/pages/RecipesPage.tsx: Die Einträge der Rezept-Liste sind Links (ListItemButton), sehen am Handy aber wie reiner Text aus – kein Trenner, kein Pfeil, ohne Hover keine Klick-Andeutung. Client/src/pages/RecipeDetailPage.tsx: Die Zutatenliste hat rund 48 px Zeilenabstand bei 16-px-Text (Sichtprüfung bei 375 px); eine Liste mit 15 Zutaten läuft über mehrere Bildschirme, beim Kochen ist sie nicht auf einen Blick lesbar.
+**Behebung:** Klick-Andeutung für Listenzeilen (z. B. Pfeil am Zeilenende und/oder Trenner) und eine dichtere Zutatenliste festlegen, beides als Eintrag in docs/guidelines/coding-guideline-ux.md#CGU-visuelle-baseline statt Einzelwerte per sx; bei 375 px im Browser prüfen.
+**Aufschubgrund:** User – im Review von US-602 run-4 entschieden: im SKELETON nebensächlich, ab MVP beheben
+
+---
+
+## TD-S142-4 — Rezept-Detailansicht: Schrittliste unter VoiceOver nicht geprüft
+**Fällig:** Phase:V1 – Barrierefreiheit muss laut User im MVP noch nicht vollständig sein
+**Problem:** Client/src/pages/RecipeDetailPage.tsx rendert die Schritte als List component="ol" mit sichtbarer Nummer im ListItemIcon; MUI setzt list-style: none. Nach verbreiteter, aber schwach belegter Darstellung (Blogposts, WebKit-Bugtracker, hier nicht geprüft) nimmt Safari/VoiceOver einer Liste mit list-style: none die Listen-Semantik – die Reihenfolge-Ansage, für die die geordnete Liste gewählt wurde, entfiele dann. Andere Screenreader könnten Listenposition und sichtbare Nummer doppelt ansagen.
+**Behebung:** Mit VoiceOver (Safari) und einem zweiten Screenreader prüfen; falls nötig role="list" an der Liste ergänzen bzw. die sichtbare Nummer per aria-hidden ausblenden. Der heutige Aufbau verbaut nichts – die Korrektur ist ein Attribut, kein Umbau.
+**Aufschubgrund:** User – im Review von US-602 run-4 entschieden: Barrierefreiheit ist im MVP noch zu früh, solange kein Weg verbaut ist

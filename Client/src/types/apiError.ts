@@ -7,6 +7,8 @@ export type ApiError =
   // Keys zur Laufzeit ehrlich `… | undefined` -> der `?.`-Guard an der Zugriffsstelle
   // ist echt nötig (kein eslint-disable).
   | { readonly kind: 'FieldErrors'; readonly fields: Readonly<Record<string, readonly string[]>> }
+  // Die Ressource gibt es nicht (404); ein erwarteter Fall, keine Ausnahme (ADR-S142-2).
+  | { readonly kind: 'NotFound' }
   // Netzwerk/sonstige Fehler (GET-Pfad, POST-catch) tragen eine technische Meldung.
   | { readonly kind: 'Unexpected'; readonly message: string }
 

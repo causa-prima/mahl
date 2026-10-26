@@ -89,3 +89,19 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: Beim Review-Fix in US-602 run-2 berechnete der Orchestrator den Test-Freigabe-Anker mit git hash-object ohne -w. Der Blob landete nicht im Objektspeicher; der Subagent konnte den Diff gegen den Anker nicht bilden (bad object) und gab die ganze Datei aus. Der Orchestrator wich auf den letzten gültigen Anker aus und prüfte den Gesamt-Diff.
   Warum: Der Skill nennt git hash-object -w, der Orchestrator rief den Befehl aber in einer Sammelzeile zusammen mit reinen Lese-Hashes auf und ließ -w weg. Kein Mechanismus prüft beim Übergeben des Ankers, ob er auflösbar ist (OBS-S141-3).
   Regel: Freigabe-Anker immer in einem eigenen Aufruf mit -w schreiben; Lese-Hashes zum Vergleichen getrennt halten.
+
+## Session 142 – 2026-10-26
+
+- **[HOCH] [PROZESS] [Review] LL-S142-1 – Findings mit dem Wortlaut der Regeln verworfen statt mit ihrer Absicht**
+  Quelle: User
+  Was: In der Abschluss-Triage von US-602 run-4 schlug der Orchestrator vor, zwei Review-Befunde ohne Änderung zu verwerfen: CQ-8 (Type Assertion bei useParams) mit „kommentiert, die Guideline verbietet es nicht", obwohl coding-guideline-typescript.md as-Assertions ausdrücklich nur für Tests lockert; CQ-4 (Lesepfad DB→DTO ohne Domain-Objekt) mit einem Argument über Primitives an der DTO-Grenze, das den Kern – den fehlenden ToDomain()-Schritt, längst als TD-S083-5 erfasst – nicht berührte. Ebenso übernahm er die Einstufung eines Subagenten, der Primitive-Obsession-Hinweis sei an dieser Stelle ein Fehlalarm. Der User fing beides ab („klingt danach, als würde der Geist der Guidelines dagegen sprechen").
+  Warum: Geprüft wurde, ob eine Regel den Fall wörtlich verbietet, nicht, wozu sie da ist. Eine ausdrückliche Lockerung für einen Kontext wurde nicht als Aussage über die übrigen Kontexte gelesen, und ein Befund wurde an seinem schwächsten Teilargument gemessen statt an seinem Kern.
+  Regel: Einen Befund erst verwerfen, wenn er auch gegen die Absicht der Regel nicht trägt – nicht schon, weil kein Wortlaut ihn verbietet. Lockert eine Regel etwas ausdrücklich für einen Kontext, gilt das Gegenteil für alle anderen. Einen Befund an seinem Kern prüfen, nicht an seinem schwächsten Argument.
+  CM-Bezug: CM-S047-1
+
+- **[HOCH] [PROZESS] [Skill-Nutzung] LL-S142-2 – Schnell behebbare Befunde dem User zum Vermerken empfohlen**
+  Quelle: User
+  Was: In der Abschluss-Triage von US-602 run-4 empfahl der Orchestrator, sieben Prozess-Befunde als OBS zu erfassen (qa-check prüft Given/When/Then erst nach Stryker, test-inventory übersieht mehrzeiliges it.each, Freigabe-Anker ohne -w, Auditor liest Guidelines nur angeschnitten u. a.). Fünf davon waren in Minuten behebbar, einer (Auditor-Lesefehler) potenziell folgenreich; nur einer brauchte einen eigenen Entwurf. Der User fragte „Warum nicht direkt umsetzen?" – danach waren sechs in derselben Session behoben.
+  Warum: Der Pflicht-Aufschubgrund aus CM-S133-2 greift nur bei der eigenen Erfassung. Eine Empfehlung „vermerken" an den User umgeht ihn: Stimmt der User zu, entsteht der zulässige Aufschubgrund „User" von selbst – die Schwelle „verstanden und behebbar → beheben" wurde nie angelegt.
+  Regel: In einer Triage dieselbe Schwelle anlegen wie bei eigener Erfassung: Verstanden und schnell behebbar oder potenziell folgenreich → „direkt umsetzen" empfehlen; „vermerken" nur mit einem Aufschubgrund, der auch ohne die Zustimmung des Users trüge.
+  CM-Bezug: CM-S133-2

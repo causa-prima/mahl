@@ -48,8 +48,9 @@ from pathlib import Path
 
 from ._feature import parse_feature  # noqa: E402
 
-# Trennt den maschinenlesbaren Kopf von der Prosa. Erstes Vorkommen zählt: die Prosa selbst
-# enthält regelmäßig weitere Gedankenstriche.
+# Trennt den maschinenlesbaren Kopf von der Prosa. Das erste Vorkommen außerhalb eines
+# Szenario-Titels zählt (`kopf_und_prosa`): die Prosa enthält regelmäßig weitere Gedankenstriche,
+# ein Titel ebenfalls.
 _KOPF_TRENNER_RE = re.compile(r"\s+[–—]\s+")
 
 # Ein Token je Alternative. Bewusst tokenisierend statt an Kommata splittend: Szenario-Titel
@@ -92,9 +93,31 @@ class Kontext:
 
 
 def kopf_und_prosa(faellig: str) -> tuple[str, str]:
-    """Zerlegt den Feldwert in maschinenlesbaren Kopf und Prosa-Rest."""
-    teile = _KOPF_TRENNER_RE.split(faellig.strip(), maxsplit=1)
-    return (teile[0].strip(), teile[1].strip() if len(teile) > 1 else "")
+    """Zerlegt den Feldwert in maschinenlesbaren Kopf und Prosa-Rest.
+
+    Getrennt wird am ersten Gedankenstrich außerhalb eines Szenario-Titels: Titel enthalten selbst
+    Gedankenstriche („Titel existiert bereits – unabhängig von …")."""
+    text = faellig.strip()
+    # Die Titel-Spannen liefert dieselbe Grammatik, die den Anker liest – eine Titel-Form, eine Stelle.
+    titel = [treffer.span() for treffer in _ANKER_RE.finditer(text) if treffer["sz_de"] or treffer["sz_gerade"]]
+    for trenner in _KOPF_TRENNER_RE.finditer(text):
+        if not any(anfang <= trenner.start() < ende for anfang, ende in titel):
+            return text[:trenner.start()].strip(), text[trenner.end():].strip()
+    return text, ""
+
+
+_FAELLIG_FELD = "**Fällig:**"
+
+
+def faelligkeitskopf(eintrag: str) -> str | None:
+    """Kopf des `**Fällig:**`-Felds eines Tracker-Eintrags (None ohne Feld).
+
+    Einziger Leser für Übersichten und AGENT_MEMORY-Auflösung – ein eigener Split dort schnitte
+    einen Szenario-Titel mit Gedankenstrich ab."""
+    for zeile in eintrag.splitlines():
+        if zeile.startswith(_FAELLIG_FELD):
+            return kopf_und_prosa(zeile.removeprefix(_FAELLIG_FELD))[0]
+    return None
 
 
 def parse(faellig: str) -> tuple[list[Anker], list[str]]:

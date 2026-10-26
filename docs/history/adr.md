@@ -783,6 +783,41 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 
 ---
 
+### ADR-S142-1: Listen: Sortierung in der DB mit expliziter ICU-Collation `de-x-icu`
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, resource:ingredients, http:get, db:ef-core
+
+**Entscheidung:** `GET /api/recipes` und `GET /api/ingredients` sortieren in der Abfrage per `EF.Functions.Collate(<titel|name>, "de-x-icu")` – deutsches Locale; die Schreibweise entscheidet nur bei sonst gleichem Wort, dann klein vor groß (S142 gemessen: `brot, Brot, BROT, Brötchen`); ein Umlaut zählt wie sein Grundbuchstabe (Szenarien „Mehrere Rezepte erscheinen alphabetisch sortiert" und „Zutaten mit Umlaut oder Kleinbuchstaben erscheinen alphabetisch einsortiert"). Der Collation-Name lebt als eine Konstante, die beide Endpoints nutzen. Das Frontend zeigt die gelieferte Reihenfolge unverändert und sortiert nicht selbst.
+
+**Begründung:** Die DB-Default-Collation (`en_US.utf8`, Provider `libc`) sortiert auf dem musl-basierten `postgres:18-alpine` nach Bytes: `Brot, Zwiebelkuchen, apfelstrudel, Ölkuchen` (S142 an der Dev-DB per `psql` gemessen; mit `COLLATE "de-x-icu"` dort: `apfelstrudel, Brot, Ölkuchen, Zwiebelkuchen`). Der Testcontainer nutzt dasselbe Image (ADR-S105-1), die Collation verhält sich in Test und Prod gleich. Die Sortierung in der DB liefert zugleich die deterministische Reihenfolge, die der Collection-ETag voraussetzt (ADR-S084-1). Eine einzige Stelle sortiert – eine zweite Sortierung im Client könnte von der DB-Collation abweichen.
+
+**Verworfen:**
+- **Spalten-Collation per Migration** (`UseCollation("de-x-icu")` auf `title`) – Schema-Änderung, die jede Abfrage der Spalte betrifft, für eine einzige Sortierung.
+- **Sortieren in .NET nach dem Laden** (`StringComparer.Create(de-DE, ignoreCase)`) – die Regel hinge an der ICU-Ausstattung des Server-Prozesses statt an der DB.
+- **Sortieren im Frontend** (`Intl.Collator('de')`) – zweite Wahrheit neben dem Server, und der ETag bliebe ohne deterministische Server-Reihenfolge.
+
+---
+
+### ADR-S142-2: `GET /api/recipes/{id}`: xmin-ETag, 404 für unbekannt und ungültig, Detailseite lädt über die Adresse
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, http:get, http:404, http:etag, db:xmin, frontend:react
+
+**Entscheidung:**
+- `GET /api/recipes/{id:guid}` antwortet mit `200` und demselben Rezept-DTO wie der `201` beim Anlegen, dazu dem xmin der Rezeptzeile als `ETag` (ADR-S058-3). Ein `If-None-Match`, das diesem ETag gleicht, ergibt `304` ohne Body.
+- Die generische Response-Middleware (ADR-S084-1) lässt eine Antwort, die bereits einen `ETag` trägt, unverändert: Single-Resource-Endpoints setzen ihren xmin-ETag selbst, die Middleware bildet den Content-Hash nur für die übrigen GET-200-Antworten.
+- Unbekannte Kennung → `404` mit ProblemDetails; eine Kennung, die keine GUID ist, beantwortet schon die Route-Constraint mit `404`.
+- Die Detailseite lädt das Rezept immer per GET über die Kennung aus ihrer Adresse – auch direkt nach dem Anlegen; es gibt keinen zweiten Ladeweg über Router-State. Jedes `404` zeigt „Rezept nicht gefunden." mit dem Weg „Zur Rezept-Liste" (ADR-S135-5).
+
+**Begründung:** Der xmin-ETag ist die If-Match-Quelle für das spätere Ändern und Löschen eines Rezepts; ein Content-Hash auf der Einzelressource bräche die Kopplung an den Concurrency-Token (ADR-S058-3, dort verworfen). Ohne die Ausnahme in der Middleware würde ihr Content-Hash den xmin-ETag überschreiben. Ein Ladeweg statt zwei: Direktlink und Navigation nach dem Speichern verhalten sich gleich; der zusätzliche GET nach dem Anlegen ist der Preis.
+
+**Verworfen:**
+- **Content-Hash-ETag der Middleware auch für die Einzelressource** – einfacher, widerspricht aber ADR-S058-3 und hätte beim ersten mutierenden Rezept-Endpoint nachgezogen werden müssen.
+- **Router-State aus dem POST als Anzeigequelle nach dem Anlegen** (bisheriger Stand) – zweiter Ladeweg, der beim Direktlink ohnehin nicht trägt.
+
+---
+
 ## WeeklyPool-Endpoints
 
 ### ADR-S007-1: POST /api/weekly-pool: 422 (nicht 404) bei Rezept nicht gefunden

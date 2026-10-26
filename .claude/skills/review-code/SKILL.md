@@ -98,6 +98,11 @@ Agent-Prompts enthalten (je Agent):
   Reviewer nicht: Er sucht Verstöße, deren betroffene Guideline-Stelle vorher niemand kennt. Wer ihm
   nur die Abschnitte gibt, die der Orchestrator für einschlägig hielt, bekommt genau die Findings
   zurück, die der Orchestrator ohnehin erwartet hat.
+  Der Weg dazu ist das Read-Tool, je Datei ein Aufruf – das steht in den Auditor-Definitionen,
+  der Prompt verlangt es zusätzlich. Per Bash gebündelt (`cat` der Guideline plus `git diff`) legt
+  Claude Code die Ausgabe ab und zeigt nur eine Vorschau; so las ein Auditor zweimal nur den Kopf der
+  Guideline und meldete Referenzen, die er nie gegengeprüft hatte. Gibt ein Bericht an, die
+  Guidelines nicht vollständig gelesen zu haben, sind seine Guideline-Referenzen Verdachtsstellen.
 
   Die ADR-Mitgabe ist nicht optional: Fehlt eine ADR, die ein Finding entkräftet, meldet der Auditor ein
   False Positive, das erst beim Zusammenführen auffliegt. Real passiert: ADR-S106-3 (Querschnitts-/

@@ -37,6 +37,7 @@ import time
 from pathlib import Path
 
 from ._run_lock import LOCK_BUSY_EXIT_CODE
+from ._wrapper_output import VERBOSE_HINT
 from ._stryker_report import (
     NO_MUTANTS_HINT,
     collect_undetected,
@@ -297,6 +298,21 @@ def check_test_structure(layer: str) -> list[tuple[str, str]]:
     return findings
 
 
+def structure_fast_fail(layer: str) -> str | None:
+    """Meldung, wenn neue Tests ohne Given/When/Then dastehen – sonst None.
+
+    Given/When/Then ist Pflicht (CGC-/CGT-given-when-then), ein Befund muss also ohnehin behoben
+    werden. Vor Stryker geprüft, weil er sonst erst nach dem minutenlangen Lauf erscheint und einen
+    zweiten Lauf kostet.
+    """
+    findings = check_test_structure(layer)
+    if not findings:
+        return None
+    details = "\n".join(f"  {f}:  {msg}" for f, msg in findings)
+    return (f"[qa-check] ❌ Test-Struktur (Given/When/Then) unvollständig – Abbruch vor Stryker, "
+            f"kein Übergabe-Hash:\n{details}\n   Kommentare ergänzen, dann qa-check neu starten.")
+
+
 # ── Test-Freigabe-Audit ──────────────────────────────────────────────────────
 
 def audit_approved_tests(layer: str, approved: dict[str, str]) -> tuple[int, list[str]]:
@@ -322,6 +338,12 @@ def audit_approved_tests(layer: str, approved: dict[str, str]) -> tuple[int, lis
             lines.append(f"⚠️  {f}: geändert, aber KEINE Freigabe-SHA übergeben – nie im Test-Review freigegeben?")
         elif current == expected:
             lines.append(f"✅ {f}: unverändert seit Freigabe.")
+        elif not _git("cat-file", "-t", expected).strip():
+            # Ohne -w berechnet: der Diff bliebe still leer und sähe wie „nichts geändert" aus.
+            findings += 1
+            lines.append(f"⚠️  {f}: seit Freigabe GEÄNDERT – der Freigabe-Blob {expected} liegt nicht in der "
+                         f"Objektdatenbank, kein Diff möglich. Anker künftig mit `git hash-object -w <datei>` "
+                         f"ablegen; jetzt die Änderung von Hand prüfen.")
         else:
             findings += 1
             lines.append(f"⚠️  {f}: seit Freigabe GEÄNDERT – nur Setup (erlaubt) oder auch Assertions (verboten)? "
@@ -358,6 +380,29 @@ def check_tsc() -> int:
     return subprocess.run(["npm", "run", "typecheck"], cwd=str(_CLIENT_DIR)).returncode
 
 
+CHECK_ESLINT_TITLE = "CHECK 4: ESLINT"
+CHECK_ADR_TITLE = "CHECK 6: ADR-REFERENZEN"
+
+# eslint-run zeigt schon ohne --verbose jede Meldung; --verbose ergänzt nur die npm-Kopfzeilen.
+ESLINT_DETAILS_HINT = "  Alle Meldungen samt Warnungen: python3 -m prozesscode.eslint-run"
+ESLINT_NO_OUTPUT = "(kein Output)"
+ESLINT_INCOMPLETE = "  ⚠️  ESLint zählt {reported} Fehler, erkannt wurden {parsed} – die Liste oben ist unvollständig."
+
+RED_CHECK_HASH_WARNING = (
+    "⚠️  Rot: {checks}. Der Hash ist verifizierbar, die Übergabe aber erst gültig, wenn der Check grün "
+    "ist – Befund oben beheben und qa-check erneut laufen lassen (oder den Befund im Return begründen).")
+
+# ESLint (stylish) schreibt je Datei eine Kopfzeile mit dem Pfad, darunter eingerückt
+# `Zeile:Spalte  error  Meldung  Regel`; Meldung und Regel trennen mindestens zwei Leerzeichen.
+# Ein Parsing-Fehler hat keine Regel (`1:23  error  Parsing error: Expression expected`).
+_ESLINT_ERROR_LINE = re.compile(r"^\s+(?P<pos>\d+:\d+)\s+error\s+(?P<message>.+?)(?:\s{2,}(?P<rule>\S+))?$")
+# ESLints Zusammenfassung, z.B. `✖ 4 problems (2 errors, 2 warnings)` – Gegenprobe zur Zahl der erkannten Fehler.
+_ESLINT_SUMMARY_ERRORS = re.compile(r"✖\s*\d+\s+problems?\s*\((\d+)\s+errors?")
+
+# Im Rückfall gezeigte Zeilen: genug für Absturzmeldung und Fehlertext, ohne den Stacktrace.
+_ESLINT_FALLBACK_LINES = 5
+
+
 def check_eslint(layer: str) -> tuple[str, int]:
     changed = _changed_paths(_LAYER_PATHS[layer])
     if not any(f.endswith((".ts", ".tsx")) for f in changed):
@@ -366,8 +411,55 @@ def check_eslint(layer: str) -> tuple[str, int]:
                        capture_output=True, text=True, cwd=str(_REPO_ROOT))
     if r.returncode == 0:
         return "OK", 0
-    lines = [line for line in (r.stdout + r.stderr).splitlines() if line.strip()]
-    return f"FEHLER – {lines[-1] if lines else '(kein Output)'}", r.returncode
+    output = r.stdout + r.stderr
+    errors = _eslint_errors(output)
+    if errors:
+        status = f"FEHLER – {len(errors)} Fehler:\n  " + "\n  ".join(errors)
+        summary = _ESLINT_SUMMARY_ERRORS.search(output)
+        if summary and int(summary.group(1)) != len(errors):
+            status += "\n" + ESLINT_INCOMPLETE.format(reported=summary.group(1), parsed=len(errors))
+        return f"{status}\n{ESLINT_DETAILS_HINT}", r.returncode
+    # Kein Fehler im bekannten Format (z.B. ESLint-Absturz): der Anfang der Ausgabe ist der Befund –
+    # ohne die Schlusszeilen des Wrappers, die nur Verdikt und --verbose-Hinweis tragen.
+    lines = _without_wrapper_trailer([line for line in output.splitlines() if line.strip()])
+    finding = "\n  ".join(lines[:_ESLINT_FALLBACK_LINES]) if lines else ESLINT_NO_OUTPUT
+    return f"FEHLER –\n  {finding}\n{ESLINT_DETAILS_HINT}", r.returncode
+
+
+def _without_wrapper_trailer(lines: list[str]) -> list[str]:
+    """Entfernt die Schlusszeilen von `_wrapper_output.emit`: Verdikt und VERBOSE_HINT."""
+    if lines and lines[-1] == VERBOSE_HINT:
+        return lines[:-2]
+    return lines
+
+
+def _eslint_errors(output: str) -> list[str]:
+    """Fehler (keine Warnungen) der ESLint-Ausgabe als `Datei:Zeile:Spalte [Regel] – Meldung`, Datei repo-relativ."""
+    errors, current_file = [], ""
+    for line in output.splitlines():
+        if line and not line[0].isspace():
+            current_file = line.removeprefix(f"{_REPO_ROOT}/")
+            continue
+        match = _ESLINT_ERROR_LINE.match(line)
+        if match:
+            rule = f" {match['rule']}" if match["rule"] else ""
+            errors.append(f"{current_file}:{match['pos']}{rule} – {match['message']}")
+    return errors
+
+
+def red_checks(*, lint_code: int, adr_code: int) -> list[str]:
+    """Namen der Checks, die mit Fehler endeten (Exit-Code > 0; -1 heißt übersprungen).
+
+    Nur Check 4 und 6 haben hier einen Fehlerzustand. Check 1–3 sind Auflistungen, die der Orchestrator
+    bewertet; Check 5 (Given/When/Then) bricht den Übergabelauf schon vor Stryker ab (`structure_fast_fail`)."""
+    return [name for name, code in ((CHECK_ESLINT_TITLE, lint_code), (CHECK_ADR_TITLE, adr_code))
+            if code > 0]
+
+
+def red_check_warning(*, lint_code: int, adr_code: int) -> str | None:
+    """Warnzeile zum Hash, wenn ein Check rot ist – sonst None."""
+    red = red_checks(lint_code=lint_code, adr_code=adr_code)
+    return RED_CHECK_HASH_WARNING.format(checks=", ".join(red)) if red else None
 
 
 # ── Hash ─────────────────────────────────────────────────────────────────────
@@ -434,6 +526,13 @@ def main() -> None:
         if check_tsc() != 0:
             print("[qa-check] ❌ tsc -b fehlgeschlagen – Typfehler zuerst beheben. "
                   "Kein Übergabe-Hash (Fast-Fail vor Stryker).", file=sys.stderr)
+            sys.exit(1)
+
+    # ── Test-Struktur (Fast-Fail vor Stryker) ─────────────────────────────────
+    if run_stryker_now:
+        message = structure_fast_fail(args.layer)
+        if message:
+            print(message, file=sys.stderr)
             sys.exit(1)
 
     # ── Stryker ──────────────────────────────────────────────────────────────
@@ -549,7 +648,7 @@ def main() -> None:
         print("keine verdächtigen Treffer")
 
     if args.layer == "frontend":
-        print("\n=== CHECK 4: ESLINT ===")
+        print(f"\n=== {CHECK_ESLINT_TITLE} ===")
         print(lint_status)
 
     print("\n=== CHECK 5: TEST-STRUKTUR (Given/When/Then) ===")
@@ -559,7 +658,7 @@ def main() -> None:
     else:
         print("alle neuen Tests strukturiert")
 
-    print("\n=== CHECK 6: ADR-REFERENZEN ===")
+    print(f"\n=== {CHECK_ADR_TITLE} ===")
     print(adr_status)
 
     # ── Hash ─────────────────────────────────────────────────────────────────
@@ -590,6 +689,10 @@ def main() -> None:
                   "ungültiger Hash).", file=sys.stderr)
             sys.exit(1)
         print("✅ Hash verifiziert – frischer Lauf, Code/Report-Zustand stimmt überein.")
+        # Auch hier: der Orchestrator entscheidet über die Übergabe und soll den roten Check nicht übersehen.
+        warning = red_check_warning(lint_code=lint_code, adr_code=adr_code)
+        if warning:
+            print(warning)
 
         # Test-Freigabe-Audit: zeigt jede Test-Änderung seit der Freigabe als Diff (WAS geändert
         # wurde), damit der Orchestrator Setup (erlaubt) von Assertion-Änderungen (verboten) trennt.
@@ -609,6 +712,9 @@ def main() -> None:
                   "--skip-stryker sind zur Übergabe gültig; Verifikation durch den Orchestrator via --verify <hash>.)")
         else:
             print(compute_hash(**hash_kwargs))
+            warning = red_check_warning(lint_code=lint_code, adr_code=adr_code)
+            if warning:
+                print(warning)
 
     # ── Gate ─────────────────────────────────────────────────────────────────
     # Score-Gate als Exit-Code – aber erst NACH vollständiger Ausgabe aller Checks + Hash,
