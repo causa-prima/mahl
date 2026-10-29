@@ -262,7 +262,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: GERING    Häufigkeit: häufig
 - Kategorie: AGENT    Kontext: Bash/Permission
-- Beobachtung: In S141 meldeten drei Layer-Subagenten (Frontend run-2, Backend run-2, Frontend Review-Fixes) unabhängig, dass der Bash-Hook python3-Heredocs, sed -i, cat >> (Redirect) und einen Heredoc-Edit mit anschließendem Wrapper-Aufruf im selben Befehl blockt. Alle wichen ohne Folgen auf Edit aus, verloren dabei aber je einen oder mehrere Versuche und meldeten den Punkt als Prozess-Auffälligkeit im Return. Offen ist, ob die Agent-Definitionen den Weg (Dateien per Edit/Write ändern) so klar nennen, dass der erste Versuch schon richtig ist.
+- Beobachtung: In S141 meldeten drei Layer-Subagenten (Frontend run-2, Backend run-2, Frontend Review-Fixes) unabhängig, dass der Bash-Hook python3-Heredocs, sed -i, cat >> (Redirect) und einen Heredoc-Edit mit anschließendem Wrapper-Aufruf im selben Befehl blockt. Alle wichen ohne Folgen auf Edit aus, verloren dabei aber je einen oder mehrere Versuche und meldeten den Punkt als Prozess-Auffälligkeit im Return. Offen ist, ob die Agent-Definitionen den Weg (Dateien per Edit/Write ändern) so klar nennen, dass der erste Versuch schon richtig ist. Erneut in S143 (US-602 run-6): Drei der vier Layer-Subagenten meldeten in ihrem Prozessverbesserungs-Abschnitt Fehlversuche an Heredoc-Skripten mit Wrapper-Aufruf, sed -i und npx eslint bzw. npm run lint, bevor sie auf Edit und eslint-run wechselten.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -302,7 +302,58 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: häufig
 - Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Die UX-Guideline und mehrere TD-Einträge verlangen, eine Ansicht bei 375 px im Browser zu prüfen. Dafür gibt es kein Werkzeug: Ein eigener Playwright-Spec für Screenshots wird vom E2E-Szenario-Hook geblockt (kein // Szenario:-Kommentar), ein Script im Scratchpad müsste Backend und Vite selbst starten und braucht eine Einzelfreigabe. In S142 (US-602 run-4) half nur, eine bestehende Spec vorübergehend um setViewportSize und page.screenshot zu erweitern, aus einer Sicherung im Scratchpad zurückzuspielen und den Blob-Hash zu vergleichen – zweimal in derselben Session, mit dem Risiko, die Test-Datei verändert zurückzulassen. Eine frühere Session (2026-09-29, Zutaten-Seite, accessibility.spec.ts) ging denselben Umweg.
+- Beobachtung: Die UX-Guideline und mehrere TD-Einträge verlangen, eine Ansicht bei 375 px im Browser zu prüfen. Dafür gibt es kein Werkzeug: Ein eigener Playwright-Spec für Screenshots wird vom E2E-Szenario-Hook geblockt (kein // Szenario:-Kommentar), ein Script im Scratchpad müsste Backend und Vite selbst starten und braucht eine Einzelfreigabe. In S142 (US-602 run-4) half nur, eine bestehende Spec vorübergehend um setViewportSize und page.screenshot zu erweitern, aus einer Sicherung im Scratchpad zurückzuspielen und den Blob-Hash zu vergleichen – zweimal in derselben Session, mit dem Risiko, die Test-Datei verändert zurückzulassen. Eine frühere Session (2026-09-29, Zutaten-Seite, accessibility.spec.ts) ging denselben Umweg. Dritter Fall in S143 (US-602 run-6): Für die Nachfrage „Eingaben verwerfen?“ bei 320 px blockte der E2E-Szenario-Hook erst eine eigene Screenshot-Spec (kein // Szenario:), dann denselben Kommentar als Dublette; es blieb wieder nur, recipes.spec.ts zu sichern, vorübergehend zu erweitern und per Blob-Hash zurückzuspielen.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – im Abschluss von US-602 run-4 entschieden: weder schnell noch riskant, eigener Schritt mit Entwurf
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S143-1 – Stryker-Timeouts können Survivors verdecken
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: In US-602 run-5 meldete der erste qa-check-Lauf des Frontends 100 % bei 43 Timeouts (Timeouts zählen als detected). Ein späterer Lauf ohne Änderung an der betroffenen Datei meldete 17 Timeouts und einen Survivor in Client/src/pages/RecipeDetailPage.tsx:24 (StringLiteral im Query-Key), der seit run-3/run-4 besteht und dort nie aufgefallen war; ein dritter Lauf mit 10 Timeouts zeigte ihn ebenfalls. Ein Score von 100 % mit vielen Timeouts ist damit kein verlässlicher Beleg dafür, dass jeder Mutant von einem Test getötet wird – und der Verifikations-Hash bestätigt nur Frische, nicht Stabilität des Ergebnisses. qa-check weist Timeouts aus („können Timing-Artefakte sein – mit --verbose prüfen"), gated aber nicht darauf. Zweiter Fall in US-602 run-6 (S143): Ein Survivor im Layout-Wert sx={{ justifyContent: 'flex-end' }} von FormActions (CreateRecipePage.tsx) stand in den ersten qa-check-Läufen hinter 68 Timeouts bei „100 %“ und fiel erst im Volllauf eines Subagenten auf; zwischen zwei Läufen wechselte er dabei zwischen den Mutatoren ObjectLiteral und StringLiteral.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-5 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S143-2 – Edit-Tool löst \uXXXX in String-Literalen zu rohen unsichtbaren Zeichen auf
+- Quelle: Subagent + Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Sonstiges
+- Beobachtung: In US-602 run-6 (S143) schrieben ein Layer-Subagent und der Orchestrator unabhängig voneinander Escape-Sequenzen wie \u200B, \u00AD, \u2060 und \uFEFF über das Edit-Tool in TypeScript-String-Literale (Komponententests, E2E-Spec). In der Datei landeten jeweils die rohen, unsichtbaren Zeichen. Im Quelltext sah ein Leser leere oder scheinbar gleiche Strings; aufgefallen ist es nur durch Zufall im Test-Review und dann per grep -P auf die Codepunkte. Die Schreibweise \u{200B} blieb erhalten. Kein Check im Repo meldet rohe unsichtbare Zeichen in Quelltext.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-6 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S143-3 – Review-Loop konvergiert nicht: frische Auditoren kehren Entscheidungen früherer Runden um
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Review
+- Beobachtung: US-602 run-6 (S143) brauchte vier Review-Runden; jede fand bei 0 ❌ zwischen 6 und 15 ⚠️. Ab Runde 3 widersprachen Funde direkt früheren Runden: Ein Test-Helfer wurde in Runde 3 verlangt und in Runde 4 als „verbirgt Arrange und Act“ wieder beanstandet; eine explizite Existenz-Assertion wurde in Runde 1 verlangt und in Runde 4 als redundant gemeldet; die Unterscheidung toHaveCount(0) gegenüber toBeHidden() wurde in Runde 2 als begründet gelobt und in Runde 4 als Streuung beanstandet. Die Regel „Auditoren ohne Iterations-Vorwissen“ verhindert gedämpfte Kritik, lässt aber jede Runde neue Politur finden; das Rundenlimit (max. 3) stoppte den Loop, die Fortsetzung entschied der User. Jede Runde kostete vier bis fünf Agentenläufe plus einen Fix-Subagenten und einen qa-check.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-6 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S143-4 – mutmut-Sperrklinke reißt durch schwankende Timeouts; die Baseline speichert keine Mutanten
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: In S143 riss die Sperrklinke für prozesscode.hooks.check-bash-permission zweimal (98,1 % → 98,1 % VERSCHLECHTERT), obwohl die Änderung nur Modulkonstanten betraf, die mutmut nicht mutiert. Beide Läufe hatten 22 Überlebende wie die Baseline (1171 beurteilbar, 1149 getötet); gesunken war nur der Nenner, weil mehr Mutanten in _maskiere_strings im Timeout endeten und Timeouts als „ohne Aussage“ aus dem Bruch fallen. Dass es dieselben 22 Überlebenden sind, ließ sich nicht prüfen: mutation-baseline.json hält je Modul nur zwei Zahlen. Der Riss wurde auf User-Entscheid als Rauschen hingenommen, die Baseline nicht nachgezogen. Verwandt mit OBS-S143-1 (Stryker), aber ein anderes Werkzeug. Vorlauf: Dieselbe Klasse trat in S139 auf (Commit 4672f72): Timeouts in main verschoben den Nenner, damals mit Exit -24 als getötet gezählt; behoben durch höheres timeout_constant, der Nenner sank von 1228 auf 1170 bei denselben 22 Überlebenden. S143 zeigt, dass Timeouts den Bruch auch danach noch um einzelne Mutanten verschieben.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – im Session-Abschluss S143 entschieden: als Rauschen hinnehmen und beobachten
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: OBS-S143-1
+
+## OBS-S143-5 – Post-Edit-Suite meldet Zwischenstände von Edit-Bündeln als rot
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Der PostToolUse-Hook check-code-quality-nonblocking fährt nach jedem einzelnen Edit an prozesscode/ oder tests/ die gesamte Werkzeug-Suite (10–45 s) und meldet „Tooling-Tests rot“. Werden mehrere zusammengehörige Edits in einem Zug geschickt (Funktion anlegen, Aufruf umstellen, Import ergänzen), meldet er die Zwischenstände dazwischen als rot – in S143 gut ein Dutzend Mal, jedes Mal Rauschen, das der Agent als solches erkennen und übergehen musste; ruff meldete dabei auch fehlende Imports, die das nächste Edit schon ergänzte. Die Meldung selbst weist auf beabsichtigte RED-Phasen hin, unterscheidet aber nicht zwischen Zwischenstand und Endstand.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – im Session-Abschluss S143 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

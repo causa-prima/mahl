@@ -1,7 +1,8 @@
 import { test, expect } from './fixtures'
 import { seedIngredientViaApi } from './api/ingredientsApi'
 import type { APIRequestContext, Page } from '@playwright/test'
-import { createRecipeViaApi, seedRecipesWithSaltViaApi } from './api/recipesApi'
+import { createRecipeViaApi, seedRecipesWithSaltViaApi, UNKNOWN_RECIPE_ID } from './api/recipesApi'
+import { discardQuestion } from './pages/recipesPage'
 
 // @US-602-happy-path
 test.describe('US602_HappyPath: Rezepte erfassen', () => {
@@ -75,6 +76,320 @@ test.describe('US602_HappyPath: Rezepte erfassen', () => {
   })
 })
 
+const INGREDIENTS_HINT = 'Eine Zutat je Zeile: Menge, Einheit, Zutat – z. B. „250 g Mehl“ oder „Salz“.'
+
+// When der Formular-Szenarien: zur Rezepte-Seite navigieren und auf "Rezept anlegen" klicken.
+async function openCreateForm(page: Readonly<Page>): Promise<void> {
+  await page.goto('/recipes')
+  await page.getByRole('button', { name: 'Rezept anlegen' }).click()
+}
+
+// Der Abschnitt "Schritte" als Gruppe. Name per Regex: Der Pflicht-Asterisk der Legende steht daneben.
+function stepsSection(page: Readonly<Page>) {
+  return page.getByRole('group', { name: /^Schritte/ })
+}
+
+// Die Nummer eines Schrittfelds ist sein sichtbares Label „Schritt N" (e2e-testing.md, sichtbares
+// Signal). toHaveText mit Array pinnt Anzahl und Reihenfolge.
+async function expectStepNumbers(page: Readonly<Page>, numbers: readonly number[]): Promise<void> {
+  await expect(stepsSection(page).locator('label')).toHaveText(numbers.map((n) => `Schritt ${String(n)}`))
+}
+
+// Then von „Felder sind beim Öffnen leer" und „direkt öffnen": Titel und Zutaten leer, genau ein leeres
+// Schrittfeld mit der Nummer 1.
+async function expectEmptyForm(page: Readonly<Page>): Promise<void> {
+  await expect(page.getByLabel('Titel')).toHaveValue('')
+  await expect(page.getByLabel('Zutaten')).toHaveValue('')
+  await expectStepNumbers(page, [1])
+  await expect(stepsSection(page).getByLabel('Schritt 1')).toHaveValue('')
+}
+
+// @US-602-happy-path
+test.describe('US602_HappyPath: Rezeptformular öffnen', () => {
+  // Szenario: Felder sind beim Öffnen des Formulars leer
+  test('US602_HappyPath_OpenCreateForm_FromList_FieldsAreEmpty', async ({ page }) => {
+    // When: ich zur Rezepte-Seite navigiere und auf "Rezept anlegen" klicke
+    await openCreateForm(page)
+
+    // Then: Titel und Zutatenfeld leer, genau ein leeres Schrittfeld mit der Nummer 1
+    await expectEmptyForm(page)
+  })
+
+  // Szenario: Pflichtfelder im Formular sind als solche markiert
+  test('US602_HappyPath_OpenCreateForm_FromList_RequiredFieldsAreMarked', async ({ page }) => {
+    // When: ich zur Rezepte-Seite navigiere und auf "Rezept anlegen" klicke
+    await openCreateForm(page)
+
+    // Then: Titel- und Zutatenfeld als Pflichtfeld markiert – der sichtbare Asterisk im Label ist die
+    //   maßgebliche Beobachtung (e2e-testing.md, sichtbares Signal), die native required-Property sichert
+    //   zusätzlich die Semantik für Screenreader. getByLabel matcht per Substring weiter "Titel *".
+    await expect(page.locator('label').filter({ hasText: /^Titel/ })).toContainText('*')
+    await expect(page.locator('label').filter({ hasText: /^Zutaten/ })).toContainText('*')
+    await expect(page.getByLabel('Titel')).toHaveJSProperty('required', true)
+    await expect(page.getByLabel('Zutaten')).toHaveJSProperty('required', true)
+    // Then: der Abschnitt "Schritte" als Pflichtangabe markiert – Asterisk an seiner Legende. Die
+    //   einzelnen Schrittfelder sind keine Pflichtfelder: Leere Schrittfelder werden übergangen.
+    await expect(stepsSection(page).locator('legend').filter({ hasText: /^Schritte/ })).toContainText('*')
+  })
+
+  // Szenario: Das Zutatenfeld erklärt seine Eingabeform
+  test('US602_HappyPath_OpenCreateForm_IngredientsField_ShowsFormatHintBeforeAndWhileTyping', async ({ page }) => {
+    // When: ich zur Rezepte-Seite navigiere und auf "Rezept anlegen" klicke
+    await openCreateForm(page)
+
+    // Then: der Hinweis steht sichtbar am Zutatenfeld – "am Feld" heißt: als Beschreibung mit ihm verknüpft
+    const ingredientsField = page.getByLabel('Zutaten')
+    await expect(page.getByText(INGREDIENTS_HINT)).toBeVisible()
+    await expect(ingredientsField).toHaveAccessibleDescription(INGREDIENTS_HINT)
+
+    // When: ich "250 g Mehl" als Zutaten eingebe
+    await ingredientsField.fill('250 g Mehl')
+
+    // Then: der Hinweis steht weiterhin da – ein Platzhalter verschwände hier
+    await expect(page.getByText(INGREDIENTS_HINT)).toBeVisible()
+    await expect(ingredientsField).toHaveAccessibleDescription(INGREDIENTS_HINT)
+  })
+
+  // Szenario: Beim Öffnen des Formulars liegt der Fokus auf dem Titel
+  test('US602_HappyPath_OpenCreateForm_FromList_FocusOnTitle', async ({ page }) => {
+    // When: ich zur Rezepte-Seite navigiere und auf "Rezept anlegen" klicke
+    await openCreateForm(page)
+
+    // Then: der Fokus liegt auf dem Titel-Feld
+    await expect(page.getByLabel('Titel')).toBeFocused()
+  })
+
+  // Szenario: Jedes Schrittfeld zeigt seine Nummer
+  test('US602_HappyPath_AddStep_Twice_StepFieldsAreNumberedInOrder', async ({ page }) => {
+    // When: ich das Formular öffne und zweimal auf "Schritt hinzufügen" klicke
+    await openCreateForm(page)
+    await page.getByRole('button', { name: 'Schritt hinzufügen' }).click()
+    await page.getByRole('button', { name: 'Schritt hinzufügen' }).click()
+
+    // Then: die Schrittfelder tragen in dieser Reihenfolge die Nummern 1, 2, 3
+    await expectStepNumbers(page, [1, 2, 3])
+  })
+
+  // Szenario: Nach „Schritt hinzufügen" liegt der Fokus im neuen Schrittfeld
+  test('US602_HappyPath_AddStep_AfterFirstStep_FocusOnNewStepField', async ({ page }) => {
+    // When: ich das Formular öffne, "Teig rühren." als Schritt eingebe und auf "Schritt hinzufügen" klicke
+    await openCreateForm(page)
+    await page.getByLabel('Schritt 1').fill('Teig rühren.')
+    await page.getByRole('button', { name: 'Schritt hinzufügen' }).click()
+
+    // Then: der Fokus liegt auf dem zweiten Schrittfeld
+    await expect(stepsSection(page).getByRole('textbox').nth(1)).toBeFocused()
+  })
+})
+
+// @US-602-edge-case
+test.describe('US602_EdgeCase: Rezeptformular direkt öffnen', () => {
+  // Szenario: Das Formular lässt sich über seine Adresse direkt öffnen und ist leer
+  test('US602_EdgeCase_OpenCreateForm_ByAddressInNewWindow_FieldsAreEmpty', async ({ context }) => {
+    // When: ich die Adresse des Formulars in einem neuen Browserfenster öffne – eine neue Seite ohne
+    //   vorher geladene Anwendung; die Adresse ist /recipes/new (ADR-S135-4: eigene Seite, eigene Adresse)
+    const newWindow = await context.newPage()
+    await newWindow.goto('/recipes/new')
+
+    // Then: das Formular "Rezept anlegen" mit leeren Feldern und genau einem Schrittfeld Nummer 1
+    await expect(newWindow.getByRole('heading', { level: 1, name: 'Rezept anlegen' })).toBeVisible()
+    await expectEmptyForm(newWindow)
+  })
+})
+
+// Then „sehe ich die Rezept-Liste": ihre Adresse und ihr Seitentitel – eine leere Liste hat keine Einträge,
+// an denen man sie erkennen könnte.
+async function expectRecipeList(page: Readonly<Page>): Promise<void> {
+  await expect(page).toHaveURL(/\/recipes$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Rezepte' })).toBeVisible()
+}
+
+// When „ich auf "Abbrechen" klicke".
+async function cancelForm(page: Readonly<Page>): Promise<void> {
+  await page.getByRole('button', { name: 'Abbrechen' }).click()
+}
+
+// When der Nachfrage-Szenarien: Formular öffnen, "Pfannkuchen" als Titel eingeben, auf "Abbrechen" klicken.
+async function openDiscardQuestionWithTitle(page: Readonly<Page>): Promise<void> {
+  await openCreateForm(page)
+  await page.getByLabel('Titel').fill('Pfannkuchen')
+  await cancelForm(page)
+}
+
+// Then „sehe ich die Rezept-Liste" und „wurde ich nicht gefragt, ob ich Eingaben verwerfen möchte" – eine
+// Nachfrage hätte den Weg zur Liste angehalten.
+async function expectListWithoutQuestion(page: Readonly<Page>): Promise<void> {
+  await expectRecipeList(page)
+  await expect(discardQuestion(page)).toHaveCount(0)
+}
+
+// Then „sehe ich das Formular mit dem Titel …": das Formular ist weiter offen und behält die Eingaben.
+async function expectFormWithTitle(page: Readonly<Page>, title: string): Promise<void> {
+  await expect(page).toHaveURL(/\/recipes\/new$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Rezept anlegen' })).toBeVisible()
+  await expect(page.getByLabel('Titel')).toHaveValue(title)
+}
+
+// @US-602-happy-path
+test.describe('US602_HappyPath: Rezeptformular abbrechen', () => {
+  // Szenario: Abbrechen ohne Eingaben führt ohne Nachfrage zur Rezept-Liste
+  test('US602_HappyPath_CancelCreateForm_WithoutInput_ShowsListWithoutQuestion', async ({ page }) => {
+    // When: ich das Formular öffne und auf "Abbrechen" klicke
+    await openCreateForm(page)
+    await cancelForm(page)
+
+    // Then: sehe ich die Rezept-Liste und wurde nicht gefragt, ob ich Eingaben verwerfen möchte
+    await expectListWithoutQuestion(page)
+  })
+
+  // Eine Zeile je Beispiel der Scenario Outline: Jedes Feld allein macht das Formular nicht leer – auch ein
+  // späteres Schrittfeld, wenn das erste leer ist; dafür fügt `prepare` das Schrittfeld erst hinzu.
+  const inputs: readonly {
+    readonly eingabe: string
+    readonly field: string
+    readonly value: string
+    readonly prepare?: (page: Readonly<Page>) => Promise<void>
+  }[] = [
+    { eingabe: '"Pfannkuchen" als Titel', field: 'Titel', value: 'Pfannkuchen' },
+    { eingabe: '"Salz" als Zutaten', field: 'Zutaten', value: 'Salz' },
+    { eingabe: '"Teig rühren." als Schritt', field: 'Schritt 1', value: 'Teig rühren.' },
+    {
+      eingabe: '"Teig rühren." als zweiten Schritt',
+      field: 'Schritt 2',
+      value: 'Teig rühren.',
+      prepare: async (page) => { await page.getByRole('button', { name: 'Schritt hinzufügen' }).click() },
+    },
+  ]
+  inputs.forEach(({ eingabe, field, value, prepare }) => {
+    // Szenario: Abbrechen mit Eingaben fragt nach – Verwerfen führt zur Rezept-Liste
+    test(`US602_HappyPath_CancelCreateForm_WithInput_DiscardShowsList (${eingabe})`, async ({ page }) => {
+      // When: ich das Formular öffne, <Eingabe> eingebe und auf "Abbrechen" klicke
+      await openCreateForm(page)
+      await prepare?.(page)
+      await page.getByLabel(field).fill(value)
+      await cancelForm(page)
+
+      // Then: sehe ich die Nachfrage "Eingaben verwerfen?"
+      await expect(discardQuestion(page)).toBeVisible()
+
+      // When: ich auf "Verwerfen" klicke
+      await discardQuestion(page).getByRole('button', { name: 'Verwerfen' }).click()
+
+      // Then: sehe ich die Rezept-Liste
+      await expectRecipeList(page)
+    })
+  })
+
+  // Szenario: Abbrechen mit Eingaben fragt nach – Weiter bearbeiten behält die Eingaben
+  test('US602_HappyPath_CancelCreateForm_WithInput_ContinueEditingKeepsInput', async ({ page }) => {
+    // When: ich das Formular öffne, "Pfannkuchen" als Titel und "250 g Mehl" als Zutaten eingebe
+    await openCreateForm(page)
+    await page.getByLabel('Titel').fill('Pfannkuchen')
+    await page.getByLabel('Zutaten').fill('250 g Mehl')
+    // When: ich auf "Abbrechen" und dann auf "Weiter bearbeiten" klicke
+    await cancelForm(page)
+    await discardQuestion(page).getByRole('button', { name: 'Weiter bearbeiten' }).click()
+
+    // Then: sehe ich das Formular mit dem Titel "Pfannkuchen" und den Zutaten "250 g Mehl"
+    await expectFormWithTitle(page, 'Pfannkuchen')
+    await expect(page.getByLabel('Zutaten')).toHaveValue('250 g Mehl')
+    // Then: sehe ich keine Nachfrage mehr
+    await expect(discardQuestion(page)).toBeHidden()
+  })
+
+  // Szenario: Beim Öffnen der Nachfrage liegt der Fokus auf „Weiter bearbeiten"
+  test('US602_HappyPath_CancelCreateForm_WithInput_FocusOnContinueEditing', async ({ page }) => {
+    // When: ich das Formular öffne, "Pfannkuchen" als Titel eingebe und auf "Abbrechen" klicke
+    await openDiscardQuestionWithTitle(page)
+
+    // Then: liegt in der Nachfrage der Fokus auf "Weiter bearbeiten"
+    await expect(discardQuestion(page).getByRole('button', { name: 'Weiter bearbeiten' })).toBeFocused()
+  })
+})
+
+// @US-602-edge-case
+test.describe('US602_EdgeCase: Rezeptformular abbrechen', () => {
+  // Szenario: Abbrechen fragt nicht nach, wenn nur Leerraum eingegeben wurde
+  // Leer heißt nach der Normalisierung leer (ADR-S135-1): Leerraum, Zeilenumbrüche und Leerzeichen ohne
+  // Breite (U+200B) bleiben dabei nicht übrig.
+  test('US602_EdgeCase_CancelCreateForm_OnlyWhitespace_ShowsListWithoutQuestion', async ({ page }) => {
+    // When: ich das Formular öffne und in jedes Feld nur Leerraum eingebe
+    await openCreateForm(page)
+    await page.getByLabel('Titel').fill(' \u{200B}  \u{200B} ')
+    await page.getByLabel('Zutaten').fill('\n  \n\u{200B}\n \u{200B} \n')
+    await page.getByLabel('Schritt 1').fill('   ')
+    await page.getByRole('button', { name: 'Schritt hinzufügen' }).click()
+    await page.getByLabel('Schritt 2').fill('\u{200B}\u{200B}')
+    // When: ich auf "Abbrechen" klicke
+    await cancelForm(page)
+
+    // Then: sehe ich die Rezept-Liste und wurde nicht gefragt, ob ich Eingaben verwerfen möchte
+    await expectListWithoutQuestion(page)
+  })
+
+  // Eine Zeile je Beispiel der Scenario Outline: die Zeichen, die ADR-S135-1 außer Leerzeichen ohne Breite
+  // entfernt, und U+0085 als Unicode-Leerraum, den JavaScripts trim() nicht kennt.
+  const vanishingCharacters = [
+    { zeichen: 'ein weiches Trennzeichen (U+00AD)', text: '\u{00AD}' },
+    { zeichen: 'einen Wortverbinder (U+2060)', text: '\u{2060}' },
+    { zeichen: 'eine Byte-Order-Mark (U+FEFF)', text: '\u{FEFF}' },
+    { zeichen: 'einen Zeilenumbruch „Next Line“ (U+0085)', text: '\u{0085}' },
+  ] as const
+  vanishingCharacters.forEach(({ zeichen, text }) => {
+    // Szenario: Abbrechen fragt nicht nach, wenn der Titel nur Zeichen enthält, die beim Normalisieren wegfallen
+    test(`US602_EdgeCase_CancelCreateForm_TitleOnlyVanishingCharacters_ShowsListWithoutQuestion (${zeichen})`, async ({ page }) => {
+      // When: ich das Formular öffne, als Titel nur <Zeichen> eingebe und auf "Abbrechen" klicke
+      await openCreateForm(page)
+      await page.getByLabel('Titel').fill(text)
+      await cancelForm(page)
+
+      // Then: sehe ich die Rezept-Liste und wurde nicht gefragt, ob ich Eingaben verwerfen möchte
+      await expectListWithoutQuestion(page)
+    })
+  })
+
+  // Eine Zeile je Beispiel der Scenario Outline. Der Klick daneben trifft die linke obere Ecke: Dort liegt
+  // bei jeder Fenstergröße der Hintergrund, nicht die mittig stehende Nachfrage.
+  const closings = [
+    { schliessen: 'Escape drücke', close: async (page: Readonly<Page>) => { await page.keyboard.press('Escape') } },
+    { schliessen: 'neben die Nachfrage klicke', close: async (page: Readonly<Page>) => { await page.mouse.click(5, 5) } },
+  ] as const
+  closings.forEach(({ schliessen, close }) => {
+    // Szenario: Escape oder Klick neben die Nachfrage behält die Eingaben
+    test(`US602_EdgeCase_CancelCreateForm_CloseQuestionAside_KeepsInput (${schliessen})`, async ({ page }) => {
+      // When: ich das Formular öffne, "Pfannkuchen" als Titel eingebe und auf "Abbrechen" klicke
+      await openDiscardQuestionWithTitle(page)
+      // Erst wenn der Fokus in der Nachfrage liegt, erreicht Escape ihren Handler – sonst prüfte die
+      // Zeile ein Timing statt des Verhaltens.
+      await expect(discardQuestion(page).getByRole('button', { name: 'Weiter bearbeiten' })).toBeFocused()
+      // When: ich <Schließen>
+      await close(page)
+
+      // Then: sehe ich das Formular mit dem Titel "Pfannkuchen"
+      await expectFormWithTitle(page, 'Pfannkuchen')
+      // Then: sehe ich keine Nachfrage mehr
+      await expect(discardQuestion(page)).toBeHidden()
+    })
+  })
+
+  // Szenario: Nach Verwerfen ist das Formular beim erneuten Öffnen leer
+  test('US602_EdgeCase_DiscardCreateForm_ReopenForm_FieldsAreEmpty', async ({ page }) => {
+    // When: ich das Formular öffne, Titel und Zutaten eingebe und einen Schritt hinzufüge
+    await openCreateForm(page)
+    await page.getByLabel('Titel').fill('Pfannkuchen')
+    await page.getByLabel('Zutaten').fill('250 g Mehl')
+    await page.getByRole('button', { name: 'Schritt hinzufügen' }).click()
+    // When: ich auf "Abbrechen" und auf "Verwerfen" klicke
+    await cancelForm(page)
+    await discardQuestion(page).getByRole('button', { name: 'Verwerfen' }).click()
+    // When: ich auf "Rezept anlegen" klicke
+    await page.getByRole('button', { name: 'Rezept anlegen' }).click()
+
+    // Then: Titel und Zutatenfeld leer, genau ein leeres Schrittfeld mit der Nummer 1
+    await expectEmptyForm(page)
+  })
+})
+
 // Given beider Detail-Szenarien: zwei Rezepte, damit ein falsch geladenes Rezept auffällt – „Brot"
 // steht in der Liste vor „Pfannkuchen", und „500 g Weizenmehl" erscheint, wenn die Zutaten nicht nach
 // Rezept gefiltert werden. Gibt die Id von „Pfannkuchen" zurück (Ziel des Direktlinks).
@@ -129,7 +444,7 @@ test.describe('US602_HappyPath: Rezept-Detailansicht', () => {
 // @US-602-error – eine Zeile je Beispiel der Scenario Outline
 test.describe('US602_Error: Direktlink ins Leere', () => {
   const links = [
-    { kennung: 'einer gültig aufgebauten, unbekannten Kennung', id: '01900000-0000-7000-8000-000000000000' },
+    { kennung: 'einer gültig aufgebauten, unbekannten Kennung', id: UNKNOWN_RECIPE_ID },
     { kennung: 'einer ungültigen Kennung', id: 'keine-kennung' },
   ] as const
   links.forEach(({ kennung, id }) => {
@@ -145,8 +460,7 @@ test.describe('US602_Error: Direktlink ins Leere', () => {
       await page.getByRole('link', { name: 'Zur Rezept-Liste' }).click()
 
       // Then: sehe ich die Rezept-Liste
-      await expect(page).toHaveURL(/\/recipes$/)
-      await expect(page.getByRole('heading', { level: 1, name: 'Rezepte' })).toBeVisible()
+      await expectRecipeList(page)
     })
   })
 })

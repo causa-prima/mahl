@@ -5,7 +5,8 @@ vitest run (nativ über npm).
 Verwendung:
   python3 -m prozesscode.vitest-run                   # alle Tests (einmalig, kein Watch)
   python3 -m prozesscode.vitest-run --filter Pattern  # nach TESTname filtern (vitest -t)
-  python3 -m prozesscode.vitest-run --file Pattern    # nach DATEIname filtern (vitest positional)
+  python3 -m prozesscode.vitest-run --file Pattern    # nach DATEIname filtern (vitest positional;
+                                                      #  Pfad relativ zu Client/ oder ab Repo-Wurzel)
   python3 -m prozesscode.vitest-run --verbose         # vollständiger Output inkl. npm-Header
 
 --filter und --file sind jeweils unabhängig optional und beliebig kombinierbar.
@@ -21,8 +22,23 @@ import sys
 from ._util import run_npm
 from ._wrapper_output import emit, strip_noise
 
+# Verzeichnis, in dem run_npm vitest startet (Default von run_npm), als Pfadpräfix ab Repo-Wurzel.
+_CLIENT_PREFIX = "Client/"
+
 # vitest-Banner und Zeitstempel – kein Aussagewert für „sind die Tests grün?".
 _VITEST_CHROME = re.compile(r"^\s*RUN\s+v[\d.]|^\s*Start at\s|^\s*Duration\s")
+
+# Testing Library gibt bei einer fehlgeschlagenen Abfrage den ganzen DOM aus – je rotem Test oft zweimal
+# und je rund 200 Zeilen (14 rote Tests ergaben mehrere hundert KB). Der Anfang zeigt, welche Seite
+# gerendert war; den Rest gibt es mit --verbose.
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+# `<body>` – oder `<body` mit Attributen auf den Folgezeilen (ein offener MUI-Dialog setzt `style`).
+_DOM_DUMP_START = re.compile(r"<body(?:>|\s|$)")
+# `</body>` – oder `...`, mit dem Testing Library einen zu langen Dump selbst abschneidet; danach
+# folgt der Stacktrace ohne Leerzeile.
+_DOM_DUMP_END = frozenset({"</body>", "..."})
+_DOM_DUMP_KEEP = 12
+DOM_DUMP_CUT = "  … {count} Zeilen DOM gekürzt – vollständig: --verbose"
 
 # vitest-Zusammenfassung: "  Tests  3 passed | 13 skipped (16)" (nicht "Test Files …").
 _TESTS_SUMMARY = re.compile(r"^\s*Tests\s+(?P<body>.+?)\s+\((?P<total>\d+)\)\s*$", re.MULTILINE)
@@ -48,6 +64,41 @@ def _parse_counts(output: str) -> dict[str, int] | None:
     }
 
 
+def shorten_dom_dumps(lines: list[str]) -> list[str]:
+    """Kürzt jede DOM-Ausgabe auf ihre ersten Zeilen plus Hinweis.
+
+    Eine Ausgabe beginnt mit `<body` und endet mit `</body>` oder – von Testing Library selbst
+    gekürzt (`DEBUG_PRINT_LIMIT`) – mit `...`. Fehlt beides, endet sie an der ersten Leerzeile oder
+    dort, wo die nächste beginnt. So verschluckt eine Ausgabe nie den Fehlertext dahinter.
+    """
+    result: list[str] = []
+    dump: list[str] | None = None
+    for line in lines:
+        # Nur ASCII-Leerraum abschneiden: Ein Textknoten aus einem schmalen Leerzeichen (U+2009 vor dem
+        # Pflicht-Asterisk) ist DOM-Inhalt, keine Leerzeile – str.strip() machte ihn zum Dump-Ende.
+        plain = _ANSI.sub("", line).strip(" \t\r")
+        if dump is not None and (not plain or _DOM_DUMP_START.match(plain)):
+            result.extend(_shortened(dump))
+            dump = None
+        if dump is None:
+            if _DOM_DUMP_START.match(plain):
+                dump = [line]
+            else:
+                result.append(line)
+            continue
+        dump.append(line)
+        if plain in _DOM_DUMP_END:
+            result.extend(_shortened(dump))
+            dump = None
+    return result + (_shortened(dump) if dump else [])
+
+
+def _shortened(dump: list[str]) -> list[str]:
+    if len(dump) <= _DOM_DUMP_KEEP + 1:
+        return dump
+    return [*dump[:_DOM_DUMP_KEEP], DOM_DUMP_CUT.format(count=len(dump) - _DOM_DUMP_KEEP)]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -63,9 +114,10 @@ def main() -> None:
 
     # "run" als erstes Argument → einmaliger Lauf, kein Watch-Mode
     npm_args = ["run", "test", "--", "run"]
-    # Positional (Datei) muss vor den Optionen stehen
+    # Positional (Datei) muss vor den Optionen stehen. vitest läuft in Client/ und matcht relativ dazu –
+    # ein Pfad ab Repo-Wurzel, wie git ihn nennt, fände sonst keine Datei.
     if args.file_name:
-        npm_args.append(args.file_name)
+        npm_args.append(args.file_name.removeprefix(_CLIENT_PREFIX))
     if args.filter_name:
         npm_args.extend(["-t", args.filter_name])
 
@@ -82,11 +134,11 @@ def main() -> None:
         emit(verbose=args.verbose, output=output, verdict=verdict)
     else:
         # Rot: der vitest-Fehlerblock (Diff, Stack, Datei/Zeile) IST die Analyse-Information –
-        # nur Banner und Zeitstempel fallen weg.
+        # Banner und Zeitstempel fallen weg, DOM-Ausgaben werden auf ihren Anfang gekürzt.
         failed = counts["failed"] if counts else "?"
         emit(verbose=args.verbose, output=output,
              verdict=f"✗ {failed} Test(s) rot – Details oben",
-             details=strip_noise(output, _VITEST_CHROME))
+             details=shorten_dom_dumps(strip_noise(output, _VITEST_CHROME)))
 
     # --filter (vitest -t) matcht als Substring gegen den voll-qualifizierten Testnamen.
     # Nicht-passende Tests werden ÜBERSPRUNGEN, nicht gefiltert – matcht das Pattern nichts,

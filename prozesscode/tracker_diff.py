@@ -12,7 +12,8 @@ der nach der Freigabe läuft – auch eine zweite Datei (`td` pflegt AGENT_MEMOR
 ist nicht beteiligt: Die Kommandozeile ist nur `shlex`-geparst, wie in `tracker_preview`.
 
 **Dargestellt** wird je Datei eine Liste von Blöcken: `kopf` (die Überschrift des betroffenen
-Eintrags), `geaendert` (eine Zeile mit Wort-Diff), `neu` und `weg` (ganze Zeilen). Jede Zeile
+Eintrags), `geaendert` (eine Zeile mit Wort-Diff), `neu` und `weg` (ganze Zeilen; `eintrag`, wenn
+der Block ein ganzer Eintrag ist). Jede Zeile
 ist eine Liste von Stücken `{text, stil}`, `stil` ⊆ {fett, code, kursiv, weg, neu}. Das Markdown
 der Tracker ist dabei aufgelöst – der kleine Teil, den sie nutzen; alles andere bleibt Rohtext.
 
@@ -146,11 +147,16 @@ def _kopf_vor(zeilen: list[str], index: int) -> str | None:
 
 
 def _zeilenblock(art: str, zeilen: list[str]) -> dict | None:
+    """Ganze neue oder gelöschte Zeilen. `eintrag`: Der Block bringt eine Eintrags-Überschrift mit,
+    ist also ein ganzer Eintrag – der Mod sagt das dann oben, statt jede Zeile einzufärben."""
     while zeilen and not zeilen[0].strip():
         zeilen = zeilen[1:]
     while zeilen and not zeilen[-1].strip():
         zeilen = zeilen[:-1]
-    return {"art": art, "zeilen": [markdown(z) for z in zeilen]} if zeilen else None
+    if not zeilen:
+        return None
+    return {"art": art, "zeilen": [markdown(z) for z in zeilen],
+            "eintrag": any(_EINTRAGSKOPF.match(z) for z in zeilen)}
 
 
 def bloecke(alt: str, neu: str) -> list[dict]:

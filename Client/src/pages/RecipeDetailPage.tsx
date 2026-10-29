@@ -21,6 +21,7 @@ export default function RecipeDetailPage() {
 
 function LoadedRecipe({ id }: Readonly<{ id: string }>) {
   // Während des Ladens bleibt die Seite leer: weder Hinweis noch Spinner.
+  // Stryker disable next-line StringLiteral: Query-Key-Präfix, äquivalent solange nichts per Präfix invalidiert (Einzelfall, vom User freigegeben S143)
   const lookup = useResultQuery(['recipes', id], () => fetchRecipe(id))
 
   if (lookup === undefined) return null

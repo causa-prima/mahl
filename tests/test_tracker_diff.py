@@ -103,6 +103,34 @@ def test_ein_neuer_eintrag_kommt_als_neue_zeilen(kopien):
     assert "• Beobachtung: B" in zeilen
 
 
+def test_ein_neuer_eintrag_ist_als_ganzer_eintrag_markiert(kopien):
+    """Der Mod zeigt dann einen Hinweis „neuer Eintrag" statt jede Zeile grün zu hinterlegen (S143)."""
+    befund = td_diff.befund(
+        "python3 -m prozesscode.obs add --titel T --quelle User --impact MITTEL "
+        "--haeufigkeit gelegentlich --kategorie TOOLING --kontext Doku --beobachtung B "
+        "--zusammen-erledigen keiner --aufschubgrund 'User – später'", kopien)
+    [block] = [b for b in befund["dateien"][0]["bloecke"]
+               if any(_text(z).startswith("OBS-") for z in b["zeilen"])]
+    assert block["eintrag"] is True
+
+
+def test_ein_entfernter_eintrag_ist_als_ganzer_eintrag_markiert(kopien):
+    tid = _erste_td_id(kopien)
+    befund = td_diff.befund(f"python3 -m prozesscode.td remove {tid}", kopien)
+    assert befund["fehler"] is None
+    [block] = [b for b in befund["dateien"][0]["bloecke"] if b["art"] == "weg"]
+    assert block["eintrag"] is True
+
+
+def test_neue_zeilen_in_einem_eintrag_sind_kein_ganzer_eintrag():
+    """Gegenprobe: Ein hinzugefügtes Feld bleibt eine grün hinterlegte Zeile."""
+    alt = "## OBS-S1-1 – Titel\n- Status: NEU\n"
+    neu = "## OBS-S1-1 – Titel\n- Status: NEU\n- Bezug: LL-S1-1\n"
+    [kopf, block] = td_diff.bloecke(alt, neu)
+    assert (kopf["art"], block["art"]) == ("kopf", "neu")
+    assert block["eintrag"] is False
+
+
 def test_ein_scheiternder_befehl_nennt_den_grund_statt_eines_diffs(kopien):
     befund = td_diff.befund("python3 -m prozesscode.td set TD-S000-0 --titel X", kopien)
     assert befund["dateien"] == []

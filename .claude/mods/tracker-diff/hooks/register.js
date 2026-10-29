@@ -1,9 +1,12 @@
 // Zeigt bei Tracker-Schreibbefehlen (obs|lessons|td|oq add|set|remove) den Diff der Datei in
 // einem Pane, solange der Aufruf auf Freigabe und Ausführung wartet.
 //
-// Nur Anzeige: Die Freigabe bleibt beim PreToolUse-Hook und seinem Prompt, den kein Mod
-// gestalten kann. Berechnet wird der Diff in Python (prozesscode/tracker_diff.py), aus dem
+// Freigeben kann der Mod nichts: Die Freigabe bleibt beim PreToolUse-Hook und seinem Prompt, den
+// kein Mod gestalten kann. Berechnet wird der Diff in Python (prozesscode/tracker_diff.py), aus dem
 // echten Werkzeug-Code mit abgefangenem Schreiben – hier wird er nur gezeichnet.
+// Abweisen darf er: Scheitert das echte Werkzeug schon in der Berechnung, scheiterte es auch
+// ausgeführt – eine Freigabe für einen Befehl, der nichts schreibt, fragte umsonst.
+// Scheitert dagegen tracker_diff selbst, sagt das nichts über den Befehl: dann nur anzeigen.
 const TRACKER = /^python3 -m prozesscode\.(obs|lessons|td|oq) (add|set|remove)\b/
 const PANE = 'tracker-diff'
 
@@ -15,12 +18,21 @@ async function berechne($, command) {
     const lauf = await $.process.run(['python3', '-m', 'prozesscode.tracker_diff'],
       { stdin: command, cwd: await $.session.root(), timeoutMs: 10000 })
     if (lauf.exitCode !== 0) {
-      return { dateien: [], fehler: 'tracker_diff endete mit Exit ' + lauf.exitCode + ': ' + lauf.stderr.trim().slice(-400) }
+      return { dateien: [], unberechenbar: 'tracker_diff endete mit Exit ' + lauf.exitCode + ': ' + lauf.stderr.trim().slice(-400) }
     }
     return JSON.parse(lauf.stdout)
   } catch (fehler) {
-    return { dateien: [], fehler: 'tracker_diff nicht aufrufbar: ' + fehler }
+    return { dateien: [], unberechenbar: 'tracker_diff nicht aufrufbar: ' + fehler }
   }
+}
+
+const ABGEWIESEN = 'Der Befehl würde scheitern und wurde nicht ausgeführt (Mod tracker-diff): '
+
+// Ein ganzer neuer oder gelöschter Eintrag: der Hinweis oben farbig, die Zeilen darunter ohne
+// Hintergrund – eine durchgehend grüne oder rote Fläche ist schwer zu lesen.
+const EINTRAG = {
+  neu: { text: 'Neuer Eintrag', props: { backgroundColor: 'green', color: 'white', weight: 'semibold' } },
+  weg: { text: 'Eintrag wird entfernt', props: { backgroundColor: 'red', color: 'white', weight: 'semibold' } },
 }
 
 // Stile aus tracker_diff.py → Text-Props. ANSI-Farben: Im Pane erscheinen alle Farben gedämpft
@@ -46,7 +58,7 @@ function geschaetzteZeilen(befund, spalten) {
   let zeilen = 2 * befund.dateien.length
   for (const datei of befund.dateien) {
     for (const block of datei.bloecke) {
-      zeilen += 1
+      zeilen += block.eintrag ? 2 : 1
       for (const zeile of block.zeilen) {
         const laenge = zeile.reduce((n, s) => n + s.text.length, 2)
         zeilen += Math.max(1, Math.ceil(laenge / Math.max(spalten, 20)))
@@ -69,6 +81,7 @@ export function register(on) {
     if (!TRACKER.test(e.command)) return next(e)
     const befund = await berechne($, e.command)
     if (!befund) return next(e)
+    if (befund.fehler) return { deny: ABGEWIESEN + befund.fehler }
     offen.set(e.tool_use_id, befund)
     await $.ui.open({ id: PANE, title: 'Tracker-Änderung' })
     $.ui.invalidate('ui.render')
@@ -87,13 +100,16 @@ export function register(on) {
     if (!befund) return next(e)
     const { Box, Text } = $.ui.resolve(e)
     const kinder = []
-    if (befund.fehler) kinder.push(Text({ key: 'fehler', color: 'error', children: ['Der Befehl würde scheitern: ' + befund.fehler] }))
+    if (befund.unberechenbar) kinder.push(Text({ key: 'unberechenbar', color: 'warning', children: ['Diff nicht berechenbar: ' + befund.unberechenbar] }))
     if (befund.warnung) kinder.push(Text({ key: 'warnung', color: 'warning', children: ['⚠ ' + befund.warnung] }))
     for (const datei of befund.dateien) {
       kinder.push(Text({ key: 'datei:' + datei.datei, weight: 'semibold', underline: true, children: [datei.datei] }))
       datei.bloecke.forEach((block, b) => {
-        const zeilen = block.zeilen.map((zeile, z) => zeichneZeile(Text, block.art, zeile, datei.datei + ':' + b + ':' + z))
-        kinder.push(Box({ key: 'block:' + datei.datei + ':' + b, flexDirection: 'column', children: zeilen }))
+        const schluessel = datei.datei + ':' + b
+        const eintrag = block.eintrag && EINTRAG[block.art]
+        const zeilen = block.zeilen.map((zeile, z) => zeichneZeile(Text, eintrag ? 'eintrag' : block.art, zeile, schluessel + ':' + z))
+        if (eintrag) zeilen.unshift(Text({ key: schluessel + ':marke', ...eintrag.props, children: [eintrag.text] }))
+        kinder.push(Box({ key: 'block:' + schluessel, flexDirection: 'column', children: zeilen }))
       })
     }
     if (kinder.length === 0) kinder.push(Text({ key: 'leer', children: ['Der Befehl ändert keine Datei.'] }))

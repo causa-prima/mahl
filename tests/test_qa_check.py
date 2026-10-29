@@ -10,6 +10,8 @@ import subprocess
 import time
 from importlib import import_module
 
+import pytest
+
 
 def _load():
     return import_module("prozesscode.qa-check")
@@ -642,3 +644,65 @@ def test_red_check_warning_names_red_checks_or_is_absent():
     assert warning is not None
     assert f"Rot: {qa.CHECK_ESLINT_TITLE}, {qa.CHECK_ADR_TITLE}." in warning
     assert qa.red_check_warning(lint_code=0, adr_code=-1) is None
+
+
+# --- ESLint-Gate (Fast-Fail vor Stryker, S143: ein Lint-Fehler kam erst nach ~5 Minuten Stryker) ---
+
+_LINT_FEHLER_STATUS = "FEHLER – 1 Fehler:\n  Client/src/hooks/useX.ts:5:3 functional/no-conditional-statements – x"
+
+
+def test_lint_fast_fail_reports_errors_before_stryker():
+    # // Given Check 4 meldet einen ESLint-Fehler
+    # // When der Fast-Fail vor Stryker prüft
+    message = qa.lint_fast_fail(_LINT_FEHLER_STATUS, 1)
+    # // Then nennt die Meldung den Befund und dass Stryker deshalb nicht lief
+    assert message is not None
+    assert "Client/src/hooks/useX.ts:5:3" in message
+    assert "vor Stryker" in message
+
+
+def test_lint_fast_fail_is_silent_for_clean_or_skipped_lint():
+    # // Given / When / Then: ohne Fehler (0) oder übersprungen (-1, Backend/keine .ts) kein Abbruch
+    assert qa.lint_fast_fail("OK", 0) is None
+    assert qa.lint_fast_fail("n/a (backend)", -1) is None
+
+
+def _main_mit_lint_fehler(monkeypatch, *argv: str) -> tuple[list, list]:
+    """Startet qa-check über seinen Einstieg; ESLint meldet einen Fehler. Liefert die Aufrufe von
+    Stryker und von Check 4 – und den Exit-Code als SystemExit."""
+    stryker_calls, lint_calls = [], []
+    monkeypatch.setattr(qa, "check_tsc", lambda: 0)
+    monkeypatch.setattr(qa, "structure_fast_fail", lambda _layer: None)
+    monkeypatch.setattr(qa, "check_eslint", lambda layer: lint_calls.append(layer) or (_LINT_FEHLER_STATUS, 1))
+    monkeypatch.setattr(qa, "_run_stryker", lambda layer: stryker_calls.append(layer) or 0)
+    monkeypatch.setattr(qa.sys, "argv", ["qa-check", "--layer", "frontend", *argv])
+    return stryker_calls, lint_calls
+
+
+def test_main_stops_before_stryker_when_eslint_reports_errors(monkeypatch, capsys):
+    # // Given ein Frontend-Übergabelauf: Typecheck und Struktur grün, ESLint meldet einen Fehler
+    stryker_calls, lint_calls = _main_mit_lint_fehler(monkeypatch)
+    # // When qa-check über seinen Einstieg läuft
+    with pytest.raises(SystemExit) as stop:
+        qa.main()
+    # // Then bricht es mit dem Befund ab, ohne Stryker zu starten – ESLint lief genau einmal
+    assert stop.value.code == 1
+    assert stryker_calls == []
+    assert lint_calls == ["frontend"]
+    assert "Client/src/hooks/useX.ts:5:3" in capsys.readouterr().err
+
+
+def test_verify_does_not_stop_early_on_eslint_errors(monkeypatch, capsys):
+    # // Given --verify (kein Stryker-Lauf) mit ESLint-Fehler; ein Report fehlt, damit der Lauf
+    #    an der nächsten Stelle nach dem Fast-Fail endet
+    stryker_calls, lint_calls = _main_mit_lint_fehler(monkeypatch, "--verify", "abc")
+    monkeypatch.setattr(qa, "_find_report", lambda _layer: None)
+    # // When qa-check läuft
+    with pytest.raises(SystemExit):
+        qa.main()
+    # // Then kein Fast-Fail: Der Lauf kommt bis zur Report-Suche, ESLint lief genau einmal
+    err = capsys.readouterr().err
+    assert "Abbruch vor Stryker" not in err
+    assert "Kein Stryker-Report gefunden" in err
+    assert lint_calls == ["frontend"]
+    assert stryker_calls == []

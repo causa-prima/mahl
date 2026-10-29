@@ -38,10 +38,10 @@ Komponenten dieselben visuellen Entscheidungen treffen müssen.
 - Ja → kein Handlungsbedarf.
 - Nein → Label oder Verhalten anpassen, bis beides übereinstimmt.
 
-✅ "Speichern" speichert. "Abbrechen" verwirft. "Löschen" löscht.
+✅ "Speichern" speichert. "Abbrechen" verwirft – bei aufwendigen Eingaben erst nach einer Nachfrage ([Sonderfall: Formular-Abbrechen](#CGU-destructive-actions)). "Löschen" löscht.
 ❌ "Speichern" speichert und navigiert überraschend auf eine andere Seite ohne Ankündigung.
 
-**Reihenfolge:** Aktionen in der Reihenfolge anordnen, die der mentalen Abfolge des Nutzers entspricht (primäre Aktion zuerst, destruktive Aktion am Ende).
+**Reihenfolge:** Aktionen in der Reihenfolge anordnen, die der mentalen Abfolge des Nutzers entspricht (primäre Aktion zuerst, destruktive Aktion am Ende). Ausnahme sind die Aktionszeilen, die ein Formular oder eine Nachfrage abschließen: Dort steht die Hauptaktion bzw. die destruktive Aktion rechts, also zuletzt – festgelegt in der [Visuellen Baseline](#CGU-visuelle-baseline).
 
 ---
 
@@ -257,6 +257,16 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
   Button dem einer Liste entspricht.
 - **Formularfelder im Dialog:** `fullWidth` und `margin="dense"`.
 - **Formularfelder auf einer eigenen Seite** (z. B. „Rezept anlegen", ADR-S135-4): `fullWidth` und `margin="normal"` – eine Seite mit vielen, teils mehrzeiligen Feldern braucht am Handy mehr Abstand zwischen den Feldern als ein Dialog mit zweien. Eine Hilfsaktion („Schritt hinzufügen") steht direkt unter den Feldern, zu denen sie gehört; die Hauptaktion („Speichern") ist davon per `Stack spacing={2}` abgesetzt – derselbe Theme-Abstand wie im Seitenrumpf.
+- **Abschluss-Aktionen eines Formulars** („Abbrechen", „Speichern"): eine Zeile, rechtsbündig, die
+  Hauptaktion rechts – im Dialog liefert das `DialogActions`, auf einer eigenen Seite eine
+  `Stack direction="row"` mit `sx={{ justifyContent: 'flex-end' }}` (`justifyContent` nimmt der Stack
+  in MUI v7 nicht als Prop an). So stehen sie auf Seite und Dialog gleich, und
+  die Hauptaktion liegt rechts im Daumenbereich.
+- **Nachfrage vor einer destruktiven Aktion** (z. B. „Eingaben verwerfen?"): MUI `Dialog` mit
+  `role="alertdialog"` und der Frage als Titel, ohne Erklärtext. Die sichere Aktion steht links und hat beim
+  Öffnen den Fokus, die destruktive steht rechts als Text-Button in der Theme-Fehlerfarbe
+  (`color="error"`) – sie ist kenntlich, ohne zur Hauptaktion zu werden. Escape und ein Klick neben die
+  Nachfrage wirken wie die sichere Aktion: Eine beiläufige Geste darf nichts verwerfen.
 - **Farbe:** Die Primärfarbe trägt die Hauptaktion einer Ansicht (`variant="contained"`, etwa
   „Zutat anlegen", „Speichern"). Aktionen auf dunklem Grund (Snackbar) übernehmen dessen
   Textfarbe (`color="inherit"`) – Primärblau erreicht dort nicht die geforderten 4,5:1.

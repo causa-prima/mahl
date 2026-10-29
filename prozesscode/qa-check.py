@@ -426,6 +426,19 @@ def check_eslint(layer: str) -> tuple[str, int]:
     return f"FEHLER –\n  {finding}\n{ESLINT_DETAILS_HINT}", r.returncode
 
 
+LINT_FAST_FAIL = ("[qa-check] ❌ ESLint meldet Fehler – Abbruch vor Stryker, kein Übergabe-Hash:\n"
+                  "{status}\n   Fehler beheben, dann qa-check neu starten.")
+
+
+def lint_fast_fail(lint_status: str, lint_code: int) -> str | None:
+    """Meldung, wenn Check 4 (ESLint) Fehler meldet – sonst None.
+
+    Ein ESLint-Fehler muss ohnehin behoben werden. Vor Stryker geprüft, weil er sonst erst nach dem
+    minutenlangen Lauf erscheint und einen zweiten Lauf kostet; -1 heißt übersprungen.
+    """
+    return LINT_FAST_FAIL.format(status=lint_status) if lint_code > 0 else None
+
+
 def _without_wrapper_trailer(lines: list[str]) -> list[str]:
     """Entfernt die Schlusszeilen von `_wrapper_output.emit`: Verdikt und VERBOSE_HINT."""
     if lines and lines[-1] == VERBOSE_HINT:
@@ -535,6 +548,17 @@ def main() -> None:
             print(message, file=sys.stderr)
             sys.exit(1)
 
+    # ── ESLint (Fast-Fail vor Stryker; das Ergebnis ist zugleich Check 4) ─────
+    # Wie der Stryker-Report misst es den Stand bei Laufbeginn; der Tree-Fingerprint unten entsteht
+    # erst danach. Wer während des Laufs Code ändert, bekommt auch ohne ESLint einen Report zum alten
+    # Stand – das Fenster ist dasselbe, nicht größer.
+    lint_status, lint_code = check_eslint(args.layer) if args.layer == "frontend" else ("n/a (backend)", -1)
+    if run_stryker_now:
+        message = lint_fast_fail(lint_status, lint_code)
+        if message:
+            print(message, file=sys.stderr)
+            sys.exit(1)
+
     # ── Stryker ──────────────────────────────────────────────────────────────
     stryker_gate_failed = False
     if run_stryker_now:
@@ -611,7 +635,6 @@ def main() -> None:
     suppressions   = check_new_suppressions(args.layer)
     unit_tests     = check_unit_test_patterns(args.layer)
     test_structure = check_test_structure(args.layer)
-    lint_status, lint_code = check_eslint(args.layer) if args.layer == "frontend" else ("n/a (backend)", -1)
     adr_status, adr_code   = check_adr_refs()
 
     # ── Ausgabe ──────────────────────────────────────────────────────────────

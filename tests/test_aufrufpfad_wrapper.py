@@ -7,6 +7,7 @@ Verdikt aus einer Ausgabe in echter Form entsteht.
 """
 import subprocess
 from importlib import import_module
+from pathlib import Path
 
 import pytest
 
@@ -32,6 +33,15 @@ def test_vitest_reicht_datei_und_filter_in_richtiger_reihenfolge_weiter(monkeypa
     assert "✓ 3 Tests grün" in capsys.readouterr().out
 
 
+def test_vitest_nimmt_dateipfad_ab_repo_wurzel_an(monkeypatch):
+    """vitest läuft in Client/ und matcht den Datei-Filter gegen Pfade relativ dazu; ein Pfad ab
+    Repo-Wurzel (so, wie ihn git und die übrigen Werkzeuge nennen) fand sonst „No test files"."""
+    modul = import_module("prozesscode.vitest-run")
+    aufrufe = _fake_npm(monkeypatch, modul, "      Tests  3 passed (3)\n")
+    cli_aufruf(monkeypatch, modul, "--file", "Client/src/pages/X.test.tsx")
+    assert aufrufe == [["run", "test", "--", "run", "src/pages/X.test.tsx"]]
+
+
 def test_vitest_roter_lauf_nennt_die_zahl_und_bleibt_rot(monkeypatch, capsys):
     modul = import_module("prozesscode.vitest-run")
     _fake_npm(monkeypatch, modul, "      Tests  2 failed | 5 passed (7)\n", 1)
@@ -55,6 +65,78 @@ def test_vitest_absturz_ohne_rote_tests_meldet_kein_gruen(monkeypatch, capsys):
     _fake_npm(monkeypatch, modul, "      Tests  5 passed (5)\nError: Unhandled rejection\n", 1)
     assert cli_aufruf(monkeypatch, modul) == 1
     assert "✓" not in capsys.readouterr().out
+
+
+_VITEST_ROT_DOM_DUMP = (Path(__file__).parent / "fixtures" / "vitest_rot_dom_dump.txt").read_text(encoding="utf-8")
+
+
+def test_vitest_roter_lauf_kuerzt_jede_dom_ausgabe_auf_ihren_anfang(monkeypatch, capsys):
+    """Gespeicherte Ausgabe eines echten roten Laufs (vitest 4.1.11, Testing Library, S143): ein
+    roter Test mit zwei DOM-Ausgaben von je rund 210 Zeilen. Ungekürzt kamen beim RED von US-602
+    run-6 (14 rote Tests) mehrere hundert KB beim Agenten an."""
+    modul = import_module("prozesscode.vitest-run")
+    _fake_npm(monkeypatch, modul, _VITEST_ROT_DOM_DUMP, 1)
+    assert cli_aufruf(monkeypatch, modul) == 1
+    ausgabe = capsys.readouterr().out
+    # Befund und Fundstelle bleiben stehen …
+    assert 'Unable to find role="button" and name "gibt es nicht"' in ausgabe
+    assert "src/pages/zz-dom-dump.test.tsx:19:18" in ausgabe
+    # … jede DOM-Ausgabe ist gekürzt und sagt, wie man sie ganz sieht
+    assert ausgabe.count("Zeilen DOM gekürzt") == 2
+    assert len(ausgabe.splitlines()) < 100
+
+
+def test_vitest_roter_lauf_mit_offenem_dialog_kuerzt_auch_den_abgeschnittenen_dom(monkeypatch, capsys):
+    """Gespeicherte Ausgabe eines echten roten Laufs mit offener Nachfrage (S143): MUI setzt `style`
+    auf `<body>`, die Zeile lautet dann `<body` mit Attributen darunter, und Testing Library kürzt den
+    Dump selbst auf `...` – ein `</body>` kommt nicht. Der Review-Auditor vermutete den ersten Teil;
+    der Lauf zeigte beide."""
+    fixture = Path(__file__).parent / "fixtures" / "vitest_rot_dom_dump_dialog.txt"
+    modul = import_module("prozesscode.vitest-run")
+    _fake_npm(monkeypatch, modul, fixture.read_text(encoding="utf-8"), 1)
+    assert cli_aufruf(monkeypatch, modul) == 1
+    ausgabe = capsys.readouterr().out
+    assert ausgabe.count("Zeilen DOM gekürzt") == 2
+    assert "src/pages/zz-dom-dialog.test.tsx:23:18" in ausgabe
+
+
+def test_dom_ausgabe_ohne_schluss_verschluckt_nichts_dahinter():
+    # // Given eine DOM-Ausgabe ohne </body>, danach Leerzeile, Fehlertext und eine zweite DOM-Ausgabe
+    modul = import_module("prozesscode.vitest-run")
+    dom = ["<body>", *[f"  <div>{i}</div>" for i in range(30)]]
+    zeilen = [*dom, "", "Fehler: Abfrage scheiterte", "src/x.test.tsx:5:3", *dom, "</body>"]
+    # // When gekürzt wird
+    gekuerzt = modul.shorten_dom_dumps(zeilen)
+    # // Then bleiben Fehlertext und Fundstelle stehen, beide Ausgaben sind gekürzt
+    assert "Fehler: Abfrage scheiterte" in gekuerzt
+    assert "src/x.test.tsx:5:3" in gekuerzt
+    assert sum("Zeilen DOM gekürzt" in zeile for zeile in gekuerzt) == 2
+
+
+def test_dom_ausgabe_folgt_direkt_auf_eine_offene_wird_einzeln_gekuerzt():
+    # // Given zwei DOM-Ausgaben ohne Leerzeile dazwischen, die erste ohne </body>
+    modul = import_module("prozesscode.vitest-run")
+    dom = ["<body>", *[f"  <div>{i}</div>" for i in range(30)]]
+    # // When / Then: jede wird für sich gekürzt
+    gekuerzt = modul.shorten_dom_dumps([*dom, *dom, "</body>"])
+    assert sum("Zeilen DOM gekürzt" in zeile for zeile in gekuerzt) == 2
+
+
+def test_kurze_dom_ausgabe_bleibt_unveraendert():
+    # // Given eine DOM-Ausgabe, die höchstens so lang ist wie der behaltene Anfang plus Kürzungszeile
+    modul = import_module("prozesscode.vitest-run")
+    kurz = ["<body>", *[f"  <div>{i}</div>" for i in range(11)], "</body>"]
+    # // When / Then
+    assert modul.shorten_dom_dumps(kurz) == kurz
+
+
+def test_vitest_verbose_zeigt_die_dom_ausgabe_ungekuerzt(monkeypatch, capsys):
+    modul = import_module("prozesscode.vitest-run")
+    _fake_npm(monkeypatch, modul, _VITEST_ROT_DOM_DUMP, 1)
+    cli_aufruf(monkeypatch, modul, "--verbose")
+    ausgabe = capsys.readouterr().out
+    assert "Zeilen DOM gekürzt" not in ausgabe
+    assert len(ausgabe.splitlines()) > 400
 
 
 def test_vitest_filter_mit_gleich_vielen_roten_und_gruenen_treffern_hat_getroffen(monkeypatch, capsys):

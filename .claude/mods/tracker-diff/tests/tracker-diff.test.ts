@@ -27,12 +27,14 @@ const ERLEDIGT = { result: { stdout: '', stderr: '', interrupted: false } }
 
 type Aufruf = { argv?: readonly string[], stdin?: string, geoeffnet?: string, geschlossen?: string }
 
-// Steht für die Engine: das Diff-Werkzeug antwortet mit `befund`, das Pane wird platziert.
-function engine(on: On, befund: object, aufrufe: Aufruf[]) {
+// Steht für die Engine: das Diff-Werkzeug antwortet mit `befund` (oder scheitert selbst mit
+// `exitCode`), das Pane wird platziert.
+function engine(on: On, befund: object, aufrufe: Aufruf[], exitCode = 0) {
   on('session.root', async () => ({ value: '/repo' }))
   on('process.run', async (_$, e) => {
     aufrufe.push({ argv: e.argv, stdin: e.init?.stdin })
-    return { value: { exitCode: 0, stdout: JSON.stringify(befund), stderr: '',
+    return { value: { exitCode, stdout: exitCode === 0 ? JSON.stringify(befund) : '',
+                      stderr: exitCode === 0 ? '' : 'Traceback: kaputt',
                       isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('ui.open', async (_$, e) => { aufrufe.push({ geoeffnet: e.id }); return { value: { isPlaced: true } } })
@@ -110,16 +112,64 @@ test('lässt andere Bash-Befehle unberührt', async ($, on) => {
   expect(aufrufe).toEqual([])
 })
 
-test('zeigt den Grund, wenn der Befehl scheitern würde', async ($, on) => {
-  engine(on, { dateien: [], fehler: 'TD-S000-0 existiert nicht.', warnung: null }, [])
+test('weist einen Befehl, der scheitern würde, ab – ohne Pane und ohne Freigabe-Prompt', async ($, on) => {
+  // Ein Befehl, der nichts schreiben kann, braucht keine Freigabe.
+  const aufrufe: Aufruf[] = []
+  engine(on, { dateien: [], fehler: 'TD-S000-0 existiert nicht.', warnung: null }, aufrufe)
+  let weitergereicht = false
+  on('tool.call', async () => { weitergereicht = true; return ERLEDIGT })
+
+  const ergebnis = await $.tool.call({ tool: 'Bash', command: 'python3 -m prozesscode.td set TD-S000-0 --titel X', tool_use_id: 'toolu_3' })
+
+  expect('deny' in ergebnis ? ergebnis.deny : '').toContain('TD-S000-0 existiert nicht.')
+  expect(weitergereicht).toBe(false)
+  expect(aufrufe.filter((a) => a.geoeffnet)).toEqual([])
+})
+
+test('lässt den Befehl durch, wenn das Diff-Werkzeug selbst scheitert', async ($, on) => {
+  // Gegenstück: Ein Fehler im Diff-Werkzeug sagt nichts über den Befehl – nur anzeigen, nie abweisen.
+  engine(on, BEFUND, [], 1)
   let gezeichnet
   on('tool.call', async () => {
     const pane = await $.ui.mount(PANE)
-    gezeichnet = await pane.find({ type: 'Text', text: /würde scheitern: TD-S000-0/ })
+    gezeichnet = await pane.find({ type: 'Text', text: /Diff nicht berechenbar/ })
     return ERLEDIGT
   })
 
-  await $.tool.call({ tool: 'Bash', command: 'python3 -m prozesscode.td set TD-S000-0 --titel X', tool_use_id: 'toolu_3' })
+  const ergebnis = await $.tool.call({ tool: 'Bash', command: BEFEHL, tool_use_id: 'toolu_5' })
 
   expect(gezeichnet).toBeDefined()
+  expect(ergebnis).toEqual(ERLEDIGT)
 })
+
+function ganzerEintrag(art: 'neu' | 'weg') {
+  return {
+    dateien: [{
+      datei: 'docs/kaizen/observations.md',
+      bloecke: [{ art, eintrag: true, zeilen: [[{ text: 'OBS-S143-9 – Titel', stil: ['fett'] }],
+                                              [{ text: '• Status: NEU', stil: [] }]] }],
+    }],
+    fehler: null,
+    warnung: null,
+  }
+}
+
+for (const [art, hinweis] of [['neu', /^Neuer Eintrag$/], ['weg', /^Eintrag wird entfernt$/]] as const) {
+  test(`zeigt einen ganzen Eintrag (${art}) mit farbigem Hinweis oben und Zeilen ohne Hintergrund`, async ($, on) => {
+    // Ein ganz grün bzw. rot hinterlegter Eintrag ist schwer zu lesen; der Hinweis sagt es einmal.
+    engine(on, ganzerEintrag(art), [])
+    let marke: FoundElement | undefined
+    let zeile: FoundElement | undefined
+    on('tool.call', async () => {
+      const pane = await $.ui.mount(PANE)
+      marke = await pane.find({ type: 'Text', text: hinweis })
+      zeile = await pane.find({ type: 'Text', text: /^• Status: NEU$/ })
+      return ERLEDIGT
+    })
+
+    await $.tool.call({ tool: 'Bash', command: BEFEHL, tool_use_id: 'toolu_6' })
+
+    expect(marke?.props.backgroundColor).toBeDefined()
+    expect(zeile?.props.backgroundColor).toBeUndefined()
+  })
+}

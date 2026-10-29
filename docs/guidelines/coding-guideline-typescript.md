@@ -322,6 +322,8 @@ const queryClient = new QueryClient({
 
 **Warum:** Eine Regel an zwei Stellen driftet. E2E schützt davor nur begrenzt – lockert das Backend eine Grenze (Max-Länge 30 → 40), während das Frontend weiter auf 30 prüft, erreicht der Request den Server nie; auffallen würde das nur einem Szenario, das genau das Band 31–40 ausübt.
 
+**Eine Entscheidung des Clients über seinen eigenen Ablauf ist keine Durchsetzung** – etwa ob „Abbrechen" nachfragt, weil ein Feld nicht leer ist (`isBlank` in `src/domain/text.ts`). Sie lehnt keine Eingabe ab, sie wählt nur den nächsten Schritt in der UI. Muss sie dabei dieselbe Definition anwenden wie der Server (ADR-S135-1: „leer" nach der Normalisierung), liegt sie als reine Funktion in `src/domain/` und verweist auf die ADR, die die Definition festlegt.
+
 <a id="CGT-offline-validierung"></a>
 ### Ausnahme: offline-schreibfähige Bereiche
 
@@ -348,7 +350,8 @@ Zwei Problemklassen, die **nicht** vermischt werden dürfen:
 - **API-Calls** gehören in dedizierte Service-Dateien (`src/services/`), nicht in Komponenten.
 - **Domänen-Logik** (Berechnungen, Transformationen) gehört in `src/domain/`, nicht in Komponenten.
   Regelprüfung gehört nicht dazu – die setzt das Backend durch, außer in der
-  [Offline-Ausnahme](#CGT-offline-validierung).
+  [Offline-Ausnahme](#CGT-offline-validierung). Eine Entscheidung des Clients über seinen eigenen Ablauf
+  (etwa „ist ein Feld leer?") ist keine Regelprüfung und gehört dazu ([Validierung](#CGT-validierung)).
 - **Komponenten** sind rein presentational: empfangen Props, rendern UI, delegieren Events.
 
 ```typescript

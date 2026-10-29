@@ -1,6 +1,8 @@
 import type { APIRequestContext, Page } from '@playwright/test'
+import { expect } from '../fixtures'
 import { seedIngredientViaApi } from '../api/ingredientsApi'
 import type { ListEntry, ListPage, ListPageDefinition } from './listPage'
+import type { TouchTargetPageDefinition } from './touchTargetPage'
 
 function ingredientEntry(page: Readonly<Page>, request: Readonly<APIRequestContext>, name: string, baseUnit: string): ListEntry {
   // exact: Playwrights Default-Textmatch ist Substring-basiert – "g" steckt in fast jedem Namen.
@@ -32,4 +34,40 @@ export const ingredientsPage: ListPageDefinition = {
       await page.getByLabel('Einheit').fill('Stück')
     },
   }),
+}
+
+// Zustände für die Touch-Target-Suite: Liste, Anlege-Dialog, Undo-Toast – über dasselbe Page Object
+// wie die Listen-Suite, damit Selektoren und Testdaten nur dort leben.
+export const ingredientsTouchTargets: TouchTargetPageDefinition = {
+  name: 'Zutaten',
+  states: (page, request) => {
+    const listPage = ingredientsPage.create(page, request)
+    const [entry] = listPage.entries
+    return [
+      {
+        name: 'Liste',
+        reach: async () => {
+          await entry.seed()
+          await listPage.goto()
+          await expect(entry.row).toBeVisible()
+        },
+      },
+      {
+        name: 'Anlege-Dialog',
+        reach: async () => {
+          await listPage.openCreateDialog()
+          await expect(page.getByRole('dialog')).toBeVisible()
+        },
+      },
+      {
+        name: 'Undo-Toast',
+        reach: async () => {
+          await page.getByRole('button', { name: 'Abbrechen' }).click()
+          await expect(page.getByRole('dialog')).toHaveCount(0)
+          await entry.deleteButton.click()
+          await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeVisible()
+        },
+      },
+    ]
+  },
 }

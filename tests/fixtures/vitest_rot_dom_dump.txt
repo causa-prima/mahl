@@ -1,0 +1,464 @@
+
+> mahl-client@0.0.0 test
+> vitest run src/pages/zz-dom-dump.test.tsx
+
+
+ RUN  v4.1.11 /home/kieritz/repos/mahl/Client
+
+ ❯ src/pages/zz-dom-dump.test.tsx (5 tests | 5 failed) 423ms
+     × zz_dom_dump_1 125ms
+     × zz_dom_dump_2 77ms
+     × zz_dom_dump_3 70ms
+     × zz_dom_dump_4 73ms
+     × zz_dom_dump_5 73ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/pages/zz-dom-dump.test.tsx > zz > zz_dom_dump_1
+TestingLibraryElementError: Unable to find role="button" and name "gibt es nicht"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"MuiContainer-root MuiContainer-maxWidthSm css-zzzaw2-MuiContainer-root"[39m
+    [36m>[39m
+      [36m<form[39m
+        [33mclass[39m=[32m"MuiBox-root css-0"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"MuiTypography-root MuiTypography-h5 MuiTypography-gutterBottom css-1f9xtph-MuiTypography-root"[39m
+        [36m>[39m
+          [0mRezept anlegen[0m
+        [36m</h1>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth MuiTextField-root css-16bevx5-MuiFormControl-root-MuiTextField-root"[39m
+        [36m>[39m
+          [36m<label[39m
+            [33mclass[39m=[32m"MuiFormLabel-root MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-shrink MuiInputLabel-outlined MuiFormLabel-colorPrimary Mui-focused Mui-required MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-shrink MuiInputLabel-outlined css-113d811-MuiFormLabel-root-MuiInputLabel-root"[39m
+            [33mdata-shrink[39m=[32m"true"[39m
+            [33mfor[39m=[32m"_r_0_"[39m
+            [33mid[39m=[32m"_r_0_-label"[39m
+          [36m>[39m
+            [0mTitel[0m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiFormLabel-asterisk MuiInputLabel-asterisk css-1ljffdk-MuiFormLabel-asterisk"[39m
+            [36m>[39m
+              [0m [0m
+              [0m*[0m
+            [36m</span>[39m
+          [36m</label>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth Mui-focused MuiInputBase-formControl css-1blp12k-MuiInputBase-root-MuiOutlinedInput-root"[39m
+          [36m>[39m
+            [36m<input[39m
+              [33maria-invalid[39m=[32m"false"[39m
+              [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-16wblaj-MuiInputBase-input-MuiOutlinedInput-input"[39m
+              [33mid[39m=[32m"_r_0_"[39m
+              [33mrequired[39m=[32m""[39m
+              [33mtype[39m=[32m"text"[39m
+              [33mvalue[39m=[32m""[39m
+            [36m/>[39m
+            [36m<fieldset[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiOutlinedInput-notchedOutline css-18p5xg2-MuiNotchedOutlined-root-MuiOutlinedInput-notchedOutline"[39m
+            [36m>[39m
+              [36m<legend[39m
+                [33mclass[39m=[32m"css-ex8a5f-MuiNotchedOutlined-root"[39m
+              [36m>[39m
+                [36m<span>[39m
+                  [0mTitel[0m
+                  [0m [0m
+                  [0m*[0m
+                [36m</span>[39m
+              [36m</legend>[39m
+            [36m</fieldset>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth MuiTextField-root css-16bevx5-MuiFormControl-root-MuiTextField-root"[39m
+        [36m>[39m
+          [36m<label[39m
+            [33mclass[39m=[32m"MuiFormLabel-root MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined MuiFormLabel-colorPrimary Mui-required MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined css-19qnlrw-MuiFormLabel-root-MuiInputLabel-root"[39m
+            [33mdata-shrink[39m=[32m"false"[39m
+            [33mfor[39m=[32m"_r_1_"[39m
+            [33mid[39m=[32m"_r_1_-label"[39m
+          [36m>[39m
+            [0mZutaten[0m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiFormLabel-asterisk MuiInputLabel-asterisk css-1ljffdk-MuiFormLabel-asterisk"[39m
+            [36m>[39m
+              [0m [0m
+              [0m*[0m
+            [36m</span>[39m
+          [36m</label>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth MuiInputBase-formControl MuiInputBase-multiline css-zsp0bh-MuiInputBase-root-MuiOutlinedInput-root"[39m
+          [36m>[39m
+            [36m<textarea[39m
+              [33maria-describedby[39m=[32m"_r_1_-helper-text"[39m
+              [33maria-invalid[39m=[32m"false"[39m
+              [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
+              [33mid[39m=[32m"_r_1_"[39m
+              [33mrequired[39m=[32m""[39m
+              [33mstyle[39m=[32m"height: 0px; overflow: hidden;"[39m
+            [36m/>[39m
+            [36m<textarea[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
+              [33mreadonly[39m=[32m""[39m
+              [33mstyle[39m=[32m"visibility: hidden; position: absolute; overflow: hidden; height: 0px; top: 0px; left: 0px; transform: translateZ(0); padding-top: 0px; padding-bottom: 0px; width: 100%;"[39m
+              [33mtabindex[39m=[32m"-1"[39m
+            [36m/>[39m
+            [36m<fieldset[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiOutlinedInput-notchedOutline css-18p5xg2-MuiNotchedOutlined-root-MuiOutlinedInput-notchedOutline"[39m
+            [36m>[39m
+              [36m<legend[39m
+                [33mclass[39m=[32m"css-1n64csd-MuiNotchedOutlined-root"[39m
+              [36m>[39m
+                [36m<span>[39m
+                  [0mZutaten[0m
+                  [0m [0m
+                  [0m*[0m
+                [36m</span>[39m
+              [36m</legend>[39m
+            [36m</fieldset>[39m
+          [36m</div>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"MuiFormHelperText-root MuiFormHelperText-sizeMedium MuiFormHelperText-contained Mui-required css-er619e-MuiFormHelperText-root"[39m
+            [33mid[39m=[32m"_r_1_-helper-text"[39m
+          [36m>[39m
+            [0mEine Zutat je Zeile: Menge, Einheit, Zutat – z. B. „250 g Mehl“ oder „Salz“.[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"MuiStack-root css-1sazv7p-MuiStack-root"[39m
+        [36m>[39m
+          [36m<fieldset[39m
+            [33maria-label[39m=[32m"Schritte (Pflichtangabe)"[39m
+            [33mclass[39m=[32m"MuiFormControl-root css-1iw3t7y-MuiFormControl-root"[39m
+          [36m>[39m
+            [36m<legend[39m
+              [33mclass[39m=[32m"MuiFormLabel-root MuiFormLabel-colorPrimary Mui-required css-nwsdb5-MuiFormLabel-root"[39m
+            [36m>[39m
+              [0mSchritte[0m
+              [36m<span[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"MuiFormLabel-asterisk css-1ljffdk-MuiFormLabel-asterisk"[39m
+              [36m>[39m
+                [0m [0m
+                [0m*[0m
+              [36m</span>[39m
+            [36m</legend>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth MuiTextField-root css-16bevx5-MuiFormControl-root-MuiTextField-root"[39m
+            [36m>[39m
+              [36m<label[39m
+                [33mclass[39m=[32m"MuiFormLabel-root MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined MuiFormLabel-colorPrimary MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined css-19qnlrw-MuiFormLabel-root-MuiInputLabel-root"[39m
+                [33mdata-shrink[39m=[32m"false"[39m
+                [33mfor[39m=[32m"_r_2_"[39m
+                [33mid[39m=[32m"_r_2_-label"[39m
+              [36m>[39m
+                [0mSchritt 1[0m
+              [36m</label>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth MuiInputBase-formControl MuiInputBase-multiline css-zsp0bh-MuiInputBase-root-MuiOutlinedInput-root"[39m
+              [36m>[39m
+                [36m<textarea[39m
+                  [33maria-invalid[39m=[32m"false"[39m
+                  [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
+                  [33mid[39m=[32m"_r_2_"[39m
+                  [33mstyle[39m=[32m"height: 0px; overflow: hidden;"[39m
+                [36m/>[39m
+                [36m<textarea[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
+                  [33mreadonly[39m=[32m""[39m
+                  [33mstyle[39m=[32m"visibility: hidden; position: absolute; overflow: hidden; height: 0px; top: 0px; left: 0px; transform: translateZ(0); padding-top: 0px; padding-bottom: 0px; width: 100%;"[39m
+                  [33mtabindex[39m=[32m"-1"[39m
+                [36m/>[39m
+                [36m<fieldset[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"MuiOutlinedInput-notchedOutline css-18p5xg2-MuiNotchedOutlined-root-MuiOutlinedInput-notchedOutline"[39m
+                [36m>[39m
+                  [36m<legend[39m
+                    [33mclass[39m=[32m"css-1n64csd-MuiNotchedOutlined-root"[39m
+                  [36m>[39m
+                    [36m<span>[39m
+                      [0mSchritt 1[0m
+                    [36m</span>[39m
+                  [36m</legend>[39m
+                [36m</fieldset>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"MuiBox-root css-0"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"MuiButtonBase-root MuiButton-root MuiButton-text MuiButton-sizeMedium MuiButton-colorPrimary css-1259lrg-MuiButtonBase-root-MuiButton-root"[39m
+                [33mtabindex[39m=[32m"0"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [0mSchritt hinzufügen[0m
+              [36m</button>[39m
+            [36m</div>[39m
+          [36m</fieldset>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"MuiStack-root css-2bof0u-MuiStack-root"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"MuiButtonBase-root MuiButton-root MuiButton-text MuiButton-sizeMedium MuiButton-colorPrimary css-1259lrg-MuiButtonBase-root-MuiButton-root"[39m
+              [33mtabindex[39m=[32m"0"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mAbbrechen[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-sizeMedium MuiButton-colorPrimary css-i572rh-MuiButtonBase-root-MuiButton-root"[39m
+              [33mformnovalidate[39m=[32m""[39m
+              [33mtabindex[39m=[32m"0"[39m
+              [33mtype[39m=[32m"submit"[39m
+            [36m>[39m
+              [0mSpeichern[0m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</form>[39m
+    [36m</main>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"MuiContainer-root MuiContainer-maxWidthSm css-zzzaw2-MuiContainer-root"[39m
+    [36m>[39m
+      [36m<form[39m
+        [33mclass[39m=[32m"MuiBox-root css-0"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"MuiTypography-root MuiTypography-h5 MuiTypography-gutterBottom css-1f9xtph-MuiTypography-root"[39m
+        [36m>[39m
+          [0mRezept anlegen[0m
+        [36m</h1>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth MuiTextField-root css-16bevx5-MuiFormControl-root-MuiTextField-root"[39m
+        [36m>[39m
+          [36m<label[39m
+            [33mclass[39m=[32m"MuiFormLabel-root MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-shrink MuiInputLabel-outlined MuiFormLabel-colorPrimary Mui-focused Mui-required MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-shrink MuiInputLabel-outlined css-113d811-MuiFormLabel-root-MuiInputLabel-root"[39m
+            [33mdata-shrink[39m=[32m"true"[39m
+            [33mfor[39m=[32m"_r_0_"[39m
+            [33mid[39m=[32m"_r_0_-label"[39m
+          [36m>[39m
+            [0mTitel[0m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiFormLabel-asterisk MuiInputLabel-asterisk css-1ljffdk-MuiFormLabel-asterisk"[39m
+            [36m>[39m
+              [0m [0m
+              [0m*[0m
+            [36m</span>[39m
+          [36m</label>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth Mui-focused MuiInputBase-formControl css-1blp12k-MuiInputBase-root-MuiOutlinedInput-root"[39m
+          [36m>[39m
+            [36m<input[39m
+              [33maria-invalid[39m=[32m"false"[39m
+              [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-16wblaj-MuiInputBase-input-MuiOutlinedInput-input"[39m
+              [33mid[39m=[32m"_r_0_"[39m
+              [33mrequired[39m=[32m""[39m
+              [33mtype[39m=[32m"text"[39m
+              [33mvalue[39m=[32m""[39m
+            [36m/>[39m
+            [36m<fieldset[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiOutlinedInput-notchedOutline css-18p5xg2-MuiNotchedOutlined-root-MuiOutlinedInput-notchedOutline"[39m
+            [36m>[39m
+              [36m<legend[39m
+                [33mclass[39m=[32m"css-ex8a5f-MuiNotchedOutlined-root"[39m
+              [36m>[39m
+                [36m<span>[39m
+                  [0mTitel[0m
+                  [0m [0m
+                  [0m*[0m
+                [36m</span>[39m
+              [36m</legend>[39m
+            [36m</fieldset>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth MuiTextField-root css-16bevx5-MuiFormControl-root-MuiTextField-root"[39m
+        [36m>[39m
+          [36m<label[39m
+            [33mclass[39m=[32m"MuiFormLabel-root MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined MuiFormLabel-colorPrimary Mui-required MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined css-19qnlrw-MuiFormLabel-root-MuiInputLabel-root"[39m
+            [33mdata-shrink[39m=[32m"false"[39m
+            [33mfor[39m=[32m"_r_1_"[39m
+            [33mid[39m=[32m"_r_1_-label"[39m
+          [36m>[39m
+            [0mZutaten[0m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiFormLabel-asterisk MuiInputLabel-asterisk css-1ljffdk-MuiFormLabel-asterisk"[39m
+            [36m>[39m
+              [0m [0m
+              [0m*[0m
+            [36m</span>[39m
+          [36m</label>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth MuiInputBase-formControl MuiInputBase-multiline css-zsp0bh-MuiInputBase-root-MuiOutlinedInput-root"[39m
+          [36m>[39m
+            [36m<textarea[39m
+              [33maria-describedby[39m=[32m"_r_1_-helper-text"[39m
+              [33maria-invalid[39m=[32m"false"[39m
+              [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
+              [33mid[39m=[32m"_r_1_"[39m
+              [33mrequired[39m=[32m""[39m
+              [33mstyle[39m=[32m"height: 0px; overflow: hidden;"[39m
+            [36m/>[39m
+            [36m<textarea[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
+              [33mreadonly[39m=[32m""[39m
+              [33mstyle[39m=[32m"visibility: hidden; position: absolute; overflow: hidden; height: 0px; top: 0px; left: 0px; transform: translateZ(0); padding-top: 0px; padding-bottom: 0px; width: 100%;"[39m
+              [33mtabindex[39m=[32m"-1"[39m
+            [36m/>[39m
+            [36m<fieldset[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"MuiOutlinedInput-notchedOutline css-18p5xg2-MuiNotchedOutlined-root-MuiOutlinedInput-notchedOutline"[39m
+            [36m>[39m
+              [36m<legend[39m
+                [33mclass[39m=[32m"css-1n64csd-MuiNotchedOutlined-root"[39m
+              [36m>[39m
+                [36m<span>[39m
+                  [0mZutaten[0m
+                  [0m [0m
+                  [0m*[0m
+                [36m</span>[39m
+              [36m</legend>[39m
+            [36m</fieldset>[39m
+          [36m</div>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"MuiFormHelperText-root MuiFormHelperText-sizeMedium MuiFormHelperText-contained Mui-required css-er619e-MuiFormHelperText-root"[39m
+            [33mid[39m=[32m"_r_1_-helper-text"[39m
+          [36m>[39m
+            [0mEine Zutat je Zeile: Menge, Einheit, Zutat – z. B. „250 g Mehl“ oder „Salz“.[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"MuiStack-root css-1sazv7p-MuiStack-root"[39m
+        [36m>[39m
+          [36m<fieldset[39m
+            [33maria-label[39m=[32m"Schritte (Pflichtangabe)"[39m
+            [33mclass[39m=[32m"MuiFormControl-root css-1iw3t7y-MuiFormControl-root"[39m
+          [36m>[39m
+            [36m<legend[39m
+              [33mclass[39m=[32m"MuiFormLabel-root MuiFormLabel-colorPrimary Mui-required css-nwsdb5-MuiFormLabel-root"[39m
+            [36m>[39m
+              [0mSchritte[0m
+              [36m<span[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"MuiFormLabel-asterisk css-1ljffdk-MuiFormLabel-asterisk"[39m
+              [36m>[39m
+                [0m [0m
+                [0m*[0m
+              [36m</span>[39m
+            [36m</legend>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth MuiTextField-root css-16bevx5-MuiFormControl-root-MuiTextField-root"[39m
+            [36m>[39m
+              [36m<label[39m
+                [33mclass[39m=[32m"MuiFormLabel-root MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined MuiFormLabel-colorPrimary MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined css-19qnlrw-MuiFormLabel-root-MuiInputLabel-root"[39m
+                [33mdata-shrink[39m=[32m"false"[39m
+                [33mfor[39m=[32m"_r_2_"[39m
+                [33mid[39m=[32m"_r_2_-label"[39m
+              [36m>[39m
+                [0mSchritt 1[0m
+              [36m</label>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth MuiInputBase-formControl MuiInputBase-multiline css-zsp0bh-MuiInputBase-root-MuiOutlinedInput-root"[39m
+              [36m>[39m
+                [36m<textarea[39m
+                  [33maria-invalid[39m=[32m"false"[39m
+                  [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
+                  [33mid[39m=[32m"_r_2_"[39m
+                  [33mstyle[39m=[32m"height: 0px; overflow: hidden;"[39m
+                [36m/>[39m
+                [36m<textarea[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
+                  [33mreadonly[39m=[32m""[39m
+                  [33mstyle[39m=[32m"visibility: hidden; position: absolute; overflow: hidden; height: 0px; top: 0px; left: 0px; transform: translateZ(0); padding-top: 0px; padding-bottom: 0px; width: 100%;"[39m
+                  [33mtabindex[39m=[32m"-1"[39m
+                [36m/>[39m
+                [36m<fieldset[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"MuiOutlinedInput-notchedOutline css-18p5xg2-MuiNotchedOutlined-root-MuiOutlinedInput-notchedOutline"[39m
+                [36m>[39m
+                  [36m<legend[39m
+                    [33mclass[39m=[32m"css-1n64csd-MuiNotchedOutlined-root"[39m
+                  [36m>[39m
+                    [36m<span>[39m
+                      [0mSchritt 1[0m
+                    [36m</span>[39m
+                  [36m</legend>[39m
+                [36m</fieldset>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"MuiBox-root css-0"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"MuiButtonBase-root MuiButton-root MuiButton-text MuiButton-sizeMedium MuiButton-colorPrimary css-1259lrg-MuiButtonBase-root-MuiButton-root"[39m
+                [33mtabindex[39m=[32m"0"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [0mSchritt hinzufügen[0m
+              [36m</button>[39m
+            [36m</div>[39m
+          [36m</fieldset>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"MuiStack-root css-2bof0u-MuiStack-root"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"MuiButtonBase-root MuiButton-root MuiButton-text MuiButton-sizeMedium MuiButton-colorPrimary css-1259lrg-MuiButtonBase-root-MuiButton-root"[39m
+              [33mtabindex[39m=[32m"0"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mAbbrechen[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-sizeMedium MuiButton-colorPrimary css-i572rh-MuiButtonBase-root-MuiButton-root"[39m
+              [33mformnovalidate[39m=[32m""[39m
+              [33mtabindex[39m=[32m"0"[39m
+              [33mtype[39m=[32m"submit"[39m
+            [36m>[39m
+              [0mSpeichern[0m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</form>[39m
+    [36m</main>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/pages/zz-dom-dump.test.tsx:19:18
+     17|     )
+     18|     // When / Then
+     19|     await screen.findByRole('button', { name: 'gibt es nicht' }, { tim…
+       |                  ^
+     20|   })
+     21| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed (5)
+   Start at  09:58:17
+   Duration  2.07s (transform 933ms, setup 114ms, import 1.28s, tests 423ms, environment 162ms)

@@ -2,6 +2,9 @@ import type { APIRequestContext } from '@playwright/test'
 import { E2E_API_BASE, expect } from '../fixtures'
 import { seedIngredientViaApi } from './ingredientsApi'
 
+// Gültig aufgebaute Kennung (UUIDv7-Form), zu der es kein Rezept gibt – Ziel eines Direktlinks ins Leere.
+export const UNKNOWN_RECIPE_ID = '01900000-0000-7000-8000-000000000000'
+
 type RecipeSeed = { readonly title: string; readonly ingredients: string; readonly instruction: string }
 
 // Low-Level-Seed über den API-Port: legt ein Rezept mit einem Schritt an und gibt seine Id zurück

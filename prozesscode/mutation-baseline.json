@@ -150,8 +150,8 @@
     "getoetet": 97
   },
   "prozesscode.qa-check": {
-    "beurteilbar": 1062,
-    "getoetet": 377,
+    "beurteilbar": 1078,
+    "getoetet": 417,
     "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.rueckgaben": {
@@ -178,9 +178,19 @@
     "getoetet": 194,
     "messung": "mutmut 3.8.0, Wertung 3"
   },
+  "prozesscode.tracker_diff": {
+    "beurteilbar": 420,
+    "getoetet": 344,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
   "prozesscode.tracker_entry": {
     "beurteilbar": 291,
     "getoetet": 220,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
+  "prozesscode.vitest-run": {
+    "beurteilbar": 243,
+    "getoetet": 178,
     "messung": "mutmut 3.8.0, Wertung 3"
   }
 }

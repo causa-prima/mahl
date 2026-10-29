@@ -622,6 +622,11 @@ def test_auditoren_nur_lesend() -> int:
         ("python3 -m prozesscode.decisions get ADR-S084-3", "decisions get"),
         ("python3 -m prozesscode.ruff-run", "ruff-run ohne --fix"),
         ("python3 -m prozesscode.vitest-run --filter Liste", "vitest-run"),
+        # S143: die Szenarien eines Laufs lesen – drei Auditoren scheiterten daran.
+        ("python3 -m prozesscode.check-atdd-gate @US-602 run-6", "check-atdd-gate"),
+        ("python3 -m prozesscode.next_run --open --story US-602", "next_run --open"),
+        # Die Zusage im Deny-Footer: Umleitung ins Scratchpad geht, ausgeschrieben.
+        (f"git diff > {SCRATCH}/r.diff", "Umleitung ins Scratchpad"),
         ("sed -n '10,20p' AGENTS.md", "sed-Zeilenbereich"),
         ("git diff | sort | uniq -c", "sort und uniq in der Pipeline"),
         ("find prozesscode -name '*.py'", "find ohne Schreib-Aktion"),

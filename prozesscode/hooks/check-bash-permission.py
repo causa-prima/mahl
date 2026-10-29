@@ -876,10 +876,13 @@ AUDITOREN = frozenset({
 # Das Paket-Muster der Allow-Liste erlaubt jedes Modul, auch solche, die ohne Rückfrage
 # schreiben (`obs-archive`). Die schreibenden Unterbefehle der Tracker-Werkzeuge fängt
 # WRITE_ACCESS ab. Nicht dabei: `dotnet-test` – parallel laufende Auditoren teilten sich die
-# Build-Ausgabe – und die Mutationsläufe mit ihrem Run-Lock.
+# Build-Ausgabe – und die Mutationsläufe mit ihrem Run-Lock. Aufgenommen wird nur ein Modul, das
+# in keinem Unterbefehl schreibt: `check-atdd-gate` und `next_run` lesen nur Feature-Dateien
+# und geben auf stdout aus – bekommt eines davon eine schreibende Option, gehört es hier heraus.
 _LESENDE_MODULE = frozenset({
     "doc", "anchors", "decisions", "test-inventory", "tracker", "ordinale",
     "obs", "td", "oq", "lessons", "ruff-run", "eslint-run", "vitest-run",
+    "check-atdd-gate", "next_run",
 })
 _GIT = r'^git\s+(?:-C\s+\S+\s+)?'
 AUDITOR_PATTERNS: list[re.Pattern[str]] = [
@@ -912,7 +915,9 @@ _NUR_LESEND_DENY_REASON = (
 )
 _NUR_LESEND_FOOTER = (
     "\n\nAls Auditor gibt es keine Freigabe per Marker. Was sich nur schreibend prüfen ließe, "
-    "im Finding als offene Prüfung nennen."
+    "im Finding als offene Prüfung nennen. Große Ausgaben dürfen ins Scratchpad umgeleitet "
+    "werden – den Pfad ausgeschrieben, nicht über eine Variable: `$S/x.diff` kann der Hook "
+    "nicht auflösen."
 )
 
 

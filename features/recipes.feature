@@ -276,10 +276,11 @@ Feature: Rezepte erfassen
     Then sehe ich die Rezept-Liste
 
     Examples:
-      | Eingabe                            |
-      | "Pfannkuchen" als Titel eingebe    |
-      | "Salz" als Zutaten eingebe         |
-      | "Teig rühren." als Schritt eingebe |
+      | Eingabe                                                                        |
+      | "Pfannkuchen" als Titel eingebe                                                |
+      | "Salz" als Zutaten eingebe                                                     |
+      | "Teig rühren." als Schritt eingebe                                             |
+      | auf "Schritt hinzufügen" klicke und "Teig rühren." als zweiten Schritt eingebe |
 
   # @run-6 · Formular·Abbrechen · Frontend-only
   @US-602-happy-path
@@ -742,6 +743,25 @@ Feature: Rezepte erfassen
     And ich auf "Abbrechen" klicke
     Then sehe ich die Rezept-Liste
     And wurde ich nicht gefragt, ob ich Eingaben verwerfen möchte
+
+  # Was beim Normalisieren wegfällt, legt ADR-S135-1 fest – auch Zeichen, die man nicht sieht und
+  # die beim Kopieren aus Webseiten mitkommen. Leerzeichen ohne Breite deckt das Szenario davor ab.
+  # @run-6 · Formular·Abbrechen · Frontend-only
+  @US-602-edge-case
+  Scenario Outline: Abbrechen fragt nicht nach, wenn der Titel nur Zeichen enthält, die beim Normalisieren wegfallen
+    When ich zur Rezepte-Seite navigiere
+    And ich auf "Rezept anlegen" klicke
+    And ich als Titel nur <Zeichen> eingebe
+    And ich auf "Abbrechen" klicke
+    Then sehe ich die Rezept-Liste
+    And wurde ich nicht gefragt, ob ich Eingaben verwerfen möchte
+
+    Examples:
+      | Zeichen                                  |
+      | ein weiches Trennzeichen (U+00AD)        |
+      | einen Wortverbinder (U+2060)             |
+      | eine Byte-Order-Mark (U+FEFF)            |
+      | einen Zeilenumbruch „Next Line“ (U+0085) |
 
   # Was das Schließen der Nachfrage auslöst, legt die Anwendung fest – an „Verwerfen" gebunden,
   # gingen die Eingaben verloren.

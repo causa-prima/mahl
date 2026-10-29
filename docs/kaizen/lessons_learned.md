@@ -105,3 +105,19 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Der Pflicht-Aufschubgrund aus CM-S133-2 greift nur bei der eigenen Erfassung. Eine Empfehlung „vermerken" an den User umgeht ihn: Stimmt der User zu, entsteht der zulässige Aufschubgrund „User" von selbst – die Schwelle „verstanden und behebbar → beheben" wurde nie angelegt.
   Regel: In einer Triage dieselbe Schwelle anlegen wie bei eigener Erfassung: Verstanden und schnell behebbar oder potenziell folgenreich → „direkt umsetzen" empfehlen; „vermerken" nur mit einem Aufschubgrund, der auch ohne die Zustimmung des Users trüge.
   CM-Bezug: CM-S133-2
+
+## Session 143 – 2026-10-29
+
+- **[HOCH] [PROZESS] [Review] LL-S143-1 – Review-Fix-Tests mit US-Tag ohne Szenario beauftragt – Regel „Szenario vor dem Fix“ übergangen**
+  Quelle: Subagent
+  Was: In Review-Runde 1 von US-602 run-6 beauftragte ich als Orchestrator Komponententests für Verhalten, das kein Szenario-Beispiel nannte: ein Titel nur aus U+0085 löst keine Nachfrage aus (eine Verhaltensänderung, vorher löste er sie aus) und Text nur in Schritt 2 löst sie aus. Beide trugen den Namen US602_EdgeCase_… und nur einen ADR-Kommentar. Der Test-Quality-Auditor fand es erst in Runde 2 (TQ-1); der User entschied, die Beispiele ins Feature-File zu nehmen.
+  Warum: Ich ordnete die Fälle der Diagnose c des Test-Reviews zu (ADR-Kommentar genügt) und übersah, dass der Review-Loop für Verhalten aus einem Review-Fix ausdrücklich ein Szenario vor dem Fix verlangt und einen US-Tag erst mit Szenario erlaubt. Die Regel stand im geladenen Skill; angewendet habe ich die näherliegende, aber für Review-Fixes nicht zuständige.
+  Regel: Vor jedem Fix-Auftrag aus dem Review-Loop die Szenario-Frage stellen und schriftlich beantworten: Ändert der Fix beobachtbares Verhalten oder testet er Verhalten, das kein Szenario-Beispiel nennt? Dann zuerst Beispiel oder Szenario ins Feature-File (mit User-Freigabe), sonst kein US-Tag am Test. Diagnose c (ADR-Kommentar) gilt nur im Test-Review nach RED, nicht für Review-Fixes.
+  CM-Bezug: CM-S070-1
+
+- **[MITTEL] [PROZESS] [Review] LL-S143-2 – Fehlende Given-Kommentare im Test-Review nicht gemeldet**
+  Quelle: Orchestrator
+  Was: Im Test-Review von US-602 run-5 gab ich vier Komponententests ohne // Given frei. Der Punkt „Given/When/Then-Struktur: fehlen die Kommentare → Finding melden“ aus IMP-test-review fiel aus. Erst der Übergabelauf von qa-check brach per Check 5 vor Stryker ab; die Testdatei musste nach der Freigabe noch geändert werden.
+  Warum: Ich habe das Test-Review auf Per-Assertion-Zuordnung und Gold-Plating konzentriert und die Checkliste nicht Punkt für Punkt abgearbeitet. Den Ausfall fing nur das mechanische Gate auf; die Checkliste selbst ist nicht der Fehler.
+  Regel: Das Test-Review geht die vier Punkte aus IMP-test-review vollständig durch und nennt zu jedem ein Ergebnis, auch „Given/When/Then: vorhanden“. Ein Punkt ohne genanntes Ergebnis gilt als nicht geprüft.
+  CM-Bezug: CM-S070-1

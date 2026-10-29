@@ -289,29 +289,11 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Behebung:** Beim Login und Logout resetConditionalGetCache() aufrufen (existiert bereits) – oder den Cache-Schlüssel um die Nutzerkennung erweitern; Entscheidung mit dem Auth-Design.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-1 mit allen drei Optionen vorgelegt; ohne Auth nicht umsetzbar
 
----
-
-## TD-S141-2 — Rezeptseiten laufen nicht durch die Querschnitts-Suite (Bedienbarkeit per Finger)
-**Fällig:** Szenario:„Felder sind beim Öffnen des Formulars leer" – mit run-5 „Formular·Öffnen" ist das Formular vollständig, der Lauf ist Frontend-only und klein
-**Problem:** features/recipes.feature deklariert @NFR-accessibility-touch für Rezept-Liste, Formular samt Nachfrage und Detailansicht, „gemessen über deren Page Objects". Die Querschnitts-Suite (Client/e2e/accessibility.spec.ts, interaction.spec.ts) läuft aber nur über LIST_PAGES (Client/e2e/pages/listPages.ts), und das Page-Object-Interface ListPage verlangt Anlege-Dialog und Löschen mit Undo-Toast – beides hat die Rezept-Liste nicht. Seit US-602 run-1 existiert /recipes, ist aber nicht eingetragen; kein Lauf plant den Umbau. Die Migrationsschritte (4)–(6) aus ADR-S112-5 und die Fähigkeits-Deklaration je Seite stehen damit aus.
-**Behebung:** Page-Object-Interface nach Fähigkeiten aufteilen (ADR-S112-5, Ebene Geltungsbereich): Touch-Targets als eigene Fähigkeit, die jede Seite liefert; Anlege-Dialog/Löschen als optionale Fähigkeiten. Rezept-Liste, Formular und Detailansicht eintragen; die Suite fragt je Test die benötigte Fähigkeit ab.
-**Aufschubgrund:** User – beim Architektur-Check von US-602 run-2 auf run-5 umgehängt, weil run-2 ohnehin groß ist
-
----
-
 ## TD-S141-3 — Backend: Rezept-Zutat liest die Zutat-Id ohne Prüfung aus der DB
 **Fällig:** Phase:MVP – mit dem DB-Inkonsistenz-Verhalten (docs/reference/architecture.md#ARC-db-inkonsistenz), gemeinsam mit TD-S083-5
 **Problem:** US-602 run-2 braucht für die Rezept-Zutat die Id einer bestehenden Zutat aus der DB. Uuid7 und IngredientId hatten bewusst nur New(); für den Lesepfad entstand ein nicht validierendes IngredientId.Create(Guid) über Uuid7.Create(Guid). Eine aus der DB gelesene Id, die kein gültiges UUIDv7 ist (manueller Eingriff, fehlerhafte Migration), wird damit ungeprüft übernommen – der Fehlerzweig, den der Kommentar in Uuid7.cs für den Lesepfad vorsieht, fehlt.
 **Behebung:** Mit dem DB-Inkonsistenz-Szenario Create(Guid) validierend machen (UUIDv7-Prädikat, OneOf) und den Fehlerzweig auf die Regel aus ARC-db-inkonsistenz abbilden (Liste: überspringen + loggen, Einzel-Endpoint: 500).
 **Aufschubgrund:** User – beim Architektur-Check von US-602 run-2 ist der Lesepfad ohne Prüfung als Zwischenschritt gewählt; ein validierender Zweig wäre ohne Szenario ungetestet
-
----
-
-## TD-S141-4 — Frontend-Test: Labels im Rezeptformular werden exakt abgefragt
-**Fällig:** Szenario:„Pflichtfelder im Formular sind als solche markiert" – dann hängt MUI über required ein „ *“ an die Labels
-**Problem:** Client/src/pages/RecipesPage.test.tsx fragt die Felder exakt ab (findByLabelText('Titel'), getByLabelText('Zutaten'), 'Schritt 1', 'Schritt 2' in fillAndSavePancakes und im Submit-Test). Sobald die Felder required tragen, finden die Abfragen nichts mehr – alle Tests, die das Formular füllen, brechen, ohne dass sich das Verhalten ändert. Die Zutaten-Tests umgehen das bereits mit /^Name/ (IngredientsPage.test.tsx).
-**Behebung:** Die Label-Abfragen auf Präfix-Regex umstellen (/^Titel/, /^Zutaten/, /^Schritt 1/) bzw. in einen Helfer kapseln, sobald das endgültige Label feststeht (auch das Schrittfeld-Label kann sich mit „Jedes Schrittfeld zeigt seine Nummer“ ändern).
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 als Hinweis für run-5 entschieden; das endgültige Label legt erst run-5 fest
 
 ## TD-S141-8 — E2E: Rezept-Liste nach dem Anlegen nur nach Neuladen geprüft
 **Fällig:** Szenario:„Von der Rezepte-Seite zur Zutaten-Seite navigieren" – mit der Navigationsleiste gibt es den Weg zur Liste innerhalb der App
@@ -366,3 +348,43 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** Client/src/pages/RecipeDetailPage.tsx rendert die Schritte als List component="ol" mit sichtbarer Nummer im ListItemIcon; MUI setzt list-style: none. Nach verbreiteter, aber schwach belegter Darstellung (Blogposts, WebKit-Bugtracker, hier nicht geprüft) nimmt Safari/VoiceOver einer Liste mit list-style: none die Listen-Semantik – die Reihenfolge-Ansage, für die die geordnete Liste gewählt wurde, entfiele dann. Andere Screenreader könnten Listenposition und sichtbare Nummer doppelt ansagen.
 **Behebung:** Mit VoiceOver (Safari) und einem zweiten Screenreader prüfen; falls nötig role="list" an der Liste ergänzen bzw. die sichtbare Nummer per aria-hidden ausblenden. Der heutige Aufbau verbaut nichts – die Korrektur ist ein Attribut, kein Umbau.
 **Aufschubgrund:** User – im Review von US-602 run-4 entschieden: Barrierefreiheit ist im MVP noch zu früh, solange kein Weg verbaut ist
+
+---
+
+## TD-S143-1 — Rezeptformular: Schrittfeld-Fokus hängt am Einhängen (autoFocus)
+**Fällig:** Szenario:„Fokus springt auf das erste fehlerhafte Feld" – dort trifft die Fokus-Regel nach Fehlern auf den Fokus der Schrittfelder
+**Problem:** Client/src/pages/CreateRecipePage.tsx (StepsSection) setzt autoFocus={index > 0}: Jedes Schrittfeld ab Nummer 2 holt sich beim Einhängen den Fokus. Das trägt nur, solange Schrittfelder ausschließlich einzeln angehängt werden. Hängt die Gruppe einmal mit mehreren Feldern neu ein (Remount nach Fehler, Vorbefüllung, Entwurf), stiehlt das letzte Feld den Fokus und kollidiert mit „Fokus aufs erste fehlerhafte Feld" (ADR-S135-4).
+**Behebung:** Im Lauf mit dem Fehler-Fokus prüfen, ob die Gruppe neu einhängt; falls ja, den Fokus nach „Schritt hinzufügen" imperativ per Ref im onAdd-Handler setzen statt über autoFocus.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-5 als Merkposten für den Fehler-Fokus-Lauf entschieden; heute fordert kein Szenario das Verhalten
+
+---
+
+## TD-S143-2 — Rezeptformular: Fehlermeldung am Zutatenfeld würde den Dauerhinweis verdrängen
+**Fällig:** Szenario:„Ungültige Menge in einer Zutatenzeile" – erster Lauf, der eine Meldung am Zutatenfeld anzeigt
+**Problem:** Das Zutatenfeld in Client/src/pages/CreateRecipePage.tsx (TitleAndIngredientsFields) zeigt den Eingabehinweis über MUI-helperText. MUI zeigt Fehlermeldungen üblicherweise ebenfalls über helperText. Wird die Meldung dort eingesetzt, verschwindet der Hinweis – ADR-S135-4 verlangt, dass er dauerhaft steht.
+**Behebung:** Meldungen und Hinweis getrennt darstellen (z. B. Hinweis bleibt helperText, Meldungen als eigene Liste am Feld, beide per aria-describedby verknüpft) und im Lauf prüfen, dass der Hinweis bei angezeigter Meldung sichtbar bleibt.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-5 als Merkposten für den ersten Zutaten-Fehlerlauf entschieden
+
+---
+
+## TD-S143-3 — Rezeptformular: formNoValidate am Speichern-Button ohne Test
+**Fällig:** Szenario:„Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig" – erster Lauf, der ein leeres Formular über die Oberfläche absendet
+**Problem:** Client/src/pages/CreateRecipePage.tsx setzt formNoValidate am Speichern-Button, weil Titel und Zutaten required tragen und die Validierung server-only ist (UX-Guideline Formular-Baseline, ADR-S090-1). Kein Test hält die Zeile: Fiele sie weg, blockierte der Browser ein leeres Absenden mit eigener Meldung, ohne dass ein Test rot würde. Vom User in US-602 run-5 bewusst ohne Test freigegeben.
+**Behebung:** Im Pflichtmeldungs-Lauf das Absenden des leeren Formulars per E2E über die Oberfläche führen (Klick auf „Speichern"), sodass ein Wegfall von formNoValidate den Test rot macht; Gegenprobe: Attribut entfernen, Test muss scheitern.
+**Aufschubgrund:** User – in US-602 run-5 bewusst ohne Test freigegeben, der deckende Test entsteht im Pflichtmeldungs-Lauf
+
+---
+
+## TD-S143-4 — Nachfrage „Eingaben verwerfen?“: Aktionen brechen bei 320 px um
+**Fällig:** Phase:MVP – wenn weitere Dialoge mit zwei Text-Aktionen dazukommen, als gemeinsame Baseline-Regel
+**Problem:** Bei 320 px Breite (laut docs/process/nfr.md primärer Bereich) bricht „WEITER BEARBEITEN“ in der Nachfrage des Rezeptformulars (DiscardDialog in Client/src/pages/CreateRecipePage.tsx) auf zwei Zeilen um, „VERWERFEN“ daneben einzeilig – die Buttons wirken ungleich hoch. Lesbar und bedienbar (Touch-Ziele ≥ 44 px), bei 390 und 1280 px sauber. Die Visuelle Baseline (coding-guideline-ux.md#CGU-visuelle-baseline) regelt den Umbruch von Dialog-Aktionen nicht.
+**Behebung:** Eine Baseline-Regel für Dialog-Aktionen auf schmalen Bildschirmen festlegen (z. B. auf xs untereinander in voller Breite) und in DialogActions umsetzen; Beleg per Screenshot bei 320 px.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-6 entschieden: Schönheitsmangel, eine Einzellösung ohne Szenario lohnt nicht
+
+---
+
+## TD-S143-5 — Leer-Definition: Server muss dieselbe Zeichenmenge verwenden wie isBlank im Client
+**Fällig:** Szenario:„Ein Wert nur aus unsichtbaren Zeichen gilt als leer" – mit @CROSS-text run-1 entsteht die Normalisierung auf dem Server
+**Problem:** ADR-S135-1 verlangt, dass der Client über „leer“ gleich entscheidet wie der Server. Seit US-602 run-6 entscheidet der Client mit Client/src/domain/text.ts (isBlank: Unicode-Eigenschaft White_Space plus U+200B, U+00AD, U+2060, U+FEFF). Den Server gibt es dafür noch nicht. Ungeprüft ist, ob die .NET-Seite dieselbe Menge bekäme – char.IsWhiteSpace weicht von Unicode White_Space möglicherweise ab (etwa bei U+001C–U+001F). Kein Test prüft beide Seiten gegeneinander.
+**Behebung:** Beim Bau der Server-Normalisierung dieselbe Zeichenmenge festlegen (Unicode White_Space plus die vier unsichtbaren Zeichen), am besten in ADR-S135-1 ausdrücklich benennen, und mit einem Test gegen dieselbe Zeichenliste wie in RecipesPage.test.tsx (wegfallende Zeichen) absichern.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-6 entschieden: der Server-Teil entsteht erst mit @CROSS-text
