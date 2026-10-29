@@ -1,4 +1,4 @@
-import type { APIRequestContext } from '@playwright/test'
+import type { APIRequestContext, APIResponse } from '@playwright/test'
 import { E2E_API_BASE, expect } from '../fixtures'
 import { seedIngredientViaApi } from './ingredientsApi'
 
@@ -16,6 +16,27 @@ export async function createRecipeViaApi(request: Readonly<APIRequestContext>, r
   expect(response.status(), 'Seed-Rezept muss angelegt werden (201)').toBe(201)
   const { id } = await response.json() as { id: string }
   return id
+}
+
+type RecipeCommand = {
+  readonly title: string
+  readonly ingredients: string
+  readonly steps: readonly { readonly instruction: string }[]
+}
+
+// Der Speicher-Befehl direkt über den API-Port, ohne Statusprüfung – für Szenarien, deren Gegenstand die
+// Antwort des Servers ist (z.B. eine Ablehnung, die das Formular nie auslöst).
+export async function postRecipeViaApi(request: Readonly<APIRequestContext>, recipe: RecipeCommand): Promise<APIResponse> {
+  return request.post(`${E2E_API_BASE}/api/recipes`, { data: recipe })
+}
+
+// Die Titel der Rezept-Liste, gelesen über den API-Port – für „ist die Rezept-Liste unverändert" aus dem
+// Formular heraus, das eine andere Seite ist als die Liste.
+export async function fetchRecipeTitlesViaApi(request: Readonly<APIRequestContext>): Promise<readonly string[]> {
+  const response = await request.get(`${E2E_API_BASE}/api/recipes`)
+  expect(response.status(), 'Rezept-Liste muss lesbar sein (200)').toBe(200)
+  const recipes = await response.json() as readonly { readonly title: string }[]
+  return recipes.map(({ title }) => title)
 }
 
 // Legt Rezepte direkt über die API an (Vorbedingung "das Rezept X existiert"), vor dem Laden der

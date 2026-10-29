@@ -60,5 +60,8 @@ export type NewRecipe = {
 export const toNewRecipe = ({ title, ingredients, steps }: RecipeFormValues): NewRecipe => ({
   title: asRecipeTitle(title),
   ingredients: asIngredientsText(ingredients),
-  steps: steps.map((instruction) => ({ instruction: asStepInstruction(instruction) })),
+  // ADR-S135-3: Leere Schrittfelder werden nicht mitgeschickt (Normalisierung wie der Server, ADR-S135-1).
+  steps: steps
+    .filter((instruction) => !isBlank(instruction))
+    .map((instruction) => ({ instruction: asStepInstruction(instruction) })),
 })

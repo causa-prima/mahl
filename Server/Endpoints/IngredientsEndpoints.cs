@@ -7,6 +7,7 @@ using mahl.Server.Types;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using OneOf;
+using static mahl.Server.Endpoints.ValidationProblems;
 using static mahl.Server.OneOfExtensions;
 
 // Die validierte Nutzlast eines Ingredient-Schreibzugriffs – Name und Einheit, keine Identität.
@@ -92,13 +93,6 @@ internal static class IngredientsEndpoints
     }
 }
 
-// ADR-S120-1: der akkumulierte Fehlertyp IST das Antwortformat (ADR-S090-1: Feld-Key + Meldung),
-// keine Zwischenstufe. Reiner Transport-Record an der API-Grenze – kein Domänentyp, deshalb ohne
-// Factory und ohne Guards: er hat keine Invariante, die er durchsetzen müsste.
-// `file`-scoped wie der Mapping-Layer: der zweite Endpoint mit Feldvalidierung zieht ihn hoch, bis
-// dahin gäbe es für einen geteilten Typ keinen Aufrufer.
-file readonly record struct FieldError(string Key, string Message);
-
 file static class IngredientMappings
 {
     // Collect-all validation of the independent required fields (ADR-S090-1): name and unit are
@@ -147,14 +141,6 @@ file static class IngredientMappings
             .MatchAsync(
                 created => Results.Created($"/api/ingredients/{created.Id}", created),
                 error => error);
-
-    // ADR-S090-1: field-keyed 422 body { "errors": { "<jsonPropertyName>": ["<msg>"] } } – multiple field
-    // errors group into one dictionary so all messages appear simultaneously.
-    internal static IResult ValidationProblemFor(IReadOnlyList<FieldError> errors) =>
-        Results.ValidationProblem(
-            errors.GroupBy(e => e.Key, e => e.Message, StringComparer.Ordinal)
-                .ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.Ordinal),
-            statusCode: StatusCodes.Status422UnprocessableEntity);
 
     // ADR-S051-2 / ADR-S090-1: ein Fehlerfall des Konzepts -> ein (Request-JSON-Property, fester
     // deutscher Text). Die Zuordnung liegt hier an der API-Grenze, die das Request-Format kennt –

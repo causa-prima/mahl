@@ -3,7 +3,7 @@
 <!--
 wann-lesen: Bevor du C#-Produktionscode oder Tests schreibst (nach docs/guidelines/coding-guideline-general.md)
 kritische-regeln:
-  - readonly record struct für Domain-Typen (Ausnahme: readonly struct bei Generics wie NonEmptyList<T>)
+  - readonly record struct für Domain-Typen (auch generische)
   - Create() nimmt Domain-Typen oder Primitives – kein DTO, kein DbType
   - ROP: .Bind()/.Map()/.MatchAsync() – kein .IsT0/.IsT1/.AsT0 im Produktionscode
   - throw nur für nicht-behebbare technische Ausnahmen – Domänenfehler via OneOf
@@ -80,6 +80,8 @@ Verwende den richtigen Typ je nach Rolle:
 #### Der Domänentyp ist die Schnittstelle, der Constraint-Typ die Implementierung
 
 Der Domänentyp *benutzt* Constraint-Typen als Baumaterial; **Constraint-Typen stehen nie in Signaturen** – weder in `Create()`-Parametern noch in Properties einer Entity. Wird die zulässige Menge eines Domänentyps später aufzählbar (Enum) oder strukturiert (Sum-Type), verschwindet der Constraint-Typ ersatzlos. Genau das ist der Ertrag: Steht der Constraint-Typ in Signaturen, ist ein Implementierungsdetail geleckt, und der absehbare Wechsel `Unit`: string → Enum wird zur Breaking Change an jeder Signatur statt zur Änderung in einer Datei.
+
+*Ausnahme:* eine Listen-Kardinalität (`NonEmptyImmutableArray<T>`, ADR-S144-5) darf in Signaturen stehen. „Mindestens ein Element" ist eine strukturelle Eigenschaft der Liste, kein Wertebereich ihrer Elemente – der Wechsel zu Enum oder Sum-Type, gegen den die Regel schützt, trifft sie nicht.
 
 <a id="CGC-regel-rolle-typ"></a>
 #### Rolle ≠ Typ
@@ -277,7 +279,7 @@ Domain-Typ    DbType    DTO
 ### Typ-Struktur
 
 - `readonly record struct` – Compiler-generierte Equality, parameterlosen Konstruktor public lassen und mit `throw new InvalidOperationException("Uninitialized")` absichern
-- Ausnahme: `readonly struct` (statt `readonly record struct`) wenn ein **privater** parameterloser Konstruktor benötigt wird – z.B. `NonEmptyList<T>`. `record struct` erzwingt einen `public` parameterlosen Ctor (nur Runtime-Guard möglich). `readonly struct` erlaubt `private T() {}` → `new NonEmptyList<T>()` wird **Compile-Fehler**. (Hinweis: `record struct` unterstützt Generics problemlos – das ist nicht der Grund.)
+- Das gilt auch für generische Typen (z.B. `NonEmptyImmutableArray<T>`): Ein **privater** parameterloser Konstruktor ist in C# für keinen Struct möglich – auch nicht für `readonly struct` (`CS8958: The parameterless struct constructor must be 'public'`). `new T()` lässt sich daher nirgends zum Compile-Fehler machen; der Runtime-Guard ist der einzige Weg.
 - `Create(...)` → `OneOf<DomainType, <Konzept>Error>`, wenn der Typ eine Regel prüft (Fehlerfall statt Meldungstext, [Regeln in den Domänentyp, Meldungen an die Grenze](#CGC-regel-meldungen-an-die-grenze)); nimmt er nur bereits validierte Domänentypen entgegen, gibt er den Typ direkt zurück. `Error<string>` nur für die Rekonstruktion beim Lesen aus der DB (`ToDomain()` im Mapping-Layer)
 - Keine `ToDto()`/`ToDbType()`-Methoden am Domain-Typ selbst
 
@@ -285,7 +287,7 @@ Domain-Typ    DbType    DTO
 ### Ort
 
 - `Server/Domain/` für **Domain-Entities** (Rezept, Zutat, …) **und Domänentypen** (`IngredientName`, `Unit`) – beide Ebenen der Drei-Ebenen-Regel aus [Primitive Obsession](#CGC-primitive-obsession) liegen hier
-- `Server/Types/` ausschließlich für **Constraint-Typen** (z.B. `NonEmptyTrimmedString`, `Bounded<TInner, TMax>`) und geteilte Bausteine (`SumType`, `NonEmptyList<T>`)
+- `Server/Types/` ausschließlich für **Constraint-Typen** (z.B. `NonEmptyTrimmedString`, `Bounded<TInner, TMax>`) und geteilte Bausteine (`SumType`, `NonEmptyImmutableArray<T>`)
 
 <a id="CGC-kanonisches-beispiel"></a>
 ### Kanonisches Beispiel

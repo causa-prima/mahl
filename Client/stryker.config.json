@@ -19,5 +19,6 @@
   ],
   "reporters": ["html", "json", "clear-text", "progress"],
   "coverageAnalysis": "perTest",
+  "timeoutMS": 60000,
   "thresholds": { "high": 100, "low": 100, "break": 100 }
 }

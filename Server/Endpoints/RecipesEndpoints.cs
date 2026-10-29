@@ -1,15 +1,28 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using mahl.Infrastructure;
 using mahl.Infrastructure.DatabaseTypes;
 using mahl.Server.Domain;
 using mahl.Server.Dtos;
 using mahl.Server.Middleware;
+using mahl.Server.Types;
 using Microsoft.EntityFrameworkCore;
+using OneOf;
+using static mahl.Server.Endpoints.ValidationProblems;
+using static mahl.Server.OneOfExtensions;
 
 // Eine zerlegte Zutatenzeile (ADR-S135-2): der Name, unter dem die Zutat nachgeschlagen wird, und die
 // Menge. Tupel-Alias statt eigenem Typ aus demselben Grund wie IngredientValues in IngredientsEndpoints:
 // keine Invariante, nur Zwischenstand an der Grenze.
 using ParsedIngredientLine = (string Name, mahl.Server.Domain.Quantity Quantity);
+
+// Die validierte Nutzlast des Anlegens – Titel, zerlegte Zutatenzeilen, Schritte; noch ohne Identität
+// und ohne Zutat-Ids (die kennt erst die DB). Tupel-Alias aus demselben Grund wie ParsedIngredientLine.
+// (Aliase können einander nicht referenzieren, daher ausgeschrieben.)
+using RecipeValues = (
+    mahl.Server.Domain.RecipeTitle Title,
+    mahl.Server.Types.NonEmptyImmutableArray<(string Name, mahl.Server.Domain.Quantity Quantity)> Lines,
+    mahl.Server.Types.NonEmptyImmutableArray<mahl.Server.Domain.StepInstruction> Steps);
 
 namespace mahl.Server.Endpoints;
 
@@ -45,14 +58,83 @@ file static class RecipeMappings
 {
     // ADR-S030-1: hier – und nur hier – entsteht die Identität des Rezepts (RecipeId.New() unten), weil hier
     // die Zeile entsteht.
-    // Ohne Validierung und ohne Fehlerantworten: die kommen mit den Fehler-Szenarien (Pflichtfelder,
-    // Zeile nicht gefunden, Einheit falsch …). Bis dahin ist eine unbekannte Zeile unbestimmt.
-    internal static async Task<IResult> CreateRecipe(CreateRecipeDto dto, MahlDbContext db, HttpContext httpContext)
+    // Validiert sind bisher die Pflichtangaben (Titel, Zutatenfeld, Schritte); die Fehler-Szenarien der
+    // Zeilen (Zeile nicht gefunden, Einheit falsch …) kommen später. Bis dahin ist eine unbekannte Zeile
+    // unbestimmt.
+    internal static async Task<IResult> CreateRecipe(CreateRecipeDto dto, MahlDbContext db, HttpContext httpContext) =>
+        await dto.ToValues().Match(
+            values => SaveRecipe(values, db, httpContext),
+            errors => Task.FromResult(ValidationProblemFor(errors)));
+
+    // ADR-S135-3: alle Feldprüfungen laufen gesammelt (ADR-S119-2) – Titel und Zutatenfeld, dann die
+    // Schritte; die Fehlerreihenfolge im Body ist unerheblich (er ist feld-keyed, ADR-S090-1).
+    private static OneOf<RecipeValues, IReadOnlyList<FieldError>> ToValues(this CreateRecipeDto dto) =>
+        CollectMany(
+            CollectMany(ToTitle(dto.Title), ToIngredientLines(dto.Ingredients), (title, lines) => (title, lines)),
+            ToSteps(dto.Steps),
+            (head, steps) => (head.title, head.lines, steps));
+
+    private static OneOf<RecipeTitle, IReadOnlyList<FieldError>> ToTitle(string? input) =>
+        RecipeTitle.Create(input)
+            .MapError<RecipeTitle, RecipeTitleError, IReadOnlyList<FieldError>>(error => [DescribeTitle(error)]);
+
+    // ADR-S135-2: leere Zeilen und Zeilen aus Leerraum werden übergangen; „mindestens eine Zutat" gilt nur,
+    // wenn keine nicht leere Zeile da ist. Null (explizit gesendet, ADR-S144-2) ist wie leer.
+    private static OneOf<NonEmptyImmutableArray<ParsedIngredientLine>, IReadOnlyList<FieldError>> ToIngredientLines(string? text) =>
+        NonEmptyImmutableArray<ParsedIngredientLine>
+            .Create([.. NonBlankLines(text).Select(ParseLine)])
+            .MapError<NonEmptyImmutableArray<ParsedIngredientLine>, ListViolation, IReadOnlyList<FieldError>>(
+                _ => [IngredientsMissing]);
+
+    private const char LineSeparator = '\n';
+
+    // ADR-S135-2: Null und Leerraum-Zeilen ergeben keine Zeile.
+    private static IEnumerable<string> NonBlankLines(string? text) =>
+        (text ?? string.Empty).Split(LineSeparator).Where(line => !string.IsNullOrWhiteSpace(line));
+
+    // ADR-S144-1: die Meldung zu einer Anweisung keyt auf den Index in der gesendeten Liste, die zur
+    // Liste als Ganzes auf `steps`.
+    private static OneOf<NonEmptyImmutableArray<StepInstruction>, IReadOnlyList<FieldError>> ToSteps(IReadOnlyList<StepDto>? steps) =>
+        CollectAll((steps ?? []).Select((step, index) => StepInstruction.Create(step.Instruction)
+                .MapError<StepInstruction, StepInstructionError, FieldError>(error => DescribeStep(error, index))))
+            .Bind<ImmutableArray<StepInstruction>, NonEmptyImmutableArray<StepInstruction>, IReadOnlyList<FieldError>>(
+                instructions => NonEmptyImmutableArray<StepInstruction>.Create(instructions)
+                    .MapError<NonEmptyImmutableArray<StepInstruction>, ListViolation, IReadOnlyList<FieldError>>(
+                        _ => [StepsMissing]));
+
+    // ADR-S051-2 / ADR-S090-1: ein Fehlerfall -> ein (Request-JSON-Property, fester deutscher Text), benannt an
+    // der Grenze. ListViolation kennt nur „leer" und bildet damit auf genau diese eine Meldung je Liste ab.
+    // Als Property statt static readonly Feld: Stryker schaltet Mutanten zur Laufzeit um, ein Feld-Initialisierer
+    // liefe nur einmal je Prozess und sähe den aktiven Mutanten nicht.
+    private static FieldError IngredientsMissing => new("ingredients", "Rezept muss mindestens eine Zutat haben.");
+    private static FieldError StepsMissing => new("steps", "Rezept muss mindestens einen Schritt haben.");
+
+    // Der Domänentyp bleibt feldagnostisch (ADR-S120-1). Coverage-Ausschluss je ganze Methode wie bei
+    // IngredientMappings.DescribeName: der Enum-Default-Arm ist unerreichbar.
+    [ExcludeFromCoverageGate("structurally unreachable sum-type/enum default arm (ADR-S040-1)")]
+    private static FieldError DescribeTitle(RecipeTitleError error) => error switch
+    {
+        RecipeTitleError.Empty => new FieldError("title", "Titel darf nicht leer sein."),
+        _ => SumType.Unreachable<FieldError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
+    };
+
+    [ExcludeFromCoverageGate("structurally unreachable sum-type/enum default arm (ADR-S040-1)")]
+    private static FieldError DescribeStep(StepInstructionError error, int index) => error switch
+    {
+        StepInstructionError.Empty => new FieldError($"steps[{index}].instruction", "Schritt-Anweisung darf nicht leer sein."),
+        _ => SumType.Unreachable<FieldError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
+    };
+
+    private static async Task<IResult> SaveRecipe(RecipeValues values, MahlDbContext db, HttpContext httpContext)
     {
         // Bewusst ohne RequestAborted: Das Backend reicht Abbruch nirgends durch (Sonar S8949 verlangt die explizite Wahl).
         var ingredientsByName = await db.Ingredients.ToDictionaryAsync(i => i.Name, StringComparer.Ordinal, CancellationToken.None);
         var ingredientsById = ingredientsByName.Values.ToDictionary(i => i.Id);
-        var recipe = ToRecipe(dto, RecipeId.New(), name => ingredientsByName[name].Id);
+        var recipe = Recipe.Create(
+            RecipeId.New(),
+            values.Title,
+            values.Lines.Map(line => ToRecipeIngredient(line, name => ingredientsByName[name].Id)),
+            values.Steps);
 
         var recipeRow = recipe.ToDbType();
         db.Recipes.Add(recipeRow);
@@ -116,13 +198,6 @@ file static class RecipeMappings
             extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["errorCode"] = "RECIPE_NOT_FOUND" });
 
     // Der Lookup Name -> Zutat-Id kommt als Funktion herein: die Zerlegung kennt keine DB.
-    private static Recipe ToRecipe(CreateRecipeDto dto, RecipeId id, Func<string, Guid> ingredientIdByName) =>
-        Recipe.Create(
-            id,
-            RecipeTitle.Create(dto.Title),
-            [.. dto.Ingredients.Split('\n').Select(ParseLine).Select(line => ToRecipeIngredient(line, ingredientIdByName))],
-            [.. dto.Steps.Select(step => StepInstruction.Create(step.Instruction))]);
-
     private static RecipeIngredient ToRecipeIngredient(ParsedIngredientLine line, Func<string, Guid> ingredientIdByName) =>
         RecipeIngredient.Create(IngredientId.Create(ingredientIdByName(line.Name)), line.Quantity);
 
@@ -145,7 +220,7 @@ file static class RecipeMappings
 
     // ADR-S135-2: Position = Zeilenreihenfolge, 1-basiert. ADR-S020-1: ohne Menge NULL.
     private static IEnumerable<RecipeIngredientDbType> ToRecipeIngredientDbTypes(this Recipe recipe) =>
-        recipe.Ingredients.Select((ingredient, index) => new RecipeIngredientDbType
+        recipe.Ingredients.Items.Select((ingredient, index) => new RecipeIngredientDbType
         {
             RecipeId = recipe.Id.Value,
             Position = index + 1,
@@ -155,7 +230,7 @@ file static class RecipeMappings
 
     // ADR-S027-1: StepNumber = Index + 1 der Listenposition, nur in der DB-Entität.
     private static IEnumerable<StepDbType> ToStepDbTypes(this Recipe recipe) =>
-        recipe.Steps.Select((step, index) => new StepDbType
+        recipe.Steps.Items.Select((step, index) => new StepDbType
         {
             RecipeId = recipe.Id.Value, StepNumber = index + 1, Instruction = step.Value,
         });
@@ -164,8 +239,8 @@ file static class RecipeMappings
         new(
             recipe.Id.Value,
             recipe.Title.Value,
-            [.. recipe.Ingredients.Select(ingredient => ingredient.ToDto(ingredientRow(ingredient.Ingredient)))],
-            [.. recipe.Steps.Select(step => new StepDto(step.Value))]);
+            [.. recipe.Ingredients.Items.Select(ingredient => ingredient.ToDto(ingredientRow(ingredient.Ingredient)))],
+            [.. recipe.Steps.Items.Select(step => new StepDto(step.Value))]);
 
     private static RecipeIngredientDto ToDto(this RecipeIngredient ingredient, IngredientDbType row) =>
         ToIngredientDto(row.Name, ingredient.Quantity.Match<decimal?>(amount => amount, () => null), row.BaseUnit);

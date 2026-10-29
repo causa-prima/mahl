@@ -121,3 +121,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Ich habe das Test-Review auf Per-Assertion-Zuordnung und Gold-Plating konzentriert und die Checkliste nicht Punkt für Punkt abgearbeitet. Den Ausfall fing nur das mechanische Gate auf; die Checkliste selbst ist nicht der Fehler.
   Regel: Das Test-Review geht die vier Punkte aus IMP-test-review vollständig durch und nennt zu jedem ein Ergebnis, auch „Given/When/Then: vorhanden“. Ein Punkt ohne genanntes Ergebnis gilt als nicht geprüft.
   CM-Bezug: CM-S070-1
+
+## Session 144 – 2026-10-29
+
+- **[MITTEL] [QUALITÄT] [Review] LL-S144-1 – Vom UI-Entwurf geforderte Assertion im Test-Review als Gold-Plating gestrichen**
+  Quelle: Orchestrator
+  Was: Im Test-Review von US-602 run-8 (S144) habe ich die Assertion toBeInvalid() am Titelfeld als Gold-Plating streichen lassen, weil kein Gherkin-Kriterium „markiert“ sagt. Der vom User freigegebene UI-Entwurf zeigte den Titel aber ausdrücklich rot. Folge: der error-Prop des Titels blieb ungetestet und überlebte als Mutant; eine Review-Runde später musste derselbe Test (diesmal über aria-invalid) zurück.
+  Warum: Ich habe die Per-Assertion-Pflicht nur gegen die Gherkin-Szenarien geprüft und den im selben Lauf freigegebenen UI-Entwurf nicht als Spec-Quelle mitgedacht.
+  Regel: Beim Test-Review gelten der freigegebene UI-Entwurf und die Szenarien gemeinsam als Spec für sichtbare UI-Details – eine Assertion, die der Entwurf trägt, ist kein Gold-Plating.
+
+- **[HOCH] [QUALITÄT] [Mutation-Testing] LL-S144-2 – 100 % Mutation-Score als verifiziert gemeldet, obwohl Timeouts 13 Survivors verdeckten**
+  Quelle: Orchestrator
+  Was: In US-602 run-8 (S144) habe ich den Frontend-qa-check mit 100 % und gültigem Hash als verifiziert gemeldet, obwohl 101 von 240 Mutanten als Timeout endeten (Vormittagsläufe: 36–44). Erst der Code-Review-Abgleich zeigte, dass auch Mutanten ohne mögliche Schleife (error={…} → false) als Timeout liefen; mit timeoutMS 60000 standen 13 Survivors da, im Gesamtlauf zusätzlich ein seit run-3/run-4 verdeckter. Dieselbe Klasse war als OBS-S143-1 bereits zweimal erfasst – ich hatte sie vor der Aussage nicht nachgeschlagen.
+  Warum: Der Hash belegt Frische, nicht, dass jeder Mutant getötet wurde; Stryker zählt Timeouts als erkannt, und qa-check gated nicht darauf. Ich habe die auffällige Timeout-Zahl zwar bemerkt, sie aber als Kann-Artefakt durchgewinkt statt sie vor der Aussage aufzulösen.
+  Regel: Ein Mutation-Score mit nennenswertem Timeout-Anteil ist kein Beleg: Vor „verifiziert“ jeden Timeout im geänderten Code ansehen (kann der Mutant eine Schleife erzeugen? sonst wie Survivor behandeln) und bekannte Beobachtungen zum Werkzeug nachschlagen (hier OBS-S143-1).
+  CM-Bezug: CM-S116-1

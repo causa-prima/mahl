@@ -23,6 +23,7 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         Guid Id, string Title, IReadOnlyList<RecipeIngredientResponse> Ingredients, IReadOnlyList<StepPayload> Steps);
     private sealed record RecipeSummaryResponse(Guid Id, string Title);
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
+    private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
 #pragma warning restore CA1812
 
     // Helper: legt Zutaten an und leert danach den Tracker – folgende Full-State-Abfragen lesen so die
@@ -369,5 +370,129 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         var body = await response.Content.ReadFromJsonAsync<RecipeResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
         body.Id.Should().Be(recipeId);
+    }
+
+    private async Task<HttpResponseMessage> PostRawJsonAsync(string json)
+    {
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        return await Client.PostAsync("/api/recipes", content, TestContext.Current.CancellationToken);
+    }
+
+    // Gemeinsamer Then-Teil der Ablehnungen: 422 (ADR-S090-1) mit genau diesen Feldmeldungen (Full State)
+    // und nichts gespeichert.
+    private async Task AssertRejectedWithAsync(HttpResponseMessage response, Dictionary<string, string[]> expectedErrors)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(expectedErrors);
+        await AssertNothingPersistedAsync();
+    }
+
+    private static Dictionary<string, string[]> SingleError(string key, string message) =>
+        new(StringComparer.Ordinal) { [key] = [message] };
+
+    private async Task AssertNothingPersistedAsync()
+    {
+        (await Db.Recipes.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no recipe row may be written");
+        (await Db.RecipeIngredients.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no recipe ingredient row may be written");
+        (await Db.Steps.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no step row may be written");
+    }
+
+    // Szenario: Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig
+    // Das Frontend sendet hier {"title":"","ingredients":"","steps":[]} (leere Schrittfelder gehen nicht mit).
+    [Fact]
+    public async Task US602_Error_CreateRecipe_EmptyForm_Returns422WithAllRequiredMessages()
+    {
+        // Given: ein leeres Formular
+        var request = new CreateRecipeRequest(Title: "", Ingredients: "", Steps: []);
+
+        // When: das Rezept wird gespeichert
+        var response = await Client.PostAsJsonAsync("/api/recipes", request, TestContext.Current.CancellationToken);
+
+        // Then: alle drei Pflichtmeldungen gleichzeitig (ADR-S135-3, ADR-S051-2), nichts gespeichert
+        await AssertRejectedWithAsync(response, new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["title"] = ["Titel darf nicht leer sein."],
+            ["ingredients"] = ["Rezept muss mindestens eine Zutat haben."],
+            ["steps"] = ["Rezept muss mindestens einen Schritt haben."],
+        });
+    }
+
+    // Szenario: Rezept ohne Zutat oder ohne Schritt
+    // Die ersten drei Beispiele der Outline: Zutatenfeld leer, Zutatenfeld nur aus leeren Zeilen und
+    // Leerzeichen, Schritte leer. Das Beispiel mit dem Schritt aus Leerzeichen sendet das Frontend nicht
+    // mit, es bleibt dem E2E-Test.
+    [Theory]
+    [InlineData("""{"title":"Pfannkuchen","ingredients":"","steps":[{"instruction":"Teig rühren."}]}""", "ingredients", "Rezept muss mindestens eine Zutat haben.")]
+    [InlineData("""{"title":"Pfannkuchen","ingredients":"\n   \n\n  \n","steps":[{"instruction":"Teig rühren."}]}""", "ingredients", "Rezept muss mindestens eine Zutat haben.")]
+    [InlineData("""{"title":"Pfannkuchen","ingredients":"250 g Mehl","steps":[]}""", "steps", "Rezept muss mindestens einen Schritt haben.")]
+    public async Task US602_Error_CreateRecipe_WithoutIngredientOrStep_Returns422WithMessage(
+        string json, string expectedKey, string expectedMessage)
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRawJsonAsync(json);
+
+        // Then: die Meldung am betroffenen Feld, nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError(expectedKey, expectedMessage));
+    }
+
+    // Szenario: Ein Rezept mit einer leeren Schritt-Anweisung wird abgelehnt
+    // ADR-S144-1: der Key trägt den 0-basierten Index in der gesendeten Liste.
+    [Fact]
+    public async Task US602_Error_CreateRecipe_BlankSecondStep_Returns422AtSecondStep()
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+        var request = new CreateRecipeRequest(
+            Title: "Pfannkuchen", Ingredients: "250 g Mehl",
+            Steps: [new StepPayload("Teig rühren."), new StepPayload("   ")]);
+
+        // When: das Rezept wird gespeichert
+        var response = await Client.PostAsJsonAsync("/api/recipes", request, TestContext.Current.CancellationToken);
+
+        // Then: die Meldung am zweiten Schritt, nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError("steps[1].instruction", "Schritt-Anweisung darf nicht leer sein."));
+    }
+
+    // ADR-S144-2 (kein US-Tag, ADR-S106-3 „Protokoll-/Infrastruktur-Mechanik"): explizites null zählt wie
+    // leer und bekommt die Pflichtmeldung des Feldes. Das jeweils andere Feld ist gültig, damit genau
+    // eine Meldung erwartet wird.
+    [Theory]
+    [InlineData("""{"title":null,"ingredients":"250 g Mehl","steps":[{"instruction":"Teig rühren."}]}""", "title", "Titel darf nicht leer sein.")]
+    [InlineData("""{"title":"Pfannkuchen","ingredients":null,"steps":[{"instruction":"Teig rühren."}]}""", "ingredients", "Rezept muss mindestens eine Zutat haben.")]
+    [InlineData("""{"title":"Pfannkuchen","ingredients":"250 g Mehl","steps":null}""", "steps", "Rezept muss mindestens einen Schritt haben.")]
+    public async Task CreateRecipe_NullProperty_Returns422LikeEmpty(string json, string expectedKey, string expectedMessage)
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+
+        // When: das Rezept mit explizitem null gesendet wird
+        var response = await PostRawJsonAsync(json);
+
+        // Then: die Pflichtmeldung am betroffenen Feld, nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError(expectedKey, expectedMessage));
+    }
+
+    // ADR-S144-2 (kein US-Tag, ADR-S106-3 „Protokoll-/Infrastruktur-Mechanik"): ein Body, dem ein
+    // Property ganz fehlt, ist ein fehlerhafter Request (400), kein Validierungsfall und kein 500.
+    [Theory]
+    [InlineData("""{"ingredients":"250 g Mehl","steps":[{"instruction":"Teig rühren."}]}""")]
+    [InlineData("""{"title":"Pfannkuchen","steps":[{"instruction":"Teig rühren."}]}""")]
+    [InlineData("""{"title":"Pfannkuchen","ingredients":"250 g Mehl"}""")]
+    public async Task CreateRecipe_MissingRequiredProperty_Returns400AndPersistsNothing(string json)
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+
+        // When: das Rezept mit fehlendem Property gesendet wird
+        var response = await PostRawJsonAsync(json);
+
+        // Then: 400 Bad Request, nichts gespeichert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await AssertNothingPersistedAsync();
     }
 }

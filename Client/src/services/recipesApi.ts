@@ -3,6 +3,7 @@ import { toUnexpectedError } from '../types/apiError'
 import type { ApiError } from '../types/apiError'
 import type { NewRecipe, Recipe, RecipeSummary } from '../domain/recipe'
 import { conditionalGetJson } from './conditionalGet'
+import { toFieldErrors } from './fieldErrors'
 
 export function fetchRecipes(): ResultAsync<readonly RecipeSummary[], ApiError> {
   // ADR-S084-3: GET nutzt HTTP-Conditional-Requests (If-None-Match / 304).
@@ -20,7 +21,8 @@ export function fetchRecipe(id: string): ResultAsync<RecipeLookup, ApiError> {
     .orElse((error) => (error.kind === 'NotFound' ? okAsync<RecipeLookup, ApiError>({ kind: 'NotFound' }) : errAsync(error)))
 }
 
-// ADR-S068-1: Die 201-Antwort trägt das volle Rezept, ein zweiter GET entfällt. Nur Erfolgspfad.
+// ADR-S068-1: Die 201-Antwort trägt das volle Rezept, ein zweiter GET entfällt.
+// ADR-S090-1: 422 -> feld-keyed Validierungsfehler (Err).
 export function createRecipe(recipe: Readonly<NewRecipe>): ResultAsync<Recipe, ApiError> {
   return ResultAsync.fromPromise(
     fetch('/api/recipes', {
@@ -29,5 +31,9 @@ export function createRecipe(recipe: Readonly<NewRecipe>): ResultAsync<Recipe, A
       body: JSON.stringify(recipe),
     }),
     toUnexpectedError,
-  ).andThen((response) => ResultAsync.fromSafePromise(response.json() as Promise<Recipe>))
+  ).andThen((response) =>
+    response.status === 422
+      ? toFieldErrors<Recipe>(response)
+      : ResultAsync.fromSafePromise(response.json() as Promise<Recipe>),
+  )
 }

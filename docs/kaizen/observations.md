@@ -262,7 +262,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: GERING    Häufigkeit: häufig
 - Kategorie: AGENT    Kontext: Bash/Permission
-- Beobachtung: In S141 meldeten drei Layer-Subagenten (Frontend run-2, Backend run-2, Frontend Review-Fixes) unabhängig, dass der Bash-Hook python3-Heredocs, sed -i, cat >> (Redirect) und einen Heredoc-Edit mit anschließendem Wrapper-Aufruf im selben Befehl blockt. Alle wichen ohne Folgen auf Edit aus, verloren dabei aber je einen oder mehrere Versuche und meldeten den Punkt als Prozess-Auffälligkeit im Return. Offen ist, ob die Agent-Definitionen den Weg (Dateien per Edit/Write ändern) so klar nennen, dass der erste Versuch schon richtig ist. Erneut in S143 (US-602 run-6): Drei der vier Layer-Subagenten meldeten in ihrem Prozessverbesserungs-Abschnitt Fehlversuche an Heredoc-Skripten mit Wrapper-Aufruf, sed -i und npx eslint bzw. npm run lint, bevor sie auf Edit und eslint-run wechselten.
+- Beobachtung: In S141 meldeten drei Layer-Subagenten (Frontend run-2, Backend run-2, Frontend Review-Fixes) unabhängig, dass der Bash-Hook python3-Heredocs, sed -i, cat >> (Redirect) und einen Heredoc-Edit mit anschließendem Wrapper-Aufruf im selben Befehl blockt. Alle wichen ohne Folgen auf Edit aus, verloren dabei aber je einen oder mehrere Versuche und meldeten den Punkt als Prozess-Auffälligkeit im Return. Offen ist, ob die Agent-Definitionen den Weg (Dateien per Edit/Write ändern) so klar nennen, dass der erste Versuch schon richtig ist. Erneut in S143 (US-602 run-6): Drei der vier Layer-Subagenten meldeten in ihrem Prozessverbesserungs-Abschnitt Fehlversuche an Heredoc-Skripten mit Wrapper-Aufruf, sed -i und npx eslint bzw. npm run lint, bevor sie auf Edit und eslint-run wechselten. Erneut in S144 (US-602 run-8): Vier von sechs Layer-Subagenten meldeten Fehlversuche an python3-Heredocs, sed -i oder Redirects auf Repo-Dateien, bevor sie auf Edit/Write wechselten; auch der Orchestrator lief einmal in die Sperre (Heredoc-Anhängen an eine Spec-Datei).
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -312,7 +312,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: In US-602 run-5 meldete der erste qa-check-Lauf des Frontends 100 % bei 43 Timeouts (Timeouts zählen als detected). Ein späterer Lauf ohne Änderung an der betroffenen Datei meldete 17 Timeouts und einen Survivor in Client/src/pages/RecipeDetailPage.tsx:24 (StringLiteral im Query-Key), der seit run-3/run-4 besteht und dort nie aufgefallen war; ein dritter Lauf mit 10 Timeouts zeigte ihn ebenfalls. Ein Score von 100 % mit vielen Timeouts ist damit kein verlässlicher Beleg dafür, dass jeder Mutant von einem Test getötet wird – und der Verifikations-Hash bestätigt nur Frische, nicht Stabilität des Ergebnisses. qa-check weist Timeouts aus („können Timing-Artefakte sein – mit --verbose prüfen"), gated aber nicht darauf. Zweiter Fall in US-602 run-6 (S143): Ein Survivor im Layout-Wert sx={{ justifyContent: 'flex-end' }} von FormActions (CreateRecipePage.tsx) stand in den ersten qa-check-Läufen hinter 68 Timeouts bei „100 %“ und fiel erst im Volllauf eines Subagenten auf; zwischen zwei Läufen wechselte er dabei zwischen den Mutatoren ObjectLiteral und StringLiteral.
+- Beobachtung: In US-602 run-5 meldete der erste qa-check-Lauf des Frontends 100 % bei 43 Timeouts (Timeouts zählen als detected). Ein späterer Lauf ohne Änderung an der betroffenen Datei meldete 17 Timeouts und einen Survivor in Client/src/pages/RecipeDetailPage.tsx:24 (StringLiteral im Query-Key), der seit run-3/run-4 besteht und dort nie aufgefallen war; ein dritter Lauf mit 10 Timeouts zeigte ihn ebenfalls. Ein Score von 100 % mit vielen Timeouts ist damit kein verlässlicher Beleg dafür, dass jeder Mutant von einem Test getötet wird – und der Verifikations-Hash bestätigt nur Frische, nicht Stabilität des Ergebnisses. qa-check weist Timeouts aus („können Timing-Artefakte sein – mit --verbose prüfen"), gated aber nicht darauf. Zweiter Fall in US-602 run-6 (S143): Ein Survivor im Layout-Wert sx={{ justifyContent: 'flex-end' }} von FormActions (CreateRecipePage.tsx) stand in den ersten qa-check-Läufen hinter 68 Timeouts bei „100 %“ und fiel erst im Volllauf eines Subagenten auf; zwischen zwei Läufen wechselte er dabei zwischen den Mutatoren ObjectLiteral und StringLiteral. Dritter Fall in US-602 run-8 (S144): qa-check meldete 100 % bei 101 Timeouts von 240 Mutanten. Ein gezielter Lauf auf CreateRecipePage.tsx mit timeoutMS 60000 ergab 0 Timeouts und 13 Survivors – darunter Mutanten, die keine Schleife erzeugen können (error={…} → false). Ursache geprüft: der Stryker-Default timeoutMS 5000 reicht für die user-event-Komponententests je Mutant nicht. timeoutMS 60000 ist seitdem gesetzt (ADR-S144-4); der Gesamtlauf deckte dabei noch einen seit run-3/run-4 verdeckten Survivor in RecipeDetailPage.tsx (Query-Key ohne Id) auf. Offen bleibt die Hälfte von qa-check: Timeouts zählen dort weiter still als erkannt, ein künftiger Timeout fiele wieder nicht auf.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-5 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -356,4 +356,44 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Der PostToolUse-Hook check-code-quality-nonblocking fährt nach jedem einzelnen Edit an prozesscode/ oder tests/ die gesamte Werkzeug-Suite (10–45 s) und meldet „Tooling-Tests rot“. Werden mehrere zusammengehörige Edits in einem Zug geschickt (Funktion anlegen, Aufruf umstellen, Import ergänzen), meldet er die Zwischenstände dazwischen als rot – in S143 gut ein Dutzend Mal, jedes Mal Rauschen, das der Agent als solches erkennen und übergehen musste; ruff meldete dabei auch fehlende Imports, die das nächste Edit schon ergänzte. Die Meldung selbst weist auf beabsichtigte RED-Phasen hin, unterscheidet aber nicht zwischen Zwischenstand und Endstand.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – im Session-Abschluss S143 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S144-1 – ESLint läuft erst im qa-check – Lint-Fehler blockieren nach der Test-Freigabe
+- Quelle: Subagent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: TDD
+- Beobachtung: In S144 (US-602 run-8) fiel functional/no-conditional-statements an Testtabellen mit if/else erst im qa-check auf: einmal im vom Orchestrator geschriebenen E2E-Spec (der qa-check der Frontend-Schicht brach deshalb vor Stryker ab, obwohl der Subagent die Datei nie berührt hatte), zweimal im Komponententest nach der Test-Freigabe – die Korrektur änderte freigegebene Assertions und lief damit am Freigabe-Anker vorbei. vitest-run und das Test-Review prüfen kein Lint; qa-check lintet das ganze Client-Projekt. Vorschlag der Subagenten: eslint-run und den Typecheck vor dem TEST-REVIEW-Signal laufen lassen bzw. der Orchestrator vor dem Spawn.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S144-2 – Test-Wrapper verschweigen Filter-Fehlgriffe und Testausgaben
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Testing
+- Beobachtung: In S144 (US-602 run-8): dotnet-test mit --filter 'FullyQualifiedName~…' lief als „Zero tests“ (Exit 8) ohne Hinweis, dass --filter ein Substring des vollqualifizierten Namens ist – das steht nur in --help. vitest-run verschluckt console.log aus Tests; ein Subagent musste für eine Layout-Messung ein throw new Error(...) nutzen. Beides kostete je einen Umweg.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S144-3 – Subagenten-Berichte kommen abgeschnitten beim Orchestrator an
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: AGENT    Kontext: Agent-Prompt
+- Beobachtung: In S144 (US-602 run-8) kamen vier Berichte von Layer-Subagenten mit „[result truncated – ask the agent for the rest via SendMessage]“ an – zweimal fehlte genau der VERIFIKATIONS-HASH, je einmal der Rest der PLANUNG und die Prozessverbesserungs-Vorschläge. Jedes Mal war eine Nachforderung per SendMessage und ein weiterer Rundlauf nötig. Die Berichte sind lang (Dateiliste, Testläufe, Pflicht-Output, Report); was am Ende steht, geht verloren.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S144-4 – Hintergrund-Lauf weckt den Layer-Subagenten nach seinem Ende nicht
+- Quelle: Orchestrator + Subagent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: AGENT    Kontext: Agent-Prompt
+- Beobachtung: In S144 (US-602 run-8) meldeten zwei Frontend-Subagenten „Warte auf qa-check (Hintergrund)“ und beendeten ihren Zug. Beide Male war der Lauf Minuten später fertig (einmal Exit 1 an ESLint, einmal Score 99,6 % nach 5 Minuten), ohne dass der Subagent sich meldete; erst der User bemerkte, dass nichts mehr lief, nach rund 10 bzw. 20 Minuten Stillstand. Ein Subagent sagte im Nachgang, der Wake-up sei erst nach einer Nachricht des Orchestrators gekommen. implementing-scenario (Innerer Loop, „Arbeitende Subagenten nicht pollen“) stützt sich auf einen Harness-Test vom 2026-10-29 (Claude Code 2.1.312), nach dem das Laufende den Subagenten selbst weckt – die Beobachtung widerspricht dem. Auch die ausdrückliche Anweisung im Spawn-Prompt, qa-check im Vordergrund laufen zu lassen, wurde einmal nicht befolgt. Der Orchestrator hat qa-check beide Male selbst gefahren.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden; Ursache ungeklärt (geprüft: nur die Rückmeldungen der Subagenten, kein Harness-Test)
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

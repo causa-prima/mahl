@@ -1,7 +1,9 @@
 import { test, expect } from './fixtures'
 import { seedIngredientViaApi } from './api/ingredientsApi'
-import type { APIRequestContext, Page } from '@playwright/test'
-import { createRecipeViaApi, seedRecipesWithSaltViaApi, UNKNOWN_RECIPE_ID } from './api/recipesApi'
+import type { APIRequestContext, Locator, Page } from '@playwright/test'
+import {
+  createRecipeViaApi, fetchRecipeTitlesViaApi, postRecipeViaApi, seedRecipesWithSaltViaApi, UNKNOWN_RECIPE_ID,
+} from './api/recipesApi'
 import { discardQuestion } from './pages/recipesPage'
 
 // @US-602-happy-path
@@ -39,7 +41,7 @@ test.describe('US602_HappyPath: Rezepte erfassen', () => {
     await page.getByLabel('Schritt 1').fill('Mehl und Milch verrühren.')
     await page.getByRole('button', { name: 'Schritt hinzufügen' }).click()
     await page.getByLabel('Schritt 2').fill('In der Pfanne ausbacken.')
-    await page.getByRole('button', { name: 'Speichern' }).click()
+    await saveForm(page)
 
     // Then: die Detailansicht des Rezepts "Pfannkuchen" (eigene Adresse, ADR-S135-5)
     await expect(page).toHaveURL(/\/recipes\/[0-9a-f-]{36}$/)
@@ -102,6 +104,32 @@ async function expectEmptyForm(page: Readonly<Page>): Promise<void> {
   await expect(page.getByLabel('Zutaten')).toHaveValue('')
   await expectStepNumbers(page, [1])
   await expect(stepsSection(page).getByLabel('Schritt 1')).toHaveValue('')
+}
+
+// When „ich auf "Speichern" klicke".
+async function saveForm(page: Readonly<Page>): Promise<void> {
+  await page.getByRole('button', { name: 'Speichern' }).click()
+}
+
+// Then „bin ich weiterhin im Formular": Adresse und Überschrift des Formulars.
+async function expectForm(page: Readonly<Page>): Promise<void> {
+  await expect(page).toHaveURL(/\/recipes\/new$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Rezept anlegen' })).toBeVisible()
+}
+
+// Then „sehe ich <am Element> die Fehlermeldung …": sichtbar und als Beschreibung mit dem Element
+// verknüpft – „am Feld" wie beim Hinweis des Zutatenfelds.
+async function expectMessageAt(page: Readonly<Page>, element: Readonly<Locator>, message: string): Promise<void> {
+  await expect(page.getByText(message, { exact: true })).toBeVisible()
+  await expect(element).toHaveAccessibleDescription(message)
+}
+
+// Then „sehe ich bei den Zutaten die Fehlermeldung …": Am Zutatenfeld bleibt der Hinweis zur Eingabeform
+// stehen (ADR-S135-4); Hinweis und Meldung beschreiben das Feld gemeinsam, in der sichtbaren Reihenfolge.
+async function expectMessageAtIngredients(page: Readonly<Page>, message: string): Promise<void> {
+  await expect(page.getByText(message, { exact: true })).toBeVisible()
+  await expect(page.getByText(INGREDIENTS_HINT)).toBeVisible()
+  await expect(page.getByLabel('Zutaten')).toHaveAccessibleDescription(`${INGREDIENTS_HINT} ${message}`)
 }
 
 // @US-602-happy-path
@@ -462,5 +490,116 @@ test.describe('US602_Error: Direktlink ins Leere', () => {
       // Then: sehe ich die Rezept-Liste
       await expectRecipeList(page)
     })
+  })
+})
+
+// @US-602-error
+test.describe('US602_Error: Rezept ohne Pflichtangaben', () => {
+  // Szenario: Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig
+  // Der Klick auf "Speichern" im leeren Formular hält zugleich formNoValidate: Ohne das Attribut hielte
+  // der Browser das Absenden der required-Felder an, und keine Meldung käme vom Server.
+  test('US602_Error_CreateRecipe_EmptyForm_ShowsAllRequiredMessagesAndFocusOnTitle', async ({ page, request }) => {
+    // Given: der Stand der Rezept-Liste (für „unverändert")
+    const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+    // When: ich das Formular öffne und auf "Speichern" klicke
+    await openCreateForm(page)
+    await saveForm(page)
+
+    // Then: am Titel, bei den Zutaten und bei den Schritten je die Pflichtmeldung – gleichzeitig
+    await expectMessageAt(page, page.getByLabel('Titel'), 'Titel darf nicht leer sein.')
+    await expectMessageAtIngredients(page, 'Rezept muss mindestens eine Zutat haben.')
+    await expectMessageAt(page, stepsSection(page), 'Rezept muss mindestens einen Schritt haben.')
+    // Then: der Fokus liegt auf dem Titel-Feld – alle drei sind fehlerhaft, das erste gewinnt (ADR-S135-4)
+    await expect(page.getByLabel('Titel')).toBeFocused()
+    // Then: weiterhin im Formular
+    await expectForm(page)
+    // Then: die Rezept-Liste ist unverändert
+    expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
+  })
+
+  // <Ort> und <Fokus> der Outline: wo die Meldung steht und welches Feld danach den Fokus hat.
+  const atIngredients = {
+    expectMessage: expectMessageAtIngredients,
+    focusTarget: (page: Readonly<Page>) => page.getByLabel('Zutaten'),
+  }
+  const atSteps = {
+    expectMessage: (page: Readonly<Page>, message: string) => expectMessageAt(page, stepsSection(page), message),
+    focusTarget: (page: Readonly<Page>) => stepsSection(page).getByLabel('Schritt 1'),
+  }
+  // Eine Zeile je Beispiel der Scenario Outline. Leere Schrittfelder schickt das Formular nicht mit
+  // (ADR-S135-3) – ein Schritt aus Leerzeichen meldet deshalb den fehlenden Schritt, nicht die leere Anweisung.
+  const missingParts = [
+    {
+      eingabe: '"Teig rühren." als Schritt eingebe',
+      ingredients: '', step: 'Teig rühren.',
+      at: atIngredients, message: 'Rezept muss mindestens eine Zutat haben.',
+    },
+    {
+      eingabe: 'als Zutaten nur leere Zeilen und Leerzeichen und "Teig rühren." als Schritt eingebe',
+      ingredients: '\n   \n\n  \n', step: 'Teig rühren.',
+      at: atIngredients, message: 'Rezept muss mindestens eine Zutat haben.',
+    },
+    {
+      eingabe: '"250 g Mehl" als Zutaten eingebe',
+      ingredients: '250 g Mehl', step: '',
+      at: atSteps, message: 'Rezept muss mindestens einen Schritt haben.',
+    },
+    {
+      eingabe: '"250 g Mehl" als Zutaten und "   " als Schritt eingebe',
+      ingredients: '250 g Mehl', step: '   ',
+      at: atSteps, message: 'Rezept muss mindestens einen Schritt haben.',
+    },
+  ] as const
+  missingParts.forEach(({ eingabe, ingredients, step, at, message }) => {
+    // Szenario: Rezept ohne Zutat oder ohne Schritt
+    test(`US602_Error_CreateRecipe_WithoutIngredientOrStep_ShowsMessageAndKeepsInput (${eingabe})`, async ({ page, request }) => {
+      // Given: die Zutat "Mehl" mit Einheit "g" existiert
+      await seedIngredientViaApi(request, 'Mehl', 'g')
+      const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+      // When: ich das Formular öffne, "Pfannkuchen" als Titel und <Eingabe> eingebe und auf "Speichern" klicke
+      await openCreateForm(page)
+      await page.getByLabel('Titel').fill('Pfannkuchen')
+      await page.getByLabel('Zutaten').fill(ingredients)
+      await page.getByLabel('Schritt 1').fill(step)
+      await saveForm(page)
+
+      // Then: die Meldung <Ort>, der Fokus auf <Fokus>
+      await at.expectMessage(page, message)
+      await expect(at.focusTarget(page)).toBeFocused()
+      // Then: weiterhin im Formular mit allen Eingaben
+      await expectForm(page)
+      await expect(page.getByLabel('Titel')).toHaveValue('Pfannkuchen')
+      await expect(page.getByLabel('Zutaten')).toHaveValue(ingredients)
+      await expectStepNumbers(page, [1])
+      await expect(stepsSection(page).getByLabel('Schritt 1')).toHaveValue(step)
+      // Then: die Rezept-Liste ist unverändert
+      expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
+    })
+  })
+
+  // Szenario: Ein Rezept mit einer leeren Schritt-Anweisung wird abgelehnt
+  // Der Speicher-Befehl geht direkt an die API: Das Formular schickt leere Schrittfelder gar nicht erst mit
+  // (ADR-S135-3), der Server hält die Regel trotzdem ein.
+  test('US602_Error_CreateRecipeViaApi_BlankSecondStep_RejectsWithMessageAtSecondStep', async ({ request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+    // When: ich den Speicher-Befehl für "Pfannkuchen" mit "250 g Mehl" und den Schritten "Teig rühren." und "   " absende
+    const response = await postRecipeViaApi(request, {
+      title: 'Pfannkuchen',
+      ingredients: '250 g Mehl',
+      steps: [{ instruction: 'Teig rühren.' }, { instruction: '   ' }],
+    })
+
+    // Then: die Meldung am zweiten Schritt – und nur sie (Full State des Fehler-Bodys, ADR-S090-1).
+    //   ADR-S144-1: der Key ist der Pfad des Feldes in der gesendeten Liste, 0-basiert.
+    expect(response.status()).toBe(422)
+    const body = await response.json() as { readonly errors: Readonly<Record<string, readonly string[]>> }
+    expect(body.errors).toEqual({ 'steps[1].instruction': ['Schritt-Anweisung darf nicht leer sein.'] })
+    // Then: die Rezept-Liste ist unverändert
+    expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
   })
 })

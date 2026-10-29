@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router'
 import { delay, http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
 import { AppRoutes } from '../App'
@@ -93,6 +93,12 @@ function useOpenRecipeHandlers() {
     http.get('/api/recipes', () => HttpResponse.json([pancakes, bread].map(({ id, title }) => ({ id, title })))),
     ...[pancakes, bread].map((recipe) => http.get(`/api/recipes/${recipe.id}`, () => HttpResponse.json(recipe))),
   )
+}
+
+// Der Browser-Zurück-Knopf: die Anwendung hat selbst keinen Weg von der Detailansicht zur Liste.
+function BrowserBackButton() {
+  const navigate = useNavigate()
+  return <button type="button" onClick={() => { void navigate(-1) }}>Browser zurück</button>
 }
 
 // Then (Szenario): die Detailansicht zeigt "Pfannkuchen" mit eigener Zutat, nicht die Zutat von "Brot".
@@ -251,6 +257,34 @@ describe('Rezepte erfassen', () => {
     const steps = within(stepList).getAllByRole('listitem').map((item) => item.textContent)
     expect(steps).toHaveLength(1)
     expect(steps[0]).toMatch(/^1\D+Teig rühren\.$/)
+  })
+
+  // Szenario: Rezept aus der Rezept-Liste öffnen
+  // Survivor-Test (nach Freigabe): Der Abruf-Schlüssel enthält die Kennung. Ohne sie zeigte das zweite Rezept
+  // sofort die gecachte Detailansicht des ersten, bis dessen Abruf nachlädt.
+  it('US602_HappyPath_OpenRecipe_SecondRecipeAfterFirst_NeverShowsFirstRecipe', async () => {
+    // Given: zwei Rezepte; ich habe "Pfannkuchen" geöffnet und bin per Browser-Zurück zur Liste gegangen
+    useOpenRecipeHandlers()
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <MemoryRouter initialEntries={['/recipes']}>
+          <AppRoutes />
+          <BrowserBackButton />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    fireEvent.click(await screen.findByRole('link', { name: 'Pfannkuchen' }))
+    await expectPancakesDetail()
+    fireEvent.click(screen.getByRole('button', { name: 'Browser zurück' }))
+
+    // When: ich auf "Brot" klicke
+    fireEvent.click(await screen.findByRole('link', { name: 'Brot' }))
+
+    // Then: bis "Brot" geladen ist, steht nichts vom Pfannkuchen da; danach zeigt die Detailansicht "Brot"
+    expect(screen.queryByRole('heading', { level: 1, name: 'Pfannkuchen' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Brot' })).toBeInTheDocument()
+    expect(within(screen.getByRole('list', { name: 'Zutaten' })).getAllByRole('listitem').map((item) => item.textContent))
+      .toEqual(['500 g Weizenmehl'])
   })
 
   // Szenario: Rezept per Direktlink aufrufen
@@ -700,5 +734,155 @@ describe('Rezepte erfassen – Fehlerfälle', () => {
     // Then: der Hinweis mit dem Weg zurück erscheint
     expect(await screen.findByRole('heading', { level: 1, name: 'Rezept nicht gefunden.' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Zur Rezept-Liste' })).toHaveAttribute('href', '/recipes')
+  })
+})
+
+const titleRequired = 'Titel darf nicht leer sein.'
+const ingredientsRequired = 'Rezept muss mindestens eine Zutat haben.'
+const stepsRequired = 'Rezept muss mindestens einen Schritt haben.'
+
+// Given: der POST lehnt mit 422 ab (ADR-S090-1, Keys nach ADR-S144-1). Liefert den Spion auf den Request-Body.
+type RejectedErrors = Readonly<Record<string, readonly string[]>>
+
+function usePostRejectedWith(errors: RejectedErrors) {
+  const postedBody = vi.fn()
+  server.use(http.post('/api/recipes', async ({ request }) => {
+    postedBody(await request.json())
+    return HttpResponse.json({ status: 422, errors }, { status: 422 })
+  }))
+  return postedBody
+}
+
+function stepsGroup() {
+  return screen.getByRole('group', { name: 'Schritte (Pflichtangabe)' })
+}
+
+// Then: weiterhin im Formular (keine Navigation zur Detailansicht oder Liste).
+function expectStillInForm() {
+  expect(screen.getByRole('heading', { level: 1, name: 'Rezept anlegen' })).toBeInTheDocument()
+}
+
+// @US-602-error
+describe('Rezept ohne Pflichtangaben', () => {
+  // Szenario: Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig
+  it('US602_Error_CreateRecipe_EmptyForm_ShowsAllRequiredMessagesAndFocusOnTitle', async () => {
+    // Given: der Server lehnt ein leeres Rezept mit allen Pflichtmeldungen ab
+    const postedBody = usePostRejectedWith({
+      title: [titleRequired], ingredients: [ingredientsRequired], steps: [stepsRequired],
+    })
+    const user = userEvent.setup()
+    await openCreateFormFromEmptyList()
+
+    // When: ich ohne Eingaben speichere
+    await user.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: alle Meldungen stehen an ihren Feldern, die Felder sind als fehlerhaft markiert,
+    // der Fokus liegt auf dem Titel, das leere Schrittfeld wurde nicht gesendet
+    expect(await screen.findByText(titleRequired)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Titel/)).toHaveAccessibleDescription(titleRequired)
+    expect(screen.getByLabelText(/^Zutaten/)).toHaveAccessibleDescription(`${ingredientsHint} ${ingredientsRequired}`)
+    expect(stepsGroup()).toHaveAccessibleDescription(stepsRequired)
+    // Der Fokus springt nach dem Fehler auf Schritt 1 (ADR-S135-4); damit die Meldung dort vorgelesen wird,
+    // beschreibt sie auch dieses Feld (Barrierefreiheit; ADR-S144-3: Semantik wird getestet).
+    expect(screen.getByLabelText('Schritt 1')).toHaveAccessibleDescription(stepsRequired)
+    expect(screen.getByLabelText(/^Titel/)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/^Zutaten/)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Schritt 1')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/^Titel/)).toHaveFocus()
+    expect(postedBody).toHaveBeenCalledExactlyOnceWith({ title: '', ingredients: '', steps: [] })
+    expectStillInForm()
+  })
+
+  // Szenario: Rezept ohne Zutat oder ohne Schritt (Outline)
+  // Erwartete Zustände je betroffenem Feld: wo die Meldung steht, bestimmt alles Übrige.
+  const expectedByField = {
+    ingredients: {
+      errors: { ingredients: [ingredientsRequired] }, meldung: ingredientsRequired, fokus: /^Zutaten/,
+      zutatenDescription: `${ingredientsHint} ${ingredientsRequired}`, zutatenAriaInvalid: 'true',
+      schritteDescription: '', schrittFeldDescription: '', schrittFeldAriaInvalid: 'false',
+    },
+    steps: {
+      errors: { steps: [stepsRequired] }, meldung: stepsRequired, fokus: 'Schritt 1',
+      zutatenDescription: ingredientsHint, zutatenAriaInvalid: 'false',
+      schritteDescription: stepsRequired, schrittFeldDescription: stepsRequired, schrittFeldAriaInvalid: 'true',
+    },
+  } as const
+
+  it.each<{
+    zeile: string; zutaten: string; schritt: string
+    where: keyof typeof expectedByField; body: unknown
+  }>([
+    {
+      zeile: 'ohne Zutaten', zutaten: '', schritt: 'Teig rühren.', where: 'ingredients',
+      body: { title: 'Pfannkuchen', ingredients: '', steps: [{ instruction: 'Teig rühren.' }] },
+    },
+    {
+      zeile: 'nur leere Zeilen als Zutaten', zutaten: '\n  \n', schritt: 'Teig rühren.', where: 'ingredients',
+      body: { title: 'Pfannkuchen', ingredients: '\n  \n', steps: [{ instruction: 'Teig rühren.' }] },
+    },
+    {
+      zeile: 'ohne Schritt', zutaten: '250 g Mehl', schritt: '', where: 'steps',
+      body: { title: 'Pfannkuchen', ingredients: '250 g Mehl', steps: [] },
+    },
+    {
+      zeile: 'leerer Schritt', zutaten: '250 g Mehl', schritt: '   ', where: 'steps',
+      body: { title: 'Pfannkuchen', ingredients: '250 g Mehl', steps: [] },
+    },
+  ])('US602_Error_CreateRecipe_WithoutIngredientOrStep_ShowsMessageAndKeepsInput ($zeile)',
+    async ({ zutaten, schritt, where, body }) => {
+      const {
+        errors, meldung, fokus, zutatenDescription, zutatenAriaInvalid,
+        schritteDescription, schrittFeldDescription, schrittFeldAriaInvalid,
+      } = expectedByField[where]
+      // Given: der Server lehnt das Rezept mit genau der einen Meldung ab
+      const postedBody = usePostRejectedWith(errors)
+      const user = userEvent.setup()
+      await openCreateFormFromEmptyList()
+
+      // When: Titel und (je Zeile) Zutaten und Schritt eingeben, speichern
+      await user.type(screen.getByLabelText(/^Titel/), 'Pfannkuchen')
+      await pasteText(user, screen.getByLabelText(/^Zutaten/), zutaten)
+      await pasteText(user, screen.getByLabelText('Schritt 1'), schritt)
+      await user.click(screen.getByRole('button', { name: 'Speichern' }))
+
+      // Then: die Meldung steht nur am betroffenen Feld, nur dieses ist als fehlerhaft markiert und hat den Fokus,
+      // Eingaben bleiben, leere Schritte wurden nicht gesendet
+      await screen.findByText(meldung)
+      expect(screen.getByLabelText(/^Zutaten/)).toHaveAccessibleDescription(zutatenDescription)
+      expect(screen.getByLabelText(/^Zutaten/)).toHaveAttribute('aria-invalid', zutatenAriaInvalid)
+      expect(stepsGroup()).toHaveAccessibleDescription(schritteDescription)
+      // Schritt 1 beschreibt die Schritt-Meldung, weil der Fokus dorthin springt (ADR-S135-4, ADR-S144-3).
+      expect(screen.getByLabelText('Schritt 1')).toHaveAccessibleDescription(schrittFeldDescription)
+      expect(screen.getByLabelText('Schritt 1')).toHaveAttribute('aria-invalid', schrittFeldAriaInvalid)
+      expect(screen.getByLabelText(/^Titel/)).toHaveAccessibleDescription('')
+      expect(screen.getByLabelText(/^Titel/)).toHaveAttribute('aria-invalid', 'false')
+      expect(screen.getByLabelText(fokus)).toHaveFocus()
+      expect(screen.getByLabelText(/^Titel/)).toHaveValue('Pfannkuchen')
+      expect(screen.getByLabelText(/^Zutaten/)).toHaveValue(zutaten)
+      expect(screen.getByLabelText('Schritt 1')).toHaveValue(schritt)
+      expect(postedBody).toHaveBeenCalledExactlyOnceWith(body)
+      expectStillInForm()
+    })
+
+  // Szenario: Rezept ohne Zutat oder ohne Schritt
+  // Survivor-Test (nach Freigabe): die Schritt-Meldung gehört nur dem ersten Schrittfeld, auch bei mehreren Feldern
+  it('US602_Error_CreateRecipe_WithoutStep_SeveralStepFields_OnlyFirstFieldCarriesMessageAndFocus', async () => {
+    // Given: der Server lehnt das Rezept mit der Schritt-Meldung ab
+    usePostRejectedWith({ steps: [stepsRequired] })
+    const user = userEvent.setup()
+    await openCreateFormFromEmptyList()
+
+    // When: ich einen zweiten, leeren Schritt hinzufüge und speichere
+    await user.click(screen.getByRole('button', { name: 'Schritt hinzufügen' }))
+    await user.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    // Then: nur Schritt 1 trägt Meldung und Fehlermarkierung und hat den Fokus
+    await screen.findByText(stepsRequired)
+    // Schritt 1 beschreibt die Schritt-Meldung, weil der Fokus dorthin springt (ADR-S135-4, ADR-S144-3).
+    expect(screen.getByLabelText('Schritt 1')).toHaveAccessibleDescription(stepsRequired)
+    expect(screen.getByLabelText('Schritt 1')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Schritt 1')).toHaveFocus()
+    expect(screen.getByLabelText('Schritt 2')).toHaveAccessibleDescription('')
+    expect(screen.getByLabelText('Schritt 2')).toHaveAttribute('aria-invalid', 'false')
   })
 })

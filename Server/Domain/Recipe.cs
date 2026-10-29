@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using mahl.Server.Types;
 
 namespace mahl.Server.Domain;
@@ -7,21 +6,19 @@ namespace mahl.Server.Domain;
 // vertraut ihnen. Die Reihenfolge der Listen ist fachlich: Zutaten in Zeilenreihenfolge
 // (ADR-S135-2), Schritte in Listenreihenfolge – die Schrittnummer ist keine Eigenschaft des
 // Rezepts, sie entsteht erst beim Speichern (ADR-S027-1).
-// ImmutableArray statt ImmutableList: als Struct hat es keinen null-Zustand; ein default(ImmutableArray)
-// wirft erst bei Length bzw. Enumeration, nicht schon beim Feldzugriff.
+// „Mindestens eine Zutat / ein Schritt" (ADR-S135-2, ADR-S135-3) steckt im Typ der Listen
+// (NonEmptyImmutableArray): ein Rezept ohne Zutat oder Schritt ist nicht darstellbar.
 internal readonly record struct Recipe
 {
     private readonly RecipeId _id;
     private readonly RecipeTitle _title;
-    private readonly ImmutableArray<RecipeIngredient> _ingredients;
-    private readonly ImmutableArray<StepInstruction> _steps;
+    private readonly NonEmptyImmutableArray<RecipeIngredient> _ingredients;
+    private readonly NonEmptyImmutableArray<StepInstruction> _steps;
 
-    // Id und Title sind Domänentypen, deren default beim Zugriff wirft. Die Arrays nicht: Create nimmt auch
-    // ein default-Array an. Ein Guard kommt mit den Entity-Invarianten (mindestens ein Schritt).
     public RecipeId Id => _id;
     public RecipeTitle Title => _title;
-    public ImmutableArray<RecipeIngredient> Ingredients => _ingredients;
-    public ImmutableArray<StepInstruction> Steps => _steps;
+    public NonEmptyImmutableArray<RecipeIngredient> Ingredients => _ingredients;
+    public NonEmptyImmutableArray<StepInstruction> Steps => _steps;
 
     // Parameterless ctor must be public (record struct limitation) – catches new Recipe():
     // Stryker disable once Statement,String : parameterless ctor unreachable via normal construction (ADR-S041-9)
@@ -29,7 +26,10 @@ internal readonly record struct Recipe
     public Recipe() => throw new InvalidOperationException("Uninitialized");
 
     private Recipe(
-        RecipeId id, RecipeTitle title, ImmutableArray<RecipeIngredient> ingredients, ImmutableArray<StepInstruction> steps)
+        RecipeId id,
+        RecipeTitle title,
+        NonEmptyImmutableArray<RecipeIngredient> ingredients,
+        NonEmptyImmutableArray<StepInstruction> steps)
     {
         _id = id;
         _title = title;
@@ -37,9 +37,13 @@ internal readonly record struct Recipe
         _steps = steps;
     }
 
-    // Kein OneOf: Entity-Invarianten (mindestens ein Schritt, jede Zutat höchstens einmal) kommen mit
-    // den Szenarien, die sie prüfen.
+    // Kein OneOf: alle Teile kommen schon als geprüfte Domänentypen an; die Fehler der Teile sammelt die API-Grenze
+    // (RecipesEndpoints.ToValues, ADR-S119-2) – ein OneOf hier käme erst danach zum Zug und schlösse kurz.
+    // „Jede Zutat höchstens einmal" kommt mit ihrem Szenario.
     public static Recipe Create(
-        RecipeId id, RecipeTitle title, ImmutableArray<RecipeIngredient> ingredients, ImmutableArray<StepInstruction> steps) =>
+        RecipeId id,
+        RecipeTitle title,
+        NonEmptyImmutableArray<RecipeIngredient> ingredients,
+        NonEmptyImmutableArray<StepInstruction> steps) =>
         new(id, title, ingredients, steps);
 }

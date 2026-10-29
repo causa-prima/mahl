@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using OneOf;
 
 namespace mahl.Server;
@@ -36,6 +37,37 @@ internal static class OneOfExtensions
             error1 => second.Match<OneOf<TOut, IReadOnlyList<TError>>>(
                 _ => new[] { error1 },
                 error2 => new[] { error1, error2 }));
+
+    // Collect für Eingänge, die selbst schon mehrere Fehler tragen (z.B. alle fehlerhaften Schritte einer
+    // Liste). Eigener Name statt Overload von Collect: mit gleicher Stelligkeit wäre die Auswahl zwischen
+    // beiden von der Typinferenz abhängig (TError = IReadOnlyList<…> passte auf beide).
+    public static OneOf<TOut, IReadOnlyList<TError>> CollectMany<T1, T2, TOut, TError>(
+        OneOf<T1, IReadOnlyList<TError>> first, OneOf<T2, IReadOnlyList<TError>> second, Func<T1, T2, TOut> combine) =>
+        first.Match(
+            ok1 => second.Match<OneOf<TOut, IReadOnlyList<TError>>>(
+                ok2 => combine(ok1, ok2),
+                errors2 => OneOf<TOut, IReadOnlyList<TError>>.FromT1(errors2)),
+            errors1 => second.Match<OneOf<TOut, IReadOnlyList<TError>>>(
+                _ => OneOf<TOut, IReadOnlyList<TError>>.FromT1(errors1),
+                errors2 => errors1.Concat(errors2).ToList()));
+
+    // Sammelt die Ergebnisse einer Liste: alle Werte, oder alle Fehler (Reihenfolge der Liste).
+    // Ein Durchlauf mit Buildern: die Zahl der Elemente ist nicht begrenzt, ein Falten über CollectMany
+    // kopierte je Element Array und Fehlerliste (quadratisch).
+    public static OneOf<ImmutableArray<T>, IReadOnlyList<TError>> CollectAll<T, TError>(
+        IEnumerable<OneOf<T, TError>> results)
+    {
+        var values = ImmutableArray.CreateBuilder<T>();
+        var errors = new List<TError>();
+        foreach (var result in results)
+        {
+            result.Switch(value => values.Add(value), error => errors.Add(error));
+        }
+
+        return errors.Count == 0
+            ? values.ToImmutable()
+            : errors;
+    }
 
     public static async Task<TResult> MatchAsync<T, TError, TResult>(
         this Task<OneOf<T, TError>> source, Func<T, TResult> onSuccess, Func<TError, TResult> onError) =>

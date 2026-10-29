@@ -818,6 +818,36 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 
 ---
 
+### ADR-S144-1: `POST /api/recipes`: Meldungen eines Schritts keyen als `steps[i].instruction`
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, http:post, http:422, arch:validation
+
+**Entscheidung:** Im 422-Body (ADR-S090-1) trägt eine Meldung zur Anweisung eines einzelnen Schritts den Key `steps[i].instruction` – `i` ist der 0-basierte Index in der **gesendeten** Liste (ADR-S135-3), der Rest der JSON-Pfad des Feldes im Request. Meldungen, die die Schrittliste als Ganzes betreffen („Rezept muss mindestens einen Schritt haben."), keyen auf `steps`; Titel und Zutatenfeld auf `title` und `ingredients`.
+
+**Begründung:** ADR-S090-1 legt Keys als Request-Property-Namen fest; für ein Feld in einem Listenelement ist der JSON-Pfad die direkte Fortsetzung. Es ist dieselbe Form, die ASP.NET `ModelState` für verschachtelte Felder erzeugt (`Steps[1].Instruction`, hier in der camelCase-Schreibweise des Requests). Listenmeldung und Elementmeldung bleiben so unterscheidbar, und ein späteres zweites Feld je Schritt bekommt einen eigenen Key, ohne das Format zu ändern.
+
+**Verworfen:**
+- **`steps[i]`** – kürzer, aber mehrdeutig, sobald ein Schritt mehr als ein Feld hat.
+- **Verschachteltes Objekt (`errors.steps = [null, ["…"]]`)** – bricht die flache Form `Feld → string[]` aus ADR-S090-1, die das Frontend und `Results.ValidationProblem` voraussetzen.
+
+---
+
+### ADR-S144-2: `POST /api/recipes`: fehlendes Property → 400, explizites `null` → wie leer (422)
+
+**Status:** Accepted
+**Tags:** scope:feature, resource:recipes, http:post, http:400, http:422, arch:validation
+
+**Entscheidung:** Jedes Property von `CreateRecipeDto` (`title`, `ingredients`, `steps`) trägt `[JsonRequired]`: Fehlt es im Body ganz, lehnt die Deserialisierung den Request mit `400` ab, bevor der Handler läuft. Ein explizites `null` als Wert gilt dagegen als leer und durchläuft die Feldprüfung – es endet als `422` mit derselben Pflichtmeldung wie ein leerer Wert (ADR-S051-2).
+
+**Begründung:** Ohne Markierung bindet ein fehlendes Property `null`, und der Handler warf eine `NullReferenceException` (500). Ein fehlendes Property ist ein Strukturfehler des Requests – kein Feldinhalt, zu dem es eine Meldung am Formularfeld gäbe –, deshalb `400` statt `422`. `[JsonRequired]` fängt aber nur das Fehlen, nicht ein gesendetes `null`; dieses behandeln die Domänentypen ohnehin wie leer (`NonEmptyTrimmedString.Create(string?)`), wie schon beim Zutaten-Endpoint. Einheitlich für alle drei Properties, damit die Regel nicht je Feld verschieden ist. Innerhalb eines Schritts gilt sie nicht: Fehlt `instruction` in einem Schritt-Objekt, zählt das wie eine leere Anweisung (422, `steps[i].instruction`, ADR-S144-1) – `StepDto` ist zugleich Teil der Antwort, und die Meldung am Schritt sagt dem Client mehr als ein 400 ohne Feldbezug. Die Tests dazu haben kein treibendes Szenario (über das Formular nicht auslösbar) und fallen unter ADR-S106-3, Kategorie „Protokoll-/Infrastruktur-Mechanik": Sie sichern den Request-Vertrag der Grenze.
+
+**Verworfen:**
+- **Global `RespectNullableAnnotations` / `RespectRequiredConstructorParameters` in den JSON-Optionen** – wirkt auf jeden Endpoint und kippte beim Zutaten-Endpoint `name: null` von `422` auf `400`.
+- **Fehlendes Property ebenfalls als `422` mit Pflichtmeldung** – bräuchte nullable DTO-Properties und Null-Behandlung je Feld im Handler; der Fall entsteht nur durch einen fehlerhaften Client, nicht durch eine Eingabe im Formular.
+
+---
+
 ## WeeklyPool-Endpoints
 
 ### ADR-S007-1: POST /api/weekly-pool: 422 (nicht 404) bei Rezept nicht gefunden
@@ -1005,6 +1035,8 @@ internal static OneOf<TOut, IReadOnlyList<TError>> Collect<T1, T2, TOut, TError>
 **Verworfen:** Tupel-Akkumulation (`r1.Zip(r2).Zip(r3)`) – die Tupel verschachteln sich zu `((a,b),c)`, und C# erlaubt keine Dekonstruktion in Lambda-Parameterlisten. Am Aufrufort unbrauchbar.
 **Verworfen:** `params`-Array – verliert die Typen zur Compile-Zeit und damit den Zweck.
 
+**Addendum (S144) – `CollectMany` und `CollectAll`:** Das Rezept (US-602) validiert eine Liste, deren Elemente je eigene Fehler tragen (jede leere Schritt-Anweisung wird gemeldet). Dafür kommen zwei Kombinatoren hinzu. `CollectMany` kombiniert zwei Eingänge, die selbst schon eine Fehler**liste** tragen (`OneOf<T, IReadOnlyList<TError>>`), und konkateniert diese; `CollectAll` sammelt eine Liste von `OneOf<T, TError>` zu allen Werten oder allen Fehlern (Traverse, Reihenfolge der Liste) – in einem Durchlauf (Builder für die Werte, Liste für die Fehler), linear in der Elementzahl: Die Schrittzahl ist unbegrenzt, eine Faltung über `CollectMany` kopierte je Element und wäre quadratisch. `CollectMany` trägt einen eigenen Namen statt eines weiteren `Collect`-Overloads: Bei gleicher Stelligkeit passte `TError = IReadOnlyList<…>` auch auf `Collect`, die Auswahl hinge an der Typinferenz. Der Grundsatz „ein Overload je Arity" bleibt für `Collect` bestehen.
+
 ### ADR-S120-1: Ein Validierungs-Fehlertyp je Domänentyp – feldagnostisch, Feldbezug an der Grenze
 
 **Status:** Accepted
@@ -1035,6 +1067,21 @@ Ein geteilter Domänentyp (`Unit`, §2 Regel 2) bekommt **je Verwendungsstelle**
 **Verworfen:** Domänentyp reicht `StringViolation` durch – null neue Typen, der Domänentyp schrumpft auf drei Zeilen. Verworfen wegen des Regel-1-Lecks oben: er hat dann keine eigene Aussage mehr, sondern ist ein Alias auf seinen Constraint-Stack.
 **Verworfen:** ein Violation-Typ **je Prüfung** mit Feld-Payload (`NonEmpty(field)`, `MaxLength(field, max)`) – ergäbe die kompakteste Grenze, einen Template-Renderer plus Override-Tabelle statt eines Match je Fall. Verworfen aus zwei unabhängigen Gründen. (1) Ein geteilter Domänentyp kennt seine Verwendungsstelle nicht; der Feldname müsste als Parameter in `Create(field, input)` – damit kennt die Domäne das Request-Format, und ein Tippfehler im Feldnamen kompiliert klaglos. (2) Nicht jeder `Create`-Aufrufer kommt von einem Request: der Read-Pfad DB-Zeile → Domain (heute umgangen, siehe ADR-S108-1), Seeding, Import. Für die gibt es keinen sinnvollen Feldnamen, und ein zweiter Overload ohne `field` hebt die Garantie des Parameters wieder auf.
 **Verworfen:** `IngredientValidationError` als Zwischenstufe beibehalten, mit dem neuen Fehlertyp davor – übersetzt dieselbe Information dreimal (`StringViolation` → `UnitError` → `IngredientValidationError` → Text), ohne Gegenwert gegenüber der ersten verworfenen Variante.
+
+---
+
+### ADR-S144-5: „Mindestens ein Element" als Constraint-Typ `NonEmptyImmutableArray<T>`
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:domain-type, arch:validation
+
+**Entscheidung:** Eine Liste, die mindestens ein Element haben muss, ist der Constraint-Typ `NonEmptyImmutableArray<T>` in `Server/Types` (neben `NonEmptyTrimmedString`). `Create(ImmutableArray<T>)` liefert `OneOf<NonEmptyImmutableArray<T>, ListViolation>`; `ListViolation { Empty }` ist feldagnostisch wie `StringViolation`, Feld und Meldungstext ordnet die API-Grenze zu (ADR-S120-1). `Map` erhält die Nicht-Leere ohne erneute Prüfung. Ein Domänentyp, der „mindestens eins" fordert, nimmt diesen Typ – erster Verwender: `Recipe` (Zutaten, Schritte; ADR-S135-2, ADR-S135-3).
+
+**Begründung:** Vorher prüfte nur der Endpoint die Leere, und `Recipe.Create` nahm leere Listen an – der Typ erlaubte ein Rezept ohne Schritt (coding-guideline-csharp.md, illegale Zustände nicht darstellbar). Ein `OneOf` in `Recipe.Create` hätte die Regel ebenfalls in die Domäne gebracht, käme aber erst nach der Titelprüfung zum Zug und schlösse kurz; als Constraint-Typ wird die Liste an der Grenze gebildet und ihr Fehler mit den übrigen Feldfehlern gesammelt (ADR-S119-2).
+
+**Verworfen:**
+- **Prüfung nur an der Grenze** (Stand vor dieser ADR) – einfacher, aber die Invariante steht nicht im Typ.
+- **`OneOf<Recipe, RecipeError>` aus `Recipe.Create`** – s. Begründung: kein Sammeln mit den Feldfehlern.
 
 ---
 
@@ -1887,3 +1934,37 @@ Syntax und Beispiele: [Stryker-Survivor: `= []` Default-Wert](../guidelines/codi
 **Begründung:** Beide Klassen entstehen mit fast jeder neuen Seite (git: f1ff899, 834ad19) – eine Einzelfreigabe je Fall wäre Verwaltung ohne Erkenntnis ([Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung)).
 
 **Verworfen:** Tests auf Klassennamen oder auf den Ladezustand ohne Szenario – prüfen nichts, was ein Nutzer fordert.
+
+---
+
+### ADR-S144-3: Frontend-Suppression: Darstellung einer Feldmeldung, die jsdom nicht zeigt
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:stryker, frontend:react
+
+**Entscheidung:** Zeigt ein Formular eine Server-Meldung am Feld (ADR-S090-1), werden zwei Mutanten-Klassen unterdrückt; die Begründung im Kommentar nennt diese ADR.
+- **Reine Farbe des Fehlerzustands ohne Semantik** – z.B. `error` an einem `FormControl`, das nur die Legende rot färbt (eine Gruppe kennt kein `aria-invalid`): `ConditionalExpression`, `EqualityOperator`.
+- **Meldungselement und seine Verknüpfung nur bei vorhandener Meldung** – `{message !== undefined && <FormHelperText …>}` und `aria-describedby={message === undefined ? … : …}`: Der Mutant „immer rendern / immer verknüpfen" erzeugt ohne Meldung ein leeres Element bzw. einen Verweis auf ein fehlendes Element; die zugängliche Beschreibung bleibt gleich, nur der Platz eines leeren Elements wäre sichtbar: nur `ConditionalExpression`. `EqualityOperator` und `LogicalOperator` blenden dagegen die vorhandene Meldung aus und werden von den Tests getötet – sie stehen nicht unter der Suppression.
+
+Was eine Semantik trägt, wird getestet, nicht unterdrückt: der Text der Meldung, die zugängliche Beschreibung des Feldes und `aria-invalid` an einem Eingabefeld.
+
+**Begründung:** Beide Klassen entstehen an jedem Feld, das eine Meldung zeigen kann – im Rezeptformular mit jedem Fehlerlauf von US-602 erneut. Farbe und Leerraum sind in jsdom nicht beobachtbar; ein Test darauf prüfte CSS-Klassen oder die DOM-Struktur, nicht Verhalten (dieselbe Abwägung wie ADR-S136-2 für Klassennamen). Eine Einzelfreigabe je Feld wäre Verwaltung ohne Erkenntnis ([Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung)).
+
+**Verworfen:**
+- **Meldungselemente immer rendern (leer ohne Meldung)** – kein Mutant mehr, aber ein leeres Element nimmt Platz ein, und die Legende bliebe ohne Fehlerfarbe – gegen den freigegebenen UI-Entwurf.
+- **Tests auf Klassen wie `Mui-error` oder auf leere Elemente** – prüften die Implementierung, nicht, was der Nutzer sieht.
+
+---
+
+### ADR-S144-4: Stryker Frontend: `timeoutMS` 60000
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:stryker, testing:mutation
+
+**Entscheidung:** `Client/stryker.config.json` setzt `"timeoutMS": 60000` (Default 5000). Ein Mutant gilt erst als Timeout, wenn sein Testlauf die Basiszeit × Faktor plus 60 s überschreitet.
+
+**Begründung:** Mit dem Default endeten Mutanten im Rezeptformular als Timeout, die keine Schleife erzeugen können (z.B. `error={…}` → `false`) – Stryker zählt Timeouts als erkannt, der Score stand bei 100 %. Derselbe Lauf mit 60000 ergab 0 Timeouts und 13 Survivors (US-602 run-8, gezielter Lauf auf `CreateRecipePage.tsx`). Die Komponententests mit `user-event` laufen pro Mutant deutlich länger, als die 5 s Zuschlag abdecken; ein Timeout war damit kein Beleg für eine erkannte Änderung.
+
+**Verworfen:**
+- **Default behalten** – der Score ist dann für Komponenten mit `user-event`-Tests nicht belastbar.
+- **`timeoutFactor` statt `timeoutMS` erhöhen** – skaliert mit der gemessenen Basiszeit, die im Probelauf mit warmem Cache kürzer ausfällt als je Mutant; der feste Zuschlag ist im Experiment belegt, der Faktor nicht.

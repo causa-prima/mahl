@@ -1,11 +1,9 @@
-import { ResultAsync, errAsync } from 'neverthrow'
+import { ResultAsync } from 'neverthrow'
+import { toFieldErrors } from './fieldErrors'
 import { toUnexpectedError } from '../types/apiError'
 import type { ApiError } from '../types/apiError'
 import type { ETag, Ingredient, IngredientId, IngredientName, NewIngredient, Unit } from '../domain/ingredient'
 import { conditionalGetJson } from './conditionalGet'
-
-// ADR-S090-1: 422-Body ist feld-keyed. Das Frontend konsumiert ausschließlich `errors`.
-type FieldErrorBody = { readonly errors: Readonly<Record<string, readonly string[]>> }
 
 // ADR-S004-1: 409-Body von POST /api/ingredients bei soft-deleted-Duplikat. Nur `id` wird
 // konsumiert (der `code` ist der einzig mögliche POST-409-Grund, kein zusätzlicher Zweig nötig).
@@ -83,9 +81,7 @@ export function restoreIngredient(id: IngredientId, name: IngredientName, baseUn
 // (ADR-S051-4). Sonst der angelegte/reaktivierte Datensatz ('Saved').
 function toCreateIngredientResult(response: Response, requested: NewIngredient): ResultAsync<CreateIngredientResult, ApiError> {
   if (response.status === 422) {
-    return ResultAsync.fromSafePromise(response.json() as Promise<FieldErrorBody>).andThen((body) =>
-      errAsync<CreateIngredientResult, ApiError>({ kind: 'FieldErrors', fields: body.errors }),
-    )
+    return toFieldErrors<CreateIngredientResult>(response)
   }
   if (response.status === 409) {
     return ResultAsync.fromSafePromise(response.json() as Promise<SoftDeletedConflictBody>).andThen((body) =>

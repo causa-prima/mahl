@@ -301,19 +301,9 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Behebung:** Im E2E nach dem Speichern über die Navigationsleiste zur Rezept-Liste wechseln statt neu zu laden; ggf. ['recipes'] nach dem Anlegen invalidieren, falls der Test es verlangt.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden; heute fehlt ein Weg zur Liste innerhalb der App
 
----
-
-## TD-S141-9 — Backend: Rezept-POST ohne Pflichtfelder endet in 500
-**Fällig:** Szenario:„Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig" – erster Lauf mit Pflichtfeld-Prüfung
-**Problem:** Ein Body ohne ingredients oder steps bindet CreateRecipeDto mit null, weil die Felder nicht required sind; RecipesEndpoints.CreateRecipe wirft dann NullReferenceException (500). Erreichbar nur per direktem API-Aufruf – die Szenarien gehen alle über die Oberfläche, die die Felder immer sendet. Ein Stack-Trace in Development ist durch ADR-S112-1 (Handler ab MVP) abgedeckt, nicht aber der Statuscode.
-**Behebung:** DTO-Felder als required markieren, sodass fehlende Felder als 400 abgelehnt werden statt als 500; im Pflichtfeld-Lauf mit einem Integrationstest belegen.
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 für run-8 entschieden
-
----
-
 ## TD-S141-10 — Rezept-Eingaben ohne Obergrenze für Zutatentext, Zeilen- und Schrittzahl
 **Fällig:** Phase:MVP – im Workshop der MVP-Stufe von US-602 als Szenario festlegen, ggf. später
-**Problem:** POST /api/recipes begrenzt weder die Länge des Zutatentexts noch die Zahl der Zutatenzeilen oder Schritte; die Spalten sind text ohne Constraint, die einzige Schranke ist Kestrels Default-Body-Grenze (30 MB). features/recipes.feature begrenzt nur Titel (100) und Schritt-Anweisung (1000). Versehentlich unsinnige Eingaben (z.B. eingefügter Großtext) werden so ungeprüft gespeichert.
+**Problem:** POST /api/recipes begrenzt weder die Länge des Zutatentexts noch die Zahl der Zutatenzeilen oder Schritte; die Spalten sind text ohne Constraint, die einzige Schranke ist Kestrels Default-Body-Grenze (30 MB). features/recipes.feature begrenzt nur Titel (100) und Schritt-Anweisung (1000). Versehentlich unsinnige Eingaben (z.B. eingefügter Großtext) werden so ungeprüft gespeichert. Seit US-602 run-8 wächst auch die 422-Antwort mit der Schrittzahl: jeder leere Schritt ergibt einen eigenen Eintrag steps[i].instruction – eine Schrittobergrenze begrenzt damit auch die Fehlerantwort (Security-Review run-8).
 **Behebung:** Fachliche Obergrenzen als Szenario festlegen – Zweck wie bei den Zutaten-Namen: versehentliche unsinnige Eingaben abfangen, nicht Lastschutz (der liegt bei TD-S102-1) – und mit Meldung am Feld umsetzen.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden: für den SKELETON egal, frühestens MVP
 
@@ -357,24 +347,6 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Behebung:** Im Lauf mit dem Fehler-Fokus prüfen, ob die Gruppe neu einhängt; falls ja, den Fokus nach „Schritt hinzufügen" imperativ per Ref im onAdd-Handler setzen statt über autoFocus.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-5 als Merkposten für den Fehler-Fokus-Lauf entschieden; heute fordert kein Szenario das Verhalten
 
----
-
-## TD-S143-2 — Rezeptformular: Fehlermeldung am Zutatenfeld würde den Dauerhinweis verdrängen
-**Fällig:** Szenario:„Ungültige Menge in einer Zutatenzeile" – erster Lauf, der eine Meldung am Zutatenfeld anzeigt
-**Problem:** Das Zutatenfeld in Client/src/pages/CreateRecipePage.tsx (TitleAndIngredientsFields) zeigt den Eingabehinweis über MUI-helperText. MUI zeigt Fehlermeldungen üblicherweise ebenfalls über helperText. Wird die Meldung dort eingesetzt, verschwindet der Hinweis – ADR-S135-4 verlangt, dass er dauerhaft steht.
-**Behebung:** Meldungen und Hinweis getrennt darstellen (z. B. Hinweis bleibt helperText, Meldungen als eigene Liste am Feld, beide per aria-describedby verknüpft) und im Lauf prüfen, dass der Hinweis bei angezeigter Meldung sichtbar bleibt.
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-5 als Merkposten für den ersten Zutaten-Fehlerlauf entschieden
-
----
-
-## TD-S143-3 — Rezeptformular: formNoValidate am Speichern-Button ohne Test
-**Fällig:** Szenario:„Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig" – erster Lauf, der ein leeres Formular über die Oberfläche absendet
-**Problem:** Client/src/pages/CreateRecipePage.tsx setzt formNoValidate am Speichern-Button, weil Titel und Zutaten required tragen und die Validierung server-only ist (UX-Guideline Formular-Baseline, ADR-S090-1). Kein Test hält die Zeile: Fiele sie weg, blockierte der Browser ein leeres Absenden mit eigener Meldung, ohne dass ein Test rot würde. Vom User in US-602 run-5 bewusst ohne Test freigegeben.
-**Behebung:** Im Pflichtmeldungs-Lauf das Absenden des leeren Formulars per E2E über die Oberfläche führen (Klick auf „Speichern"), sodass ein Wegfall von formNoValidate den Test rot macht; Gegenprobe: Attribut entfernen, Test muss scheitern.
-**Aufschubgrund:** User – in US-602 run-5 bewusst ohne Test freigegeben, der deckende Test entsteht im Pflichtmeldungs-Lauf
-
----
-
 ## TD-S143-4 — Nachfrage „Eingaben verwerfen?“: Aktionen brechen bei 320 px um
 **Fällig:** Phase:MVP – wenn weitere Dialoge mit zwei Text-Aktionen dazukommen, als gemeinsame Baseline-Regel
 **Problem:** Bei 320 px Breite (laut docs/process/nfr.md primärer Bereich) bricht „WEITER BEARBEITEN“ in der Nachfrage des Rezeptformulars (DiscardDialog in Client/src/pages/CreateRecipePage.tsx) auf zwei Zeilen um, „VERWERFEN“ daneben einzeilig – die Buttons wirken ungleich hoch. Lesbar und bedienbar (Touch-Ziele ≥ 44 px), bei 390 und 1280 px sauber. Die Visuelle Baseline (coding-guideline-ux.md#CGU-visuelle-baseline) regelt den Umbruch von Dialog-Aktionen nicht.
@@ -385,6 +357,46 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 
 ## TD-S143-5 — Leer-Definition: Server muss dieselbe Zeichenmenge verwenden wie isBlank im Client
 **Fällig:** Szenario:„Ein Wert nur aus unsichtbaren Zeichen gilt als leer" – mit @CROSS-text run-1 entsteht die Normalisierung auf dem Server
-**Problem:** ADR-S135-1 verlangt, dass der Client über „leer“ gleich entscheidet wie der Server. Seit US-602 run-6 entscheidet der Client mit Client/src/domain/text.ts (isBlank: Unicode-Eigenschaft White_Space plus U+200B, U+00AD, U+2060, U+FEFF). Den Server gibt es dafür noch nicht. Ungeprüft ist, ob die .NET-Seite dieselbe Menge bekäme – char.IsWhiteSpace weicht von Unicode White_Space möglicherweise ab (etwa bei U+001C–U+001F). Kein Test prüft beide Seiten gegeneinander.
+**Problem:** ADR-S135-1 verlangt, dass der Client über „leer“ gleich entscheidet wie der Server. Der Client entscheidet seit US-602 run-6 mit Client/src/domain/text.ts (isBlank: Unicode-Eigenschaft White_Space plus U+200B, U+00AD, U+2060, U+FEFF), der Server seit run-8 per Trim (NonEmptyTrimmedString, char.IsWhiteSpace) – ohne die vier unsichtbaren Zeichen, und char.IsWhiteSpace weicht von Unicode White_Space möglicherweise ab (etwa bei U+001C–U+001F, U+0085). Kein Test prüft beide Seiten gegeneinander. Konkrete Folge: Hält der Client ein Schrittfeld für nicht leer, der Server es aber für leer, kommt ein 422 nur mit steps[i].instruction, den das Formular bis run-9 nicht anzeigt – Speichern ohne sichtbare Reaktion; umgekehrt filtert der Client Schritte aus U+200B weg, die der Server annähme.
 **Behebung:** Beim Bau der Server-Normalisierung dieselbe Zeichenmenge festlegen (Unicode White_Space plus die vier unsichtbaren Zeichen), am besten in ADR-S135-1 ausdrücklich benennen, und mit einem Test gegen dieselbe Zeichenliste wie in RecipesPage.test.tsx (wegfallende Zeichen) absichern.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-6 entschieden: der Server-Teil entsteht erst mit @CROSS-text
+
+---
+
+## TD-S144-1 — Backend: Zutatenzeile, die sich nicht zerlegen lässt, endet in 500 und verdeckt die gesammelten Meldungen
+**Fällig:** Szenario:„Ungültige Menge in einer Zutatenzeile" – erster Lauf mit Zeilenprüfung
+**Problem:** RecipesEndpoints.ToIngredientLines zerlegt jede nicht leere Zeile schon in der Validierung (Select(ParseLine)). ParseLine wirft bei Zeilen wie „1 g“ (IndexOutOfRange auf words[2]) oder „1x g Mehl“ (FormatException in decimal.Parse), eine unbekannte Zutat wirft später in SaveRecipe (KeyNotFoundException auf ingredientsByName). Seit US-602 run-8 verdeckt das auch die gesammelten Pflichtmeldungen: ein Request mit leerem Titel und einer solchen Zeile endet in 500 statt 422 mit der Titelmeldung.
+**Behebung:** ParseLine als totale Funktion mit Fehlerkanal (OneOf je Zeile), die Zeilenfehler über CollectAll mit den übrigen Feldfehlern sammeln (ADR-S119-2, ADR-S135-2); Test: ungültige Zeile zusammen mit leerem Titel ergibt 422 mit beiden Meldungen.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden: die Zeilenprüfung ist Gegenstand von run-10/11
+
+---
+
+## TD-S144-2 — Backend: Rezept-POST mit null als Schritt-Element endet in 500
+**Fällig:** Phase:MVP – mit dem öffentlich erreichbaren API und dem globalen Exception-Handler (TD-S106-1)
+**Problem:** Ein Body mit "steps": [null] bindet ein null-StepDto; RecipesEndpoints.ToSteps greift auf step.Instruction zu und wirft NullReferenceException (500). Über das Formular nicht auslösbar (der Client sendet immer Schritt-Objekte). Fehlende Properties (ADR-S144-2) und ein fehlendes instruction im Schritt-Objekt sind dagegen behandelt.
+**Behebung:** null-Elemente in steps wie eine leere Anweisung behandeln (422 mit steps[i].instruction, ADR-S144-1) oder als fehlerhaften Request ablehnen (400) – Entscheidung in ADR-S144-2 ergänzen; mit einem Integrationstest belegen.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden
+
+---
+
+## TD-S144-3 — Rezeptformular: weitere Meldungen für Screenreader nicht angesagt
+**Fällig:** Phase:MVP – Barrierefreiheit der Formulare vor dem öffentlichen Betrieb
+**Problem:** Nach einem Speichern mit mehreren Fehlern springt der Fokus aufs erste fehlerhafte Feld (ADR-S135-4); dessen Meldung wird vorgelesen. Die übrigen Meldungen (z.B. Zutaten und Schritte im leeren Formular) sind weder role="alert" noch aria-live – ein Screenreader-Nutzer erfährt erst davon, wenn er die Felder anspringt. Sehende sehen alle gleichzeitig (Szenario „Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig“). UX-Review US-602 run-8.
+**Behebung:** Eine kurze Zusammenfassung per role="status" (z.B. „3 Angaben fehlen“) oder role="alert" an den eigenen Meldungselementen; als Szenario bzw. UX-Guideline-Regel festlegen, dann umsetzen.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden: Erweiterung über den freigegebenen UI-Entwurf hinaus
+
+---
+
+## TD-S144-4 — Rezeptformular und Rezept-Tests: Extraktionen vor den Schritt-Meldungen
+**Fällig:** Szenario:„Meldungen erscheinen am richtigen Schritt, auch hinter leeren Schrittfeldern" – run-9 fasst genau diese Stellen an
+**Problem:** Client/src/pages/CreateRecipePage.tsx: StepsSection wiederholt die Bedingung „erstes Schrittfeld“ (index === 0) für inputRef, aria-invalid und aria-describedby; das Meldungselement samt ADR-S144-3-Suppression steht in IngredientsField und StepsSection je einmal. Server.Tests/RecipesEndpointsTests.cs: Request-DTOs werden überall per new CreateRecipeRequest(...) gebaut, die Fehler-Helfer (AssertRejectedWithAsync, SingleError, AssertNothingPersistedAsync) sind privat in der Klasse. Code- und Testqualitäts-Review US-602 run-8.
+**Behebung:** Komponenten StepField und FieldMessageText extrahieren (Suppression an einer Stelle); Request-Builder (ACreateRecipe…) und Fehler-Helfer in EndpointsTestsBase heben (tdd-process.md, Test-Data-Builder).
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden: mit run-9 im selben Code erledigen
+
+---
+
+## TD-S144-5 — Frontend: createRecipe wertet jede Antwort außer 422 als Erfolg
+**Fällig:** Szenario:„Backend liefert Serverfehler beim Speichern – Formular bleibt offen", Phase:MVP – wenn der Querschnitt auf das Rezeptformular angewendet wird (ADR-S112-5), spätestens mit dem öffentlichen API
+**Problem:** Client/src/services/recipesApi.ts createRecipe behandelt nur 422 als Fehler (toFieldErrors); bei 400 oder 500 wird der Problem-Body als Recipe gelesen, created.id ist undefined und die Seite navigiert nach /recipes/undefined. Ein 500 ohne JSON-Body lässt response.json() rejecten (fromSafePromise, unbehandelt). Seit US-602 run-8 gibt es zusätzlich den 400-Pfad für fehlende Properties (ADR-S144-2), über das Formular nicht erreichbar.
+**Behebung:** response.ok prüfen; 422 → FieldErrors, sonst UnexpectedError, sodass das Formular mit allen Eingaben stehen bleibt (Querschnittsvertrag „Formular speichern“, recipes.feature).
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden
