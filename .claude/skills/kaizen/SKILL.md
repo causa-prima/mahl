@@ -195,9 +195,16 @@ Falls keine Session die relevante Arbeit enthielt: Maßnahme hat keine neue Evid
 
 **BEWÄHRT?** Kriterium: Die relevante Situation ist nach Einführung mind. 3× aufgetreten ohne Rückfall.
 
+**Kriterium vorhanden?** Trägt der Eintrag kein `**Wirksamkeit prüfen:**` (`retro_report.py`
+listet solche), ist das zuerst zu beheben: Kriterium nachtragen, oder BEWÄHRT bzw. OBSOLET nach
+[„Ohne Wirksamkeitskriterium kein AKTIV"](../../../docs/kaizen/process.md#KPR-wirksamkeitskriterium).
+Ohne Kriterium ist jede weitere Frage dieses Abschnitts unbeantwortbar.
+
 **Überarbeiten?** Gibt es Rückfälle in der aktuellen `lessons_learned.md`? Falls ja:
 Maßnahme war unzureichend – verschärfen (bei KRITISCH: Poka-yoke Pflicht, bei anderen: Poka-yoke
-anstreben wenn verhältnismäßig).
+anstreben wenn verhältnismäßig) **oder begründet beibehalten**; je Rückfall eine der beiden
+Reaktionen ausdrücklich nennen ([Regel](../../../docs/kaizen/process.md#KPR-rueckfall)). Ein
+Nachtrag, der nur verzeichnet und „Bleibt AKTIV" sagt, genügt nicht.
 Bei einem Rückfall auf eine KRITISCH-Maßnahme: In [Findings präsentieren](#KZN-findings-praesentieren) als **KRITISCH-Rückfall** explizit markieren und Poka-yoke-Pflicht in der Empfehlung hervorheben.
 
 **BEWÄHRT-Einträge auf Regressionen prüfen:** Gibt es ein neues Finding in `lessons_learned.md`,
@@ -280,7 +287,7 @@ Nur freigegebene Änderungen, in dieser Reihenfolge (Abhängigkeiten beachten: c
    Skills gilt, gehört in den Skill oder in `docs/kaizen/process.md`, nicht hierher.
 2. Guidelines / Skills anpassen – Entscheidungshilfe: [„Wann gehört etwas wohin?"](../../../docs/kaizen/process.md#KPR-wohin)
    Bei echter Überschneidung: mit User absprechen
-3. `docs/kaizen/countermeasures.md` aktualisieren (Verweise auf principles.md oder Guideline-Änderungen aus den vorangegangenen Schritten ergänzen)
+3. `docs/kaizen/countermeasures.md` aktualisieren (Verweise auf principles.md oder Guideline-Änderungen aus den vorangegangenen Schritten ergänzen). Jede neue oder auf AKTIV gesetzte Maßnahme bekommt ihr `**Wirksamkeit prüfen:**` ([Pflicht](../../../docs/kaizen/process.md#KPR-wirksamkeitskriterium)).
 4. [Kontext-Tags](../../../docs/kaizen/process.md#KPR-kontext-tags) in `docs/kaizen/process.md` aktualisieren falls neue vereinbart
 5. `docs/kaizen/observations.md`: die in der [OBS-Retro-Berührung](#KZN-obs-beruehrung) hinter einem LL-Muster neu angelegten OBS schreiben (per `Bezug:` verlinkt). **Status-Änderungen und das Archivieren aufgelöster Einträge macht der Drain** (`draining-observations` → `obs-archive.py`), nicht die Retro – sie trifft keine OBS-Entscheidungen.
 6. Neue OFFEN-Einträge sichtbar machen – **nach der Weiche in [„Umsetzung offener Maßnahmen"](../../../docs/kaizen/process.md#KPR-offene-massnahmen), Sichtbarkeit**, nicht pauschal nach AGENT_MEMORY: Ist die Maßnahme **definiert** (konkreter nächster Schritt + Done-Kriterium) → Punkt unter „Nächste Prioritäten" in `docs/AGENT_MEMORY.md`, als Kurzzusammenfassung mit Verweis auf `countermeasures.md`. Steht dagegen die **Antwort selbst** noch aus und braucht ihre Abwägung eigene Recherche (mehrere ernsthafte Kandidaten allein genügen nicht – die legst du dem User jetzt zur Entscheidung vor) → CM bleibt OFFEN, Ausgestaltung als `observations.md`-Eintrag mit `Bezug:` in den Drain, Grund im CM-Eintrag notieren. Falls zutreffend zusätzlich als technische Schuld (`docs/tech-debt.md`) oder offene Frage (`docs/open-questions.md`) eintragen.

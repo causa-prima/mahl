@@ -221,6 +221,36 @@ Beispiele: `US201_HappyPath_Create_ValidData_Returns201`, `US201_Error_Create_Em
 
 Wird dasselbe Verhalten von mehreren Szenarien exercised: Primär-Szenario taggen (das Szenario, das diesen Test im inneren Loop erzwungen hat). Kein Mehrfach-Tagging.
 
+<a id="TDD-spec-verweis"></a>
+### Spec-Verweis über jedem neuen Test
+
+Der US-Tag nennt nur die Story und die Kategorie, nicht das Szenario. Jeder **neue** Komponenten-
+und Integrationstest (`Client/src/**/*.test.ts(x)`, `Server.Tests/**/*.cs`) trägt deshalb im
+Kommentarblock direkt darüber, bei C# über den Attributen, den Verweis auf die Spec, die ihn treibt:
+
+```ts
+// Szenario: Abbrechen mit Eingaben fragt nach – Verwerfen führt zur Rezept-Liste
+// Beispiel: "Salz" als Zutaten eingebe
+it('US602_HappyPath_CreateForm_CancelWithIngredient_AsksBeforeDiscard', …)
+```
+
+- **Szenario:** der exakte Titel aus `features/`.
+- **Beispiel:** nur bei einem Szenariogrundriss, und dort Pflicht – eine Zeile seiner
+  Beispieltabelle (Zellen mit `|` getrennt, äußere Striche optional), mehrere Zeilen je eine
+  `// Beispiel:`-Zeile, ein parametrisierter Test über die ganze Tabelle `// Beispiel: alle`.
+- **Ohne Szenario** nur Querschnitts- und Invarianten-Tests nach ADR-S106-3: dann **kein** US-Tag,
+  dafür `// ADR-SNNN-N` auf eine existierende ADR.
+
+Ein Survivor-Test nach der Freigabe nennt das Szenario, dessen Code er absichert. Der Hook
+`check-test-spec-ref.py` weist einen neuen Test ohne gültigen Verweis vor dem Schreiben ab;
+Bestandstests prüft er nicht. **Was er nicht prüft:** ob die genannte Zeile den Fall inhaltlich
+deckt – ein einfaches Szenario, das den Fall gar nicht erwähnt, kommt durch. Das bleibt die
+Frage des Test-Reviews, das jetzt einen Anker dafür hat. Deckt keine Zeile den Fall, gehört das
+Beispiel **vor** dem Test ins Feature-File, mit User-Freigabe.
+
+Grund: In einem Review-Fix entstanden Tests für Verhalten, das kein Szenario-Beispiel nannte;
+sie trugen einen US-Tag, der die Lücke verdeckte (CM-S070-1).
+
 <a id="TDD-test-data-builder"></a>
 ## Test-Data-Builder
 

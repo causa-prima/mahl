@@ -157,6 +157,14 @@ Ein Finding gilt als false positive wenn die zitierte Guideline im konkreten Cod
 greift (z.B. agenten-eigene Checkliste widerspricht Projektguideline) oder wenn die Begründung
 durch den Code-Kontext widerlegbar ist. False positives aus dem Report herausnehmen und kurz begründen.
 
+**Gemessen wird an der Absicht der Regel, nicht an ihrem Wortlaut.** „Kein Satz der Guideline
+verbietet das" verwirft ein Finding noch nicht – erst, wenn es auch gegen den Zweck der Regel nicht
+trägt. Lockert eine Regel etwas ausdrücklich für einen Kontext (etwa Type Assertions nur in Tests),
+gilt sie in allen übrigen Kontexten unverändert. Und ein Finding wird an seinem **Kern** geprüft,
+nicht an seinem schwächsten Teilargument. Dasselbe gilt für die Einstufung eines Subagenten, ein
+Hinweis sei ein Fehlalarm: übernehmen erst nach eigener Prüfung. Grund: Zwei Findings sollten
+schon mit dem Wortlaut verworfen werden, deren Kern gültig war – eins davon längst als Schuld erfasst.
+
 **Scope-Prüfung (Pflicht für jedes verbleibende Finding, in dieser Reihenfolge):**
 
 1. **Gehört das geforderte Verhalten in die aktuelle Phase?** Ist es erst in einer späteren

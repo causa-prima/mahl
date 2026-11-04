@@ -293,7 +293,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
 - Beobachtung: In S141 war Server.Tests/Helpers/EndpointsTestsBase.cs laut git geändert (neue Test-Data-Builder) und per --approved-tests freigegeben, erschien aber nicht unter „CHECK 1: GEÄNDERTE TEST-DATEIEN“. Der Test-Freigabe-Audit meldete nur „freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf (committet/zurückgesetzt?)“ – eine irreführende Vermutung. Eine Änderung an einer Hilfsdatei, die alle Integrationstests trägt, läuft so am Audit vorbei.
-- Zusammen-erledigen: OBS-S141-3
+- Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
@@ -397,3 +397,14 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden; Ursache ungeklärt (geprüft: nur die Rückmeldungen der Subagenten, kein Harness-Test)
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S145-1 – Edit/Write-Dispatcher (Hinweise und blockierend): main() kaum mutationsgetestet
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: HOCH    Häufigkeit: dauerhaft
+- Kategorie: QUALITÄT    Kontext: Hook/Script
+- Beobachtung: In S145 erstmals unter der Sperrklinke: check-code-quality-nonblocking steht bei 47,5 % (40 Mutanten, 21 überlebt). Zwei Lücken mit Folge: (a) continue → break nach einem werfenden Check überlebt – wirft ein früher Check, laufen alle späteren nicht mehr, darunter tooling_tests, das einzige Gate der Werkzeug-Suite, und kein Test merkt es; (b) der Name, unter dem guard_log.protokolliere eine Auslösung zählt (rsplit/Index), ist ungeprüft – guard-stats könnte still falsch zuordnen. Dazu Exit-Codes ohne Eingabe, Fehlermeldungstext auf stderr und der Trenner zwischen Meldungen. Die Lücke ist alt (Bestand), nicht aus S145. Dieselbe Klasse im blockierenden Dispatcher: dispatch-edit-write steht in S145 bei 57,8 % (64 Mutanten, 27 überlebt, u. a. in collect_reasons und main) – erstmals mit Messkennung, ohne Vergleichswert. Beide Dispatcher in einem Zug.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – Umfang: in S145 zum Session-Abschluss als ‚aufschieben' entschieden; Tests für Fehlerpfad, Protokollname und Trenner, etwa 25 Minuten
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: CM-S116-1

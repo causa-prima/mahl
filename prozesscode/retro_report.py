@@ -113,6 +113,7 @@ class Countermeasure:
     seit_session: int = 0
     cm_id: str = ""
     titel: str = ""         # Kurztitel aus dem Header – `problem` überschreibt die Problem-Zeile
+    hat_kriterium: bool = False  # trägt `**Wirksamkeit prüfen:**` (process.md, KPR-wirksamkeitskriterium)
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +141,8 @@ CM_META_RE = re.compile(
     r"\*\*Seit:\*\*\s*S?(?P<seit>\d+)"
 )
 CM_PROBLEM_RE = re.compile(r"^\*\*Problem:\*\*\s*(?P<problem>.+)")
+# Das Feld steht im Bestand meist mitten im Maßnahmen-Absatz, nicht am Zeilenanfang.
+CM_KRITERIUM_MARKER = "**Wirksamkeit prüfen:**"
 
 
 def parse_file(path: str) -> list[SessionData]:
@@ -249,9 +252,13 @@ def load_cm(path: str) -> list[Countermeasure]:
                     seit_session=int(m.group("seit")),
                 ))
                 continue
+            if not (cms and cms[-1].cm_id == cur_id):
+                continue
             m = CM_PROBLEM_RE.match(line)
-            if m and cms and cms[-1].cm_id == cur_id:
+            if m:
                 cms[-1].problem = m.group("problem").strip()
+            if CM_KRITERIUM_MARKER in line:
+                cms[-1].hat_kriterium = True
     return cms
 
 
@@ -731,6 +738,25 @@ def archive_start_sessions(archive_dir: str) -> list[int]:
     return starts
 
 
+OHNE_LUECKE = "  Jede AKTIV-Maßnahme trägt ein Wirksamkeitskriterium."
+OHNE_KRITERIUM_AUSWEG = ("  Je Eintrag: `**Wirksamkeit prüfen:**` nachtragen – oder BEWÄHRT bzw. OBSOLET "
+                         "(docs/kaizen/process.md, KPR-wirksamkeitskriterium).")
+
+
+def render_ohne_kriterium(cms: list[Countermeasure]) -> str:
+    """AKTIV-Maßnahmen ohne Wirksamkeitskriterium: Für sie ist BEWÄHRT nie feststellbar, also
+    schriebe jede Retro „unverändert". Nur AKTIV – BEWÄHRT ist entschieden,
+    OFFEN noch nicht live."""
+    lines = [section("AKTIV ohne Wirksamkeitskriterium")]
+    luecken = [cm for cm in cms if cm.status == "AKTIV" and not cm.hat_kriterium]
+    if not luecken:
+        lines.append(OHNE_LUECKE)
+        return "\n".join(lines)
+    lines += [f"  {cm.cm_id} (seit S{cm.seit_session}) – {cm.titel}" for cm in luecken]
+    lines.append(OHNE_KRITERIUM_AUSWEG)
+    return "\n".join(lines)
+
+
 def render_escalated(cms: list[Countermeasure], archive_dir: str) -> str:
     lines = [section("Eskalierte Maßnahmen (≥ 2 Retros OFFEN)")]
     archive_starts = archive_start_sessions(archive_dir)
@@ -808,6 +834,7 @@ def main() -> int:
     if args.verbose:
         print(render_clustering(all_sessions, cms))
         print(render_trend(all_sessions))
+    print(render_ohne_kriterium(cms))
     print(render_escalated(cms, args.archive))
     print()
 

@@ -54,14 +54,8 @@ def cluster(drainable):
             if ziel in nach_id and ziel != e["id"]:
                 nachbarn[e["id"]].add(ziel)
                 nachbarn[ziel].add(e["id"])
-            elif ziel != e["id"]:
-                # Nicht stumm verwerfen: Solche Kanten entstehen zwangsläufig, sobald der
-                # Partner aufgelöst und archiviert wird. Lautlos wäre der Ausfall von
-                # „hatte nie eine Kante" nicht unterscheidbar – und ein Vertipper, den die
-                # Schreibprüfung nicht abgefangen hat, bliebe für immer unsichtbar.
-                print(f"WARNUNG: {e['id']} nennt {ziel} unter Zusammen-erledigen, aber der "
-                      f"Eintrag ist nicht (mehr) drainbar – Kante wirkungslos, ggf. entfernen "
-                      f"(`obs.py set {e['id']} --zusammen-erledigen …`).", file=sys.stderr)
+            # Eine Kante zu einem nicht drainbaren Ziel fällt hier still weg; gemeldet wird sie
+            # von tote_kanten() – einmal, aus render(). cluster() läuft je Agenda mehrfach.
 
     gesehen, einheiten = set(), []
     for e in sorted(drainable, key=lambda x: (x["session"], x["sub"])):
@@ -85,6 +79,25 @@ def unit_score(einheit) -> float:
 
 def _alter(cur, e):
     return (cur - e["session"]) if cur is not None else 0
+
+
+TOTE_KANTE = ("WARNUNG: {id} nennt {ziel} unter Zusammen-erledigen, aber der Eintrag ist nicht "
+              "(mehr) drainbar – Kante wirkungslos, ggf. entfernen "
+              "(`obs.py set {id} --zusammen-erledigen …`).")
+
+
+def tote_kanten(drainable) -> list[str]:
+    """Kanten zu Einträgen, die nicht (mehr) drainbar sind – je eine Meldung.
+
+    Nicht stumm verwerfen: Solche Kanten entstehen zwangsläufig, sobald der Partner aufgelöst
+    und archiviert wird. Lautlos wäre der Ausfall von „hatte nie eine Kante" nicht
+    unterscheidbar – und ein Vertipper, den die Schreibprüfung nicht abgefangen hat, bliebe
+    für immer unsichtbar. Getrennt von cluster(), weil das je Agenda mehrfach läuft und die
+    Warnung sonst mehrfach stünde.
+    """
+    ids = {e["id"] for e in drainable}
+    return [TOTE_KANTE.format(id=e["id"], ziel=ziel) for e in drainable
+            for ziel in e["zusammen"] if ziel not in ids and ziel != e["id"]]
 
 
 def wert_einheiten(drainable):
@@ -184,6 +197,8 @@ def render(root: Path, entries):
     cur = current_session(root)
     wert, alt, b, drainable = compute(entries, cur)
     warn_far_parks(entries, cur)
+    for meldung in tote_kanten(drainable):
+        print(meldung, file=sys.stderr)
     due = due_parked(entries, cur)
     resolved = [e for e in entries if is_resolved(e["status"])]
 

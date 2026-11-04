@@ -413,8 +413,15 @@ def cd_npm_conflict(segments: list[str]) -> bool:
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-def _log_command(command: str, log_type: str, log_file: str | None = None) -> None:
+def _log_command(command: str, log_type: str, log_file: str | None = None,
+                 agent: str | None = None) -> None:
     """Protokolliert einen Befehl in einem Log (Default: denied-commands.log).
+
+    agent: `agent_type` der Hook-Eingabe – bei Subagent-Aufrufen der Typ, bei einem mit `name`
+           gestarteten der Name. Steht als `[agent=…]` zwischen Typ und Befehl; der Haupt-Thread
+           bringt kein `agent_type` mit, seine Zeile trägt kein Feld. Ohne das Feld ist nicht
+           feststellbar, ob ein Deny aus einem Subagenten kam – genau das fragt das
+           Wirksamkeitskriterium von CM-S056-1. Zeilen vor dem 2026-11-04 tragen es nie.
 
     log_type: ALLOW | WRONG_APPROACH | DESTRUCTIVE | UNSAFE_REDIRECT | UNKNOWN |
               COMPOUND_DESTRUCTIVE | COMPOUND_UNSAFE_REDIRECT | COMPOUND_UNKNOWN |
@@ -431,8 +438,9 @@ def _log_command(command: str, log_type: str, log_file: str | None = None) -> No
     try:
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        herkunft = f"[agent={agent}] " if agent else ""
         with open(log_file, 'a', encoding='utf-8') as f:
-            f.write(f"[{ts}] [{log_type}] {command}\n")
+            f.write(f"[{ts}] [{log_type}] {herkunft}{command}\n")
     except OSError:
         pass
 
@@ -1851,14 +1859,15 @@ def main() -> None:
 
     # Claude Code nennt bei Subagent-Aufrufen den Typ in `agent_type`, bei einem mit `name`
     # gestarteten allerdings den Namen – s. Grenze bei AUDITOREN.
-    nur_lesend = inp.get("agent_type") in AUDITOREN
+    agent = inp.get("agent_type")
+    nur_lesend = agent in AUDITOREN
     decision, reason, log_type = check_command(command, nur_lesend)
 
     # allow: in separates allowed-commands.log (Misuse-Pattern-Analyse, OBS-S085-3 D) –
     # denied-commands.log bleibt ausschließlich für Denies/Asks.
     # _build_allow_output ergänzt bei normalisiertem Repo-Pfad updatedInput + Hinweis.
     if decision == "allow":
-        _log_command(command, "ALLOW", _ALLOWED_LOG_FILE)
+        _log_command(command, "ALLOW", _ALLOWED_LOG_FILE, agent)
         hso = _build_allow_output(command)
         if log_type == "ONE_TIME_UNNEEDED":  # # --allow-once war unnötig → Agenten nudgen
             hso["additionalContext"] = _ONE_TIME_UNNEEDED_HINT
@@ -1870,7 +1879,7 @@ def main() -> None:
         # Design-Rückfragen (WRITE_ACCESS beim Tracker-Schreiben) im Log nicht von
         # echter Reibung (--allow-once, weil kein regulärer Weg existiert) zu trennen –
         # und genau diese Unterscheidung braucht man, um die Allow-Liste zu justieren.
-        _log_command(command, log_type)
+        _log_command(command, log_type, agent=agent)
         hso = {"hookEventName": "PreToolUse", "permissionDecision": "ask"}
         if reason:  # Deny-Grund/Gefahr des nackten Befehls am User-Prompt zeigen (statt kontextlos)
             hso["permissionDecisionReason"] = reason
@@ -1878,7 +1887,7 @@ def main() -> None:
         sys.exit(0)
 
     # deny: loggen + blockieren mit Hinweis
-    _log_command(command, log_type)
+    _log_command(command, log_type, agent=agent)
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",

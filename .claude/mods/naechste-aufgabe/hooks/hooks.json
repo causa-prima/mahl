@@ -1,0 +1,4 @@
+{
+  "description": "naechste-aufgabe hooks module",
+  "modules": ["./register.tsx"]
+}

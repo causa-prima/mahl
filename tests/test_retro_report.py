@@ -1,5 +1,9 @@
 """Tests für retro_report.py – CM-Matching (volles Tripel, severity-exakt) und Finding-Parser."""
+import sys
 import textwrap
+from pathlib import Path
+
+import pytest
 
 from prozesscode import retro_report as rr
 
@@ -213,6 +217,128 @@ def test_abgedeckter_kandidat_nennt_die_abdeckende_cm():
                  if "[MITTEL] [AGENT] [Doku]" in z)
     assert "CM-S105-1" in zeile
     assert "Postgres-Init-Config" in zeile
+
+
+def test_fenster_nimmt_nur_die_letzten_archiv_perioden():
+    """Das Fenster sind aktuelle Periode + PATTERN_WINDOW Archiv-Perioden – eine ältere zählt nicht mit."""
+    # Given – eine Periode mehr als das Fenster, jede mit einem Mitglied desselben Tripels
+    archiv = [[_periode(10 * (i + 1), f"LL-S0{i + 1}0-1 – periode {i + 1}")]
+              for i in range(rr.PATTERN_WINDOW + 1)]
+    aktuell = [_periode(90, "LL-S090-1 – aktuell")]
+    # When
+    ausgabe = rr.render_pattern(aktuell, archiv, [])
+    # Then
+    assert "periode 1" not in ausgabe
+    assert all(f"periode {i}" in ausgabe for i in range(2, rr.PATTERN_WINDOW + 2))
+    assert f"letzte {rr.PATTERN_WINDOW} Archiv-Perioden ({rr.PATTERN_WINDOW + 1} Sessions gesamt)" in ausgabe
+
+
+# --- Laden aus dem Archiv: Form des Bestands ------------------------------------
+_KOPF = (Path(__file__).resolve().parent.parent
+         / ".claude" / "skills" / "kaizen" / "references" / "lessons_learned_template.md")
+
+
+def _periodendatei(pfad, *sessions: int) -> None:
+    """Archiv-Datei wie im Bestand: echter Datei-Header (mit Beispielzeilen), dann Sessions."""
+    rumpf = "".join(
+        f"\n## Session {n} – 2026-10-0{i + 1}\n\n"
+        f"- **[HOCH] [AGENT] [Doku] LL-S{n}-1 – Eintrag {n}**\n  Was: w\n  Warum: x\n"
+        for i, n in enumerate(sessions))
+    pfad.write_text(_KOPF.read_text(encoding="utf-8") + rumpf, encoding="utf-8")
+
+
+def test_archiv_perioden_sind_nach_dateiname_sortiert_und_ohne_fremde_dateien(tmp_path):
+    # Given – wie docs/kaizen/archive/: Perioden, ein OBS-Archiv ohne Sessions, eine .legacy-Datei
+    _periodendatei(tmp_path / "session_133_to_139.md", 133, 139)
+    _periodendatei(tmp_path / "session_127_to_132.md", 127, 132)
+    (tmp_path / "observations_archive.md").write_text("# OBS-Archiv\n\n## OBS-S100-1 – x\n",
+                                                      encoding="utf-8")
+    _periodendatei(tmp_path / "session_001_to_046.legacy", 1)
+    # When
+    perioden = rr.load_archive_periods(str(tmp_path))
+    # Then – älteste zuerst; die Beispielzeilen des Headers zählen nicht als Session oder Finding
+    assert [[s.num for s in p] for p in perioden] == [[127, 132], [133, 139]]
+    assert [len(s.findings) for p in perioden for s in p] == [1, 1, 1, 1]
+
+
+def test_load_all_vereint_archiv_und_aktuelle_periode_aufsteigend(tmp_path):
+    # Given
+    archiv = tmp_path / "archive"
+    archiv.mkdir()
+    _periodendatei(archiv / "session_133_to_139.md", 133)
+    aktuell = tmp_path / "lessons_learned.md"
+    _periodendatei(aktuell, 141, 140)
+    # When
+    nummern = [s.num for s in rr.load_all(str(aktuell), str(archiv))]
+    # Then
+    assert nummern == [133, 140, 141]
+
+
+@pytest.mark.aufrufpfad("retro_report")
+def test_bericht_ueber_main_nennt_periodengrenze_und_kandidat(tmp_path, monkeypatch, capsys):
+    # Given – Bestand in echter Form: Archiv bis S139, aktuelle Periode S140/S141
+    archiv = tmp_path / "archive"
+    archiv.mkdir()
+    _periodendatei(archiv / "session_133_to_139.md", 133)
+    aktuell = tmp_path / "lessons_learned.md"
+    _periodendatei(aktuell, 140, 141)
+    cm = tmp_path / "countermeasures.md"
+    cm.write_text(_CM_SAMPLE, encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["retro_report", "--current", str(aktuell),
+                                      "--archive", str(archiv), "--cm", str(cm)])
+    # When
+    code = rr.main()
+    # Then
+    ausgabe = capsys.readouterr().out
+    assert code == 0
+    assert "Letzte Retro: nach Session 139  |  Neue Sessions ab: 140" in ausgabe
+    assert "[HOCH] [AGENT] [Doku] – 3×" in ausgabe
+    # die Liste aus KPR-wirksamkeitskriterium ist verdrahtet – das Sample trägt kein Kriterium
+    assert "CM-S070-3 (seit S70) – Multi-Kontext-Maßnahme" in ausgabe
+
+
+# --- AKTIV ohne Wirksamkeitskriterium (process.md, KPR-wirksamkeitskriterium) ----
+_CM_KRITERIUM = textwrap.dedent("""\
+    ## Aktive Maßnahmen
+
+    ### CM-S140-1 – Mit Kriterium
+    **Impact:** HOCH | **Kategorie:** PROZESS | **Kontext:** Gherkin | **Status:** AKTIV | **Seit:** S140
+    **Problem:** P
+    **Maßnahme:** M. **Wirksamkeit prüfen:** BEWÄHRT, wenn …
+
+    ### CM-S082-1 – Ohne Kriterium
+    **Impact:** MITTEL | **Kategorie:** PROZESS | **Kontext:** Gherkin | **Status:** AKTIV | **Seit:** S082
+    **Problem:** P
+    **Maßnahme:** M ohne Kriterium
+
+    ## Bewährte Maßnahmen
+
+    ### CM-S124-3 – Bewährt ohne Kriterium
+    **Impact:** MITTEL | **Kategorie:** TOOLING | **Kontext:** Doku | **Status:** BEWÄHRT | **Seit:** S124
+    **Problem:** P
+    **Maßnahme:** M
+    """)
+
+
+def test_nur_aktive_massnahmen_ohne_kriterium_werden_gelistet(tmp_path):
+    # Given
+    p = tmp_path / "countermeasures.md"
+    p.write_text(_CM_KRITERIUM, encoding="utf-8")
+    # When
+    ausgabe = rr.render_ohne_kriterium(rr.load_cm(str(p)))
+    # Then – BEWÄHRT braucht keins mehr, die mit Kriterium bleibt draußen
+    assert "CM-S082-1" in ausgabe
+    assert "Ohne Kriterium" in ausgabe
+    assert "CM-S140-1" not in ausgabe
+    assert "CM-S124-3" not in ausgabe
+
+
+def test_ohne_luecke_meldet_die_liste_das_ausdruecklich(tmp_path):
+    """Gegenprobe – ein leerer Abschnitt wäre nicht von „prüft nichts" zu unterscheiden."""
+    p = tmp_path / "countermeasures.md"
+    p.write_text(_CM_KRITERIUM.split("### CM-S082-1")[0], encoding="utf-8")
+    assert "Jede AKTIV-Maßnahme trägt ein Wirksamkeitskriterium" in rr.render_ohne_kriterium(
+        rr.load_cm(str(p)))
 
 
 def test_abgedeckter_kandidat_zeigt_nur_die_mitglieder_der_aktuellen_periode():

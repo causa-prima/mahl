@@ -51,14 +51,19 @@
     "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-bash-permission": {
-    "beurteilbar": 1171,
-    "getoetet": 1149,
+    "beurteilbar": 1186,
+    "getoetet": 1164,
     "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.hooks.check-code-quality-blocking": {
     "beurteilbar": 15,
     "getoetet": 15,
     "messung": "mutmut 3.8.0, Wertung 2"
+  },
+  "prozesscode.hooks.check-code-quality-nonblocking": {
+    "beurteilbar": 40,
+    "getoetet": 19,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.hooks.check-dangling-refs": {
     "beurteilbar": 103,
@@ -105,6 +110,11 @@
     "getoetet": 130,
     "messung": "mutmut 3.8.0, Wertung 2"
   },
+  "prozesscode.hooks.check-test-spec-ref": {
+    "beurteilbar": 175,
+    "getoetet": 170,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
   "prozesscode.hooks.checks.common": {
     "beurteilbar": 28,
     "getoetet": 0
@@ -122,8 +132,9 @@
     "getoetet": 22
   },
   "prozesscode.hooks.dispatch-edit-write": {
-    "beurteilbar": 21,
-    "getoetet": 5
+    "beurteilbar": 64,
+    "getoetet": 37,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.hooks.merke-rueckgaben": {
     "beurteilbar": 115,
@@ -140,6 +151,11 @@
     "getoetet": 457,
     "messung": "mutmut 3.8.0, Wertung 3"
   },
+  "prozesscode.obs-drain": {
+    "beurteilbar": 436,
+    "getoetet": 351,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
   "prozesscode.oq": {
     "beurteilbar": 436,
     "getoetet": 72,
@@ -154,9 +170,19 @@
     "getoetet": 417,
     "messung": "mutmut 3.8.0, Wertung 3"
   },
+  "prozesscode.retro_report": {
+    "beurteilbar": 1511,
+    "getoetet": 471,
+    "messung": "mutmut 3.8.0, Wertung 3"
+  },
   "prozesscode.rueckgaben": {
     "beurteilbar": 119,
     "getoetet": 108
+  },
+  "prozesscode.session-agenda": {
+    "beurteilbar": 1033,
+    "getoetet": 528,
+    "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.stryker-frontend": {
     "beurteilbar": 191,

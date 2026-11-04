@@ -250,7 +250,7 @@ git hash-object -w <test-datei-1> <test-datei-2> …    # gibt je Datei einen Bl
 ```
 Gegen diesen Anker prüft [Orchestrator-Check](#IMP-orchestrator-check), dass nach der Freigabe **nur Setup** (Mock-Handler, Testdaten), **keine Assertions** geändert wurden – auch wenn der Subagent die Tests selbst staged (der Blob hängt am Inhalt, nicht am Index). Wird der Batch **nicht** freigegeben: konkrete Korrektur-Anforderung, **kein** Blob. Setup-Änderungen nach Freigabe beschreibt der Subagent im Return; [Orchestrator-Check](#IMP-orchestrator-check) zeigt sie als Diff.
 
-- **Per-Assertion-Pflicht (inkl. Given/When):** Für jede neue oder geänderte Assertion und signifikante Given/When-Schritte: Welches Gherkin-Kriterium erzwingt sie? Falls keines vorhanden – drei Diagnosen, der Haupt-Thread entscheidet:
+- **Per-Assertion-Pflicht (inkl. Given/When):** Für jede neue oder geänderte Assertion und signifikante Given/When-Schritte: Welches Gherkin-Kriterium erzwingt sie? Ausgangspunkt ist der [Spec-Verweis](../../../docs/process/tdd-process.md#TDD-spec-verweis) über dem Test (`// Szenario:`, bei Grundrissen `// Beispiel:`): Der Hook hat nur geprüft, dass die Zeile existiert – hier wird geprüft, ob der Test zu **genau dieser Zeile** passt. Falls keines vorhanden – drei Diagnosen, der Haupt-Thread entscheidet:
   - a) **Gold-Plating** → Subagent löscht Assertion und ggf. zugehörigen Produktionscode.
   - b) **User-facing Verhalten ohne Szenario** → User-Freigabe für neues Szenario einholen, erst dann implementieren.
   - c) **Technische API/Architektur-Entscheidung** → Test braucht `// ADR-SXXX-N`-Kommentar der auf den Eintrag in `docs/history/adr.md` verweist; Haupt-Thread verifiziert via `python3 -m prozesscode.decisions refs`.
@@ -260,6 +260,18 @@ Gegen diesen Anker prüft [Orchestrator-Check](#IMP-orchestrator-check), dass na
 - **Full-State-Assertions:** Bei `BeEquivalentTo` / `toEqual` (C#) bzw. `toEqual` / `toMatchObject` (TypeScript): Sind alle Properties durch ein Gherkin-Kriterium gedeckt? Gibt es `Excluding(...)` oder Partial-Matches? → müssen mit Kommentar begründet sein; unchecked oder excluded Properties sind Gold-Plating-Signal für den Produktionscode.
 
 - **Given/When-Struktur:** Neue Tests sollen durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Fehlen diese → Finding melden (im Test-Review nicht blockierend; der Übergabelauf von `qa-check` bricht dann vor Stryker ab, die Lücke muss also bis zur Übergabe geschlossen sein).
+
+**Spec-Quelle für sichtbare UI-Details:** Wurde im Lauf ein UI-Entwurf freigegeben, gilt er
+**zusammen mit den Szenarien** als Spec. Eine Assertion, die der Entwurf trägt (ein Feld ist
+markiert, ein Hinweis steht an dieser Stelle), ist kein Gold-Plating, auch wenn kein Gherkin-Satz
+das Detail nennt. Grund: Eine Markierung, die der Entwurf zeigte, wurde als Gold-Plating
+gestrichen – der Mutant überlebte, der Test musste zurück.
+
+**Ergebnis je Punkt nennen:** Die Freigabe (oder Korrektur-Anforderung) nennt zu **jedem** der
+vier Punkte oben ein Ergebnis – auch „Given/When/Then: vorhanden" oder „keine Anpassungen an
+bestehenden Tests". Ein Punkt ohne genanntes Ergebnis gilt als nicht geprüft, und ohne alle vier
+gibt es keinen Freigabe-Anker. Grund: Ein Review, das sich auf zwei Punkte konzentriert, lässt die
+anderen still fallen; aufgefallen ist das bisher nur, wo ein mechanisches Gate nachfing.
 
 <a id="IMP-orchestrator-check"></a>
 ## Orchestrator-Check
@@ -313,6 +325,11 @@ dazu Stryker-Score sowie den **TEST-FREIGABE-AUDIT**.
    gemeldete Survivors → je Survivor nach [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung)
    (dort auch, welche Fälle der User entscheidet). Bleibt der Score nach einer Korrekturrunde unter
    100 % → STOP, User fragen; zusätzlich als `lessons_learned` dokumentieren.
+   **Timeouts zählen bei Stryker als erkannt** – ein Score von 100 % mit nennenswertem
+   Timeout-Anteil ist deshalb noch kein Beleg. Vor „verifiziert" jeden Timeout im geänderten Code
+   ansehen (`--verbose`): Kann der Mutant eine Schleife oder ein Warten ohne Ende erzeugen? Wenn
+   nicht, wie einen Survivor behandeln. Grund: 101 Timeouts verdeckten schon einmal 13 Survivors,
+   der Lauf war trotzdem als verifiziert gemeldet.
 
 4. **Unit-Test-Autorisierung:** Für jeden Treffer aus dem Check „Unit-Test-Muster": Wurde dieser Test explizit
    vom Orchestrator beauftragt, nach Freigabe durch den User (Survivor nicht via Schicht-Grenze beobachtbar)?
@@ -377,7 +394,14 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
      Prüfe zusätzlich, ob ein Eintrag **unbewusst nebenbei** behoben wurde (den fängt kein Anker) → ebenfalls schließen. Verhindert, dass `tech-debt.md` längst erledigte Posten weiterschleppt.
      Warum mechanisch statt als Lese-Aufforderung: Ein TD-Eintrag wurde nachweislich übersehen, während genau der von ihm beschriebene Bereich in einem Lauf verändert wurde. Unvergesslich ist das aber nicht dieser Schritt, sondern das `td-due`-Modul der `session-agenda.py` – es meldet einen Anker, dessen Szenario implementiert ist, auch dann, wenn dieser Schritt übersprungen wurde.
 
-   Lege dem User **jeden** Punkt vor – mit genug **Kontext** zum Entscheiden und einer **begründeten Empfehlung**. Der User entscheidet pro Punkt:
+   Lege dem User **jeden** Punkt vor – mit genug **Kontext** zum Entscheiden und einer **begründeten Empfehlung**.
+   **Schwelle der Empfehlung:** dieselbe wie bei eigener Erfassung. Ist ein Punkt verstanden und
+   schnell behebbar, oder potenziell folgenreich, lautet die Empfehlung „direkt umsetzen".
+   „Vermerken" nur mit einem Aufschubgrund, der auch **ohne** die Zustimmung des Users trüge
+   (Verstehen braucht viele Schritte). Grund: Stimmt der User einem „vermerken" zu, entsteht der
+   Aufschubgrund „User" von selbst – die Pflichtprüfung beim Erfassen würde so umgangen; von
+   sieben zum Vermerken empfohlenen Punkten waren einmal sechs danach in Minuten behoben.
+   Der User entscheidet pro Punkt:
    1. **Direkt umsetzen** → jetzt erledigen (ggf. eigener TDD-Zyklus / Schicht-Subagent).
    2. **Vermerken** → in das passende Dokument bzw. die passenden Dokumente eintragen. Welches Dokument wofür zuständig ist, steht in der `AGENTS.md`-Navigationstabelle (single source of truth – hier bewusst NICHT dupliziert, damit nichts driftet).
    3. **Ignorieren** → bewusst verwerfen.

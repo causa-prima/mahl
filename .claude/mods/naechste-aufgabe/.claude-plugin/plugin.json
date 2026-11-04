@@ -1,0 +1,6 @@
+{
+  "name": "naechste-aufgabe",
+  "version": "0.1.0",
+  "description": "Zeigt beim Session-Start über dem Prompt, was als Nächstes ansteht (aus der Session-Agenda)",
+  "types": "./types/index.d.ts"
+}

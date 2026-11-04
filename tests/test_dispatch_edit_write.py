@@ -48,6 +48,7 @@ def test_registry_covers_every_registered_check():
         "check-dependency-allowlist",
         "check-code-quality-blocking",
         "check-e2e-scenario-ref",
+        "check-test-spec-ref",
         "check-feature-plan",
         "check-ref-direction",
         "check-obs-capture",

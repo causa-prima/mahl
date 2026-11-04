@@ -154,6 +154,46 @@ def test_abgelehntes_und_rueckfragen_gehen_ins_deny_log(monkeypatch, capsys, log
     assert _zeilen(logs[1]) == []
 
 
+def test_abgelehnter_befehl_eines_subagenten_nennt_den_agenten_im_deny_log(
+        monkeypatch, capsys, logs):
+    # Given – Claude Code liefert bei Subagent-Aufrufen `agent_type` (bei benanntem Start: den Namen)
+    eingabe = _bash("npm --prefix Client run lint", agent_type="frontend-layer-implementer")
+    # When
+    _hook(monkeypatch, capsys, eingabe)
+    # Then – ohne den Agenten ist das Kriterium von CM-S056-1 („aus Subagent-Kontext") nicht prüfbar
+    assert _zeilen(logs[0]) == [
+        "[WRONG_APPROACH] [agent=frontend-layer-implementer] npm --prefix Client run lint"]
+
+
+def test_erlaubter_befehl_eines_subagenten_nennt_den_agenten_im_allow_log(
+        monkeypatch, capsys, logs):
+    # Given
+    eingabe = _bash("ls", agent_type="impl-frontend-run9")
+    # When
+    _hook(monkeypatch, capsys, eingabe)
+    # Then
+    assert _zeilen(logs[1]) == ["[ALLOW] [agent=impl-frontend-run9] ls"]
+    assert _zeilen(logs[0]) == []
+
+
+def test_rueckfrage_eines_subagenten_nennt_den_agenten_im_deny_log(monkeypatch, capsys, logs):
+    # Given – der dritte Pfad neben allow und deny: Rückfrage an den User
+    eingabe = _bash("rm -rf x # --allow-once", agent_type="backend-layer-implementer")
+    # When
+    _hook(monkeypatch, capsys, eingabe)
+    # Then
+    assert _zeilen(logs[0]) == ["[ONE_TIME] [agent=backend-layer-implementer] rm -rf x # --allow-once"]
+
+
+def test_befehl_des_haupt_threads_traegt_kein_agentenfeld(monkeypatch, capsys, logs):
+    # Given – ohne agent_type: Haupt-Thread; die Zeile bleibt im bisherigen Format
+    eingabe = _bash("npm --prefix Client run lint")
+    # When
+    _hook(monkeypatch, capsys, eingabe)
+    # Then
+    assert _zeilen(logs[0]) == ["[WRONG_APPROACH] npm --prefix Client run lint"]
+
+
 def test_protokollzeile_traegt_zeitstempel_typ_und_befehl(tmp_path):
     log = tmp_path / "unter" / "x.log"
     hook._log_command("echo ä", "UNKNOWN", str(log))

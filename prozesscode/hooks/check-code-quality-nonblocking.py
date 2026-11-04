@@ -3,11 +3,13 @@
 import sys
 
 from .checks.common import parse_input
-from .checks import constructors, guard_log, mengenangaben, ruff_lint, test_patterns
+from .checks import guard_log, mengenangaben, ruff_lint, test_patterns
 from .checks import tooling_tests
 from .checks.primitives import check_nonblocking as primitives_nonblocking
 
-CHECKS = [constructors.check, test_patterns.check, primitives_nonblocking,
+# Kein Check, der schon im blockierenden Dispatcher steht: Der läuft vor dem Schreiben, ein
+# Verstoß kommt hier also nie an (tests/test_dispatcher_listen.py).
+CHECKS = [test_patterns.check, primitives_nonblocking,
           tooling_tests.check, ruff_lint.check, mengenangaben.check]
 
 

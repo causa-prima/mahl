@@ -49,4 +49,5 @@ Auswahl. TD-Einträge mit
 
 ## Nächste Prioritäten
 
+- **qa-check: Stryker-Timeouts im geänderten Code nicht still als erkannt zählen** — `Fällig: Szenario:„Ungültiger Titel"` · Quelle: OBS-S143-1, CM-S116-1 (zweiter Fall in Folge – Mechanismus nach `process.md#KPR-rueckfall`) · Done: Der Übergabelauf weist Timeouts in geänderten Dateien gesondert aus und gibt ohne Klärung kein gültiges Verdikt; Bruchtest mit einem Timeout-Mutanten geführt.
 - **Visuelle Konsistenz-Guideline erweitern** — `Fällig: Phase:MVP` · Quelle: `docs/guidelines/coding-guideline-ux.md` → Visuelle Baseline · Done: Spacing/Hierarchie/Farbe sind dort als System geregelt und im Theme verankert.

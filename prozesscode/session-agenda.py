@@ -50,6 +50,7 @@ Totalausfall wäre von „nichts zu tun" ununterscheidbar.
 """
 import argparse
 import io
+import json
 import re
 import subprocess
 import sys
@@ -756,6 +757,33 @@ def rendere(bloecke: dict[str, Block], warnungen: list[str]) -> str:
     return "\n".join(teile)
 
 
+# --- Überblick für den User --------------------------------------------------
+# Die Injektion erreicht nur das Modell; der User sah beim Session-Start nichts, bis der Agent
+# loslegte (Wunsch des Users). Die Mod `naechste-aufgabe` zeigt diesen Überblick über dem
+# Prompt. Er wählt mit derselben Rangfolge wie `rendere` – zwei Auswahlen könnten auseinanderlaufen.
+_ZUSTAND_RE = {
+    "phase": re.compile(r"^\*\*Phase:\*\*\s*(.+?)\s*$", re.MULTILINE),
+    "story": re.compile(r"^\*\*Aktuelle Story:\*\*\s*(.+?)\s*$", re.MULTILINE),
+    # Nur das Etikett des Laufs – die Szenarienliste dahinter sprengte jede Zeile.
+    "lauf": re.compile(r"^\*\*Nächster Lauf:\*\*\s*(.+?\))(?::|\s*$)", re.MULTILINE),
+}
+_WEG_PRAEFIX = "→ "
+
+
+def ueberblick(bloecke: dict[str, Block]) -> dict:
+    """Aufgabe (Einzeiler + „→"-Ausweg), Phase/Story/Lauf, Namen der nachrangigen Punkte."""
+    aufgabe = waehle_aufgabe(bloecke)
+    block = bloecke.get(aufgabe) if aufgabe else None
+    weg = next((z.removeprefix(_WEG_PRAEFIX) for z in block.inhalt.splitlines()
+                if z.startswith(_WEG_PRAEFIX)), None) if block else None
+    zustand = bloecke["memory-state"].inhalt if "memory-state" in bloecke else ""
+    werte = {k: (m.group(1) if (m := r.search(zustand)) else None) for k, r in _ZUSTAND_RE.items()}
+    nachrangig = sorted(name for name, art, _ in MODULE
+                        if art in (AUFGABE, STUB) and name != aufgabe
+                        and (b := bloecke.get(name)) and b.stub)
+    return {"aufgabe": block.stub if block else None, "weg": weg, **werte, "nachrangig": nachrangig}
+
+
 # --- Injektions-Blöcke -------------------------------------------------------
 # EIN Block = EINE SessionStart-Registrierung in settings.json = EIN eigener 10.000er-Cap.
 # Der Cap gilt pro registriertem Command (belegt in #84021: zwei gemeinsam registrierte
@@ -848,7 +876,13 @@ def main() -> int:
                         help="einen Injektionsblock ausgeben (so ruft der SessionStart-Hook)")
     gruppe.add_argument("--only", metavar="ID", help="ein Modul in voller Tiefe ausgeben")
     gruppe.add_argument("--list", action="store_true", help="Modulnamen listen")
+    gruppe.add_argument("--ueberblick", action="store_true",
+                        help="Nächste Aufgabe, Story und Lauf als JSON (für die Mod naechste-aufgabe)")
     args = ap.parse_args()
+
+    if args.ueberblick:
+        print(json.dumps(ueberblick(sammle()[0]), ensure_ascii=False))
+        return 0
 
     if args.list:
         for name, art, _ in MODULE:

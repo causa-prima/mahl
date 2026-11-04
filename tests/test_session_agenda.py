@@ -87,6 +87,72 @@ def test_stub_only_modules_never_claim():
     assert agenda.waehle_aufgabe(blocks(**alle_stubs)) is None
 
 
+# --- Überblick für den User (Mod naechste-aufgabe) ----------------------------
+ZUSTAND = ("**Phase:** SKELETON 🔄\n**Aktuelle Story:** US-602 (Rezept-Erfassung)\n"
+           "**Nächster Lauf:** `run-9` „Anlegen·Validierung Titel und Anweisung\" (Full-Stack): "
+           "„Ungültiger Titel\", „Schritt-Anweisung mit mehr als 1000 Zeichen\"\n"
+           "  **Teil dieses Laufs** – Einträge …\n  - TD-S144-4 „…\"")
+
+
+def _mit_zustand(bloecke: dict) -> dict:
+    bloecke["memory-state"] = agenda.Block(stub="", inhalt=ZUSTAND)
+    return bloecke
+
+
+def test_ueberblick_nennt_aufgabe_mit_ausweg_story_und_lauf_ohne_szenarienliste():
+    # Given – Retro fällig, Inhalt in der echten Form von modul_retro
+    bloecke = _mit_zustand(blocks(retro=True))
+    bloecke["retro"] = agenda.Block(stub="Jenga-Score: -7 / 100 (fällig ≤ 0)", beansprucht=True,
+                                    inhalt="Retro – Jenga-Score: -7 / 100\n→ Session mit Skill `kaizen` beginnen.")
+    # When
+    ue = agenda.ueberblick(bloecke)
+    # Then
+    assert ue == {
+        "aufgabe": "Jenga-Score: -7 / 100 (fällig ≤ 0)",
+        "weg": "Session mit Skill `kaizen` beginnen.",
+        "phase": "SKELETON 🔄",
+        "story": "US-602 (Rezept-Erfassung)",
+        "lauf": "`run-9` „Anlegen·Validierung Titel und Anweisung\" (Full-Stack)",
+        "nachrangig": sorted(n for n, art, _ in agenda.MODULE
+                             if art in (agenda.AUFGABE, agenda.STUB) and n != "retro"),
+    }
+
+
+def test_ueberblick_ohne_aufgabe_und_ohne_weg():
+    # Given – nichts beansprucht; ein Aufgabeninhalt ohne „→"-Zeile
+    ue = agenda.ueberblick(_mit_zustand(blocks()))
+    # Then
+    assert (ue["aufgabe"], ue["weg"]) == (None, None)
+
+
+def test_ueberblick_laesst_ausgefallenen_zustand_leer_statt_zu_raten():
+    bloecke = blocks(retro=True)
+    bloecke["memory-state"] = agenda.Block(stub="", inhalt="(kein Zustand lesbar)")
+    ue = agenda.ueberblick(bloecke)
+    assert (ue["phase"], ue["story"], ue["lauf"]) == (None, None, None)
+
+
+def test_ueberblick_uebersteht_ein_ausgefallenes_zustandsmodul():
+    """`sammle` lässt ein Modul, das wirft, aus den Blöcken weg – der Überblick bleibt lesbar."""
+    bloecke = blocks(retro=True)
+    del bloecke["memory-state"]
+    ue = agenda.ueberblick(bloecke)
+    assert (ue["aufgabe"], ue["story"]) == ("retro-stub", None)
+
+
+@pytest.mark.aufrufpfad("session-agenda")
+def test_ueberblick_ueber_die_cli_ist_json(monkeypatch, capsys):
+    # Given – Module ersetzt, damit der Test nicht den ganzen Bestand prüft
+    bloecke = _mit_zustand(blocks(retro=True))
+    monkeypatch.setattr(agenda, "sammle", lambda: (bloecke, []))
+    monkeypatch.setattr(sys, "argv", ["session-agenda", "--ueberblick"])
+    # When
+    code = agenda.main()
+    # Then
+    assert code == 0
+    assert json.loads(capsys.readouterr().out)["aufgabe"] == "retro-stub"
+
+
 # --- Rendern -----------------------------------------------------------------
 def test_the_task_is_rendered_in_full():
     out = agenda.rendere(blocks(retro=True), [])

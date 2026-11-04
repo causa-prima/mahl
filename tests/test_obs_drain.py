@@ -97,22 +97,34 @@ def test_cluster_is_transitive():
     assert len(wert) == 1 and len(ids(wert)) == 3
 
 
-def test_cluster_warns_about_a_dead_edge(capsys):
+TOTE_KANTE = (make("OBS-S090-1", zusammen="OBS-S088-1"),
+              make("OBS-S088-1", status="UMGESETZT (S089)"))
+
+
+def test_tote_kante_wird_benannt():
     # Ein Ziel, das nicht mehr drainbar ist, verwirft cluster() – korrekt, aber es darf nicht
     # STUMM geschehen: Die Kante entsteht zwangsläufig, sobald der Partner archiviert wird,
     # und ein lautloser Ausfall wäre von "nie eine Kante gehabt" nicht unterscheidbar.
-    od.cluster(od.compute(parse(
-        make("OBS-S090-1", zusammen="OBS-S088-1"),
-        make("OBS-S088-1", status="UMGESETZT (S089)"),
-    ))[3])
-    err = capsys.readouterr().err
-    assert "OBS-S090-1" in err and "OBS-S088-1" in err
+    meldungen = od.tote_kanten(od.compute(parse(*TOTE_KANTE))[3])
+    assert len(meldungen) == 1
+    assert "OBS-S090-1" in meldungen[0] and "OBS-S088-1" in meldungen[0]
 
 
-def test_cluster_is_silent_without_dead_edges(capsys):
-    od.cluster(od.compute(parse(make("OBS-S090-1", zusammen="OBS-S090-2"),
-                                make("OBS-S090-2", zusammen="OBS-S090-1")))[3])
+def test_ohne_tote_kante_keine_meldung():
+    assert od.tote_kanten(od.compute(parse(make("OBS-S090-1", zusammen="OBS-S090-2"),
+                                           make("OBS-S090-2", zusammen="OBS-S090-1")))[3]) == []
+
+
+def test_cluster_selbst_bleibt_still(capsys):
+    """cluster() läuft je Agenda mehrfach (Satz, Wert-Einheiten, Trigger) – gemeldet wird
+    einmal, aus render()."""
+    od.cluster(od.compute(parse(*TOTE_KANTE))[3])
     assert capsys.readouterr().err == ""
+
+
+def test_render_meldet_jede_tote_kante_genau_einmal(capsys):
+    od.render(od.Path("."), parse(*TOTE_KANTE))
+    assert capsys.readouterr().err.count("OBS-S090-1 nennt OBS-S088-1") == 1
 
 
 def test_cluster_ignores_links_to_non_drainable():

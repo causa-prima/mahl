@@ -451,6 +451,39 @@ Nachweis: Die Commit-Nachrichten der Sessions lesen (`git log --grep='^Session-E
 
 > **Harte Daten bei nicht-selbstberichteten Verhaltensweisen:** Adressiert die Maßnahme ein Agenten-Verhalten, das der Agent **nicht selbst** als Problem in lessons_learned einträgt (z.B. Bash-Permission-Verstöße, abgelehnte Befehle), ist „keine neuen lessons_learned dazu" **kein** Beleg für BEWÄHRT (der Agent sieht es nicht als Problem). Stattdessen die primäre Datenquelle auswerten (z.B. `.claude/tmp/denied-commands.log`). Fehlt diese, ist **keine verlässliche/belastbare Aussage** möglich – dann den User fragen, ob ihm das Verhalten aufgefallen ist und wie mit dem Punkt weiter verfahren werden soll.
 
+<a id="KPR-wirksamkeitskriterium"></a>
+### Ohne Wirksamkeitskriterium kein AKTIV
+
+Jede AKTIV-Maßnahme trägt ein Feld `**Wirksamkeit prüfen:**`, das drei Dinge nennt: **bei welcher
+Art von Arbeit** die Situation auftritt (so wird „3× aufgetreten" zählbar), **welche Quelle** es
+zeigt (Commit-Nachricht, Log, Script-Lauf) und **was als Rückfall zählt**. Eine Maßnahme, für die
+sich das nicht formulieren lässt, ist entweder strukturell erledigt (→ BEWÄHRT, wenn ein Mechanismus
+das Problem unmöglich macht und sein Bruchtest belegt ist) oder ohne Gegenstand (→ OBSOLET).
+
+Grund: Als diese Regel entstand, trugen 17 von 32 AKTIV-Maßnahmen kein solches Feld (14, wenn
+man frei formulierte Sätze wie „BEWÄHRT erst, wenn …" mitzählt), überwiegend die ältesten.
+Jede Retro schrieb „keine neue Evidenz, unverändert" – nicht, weil sie nicht wirkten, sondern weil
+sich gar nicht feststellen ließ, ob sie es tun. AKTIV unterschied dadurch eine wirksame, eine
+unwirksame und eine nie geprüfte Maßnahme nicht mehr. `retro_report.py` listet AKTIV-Einträge ohne
+das Feld, damit eine Lücke nicht erst bei der nächsten Sichtung auffällt.
+
+<a id="KPR-rueckfall"></a>
+### Rückfall: verschärfen oder begründet beibehalten
+
+Ein Rückfall ist ein Beleg, dass die Maßnahme in ihrer jetzigen Form nicht trägt. Die Reaktion
+darauf ist eine von zwei, und die Retro nennt sie ausdrücklich:
+
+- **Verschärfen** – die Maßnahme ändert sich (neuer Skill-Schritt, Mechanismus, Pflichtfeld), mit
+  Bezug auf den Rückfall. Ab dem zweiten Rückfall in Folge auf dieselbe Form ist ein Mechanismus
+  zu prüfen, nicht eine weitere Regel.
+- **Begründet beibehalten** – die Retro hält fest, *warum* die Form trotz Rückfall bleibt (etwa:
+  Dauerrisiko eines Urteils, das sich nicht mechanisieren lässt, und der Rückfall wurde von einem
+  nachgelagerten Gate gefangen).
+
+Ein Nachtrag, der den Rückfall nur verzeichnet und mit „Bleibt AKTIV" endet, ist keine dieser
+beiden. Grund: So wuchsen Maßnahmen wie CM-S064-1 auf rund zehn Rückfall-Nachträge an, ohne dass
+sich an ihrer Form etwas änderte.
+
 <a id="KPR-obsolet"></a>
 ## Obsolet-Kriterien für Countermeasures
 

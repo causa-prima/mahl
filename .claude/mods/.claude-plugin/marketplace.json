@@ -6,6 +6,11 @@
       "name": "tracker-diff",
       "source": "./tracker-diff",
       "description": "Zeigt bei Tracker-Schreibbefehlen die Änderung im Pane, solange die Freigabe aussteht"
+    },
+    {
+      "name": "naechste-aufgabe",
+      "source": "./naechste-aufgabe",
+      "description": "Zeigt beim Session-Start über dem Prompt, was als Nächstes ansteht (aus der Session-Agenda)"
     }
   ]
 }

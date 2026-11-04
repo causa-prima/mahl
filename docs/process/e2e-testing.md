@@ -170,7 +170,7 @@ Alle drei Ebenen tragen denselben Identifier – das ermöglicht direktes Grep (
 
 `ScenarioType` = Gherkin-Tag-Suffix des Primär-Szenarios (das den Test im inneren ATDD-Loop erzwungen hat): `HappyPath`, `Error`, `EdgeCase`. Bei mehreren Szenarien, die dasselbe Verhalten exercisen: Primär-Szenario taggen, kein Mehrfach-Tagging.
 
-**Pflicht:** Kein Backend-Integrationstest ohne erkennbare Szenario-Zuordnung (US-Tag + ScenarioType).
+**Pflicht:** Kein Backend-Integrationstest ohne erkennbare Szenario-Zuordnung (US-Tag + ScenarioType). Neue Komponenten- und Integrationstests nennen zusätzlich ihre Spec per `// Szenario:` (bei Grundrissen `// Beispiel:`), erzwungen vor dem Schreiben – [Spec-Verweis über jedem neuen Test](tdd-process.md#TDD-spec-verweis).
 
 > **Ausnahme (ADR-S106-3):** Querschnitts-**Protokoll-/Infra-Tests** (ETag/If-Match-Mechanik, POST-liefert-ETag) und **Stryker-blinde Invarianten-Tests** (Reihenfolge-/Prioritäts-Pins, die kein Mutant fängt) haben per Definition kein treibendes Szenario → **kein US-Tag**. Sie MÜSSEN per Kommentar als solche ausgewiesen sein (welche ADR / welche Invariante). Alles andere ohne Szenario bleibt eine Outside-In-Verletzung.
 
