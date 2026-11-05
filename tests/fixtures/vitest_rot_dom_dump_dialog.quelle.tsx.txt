@@ -1,0 +1,27 @@
+// Quelle der Fixture vitest_rot_dom_dump_dialog.txt – kein Test dieses Repos. Zum Neuerzeugen als
+// Client/src/pages/zz-dom-dialog.test.tsx anlegen (Ablauf: docs/process/dev-workflow.md,
+// Abschnitt DEV-abhaengigkeiten-durchsicht) und danach wieder löschen.
+import { describe, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
+import { AppRoutes } from '../App'
+
+describe('zz', () => {
+  it('zz_dom_dialog', async () => {
+    // Given
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/recipes/new']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    fireEvent.change(screen.getByLabelText(/^Titel/), { target: { value: 'Pfannkuchen' } })
+    // When
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
+    await screen.findByRole('alertdialog')
+    // Then
+    await screen.findByRole('button', { name: 'gibt es nicht' }, { timeout: 50 })
+  })
+})

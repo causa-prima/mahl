@@ -1,0 +1,23 @@
+// Quelle der Fixture vitest_rot_dom_dump.txt – kein Test dieses Repos. Zum Neuerzeugen als
+// Client/src/pages/zz-dom-dump.test.tsx anlegen (Ablauf: docs/process/dev-workflow.md,
+// Abschnitt DEV-abhaengigkeiten-durchsicht) und danach wieder löschen.
+import { describe, it } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
+import { AppRoutes } from '../App'
+
+describe('zz', () => {
+  it.each([1, 2, 3, 4, 5])('zz_dom_dump_%s', async () => {
+    // Given
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/recipes/new']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    // When / Then
+    await screen.findByRole('button', { name: 'gibt es nicht' }, { timeout: 50 })
+  })
+})

@@ -68,6 +68,55 @@ def test_bash_hook_sperrt_auditoren_auf_lesen(tmp_path, monkeypatch, capsys, age
 
 
 
+def _bash_hook_mit_cwd(tmp_path, monkeypatch, capsys, befehl: str, cwd: str | None) -> dict:
+    hook = import_module("prozesscode.hooks.check-bash-permission")
+    monkeypatch.setattr(hook, "_LOG_FILE", str(tmp_path / "denied.log"))
+    monkeypatch.setattr(hook, "_ALLOWED_LOG_FILE", str(tmp_path / "allowed.log"))
+    daten = {"tool_name": "Bash", "tool_input": {"command": befehl}}
+    if cwd is not None:
+        daten["cwd"] = cwd
+    _mit_stdin(monkeypatch, hook, daten)
+    return json.loads(capsys.readouterr().out)["hookSpecificOutput"]
+
+
+def _repo_root() -> str:
+    return import_module("prozesscode.hooks.check-bash-permission")._NORMALIZE_ROOT
+
+
+def test_bash_hook_kuerzt_absoluten_repo_pfad_nur_vom_repo_root_aus(tmp_path, monkeypatch, capsys):
+    """Gegenprobe zu den beiden folgenden: Im Repo-Root wird relativ ausgeführt."""
+    root = _repo_root()
+    entscheidung = _bash_hook_mit_cwd(tmp_path, monkeypatch, capsys,
+                                      f"python3 {root}/tests/test-bash-permission.py", root)
+    assert entscheidung["permissionDecision"] == "allow"
+    assert entscheidung["updatedInput"] == {"command": "python3 tests/test-bash-permission.py"}
+
+
+@pytest.mark.parametrize("cwd_relativ", ["Client", None])
+def test_bash_hook_fuehrt_absoluten_pfad_ausserhalb_des_repo_roots_unveraendert_aus(
+        tmp_path, monkeypatch, capsys, cwd_relativ):
+    """Ein `cd` bleibt in der Hauptsession bestehen (gemessen 2.1.318). Der relative Pfad stimmt
+    dann nicht mehr, der absolute schon: aus `cd <root>/Client/src` würde in `Client/` ein
+    scheiterndes `cd Client/src`. Ohne `cwd` im Input ist der Standort unbekannt – der absolute
+    Pfad ist dann der einzige, der sicher stimmt."""
+    root = _repo_root()
+    cwd = f"{root}/{cwd_relativ}" if cwd_relativ else None
+    entscheidung = _bash_hook_mit_cwd(tmp_path, monkeypatch, capsys,
+                                      f"python3 {root}/tests/test-bash-permission.py", cwd)
+    assert entscheidung["permissionDecision"] == "allow"
+    assert "updatedInput" not in entscheidung
+    assert "additionalContext" not in entscheidung
+
+
+def test_bash_hook_entfernt_filter_auch_ausserhalb_des_repo_roots(tmp_path, monkeypatch, capsys):
+    """Der Filter-Strip hängt nicht am Standort – nur die Pfad-Kürzung tut es."""
+    root = _repo_root()
+    befehl = f"python3 -m prozesscode.vitest-run --file {root}/Client/src/a.test.tsx | tail -5"
+    entscheidung = _bash_hook_mit_cwd(tmp_path, monkeypatch, capsys, befehl, f"{root}/Client")
+    assert entscheidung["updatedInput"] == {
+        "command": f"python3 -m prozesscode.vitest-run --file {root}/Client/src/a.test.tsx"}
+
+
 @pytest.mark.parametrize("befehl", [
     "touch notiz.md",        # Allow-Muster, für Auditoren gesperrt
     "rm -rf notiz",          # destruktiv: der Grund nennt ein Beispiel mit Marker

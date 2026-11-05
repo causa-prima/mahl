@@ -3,10 +3,11 @@
 > vitest run src/pages/zz-dom-dialog.test.tsx
 
 
- RUN  v4.1.11 /home/kieritz/repos/mahl/Client
+ RUN  v5.1.0 /home/kieritz/repos/mahl/Client
 
- ❯ src/pages/zz-dom-dialog.test.tsx (1 test | 1 failed) 792ms
-     × zz_dom_dialog 769ms
+ ❯ src/pages/zz-dom-dialog.test.tsx (1 test | 1 failed) 185ms
+   ❯ zz (1)
+     × zz_dom_dialog 181ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -77,13 +78,12 @@ Ignored nodes: comments, script, style
           [36m</div>[39m
         [36m</div>[39m
         [36m<div[39m
-          [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth MuiTextField-root css-16bevx5-MuiFormControl-root-MuiTextField-root"[39m
+          [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth css-16mfwdg-MuiFormControl-root"[39m
         [36m>[39m
           [36m<label[39m
             [33mclass[39m=[32m"MuiFormLabel-root MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined MuiFormLabel-colorPrimary Mui-required MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined css-19qnlrw-MuiFormLabel-root-MuiInputLabel-root"[39m
             [33mdata-shrink[39m=[32m"false"[39m
             [33mfor[39m=[32m"_r_1_"[39m
-            [33mid[39m=[32m"_r_1_-label"[39m
           [36m>[39m
             [0mZutaten[0m
             [36m<span[39m
@@ -95,10 +95,10 @@ Ignored nodes: comments, script, style
             [36m</span>[39m
           [36m</label>[39m
           [36m<div[39m
-            [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth MuiInputBase-formControl MuiInputBase-multiline css-zsp0bh-MuiInputBase-root-MuiOutlinedInput-root"[39m
+            [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-formControl MuiInputBase-multiline css-xrmkj5-MuiInputBase-root-MuiOutlinedInput-root"[39m
           [36m>[39m
             [36m<textarea[39m
-              [33maria-describedby[39m=[32m"_r_1_-helper-text"[39m
+              [33maria-describedby[39m=[32m"_r_2_"[39m
               [33maria-invalid[39m=[32m"false"[39m
               [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
               [33mid[39m=[32m"_r_1_"[39m
@@ -129,7 +129,7 @@ Ignored nodes: comments, script, style
           [36m</div>[39m
           [36m<p[39m
             [33mclass[39m=[32m"MuiFormHelperText-root MuiFormHelperText-sizeMedium MuiFormHelperText-contained Mui-required css-er619e-MuiFormHelperText-root"[39m
-            [33mid[39m=[32m"_r_1_-helper-text"[39m
+            [33mid[39m=[32m"_r_2_"[39m
           [36m>[39m
             [0mEine Zutat je Zeile: Menge, Einheit, Zutat – z. B. „250 g Mehl“ oder „Salz“.[0m
           [36m</p>[39m
@@ -142,7 +142,8 @@ Ignored nodes: comments, script, style
             [33mclass[39m=[32m"MuiFormControl-root css-1iw3t7y-MuiFormControl-root"[39m
           [36m>[39m
             [36m<legend[39m
-      ...
+              [33mclass[39m=[32m"MuiFormLabel-root MuiFormLabel-colorPrimary Mui-required css-nwsdb5-MuiFormLabel-root"[39m
+          ...
 
 Ignored nodes: comments, script, style
 [36m<body[39m
@@ -208,13 +209,12 @@ Ignored nodes: comments, script, style
           [36m</div>[39m
         [36m</div>[39m
         [36m<div[39m
-          [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth MuiTextField-root css-16bevx5-MuiFormControl-root-MuiTextField-root"[39m
+          [33mclass[39m=[32m"MuiFormControl-root MuiFormControl-marginNormal MuiFormControl-fullWidth css-16mfwdg-MuiFormControl-root"[39m
         [36m>[39m
           [36m<label[39m
             [33mclass[39m=[32m"MuiFormLabel-root MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined MuiFormLabel-colorPrimary Mui-required MuiInputLabel-root MuiInputLabel-formControl MuiInputLabel-animated MuiInputLabel-outlined css-19qnlrw-MuiFormLabel-root-MuiInputLabel-root"[39m
             [33mdata-shrink[39m=[32m"false"[39m
             [33mfor[39m=[32m"_r_1_"[39m
-            [33mid[39m=[32m"_r_1_-label"[39m
           [36m>[39m
             [0mZutaten[0m
             [36m<span[39m
@@ -226,10 +226,10 @@ Ignored nodes: comments, script, style
             [36m</span>[39m
           [36m</label>[39m
           [36m<div[39m
-            [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth MuiInputBase-formControl MuiInputBase-multiline css-zsp0bh-MuiInputBase-root-MuiOutlinedInput-root"[39m
+            [33mclass[39m=[32m"MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-formControl MuiInputBase-multiline css-xrmkj5-MuiInputBase-root-MuiOutlinedInput-root"[39m
           [36m>[39m
             [36m<textarea[39m
-              [33maria-describedby[39m=[32m"_r_1_-helper-text"[39m
+              [33maria-describedby[39m=[32m"_r_2_"[39m
               [33maria-invalid[39m=[32m"false"[39m
               [33mclass[39m=[32m"MuiInputBase-input MuiOutlinedInput-input css-w4nesw-MuiInputBase-input-MuiOutlinedInput-input"[39m
               [33mid[39m=[32m"_r_1_"[39m
@@ -260,7 +260,7 @@ Ignored nodes: comments, script, style
           [36m</div>[39m
           [36m<p[39m
             [33mclass[39m=[32m"MuiFormHelperText-root MuiFormHelperText-sizeMedium MuiFormHelperText-contained Mui-required css-er619e-MuiFormHelperText-root"[39m
-            [33mid[39m=[32m"_r_1_-helper-text"[39m
+            [33mid[39m=[32m"_r_2_"[39m
           [36m>[39m
             [0mEine Zutat je Zeile: Menge, Einheit, Zutat – z. B. „250 g Mehl“ oder „Salz“.[0m
           [36m</p>[39m
@@ -273,7 +273,8 @@ Ignored nodes: comments, script, style
             [33mclass[39m=[32m"MuiFormControl-root css-1iw3t7y-MuiFormControl-root"[39m
           [36m>[39m
             [36m<legend[39m
-      ...
+              [33mclass[39m=[32m"MuiFormLabel-root MuiFormLabel-colorPrimary Mui-required css-nwsdb5-MuiFormLabel-root"[39m
+          ...
  ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
  ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
  ❯ src/pages/zz-dom-dialog.test.tsx:23:18
@@ -289,5 +290,5 @@ Ignored nodes: comments, script, style
 
  Test Files  1 failed (1)
       Tests  1 failed (1)
-   Start at  10:15:11
-   Duration  10.38s (transform 5.23s, setup 791ms, import 7.38s, tests 792ms, environment 1.11s)
+   Start at  09:07:07
+   Duration  1.52s (transform 35%, import 30%, environment 14%, tests 13%, setup 8%, worker 1%)

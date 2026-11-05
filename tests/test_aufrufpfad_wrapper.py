@@ -49,13 +49,50 @@ def test_vitest_roter_lauf_nennt_die_zahl_und_bleibt_rot(monkeypatch, capsys):
     assert "✗ 2 Test(s) rot" in capsys.readouterr().out
 
 
+# Echte Ausgabe von vitest 5.1 bei einem Filter ohne Treffer, ohne npm-Kopf.
+_VITEST_FILTER_OHNE_TREFFER = """\
+
+ RUN  v5.1.0 /home/kieritz/repos/mahl/Client
+
+
+ Test Files  4 skipped (4)
+      Tests  87 skipped (87)
+   Start at  09:30:40
+   Duration  1.25s (environment 33%, transform 29%, import 24%, setup 13%, worker 1%)
+"""
+
+
 def test_vitest_filter_ohne_treffer_ist_ein_fehler_statt_gruen(monkeypatch, capsys):
     """Fail-closed-Guard: vitest -t überspringt Nicht-Treffer und läuft sonst grün durch.
-    Bis S133 hielt kein Test diese Stelle (mutmut: `exit_code or 1` überlebte)."""
+    Bis S133 hielt kein Test diese Stelle (mutmut: `exit_code or 1` überlebte). Auch das
+    Verdikt darf dann kein „✓" zeigen – sonst widerspricht es der Warnung darüber."""
     modul = import_module("prozesscode.vitest-run")
-    _fake_npm(monkeypatch, modul, "      Tests  7 skipped (7)\n", 0)
+    _fake_npm(monkeypatch, modul, _VITEST_FILTER_OHNE_TREFFER, 0)
     assert cli_aufruf(monkeypatch, modul, "--filter", "Tippfehler") == 1
-    assert "0 Tests gematcht" in capsys.readouterr().err
+    ausgabe = capsys.readouterr()
+    assert "0 Tests gematcht" in ausgabe.err
+    assert "✓" not in ausgabe.out
+    assert ausgabe.out.startswith("✗")
+
+
+def test_vitest_filter_ohne_treffer_zeigt_mit_verbose_die_rohausgabe(monkeypatch, capsys):
+    """Hält `verbose` und `output` am Verdikt ohne Treffer – beide überlebten sonst mutmut."""
+    modul = import_module("prozesscode.vitest-run")
+    _fake_npm(monkeypatch, modul, _VITEST_FILTER_OHNE_TREFFER, 0)
+    assert cli_aufruf(monkeypatch, modul, "--filter", "Tippfehler", "--verbose") == 1
+    ausgabe = capsys.readouterr().out
+    assert "Tests  87 skipped (87)" in ausgabe
+    assert "✗" not in ausgabe
+
+
+def test_vitest_abbruch_ohne_zusammenfassung_meldet_rot_statt_abzustuerzen(monkeypatch, capsys):
+    """Ohne `Tests`-Zeile (etwa wenn vitest schon beim Laden scheitert) gibt es keine Zähler;
+    der Wrapper meldet dann rot statt mit einem Traceback abzustürzen (`if counts or True`).
+    Handgeschriebene Ausgabe: Es kommt nur auf das Fehlen der Zusammenfassung an."""
+    modul = import_module("prozesscode.vitest-run")
+    _fake_npm(monkeypatch, modul, "Error: failed to load config from vite.config.ts\n", 1)
+    assert cli_aufruf(monkeypatch, modul, "--filter", "sucht") == 1
+    assert "✗ ? Test(s) rot" in capsys.readouterr().out
 
 
 def test_vitest_absturz_ohne_rote_tests_meldet_kein_gruen(monkeypatch, capsys):

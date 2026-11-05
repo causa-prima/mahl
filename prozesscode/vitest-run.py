@@ -11,7 +11,8 @@ Verwendung:
 
 --filter und --file sind jeweils unabhängig optional und beliebig kombinierbar.
 
---filter matcht als Substring gegen den voll-qualifizierten Testnamen (inkl. describe-Block);
+--filter matcht als Substring gegen den voll-qualifizierten Testnamen (describe-Block und Test
+mit ' > ' verbunden, seit vitest 5);
 nicht-passende Tests werden übersprungen. Matcht das Pattern nichts, würde vitest grün durchlaufen –
 der Wrapper meldet das als FEHLER (Exit 1) und weist ausgeführte/übersprungene Tests aus.
 """
@@ -44,6 +45,8 @@ DOM_DUMP_CUT = "  … {count} Zeilen DOM gekürzt – vollständig: --verbose"
 _TESTS_SUMMARY = re.compile(r"^\s*Tests\s+(?P<body>.+?)\s+\((?P<total>\d+)\)\s*$", re.MULTILINE)
 _FILES_SUMMARY = re.compile(r"^\s*Test Files\s+.+?\((?P<total>\d+)\)\s*$", re.MULTILINE)
 _DURATION = re.compile(r"^\s*Duration\s+(?P<value>[\d.]+m?s)", re.MULTILINE)
+
+FILTER_OHNE_TREFFER = "✗ --filter traf keinen Test – Pattern prüfen (s. [filter]-Zeilen)"
 
 
 def _parse_counts(output: str) -> dict[str, int] | None:
@@ -126,7 +129,11 @@ def main() -> None:
     counts = _parse_counts(output)
     files = _FILES_SUMMARY.search(output)
     duration = _DURATION.search(output)
-    if exit_code == 0 and counts and counts["failed"] == 0:
+    matched = counts["passed"] + counts["failed"] if counts else None
+    ohne_treffer = bool(args.filter_name) and matched == 0
+    if ohne_treffer:
+        emit(verbose=args.verbose, output=output, verdict=FILTER_OHNE_TREFFER)
+    elif exit_code == 0 and counts and counts["failed"] == 0:
         skipped = f", {counts['skipped']} übersprungen" if counts["skipped"] else ""
         scope = f", {files.group('total')} Dateien" if files else ""
         took = f", {duration.group('value')}" if duration else ""
@@ -146,17 +153,16 @@ def main() -> None:
     if args.filter_name:
         print(
             f"\n[filter] --filter '{args.filter_name}' matcht als Substring gegen den "
-            f"voll-qualifizierten Testnamen (inkl. describe-Block).",
+            f"voll-qualifizierten Testnamen (describe-Block und Test mit ' > ' verbunden).",
             file=sys.stderr,
         )
         if counts is not None:
-            matched = counts["passed"] + counts["failed"]
             print(
                 f"[filter] {matched} ausgeführt, {counts['skipped']} übersprungen "
                 f"(von {counts['total']}).",
                 file=sys.stderr,
             )
-            if matched == 0:
+            if ohne_treffer:
                 print(
                     "[filter] ⚠️  0 Tests gematcht – alle übersprungen. Tippfehler im Pattern "
                     "oder Test existiert (noch) nicht? → als FEHLER gewertet.",

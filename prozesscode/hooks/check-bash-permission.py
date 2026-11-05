@@ -1803,13 +1803,22 @@ def _print_allow_list() -> None:
     print(allow_list_text())
 
 
-def _build_allow_output(command: str) -> dict:
+def _im_repo_root(cwd: str | None) -> bool:
+    """Steht die Shell im Repo-Root? Ohne `cwd` im Hook-Input ist das unbekannt → nein."""
+    return cwd is not None and os.path.normpath(cwd) == _NORMALIZE_ROOT
+
+
+def _build_allow_output(command: str, cwd: str | None = _NORMALIZE_ROOT) -> dict:
     """Baut den allow-`hookSpecificOutput`.
 
     Enthält die Normalisierung einen geänderten Befehl (außer bei # --allow-once und bei
     einem Befehl mit Heredoc), werden `updatedInput` (umgeschriebener Befehl) und
     `additionalContext` (Hinweis) ergänzt, damit Claude Code den relativen Befehl ausführt und der Agent lernt,
     künftig relative Pfade zu nutzen.
+
+    Die Pfad-Kürzung gilt nur, wenn `cwd` der Repo-Root ist: Ein `cd` bleibt in der
+    Hauptsession bestehen, und von woanders aus zeigt der relative Pfad ins Leere, während der
+    absolute stimmt. Geprüft wird ohnehin die normalisierte Fassung (check_command).
     """
     hso: dict = {
         "hookEventName": "PreToolUse",
@@ -1823,7 +1832,7 @@ def _build_allow_output(command: str) -> dict:
     if ONE_TIME_MARKER in command or strip_heredoc_bodies(command) != command:
         return hso
 
-    rewritten, changed = normalize_repo_paths(command)
+    rewritten, changed = normalize_repo_paths(command) if _im_repo_root(cwd) else (command, False)
     hint = _NORMALIZE_HINT if changed else ""
 
     # Filter-Strip auf dem bereits normalisierten Befehl: so greift das Wrapper-Muster auch
@@ -1868,7 +1877,7 @@ def main() -> None:
     # _build_allow_output ergänzt bei normalisiertem Repo-Pfad updatedInput + Hinweis.
     if decision == "allow":
         _log_command(command, "ALLOW", _ALLOWED_LOG_FILE, agent)
-        hso = _build_allow_output(command)
+        hso = _build_allow_output(command, inp.get("cwd"))
         if log_type == "ONE_TIME_UNNEEDED":  # # --allow-once war unnötig → Agenten nudgen
             hso["additionalContext"] = _ONE_TIME_UNNEEDED_HINT
         print(json.dumps({"hookSpecificOutput": hso}))

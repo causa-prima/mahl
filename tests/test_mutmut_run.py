@@ -94,13 +94,14 @@ def test_ein_voller_mutantenname_laeuft_ohne_platzhalter(tmp_path, monkeypatch, 
 
 
 # --- Abgebrochener Lauf --------------------------------------------------------
-# Schluss einer echten Ausgabe von mutmut 3.8: Sammelfehler beim Testimport.
+# Schluss einer echten Ausgabe von mutmut 3.8.1 unter pytest 9.2: Sammelfehler beim Testimport.
 _ABBRUCH_SAMMELN = """\
 E   ModuleNotFoundError: No module named 'gibt_es_nicht'
 =========================== short test summary info ============================
 ERROR tests/test_zz_gegenprobe_kaputt.py
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
-1595 tests collected, 1 error in 0.54s
+2030 tests collected, 1 error in 0.62s
 Failed to collect list of tests
 """
 

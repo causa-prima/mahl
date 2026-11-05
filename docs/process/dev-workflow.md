@@ -325,6 +325,18 @@ erscheinen im Folgemonat wieder; ihre Gründe stehen im Rumpf des letzten Durchs
    seinen Tests durch die der neuen Version ersetzen. Sie altert mit der Version: Unter mutmut
    3.8 änderte sich ein Meldungstext, `mutmut-run` meldete falsch grün, und die Tests gegen die
    alte gespeicherte Ausgabe blieben grün (S139).
+   Rote Ausgaben gibt es nur von absichtlich roten Wegwerf-Tests; sie werden nie committet
+   (ein vergessener bleibt rot und fällt in jedem Lauf auf):
+   - **Vitest** (`tests/fixtures/vitest_rot_dom_dump*.txt`): die Quelle
+     `tests/fixtures/<name>.quelle.tsx.txt` als `Client/src/pages/zz-….test.tsx` anlegen – per
+     Bash-Heredoc mit `# --allow-once`, weil der Spec-Verweis-Hook Testdateien ohne Szenario
+     abweist –, `python3 -m prozesscode.vitest-run --file <datei> --verbose` ins Scratchpad
+     umleiten, Datei löschen. Die Fixture `vitest_rot_dom_dump.txt` trägt nur den ersten
+     FAIL-Block und die Zusammenfassung, `…_dialog.txt` die ganze Ausgabe.
+   - **mutmut-Abbruch** (`_ABBRUCH_SAMMELN` in `tests/test_mutmut_run.py`):
+     `tests/test_zz_gegenprobe_kaputt.py` mit `import gibt_es_nicht` anlegen,
+     `python3 -m prozesscode.mutmut-run --mutate <kleines Modul> --ratchet --verbose`, Datei
+     löschen. Die Kopie im Mutantenbaum bleibt liegen – der nächste Lauf braucht `--frisch`.
 4. Den abschließenden Commit mit `Dependency-Check: JJJJ-MM` im Trailer-Absatz
    versehen – auch wenn nichts aktualisiert wurde. Fehlt die Zeile, legt die Agenda die
    Durchsicht erneut vor. Der Rumpf nennt die abgelehnten Updates mit Grund – Schritt 1 des

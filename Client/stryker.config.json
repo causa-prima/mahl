@@ -5,9 +5,7 @@
     "configFile": "vite.config.ts"
   },
   "checkers": ["typescript"],
-  "typescript": {
-    "tsconfigFile": "tsconfig.app.json"
-  },
+  "tsconfigFile": "tsconfig.app.json",
   "mutate": [
     "src/**/*.ts",
     "src/**/*.tsx",

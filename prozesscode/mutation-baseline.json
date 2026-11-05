@@ -51,9 +51,9 @@
     "messung": "mutmut 3.8.0, Wertung 2"
   },
   "prozesscode.hooks.check-bash-permission": {
-    "beurteilbar": 1186,
-    "getoetet": 1164,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 1197,
+    "getoetet": 1175,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-code-quality-blocking": {
     "beurteilbar": 15,
@@ -98,7 +98,7 @@
   "prozesscode.hooks.check-ordinale": {
     "beurteilbar": 39,
     "getoetet": 39,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-ref-direction": {
     "beurteilbar": 49,
@@ -215,8 +215,8 @@
     "messung": "mutmut 3.8.0, Wertung 3"
   },
   "prozesscode.vitest-run": {
-    "beurteilbar": 243,
-    "getoetet": 178,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 254,
+    "getoetet": 189,
+    "messung": "mutmut 3.8.1, Wertung 3"
   }
 }
