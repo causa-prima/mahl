@@ -83,6 +83,13 @@ Wähle immer die einfachste Lösung, die den Anforderungen genügt.
   (Wert brechen → Test rot) – ein Mutation-Score von 100 % belegt ihn nicht. Ausgenommen sind Literale, die wörtlich die
   Spec wiedergeben: Testdaten und Erwartungswerte in Tests (spiegeln das Szenario) und
   Meldungstexte, die ein Szenario festlegt.
+- **Unsichtbare Zeichen als Codepunkt-Ausdruck:** Leerraum außer dem ASCII-Leerzeichen, unsichtbare
+  und kombinierende Zeichen stehen im Quelltext als Codepunkt (`String.fromCodePoint(0x00A0)`,
+  `char.ConvertFromUtf32(0x00A0)` oder ein `int`-Codepunkt), nie als Literal und nie als `\u`-Escape.
+  Ein Literal ist unsichtbar und übersteht kein Editor-Normalisieren; einen `\u`-Escape löst die
+  Werkzeugkette des Agenten schon beim Schreiben der Datei zum Literal auf (an Write und Edit
+  nachgewiesen, Ursache nicht geprüft). Sichtbare
+  Buchstaben wie ein vorkomponiertes „ä" bleiben Literal: Geht es verloren, wird der Test laut rot.
 
 ---
 
@@ -114,7 +121,7 @@ Diese Prinzipien gelten für den gesamten Produktionscode. Die sprachspezifische
 | Prinzip | C# | TypeScript |
 |---|---|---|
 | Immutability | `readonly record struct`, `init;` | `readonly`, `as const`, Spreading |
-| Keine Primitive Obsession | Value Objects (`NonEmptyTrimmedString` etc.) | Branded Types |
+| Keine Primitive Obsession | Value Objects (`NonEmptyNormalizedString` etc.) | Branded Types |
 | Make Illegal States Unrepresentable | Private Konstruktoren + `Create()` Factory | Discriminated Unions |
 | Railway-Oriented Programming | `OneOf<T, TError>` + `.Match()` | `neverthrow` `Result<T, E>` + `.match()` |
 | Pure Functions | Extension Methods, keine Seiteneffekte | `src/domain/`, `src/services/` |

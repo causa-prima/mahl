@@ -9,7 +9,7 @@ Warum die Unterscheidung (Drei-Ebenen-Regel,
 `docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession`): In
 `Server/Domain/` liegen zwei Ebenen mit gegensätzlicher Regel.
 
-  - **Constraint-/Domänentyp** (`NonEmptyTrimmedString`, `IngredientName`): `Create()` nimmt
+  - **Constraint-/Domänentyp** (`NonEmptyNormalizedString`, `IngredientName`): `Create()` nimmt
     Primitives – das *ist* die Validierungsebene. Ein Blocken wäre hier schlicht falsch.
   - **Entity** (`Ingredient`): `Create()` nimmt ausschließlich Domänentypen. Ein rohes
     `Guid`/`string` ist die Verletzung, die dieser Check fangen soll.
@@ -17,7 +17,7 @@ Warum die Unterscheidung (Drei-Ebenen-Regel,
 Mechanisch getrennt an der `Value`-Property: Ein Typ, der seinen gekapselten Wert über
 `public <primitive> Value` freigibt, ist die Kapselung selbst und darf Primitives annehmen.
 Fehlt sie, ist der Typ ein Aggregat aus anderen Typen – dort ist ein Primitive ein Leck.
-Der Bestand belegt die Trennschärfe: `NonEmptyTrimmedString` hat `Value`, `Ingredient` nicht.
+Der Bestand belegt die Trennschärfe: `NonEmptyNormalizedString` hat `Value`, `Ingredient` nicht.
 """
 import re
 from pathlib import Path

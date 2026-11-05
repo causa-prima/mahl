@@ -420,13 +420,103 @@ def test_score_gate_von_stryker_macht_den_lauf_ungueltig_auch_bei_100_prozent(tm
     # // When
     code = cli_aufruf(monkeypatch, qa, "--layer", "backend")
     out, err = capsys.readouterr()
-    # // Then: alle Checks und der Hash, dazu Warnung und Exit 1
+    # // Then: alle Checks und der Hash, dazu Warnung und Exit 1 – die Meldung nennt den Exit-Code als
+    #    Grund, nicht einen Score unter 100 %, den der Report nicht zeigt
     assert out == ("[qa-check] Starte Stryker (backend) …\n" + _stryker_block("BACKEND", "100.0%", _BACKEND_REPORT)
                    + _BACKEND_CHECKS_LEER
                    + f"\n=== VERIFIKATIONS-HASH ===\n{_erwarteter_hash('backend', _BACKEND_REPORT)}\n")
-    assert err == ("[qa-check] ⚠️  Stryker-Score-Gate fehlgeschlagen (Score < 100 %, Exit 1) – frischer Report "
-                   "vorhanden, führe restliche Checks dennoch aus.\n" + _achtung("100.0%"))
+    assert err == ("[qa-check] ⚠️  Stryker endete mit Exit 1 – frischer Report vorhanden, führe restliche "
+                   "Checks dennoch aus.\n"
+                   "\n⚠️  ACHTUNG: Stryker endete mit Exit 1, der Report zeigt aber 100.0% – der Score ist nicht "
+                   "der Grund. Dieser Lauf ist KEINE gültige Übergabe: Ursache im Stryker-Output oben suchen, "
+                   "beheben und qa-check erneut laufen lassen.\n")
     assert code == 1
+
+
+def test_score_gate_von_stryker_unter_100_prozent_nennt_den_score(tmp_path, monkeypatch, capsys):
+    # // Given Stryker endet mit Exit 1, der frische Report zeigt einen Survivor
+    _Umgebung(tmp_path, monkeypatch, stryker_rc=1, lauf_report=_report(survived_zu=("Killed",))).commit(
+        {"Server/app.cs": "x\n"})
+    # // When
+    code = cli_aufruf(monkeypatch, qa, "--layer", "backend")
+    # // Then: nur die Score-Warnung – der Exit-Code ist durch den Score erklärt
+    assert capsys.readouterr().err == (
+        "[qa-check] ⚠️  Stryker endete mit Exit 1 – frischer Report vorhanden, führe restliche Checks "
+        "dennoch aus.\n" + _achtung("90.9%"))
+    assert code == 1
+
+
+# --- Timeouts in geänderten Dateien ---
+
+_GEMESSENE_DATEI = "Client/src/hooks/useDeleteIngredientWithUndo.ts"   # die Datei des Fixture-Reports
+
+
+def _timeout_achtung(anzahl: int) -> str:
+    return (f"\n⚠️  ACHTUNG: {anzahl} Timeout(s) in geänderten Dateien – Stryker zählt sie als erkannt, belegt "
+            "ist das nicht: Eine zu knappe Zeitgrenze hat schon Survivors verdeckt. Dieser Lauf ist KEINE gültige "
+            "Übergabe, bis jeder geklärt ist. Kann der Mutant eine Schleife oder ein Warten ohne Ende erzeugen, "
+            "ist er erkannt; sonst ist er wie ein Survivor zu behandeln (docs/process/tdd-process.md"
+            "#TDD-survivor-entscheidung). Jeden einzeln mit Einordnung im Return aufführen.\n")
+
+
+@pytest.mark.aufrufpfad("qa-check")
+def test_timeout_in_geaenderter_datei_wird_ausgewiesen_und_macht_den_lauf_ungueltig(tmp_path, monkeypatch, capsys):
+    # // Given ein Frontend-Lauf mit 100 %, davon ein Timeout in der geänderten Datei
+    report = _report(survived_zu=("Timeout", "Killed"))
+    u = _Umgebung(tmp_path, monkeypatch, lauf_report=report)
+    u.commit({_GEMESSENE_DATEI: "a\n"})
+    u.dateien({_GEMESSENE_DATEI: "b\n"})
+    # // When qa-check läuft
+    code = cli_aufruf(monkeypatch, qa, "--layer", "frontend")
+    out, err = capsys.readouterr()
+    # // Then: der Timeout steht gesondert direkt unter dem Stryker-Block, der Hash wird ausgegeben,
+    #    und der Lauf ist ungültig
+    erwartet_hash = _erwarteter_hash("frontend", _FRONTEND_REPORT, lint_code=0)
+    assert out.startswith(
+        "[qa-check] tsc -b (Typecheck) …\n[qa-check] Starte Stryker (frontend) …\n"
+        + _stryker_block("FRONTEND", "100.0%", _FRONTEND_REPORT)
+        + f"\n{qa.TIMEOUT_TITEL.format(anzahl=1)}\n{_gruppe(report, 'Timeout')}\n"
+        + "\n=== CHECK 1: GEÄNDERTE TEST-DATEIEN ===\n")
+    assert out.endswith(f"\n=== VERIFIKATIONS-HASH ===\n{erwartet_hash}\n")
+    assert (err, code) == (_timeout_achtung(1), 1)
+    # // When der Orchestrator den Hash verifiziert
+    code = cli_aufruf(monkeypatch, qa, "--layer", "frontend", "--verify", erwartet_hash)
+    # // Then: Hash stimmt, das Timeout-Gate gilt auch hier
+    out, err = capsys.readouterr()
+    assert "✅ Hash verifiziert" in out
+    assert (err, code) == (_timeout_achtung(1), 1)
+
+
+def test_timeout_im_backend_wird_ueber_den_absoluten_report_pfad_erkannt(tmp_path, monkeypatch, capsys):
+    # // Given ein Backend-Report mit einem Timeout in der geänderten Datei Server/Domain/Foo.cs. Die
+    #    Pfadform ist nachgebaut: Stryker.NET schreibt absolute Pfade als Schlüssel (an einem echten
+    #    Report gesichtet: /home/…/repos/mahl/Server/Domain/Ingredient.cs); die einzige Datei des echten
+    #    Frontend-Reports bekommt diesen Schlüssel.
+    report = _report(survived_zu=("Timeout", "Killed"))
+    [einzige_datei] = report["files"].values()
+    report["files"] = {f"{tmp_path}/Server/Domain/Foo.cs": einzige_datei}
+    u = _Umgebung(tmp_path, monkeypatch, lauf_report=report)
+    u.commit({"Server/Domain/Foo.cs": "a\n"})
+    u.dateien({"Server/Domain/Foo.cs": "b\n"})
+    # // When
+    code = cli_aufruf(monkeypatch, qa, "--layer", "backend")
+    out, err = capsys.readouterr()
+    # // Then: der Timeout steht unter dem Repo-Pfad der Datei, der Lauf ist ungültig
+    assert f"\n{qa.TIMEOUT_TITEL.format(anzahl=1)}\n  Server/Domain/Foo.cs (1)\n" in out
+    assert (err, code) == (_timeout_achtung(1), 1)
+
+
+def test_timeout_in_unveraenderter_datei_bleibt_aussen_vor(tmp_path, monkeypatch, capsys):
+    # // Given ein Timeout in der Datei des Reports, geändert ist aber eine andere Datei
+    u = _Umgebung(tmp_path, monkeypatch, lauf_report=_report(survived_zu=("Timeout", "Killed")))
+    u.commit({_GEMESSENE_DATEI: "a\n", "Client/src/app.ts": "a\n"})
+    u.dateien({"Client/src/app.ts": "b\n"})
+    # // When
+    code = cli_aufruf(monkeypatch, qa, "--layer", "frontend")
+    out, err = capsys.readouterr()
+    # // Then: kein Timeout-Block, gültige Übergabe
+    assert "Timeout" not in out
+    assert (err, code) == ("", 0)
 
 
 def test_erfolgreicher_lauf_mit_nur_altem_report_ist_harter_fehler(tmp_path, monkeypatch, capsys):

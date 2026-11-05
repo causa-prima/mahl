@@ -57,11 +57,29 @@ export type NewRecipe = {
   readonly steps: readonly RecipeStep[]
 }
 
+// ADR-S135-3: Leere Schrittfelder werden nicht mitgeschickt (Normalisierung wie der Server, ADR-S135-1).
+const isSentStep = (instruction: string): boolean => !isBlank(instruction)
+
+// ADR-S135-3: Meldungen zu Schritten keyen auf den Index in der gesendeten Liste. Das Ergebnis nennt je
+// gesendetem Schritt den Index seines Formularfeldes.
+export const sentStepFieldIndexes = (steps: readonly string[]): readonly number[] =>
+  steps.flatMap((instruction, fieldIndex) => (isSentStep(instruction) ? [fieldIndex] : []))
+
+// ADR-S144-1: Ordnet die Meldung je gesendetem Schritt (Index in der gesendeten Liste) dem Formularfeld zu, aus
+// dem der Schritt stammt. Das Ergebnis enthält nur Felder mit Meldung, in Formularreihenfolge.
+export const messagesByFieldIndex = (
+  sentFieldIndexes: readonly number[],
+  messageAtSentIndex: (sentIndex: number) => string | undefined,
+): ReadonlyMap<number, string> =>
+  new Map(sentFieldIndexes.flatMap((fieldIndex, sentIndex) => {
+    const message = messageAtSentIndex(sentIndex)
+    return message === undefined ? [] : [[fieldIndex, message] as const]
+  }))
+
 export const toNewRecipe = ({ title, ingredients, steps }: RecipeFormValues): NewRecipe => ({
   title: asRecipeTitle(title),
   ingredients: asIngredientsText(ingredients),
-  // ADR-S135-3: Leere Schrittfelder werden nicht mitgeschickt (Normalisierung wie der Server, ADR-S135-1).
   steps: steps
-    .filter((instruction) => !isBlank(instruction))
+    .filter(isSentStep)
     .map((instruction) => ({ instruction: asStepInstruction(instruction) })),
 })

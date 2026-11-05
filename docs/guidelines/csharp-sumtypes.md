@@ -37,16 +37,16 @@ internal abstract record RecipeSource
 {
     private RecipeSource() { }  // verhindert externe Subtypen (stärkste Kapselung)
 
-    private sealed record UrlCase(NonEmptyTrimmedString Url) : RecipeSource;
+    private sealed record UrlCase(NonEmptyNormalizedString Url) : RecipeSource;
     private sealed record NoSourceCase : RecipeSource;
 
-    public static RecipeSource FromUrl(NonEmptyTrimmedString url) => new UrlCase(url);
+    public static RecipeSource FromUrl(NonEmptyNormalizedString url) => new UrlCase(url);
     public static RecipeSource None { get; } = new NoSourceCase();
 
     // Match<T> ist public für Wert-Träger-Sum-Types – der Mapping-Layer benötigt es.
     // Bei operationalen Sum-Types mit reichhaltigen Domänenoperationen: Match internal,
     // Consumer nutzen nur benannte Methoden.
-    public T Match<T>(Func<NonEmptyTrimmedString, T> onUrl, Func<T> onNone) => this switch
+    public T Match<T>(Func<NonEmptyNormalizedString, T> onUrl, Func<T> onNone) => this switch
     {
         UrlCase u    => onUrl(u.Url),
         NoSourceCase => onNone(),
@@ -54,7 +54,7 @@ internal abstract record RecipeSource
     };
 
     // explicit: Konvertierung nach string? verliert die Fallunterscheidung – nicht reversibel.
-    // implicit: nur wenn verlustfrei und reversibel (z.B. NonEmptyTrimmedString → string).
+    // implicit: nur wenn verlustfrei und reversibel (z.B. NonEmptyNormalizedString → string).
     public static explicit operator string?(RecipeSource source) =>
         source.Match(onUrl: url => (string?)url, onNone: () => null);
 }

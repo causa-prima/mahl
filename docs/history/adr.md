@@ -231,7 +231,7 @@ Pflichtfeld-**Markierung** (Affordance, keine Logik) ist davon unberührt und pe
 **Tags:** scope:cross-cutting, arch:validation, arch:domain-type
 
 **Entscheidung:** Jedes Textfeld (Zutat: Name, Basiseinheit; Rezept: Titel, Schritt-Anweisung, jede Zutatenzeile; jedes künftige) wird vor Prüfung und Speicherung normalisiert:
-1. Jede Folge von Leerraum – jedes Unicode-Leerzeichen einschließlich geschützter Leerzeichen, Tabulator, Zeilenumbruch – wird zu einem Leerzeichen.
+1. Jede Folge von Leerraum – jedes Unicode-Leerzeichen einschließlich geschützter Leerzeichen, Tabulator, Zeilenumbruch – wird zu einem Leerzeichen. Leerraum ist genau die Unicode-Eigenschaft `White_Space` (wie `\p{White_Space}` im Client), **nicht** .NET `char.IsWhiteSpace` – das zählt zusätzlich U+001C–U+001F, und Client und Server entschieden dann verschieden.
 2. Unsichtbare Zeichen werden entfernt: Leerzeichen ohne Breite (U+200B), weiches Trennzeichen (U+00AD), Wortverbinder (U+2060), Byte-Order-Mark (U+FEFF).
 3. Der Text wird in die Unicode-Normalform NFC gebracht und getrimmt.
 
@@ -964,10 +964,10 @@ Konvertierungsoperatoren: `implicit` wenn verlustfrei und reversibel, `explicit`
 **Entscheidung:** Eine parametrisierte Einschränkung (`max. N Zeichen` und Analoges) wird **Teil des Typs**, nicht eine Prüfung in der `Create()` des Domänentyps. Der Domänentyp trägt sie als Typ seines privaten Feldes:
 
 ```csharp
-private readonly Bounded<NonEmptyTrimmedString, Max30> _value;
+private readonly Bounded<NonEmptyNormalizedString, Max30> _value;
 ```
 
-Bausteine in `Server/Types/`: `IStringConstraint<TSelf>` (CRTP mit `static abstract Create`), `IMaxLength` als Marker-Interface, die Träger `NonEmptyTrimmedString` und `Bounded<TInner, TMax>` und ein Marker-Typ **je Grenzwert** (`Max30`, `Max20`). Die Träger melden `StringViolation` (`Empty`, `TooLong`); der Domänentyp faltet das in seine Fehlerfälle auf (ADR-S051-2 bleibt unberührt; die Fälle gehören zum Konzept, nicht zum Feld – ADR-S120-1). Der Entwurf sah ursprünglich eine feinere Träger-Trennung vor, siehe nächster Absatz.
+Bausteine in `Server/Types/`: `IStringConstraint<TSelf>` (CRTP mit `static abstract Create`), `IMaxLength` als Marker-Interface, die Träger `NonEmptyNormalizedString` (bis S146 `NonEmptyTrimmedString`, umbenannt mit der Normalisierung nach ADR-S135-1) und `Bounded<TInner, TMax>` und ein Marker-Typ **je Grenzwert** (`Max30`, `Max20`). Die Träger melden `StringViolation` (`Empty`, `TooLong`); der Domänentyp faltet das in seine Fehlerfälle auf (ADR-S051-2 bleibt unberührt; die Fälle gehören zum Konzept, nicht zum Feld – ADR-S120-1). Der Entwurf sah ursprünglich eine feinere Träger-Trennung vor, siehe nächster Absatz.
 
 **Warum `NonEmptyTrimmedString` statt `NonEmpty<TrimmedString>` (S120):** Ursprünglich waren zwei orthogonale Träger vorgesehen – `TrimmedString` normalisiert, `NonEmpty<TInner>` prädiziert. Beim Umbau zeigte sich, dass diese Trennung einen **nicht killbaren Mutanten** erzeugt: Ein rein normalisierender Träger muss im JSON-`null`-Fall einen *Wert* liefern (`""`), und `""` aus `null` ist von `""` aus `""` nicht unterscheidbar – jeder Mutant, der die Null-Behandlung entfernt, wirkt sich nur bei `{"feld": null}` aus, wofür kein Szenario existiert. Im ungetrennten Träger fällt die Leer-Entscheidung dagegen im selben Schritt und kann einen **Fehler** zurückgeben, dessen Entfernung über HTTP sofort beobachtbar ist. Eine Suppression schied aus: Der Zweig ist erreichbar, das ist eine Testlücke und keine Unerreichbarkeit (ADR-S041-9 greift nicht). Die verworfene Trennung als Code – das Feld hieß damals `Bounded<NonEmpty<TrimmedString>, Max30>`:
 

@@ -115,6 +115,7 @@ file static class RecipeMappings
     private static FieldError DescribeTitle(RecipeTitleError error) => error switch
     {
         RecipeTitleError.Empty => new FieldError("title", "Titel darf nicht leer sein."),
+        RecipeTitleError.TooLong => new FieldError("title", "Titel darf maximal 100 Zeichen lang sein."),
         _ => SumType.Unreachable<FieldError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
     };
 
@@ -122,6 +123,7 @@ file static class RecipeMappings
     private static FieldError DescribeStep(StepInstructionError error, int index) => error switch
     {
         StepInstructionError.Empty => new FieldError($"steps[{index}].instruction", "Schritt-Anweisung darf nicht leer sein."),
+        StepInstructionError.TooLong => new FieldError($"steps[{index}].instruction", "Schritt-Anweisung darf maximal 1000 Zeichen lang sein."),
         _ => SumType.Unreachable<FieldError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
     };
 

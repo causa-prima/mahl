@@ -13,17 +13,12 @@ namespace mahl.Server.Tests;
 public class RecipesEndpointsTests(PostgresContainerFixture postgres) : EndpointsTestsBase(postgres)
 {
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
-    // ADR-S027-1: ein Schritt trägt nur die Anweisung – die Nummer ist die Listenposition.
-    private sealed record StepPayload(string Instruction);
-    // ADR-S135-2: die Zutaten gehen als roher Text des Zutatenfelds hinaus, eine Zutat je Zeile.
-    private sealed record CreateRecipeRequest(string Title, string Ingredients, IReadOnlyList<StepPayload> Steps);
     // ADR-S020-1: Quantity und Unit sind beide null (ohne Menge) oder beide gesetzt.
     private sealed record RecipeIngredientResponse(string Name, decimal? Quantity, string? Unit);
     private sealed record RecipeResponse(
         Guid Id, string Title, IReadOnlyList<RecipeIngredientResponse> Ingredients, IReadOnlyList<StepPayload> Steps);
     private sealed record RecipeSummaryResponse(Guid Id, string Title);
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
-    private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
 #pragma warning restore CA1812
 
     // Helper: legt Zutaten an und leert danach den Tracker – folgende Full-State-Abfragen lesen so die
@@ -63,12 +58,12 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         var milch = AnIngredient("Milch", "ml");
         var salz = AnIngredient("Salz", "g");
         await SeedIngredientsAsync(mehl, milch, salz);
-        var request = new CreateRecipeRequest(
-            Title: title, Ingredients: "Salz\n250 g Mehl\n500 ml Milch",
-            Steps: [new StepPayload(stir), new StepPayload(fry)]);
+        var request = ACreateRecipe(
+            title: title, ingredients: "Salz\n250 g Mehl\n500 ml Milch",
+            steps: [AStepPayload(stir), AStepPayload(fry)]);
 
         // When: das Rezept wird gespeichert
-        var response = await Client.PostAsJsonAsync("/api/recipes", request, TestContext.Current.CancellationToken);
+        var response = await PostRecipeAsync(request);
 
         // Then: 201 Created (ADR-S068-1)
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -124,11 +119,11 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
     {
         // Given: die Zutat "Salz" existiert
         await SeedIngredientsAsync(AnIngredient("Salz", "g"));
-        var request = new CreateRecipeRequest(
-            Title: "Salzwasser", Ingredients: "Salz", Steps: [new StepPayload("Salz in Wasser lösen.")]);
+        var request = ACreateRecipe(
+            title: "Salzwasser", ingredients: "Salz", steps: [AStepPayload("Salz in Wasser lösen.")]);
 
         // When: das Rezept wird gespeichert
-        var response = await Client.PostAsJsonAsync("/api/recipes", request, TestContext.Current.CancellationToken);
+        var response = await PostRecipeAsync(request);
 
         // Then: 201 Created mit dem xmin der Rezeptzeile als ETag (ADR-S058-3: hex-kodiert, quoted)
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -372,31 +367,14 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         body.Id.Should().Be(recipeId);
     }
 
+    // Nur dieses Testfile postet Rezepte; PostRawJsonAsync (Raw-JSON-Theorien) liegt ebenfalls hier.
+    private async Task<HttpResponseMessage> PostRecipeAsync(CreateRecipeRequest request) =>
+        await Client.PostAsJsonAsync("/api/recipes", request, TestContext.Current.CancellationToken);
+
     private async Task<HttpResponseMessage> PostRawJsonAsync(string json)
     {
         using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
         return await Client.PostAsync("/api/recipes", content, TestContext.Current.CancellationToken);
-    }
-
-    // Gemeinsamer Then-Teil der Ablehnungen: 422 (ADR-S090-1) mit genau diesen Feldmeldungen (Full State)
-    // und nichts gespeichert.
-    private async Task AssertRejectedWithAsync(HttpResponseMessage response, Dictionary<string, string[]> expectedErrors)
-    {
-        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
-        body.Should().NotBeNull();
-        body.Errors.Should().BeEquivalentTo(expectedErrors);
-        await AssertNothingPersistedAsync();
-    }
-
-    private static Dictionary<string, string[]> SingleError(string key, string message) =>
-        new(StringComparer.Ordinal) { [key] = [message] };
-
-    private async Task AssertNothingPersistedAsync()
-    {
-        (await Db.Recipes.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no recipe row may be written");
-        (await Db.RecipeIngredients.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no recipe ingredient row may be written");
-        (await Db.Steps.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no step row may be written");
     }
 
     // Szenario: Leeres Formular speichern zeigt alle Pflichtmeldungen gleichzeitig
@@ -405,13 +383,13 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
     public async Task US602_Error_CreateRecipe_EmptyForm_Returns422WithAllRequiredMessages()
     {
         // Given: ein leeres Formular
-        var request = new CreateRecipeRequest(Title: "", Ingredients: "", Steps: []);
+        var request = ACreateRecipe(title: "", ingredients: "", steps: []);
 
         // When: das Rezept wird gespeichert
-        var response = await Client.PostAsJsonAsync("/api/recipes", request, TestContext.Current.CancellationToken);
+        var response = await PostRecipeAsync(request);
 
         // Then: alle drei Pflichtmeldungen gleichzeitig (ADR-S135-3, ADR-S051-2), nichts gespeichert
-        await AssertRejectedWithAsync(response, new Dictionary<string, string[]>(StringComparer.Ordinal)
+        await AssertRejectedWithAsync(response, new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
             ["title"] = ["Titel darf nicht leer sein."],
             ["ingredients"] = ["Rezept muss mindestens eine Zutat haben."],
@@ -447,15 +425,115 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
     {
         // Given: die Zutat "Mehl" mit Einheit "g" existiert
         await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
-        var request = new CreateRecipeRequest(
-            Title: "Pfannkuchen", Ingredients: "250 g Mehl",
-            Steps: [new StepPayload("Teig rühren."), new StepPayload("   ")]);
+        var request = ACreateRecipe(steps: [AStepPayload("Teig rühren."), AStepPayload("   ")]);
 
         // When: das Rezept wird gespeichert
-        var response = await Client.PostAsJsonAsync("/api/recipes", request, TestContext.Current.CancellationToken);
+        var response = await PostRecipeAsync(request);
 
         // Then: die Meldung am zweiten Schritt, nichts gespeichert
         await AssertRejectedWithAsync(response, SingleError("steps[1].instruction", "Schritt-Anweisung darf nicht leer sein."));
+    }
+
+    // Szenario: Ungültiger Titel
+    // Beispiel: alle
+    [Theory]
+    [MemberData(nameof(InvalidTitles))]
+    public async Task US602_Error_CreateRecipe_InvalidTitle_Returns422AtTitle(string title, string expectedMessage)
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+        var request = ACreateRecipe(title: title);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: die Meldung am Titel, nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError("title", expectedMessage));
+    }
+
+    // Anzeigename benennt den Fall lesbar im roten Lauf; Parameter: Titel, Meldung.
+    public static IEnumerable<TheoryDataRow<string, string>> InvalidTitles =>
+    [
+        new("   ", "Titel darf nicht leer sein.") { TestDisplayName = "Titel aus Leerzeichen" },
+        new(new string('a', 101), "Titel darf maximal 100 Zeichen lang sein.") { TestDisplayName = "Titel mit 101 Zeichen" },
+    ];
+
+    // Szenario: Schritt-Anweisung mit mehr als 1000 Zeichen
+    [Fact]
+    public async Task US602_Error_CreateRecipe_InstructionTooLong_Returns422AtStep()
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+        var request = ACreateRecipe(
+            steps: [AStepPayload("Teig rühren."), AStepPayload(new string('a', 1001))]);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: die Meldung am zweiten Schritt (ADR-S144-1), nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError("steps[1].instruction", InstructionTooLongMessage));
+    }
+
+    private const string InstructionTooLongMessage = "Schritt-Anweisung darf maximal 1000 Zeichen lang sein.";
+
+    // Szenario: Alle fehlerhaften Schritte werden gemeldet, der Fokus liegt auf dem ersten
+    [Fact]
+    public async Task US602_Error_CreateRecipe_SeveralInstructionsTooLong_Returns422AtEachStep()
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+        var request = ACreateRecipe(
+            steps: [AStepPayload("Teig rühren."), AStepPayload(new string('a', 1001)), AStepPayload(new string('b', 1001))]);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: je eine Meldung an Schritt 2 und 3, keine an Schritt 1, nichts gespeichert
+        await AssertRejectedWithAsync(response, new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            ["steps[1].instruction"] = [InstructionTooLongMessage],
+            ["steps[2].instruction"] = [InstructionTooLongMessage],
+        });
+    }
+
+    // Roh-Eingabe aus dem normalisierten Wert: je zwei Leerzeichen davor/dahinter, inneres Leerzeichen verdoppelt.
+    private static string WithExtraSpaces(string text) => $"  {text.Replace(" ", "  ", StringComparison.Ordinal)}  ";
+
+    // Szenario: Titel und Anweisung mit genau der zulässigen Länge werden gespeichert
+    // Gemessen wird am normalisierten Wert (ADR-S135-1): roh 105 bzw. 1005 Zeichen, normalisiert 100 bzw. 1000.
+    [Fact]
+    public async Task US602_EdgeCase_CreateRecipe_ExactMaxLengthAfterNormalization_Returns201AndPersistsNormalized()
+    {
+        // Given: Titel aus 100 und Anweisung aus 1000 Zeichen (normalisiert)
+        var title = $"{new string('a', 49)} {new string('b', 50)}";
+        var instruction = $"{new string('c', 499)} {new string('d', 500)}";
+        title.Length.Should().Be(100);
+        instruction.Length.Should().Be(1000);
+
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        var mehl = AnIngredient("Mehl", "g");
+        await SeedIngredientsAsync(mehl);
+        var request = ACreateRecipe(title: WithExtraSpaces(title), steps: [AStepPayload(WithExtraSpaces(instruction))]);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: 201, der Body trägt Titel und Anweisung normalisiert (Full State)
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var recipes = await Db.Recipes.ToListAsync(TestContext.Current.CancellationToken);
+        // Id vergibt der Server; geprüft wird sie über die Response-Assertion unten
+        recipes.Should().BeEquivalentTo([ARecipe(title)], o => o.Excluding(r => r.Id));
+        var body = await response.Content.ReadFromJsonAsync<RecipeResponse>(TestContext.Current.CancellationToken);
+        body.Should().BeEquivalentTo(new RecipeResponse(
+            Id: recipes[0].Id, Title: title,
+            Ingredients: [new RecipeIngredientResponse(Name: "Mehl", Quantity: 250m, Unit: "g")],
+            Steps: [AStepPayload(instruction)]));
+
+        // Then: gespeichert ist der normalisierte Text
+        (await Db.Steps.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
+            [AStep(recipeId: recipes[0].Id, stepNumber: 1, instruction: instruction)]);
+        (await Db.RecipeIngredients.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
+            [ARecipeIngredient(recipeId: recipes[0].Id, position: 1, ingredientId: mehl.Id, quantity: 250m)]);
     }
 
     // ADR-S144-2 (kein US-Tag, ADR-S106-3 „Protokoll-/Infrastruktur-Mechanik"): explizites null zählt wie

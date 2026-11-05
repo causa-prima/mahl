@@ -221,23 +221,23 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S141-4 – qa-check Check 1 übersieht geänderte Test-Hilfsdateien
 - Quelle: Orchestrator
-- Status: NEU
+- Status: UMGESETZT (S147)
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
 - Beobachtung: In S141 war Server.Tests/Helpers/EndpointsTestsBase.cs laut git geändert (neue Test-Data-Builder) und per --approved-tests freigegeben, erschien aber nicht unter „CHECK 1: GEÄNDERTE TEST-DATEIEN“. Der Test-Freigabe-Audit meldete nur „freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf (committet/zurückgesetzt?)“ – eine irreführende Vermutung. Eine Änderung an einer Hilfsdatei, die alle Integrationstests trägt, läuft so am Audit vorbei.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: _is_test_file in qa-check.py erkennt Testdateien jetzt auch über ihr Verzeichnis (Server.Tests/, Client/src/test/, Client/src/mocks/); Helfer wie EndpointsTestsBase.cs und RecipeRequests.cs laufen damit durch den Freigabe-Audit. Die Endung Tests.cs/Test.cs entfiel als toter Code (mutmut zeigte sie als überlebend). Test: test_is_test_file_recognizes_test_helpers_by_directory. Zweiter Fall war US-602 run-9 (S147).
 
 ## OBS-S143-1 – Stryker-Timeouts können Survivors verdecken
 - Quelle: Orchestrator
-- Status: NEU
+- Status: UMGESETZT (S147)
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
 - Beobachtung: In US-602 run-5 meldete der erste qa-check-Lauf des Frontends 100 % bei 43 Timeouts (Timeouts zählen als detected). Ein späterer Lauf ohne Änderung an der betroffenen Datei meldete 17 Timeouts und einen Survivor in Client/src/pages/RecipeDetailPage.tsx:24 (StringLiteral im Query-Key), der seit run-3/run-4 besteht und dort nie aufgefallen war; ein dritter Lauf mit 10 Timeouts zeigte ihn ebenfalls. Ein Score von 100 % mit vielen Timeouts ist damit kein verlässlicher Beleg dafür, dass jeder Mutant von einem Test getötet wird – und der Verifikations-Hash bestätigt nur Frische, nicht Stabilität des Ergebnisses. qa-check weist Timeouts aus („können Timing-Artefakte sein – mit --verbose prüfen"), gated aber nicht darauf. Zweiter Fall in US-602 run-6 (S143): Ein Survivor im Layout-Wert sx={{ justifyContent: 'flex-end' }} von FormActions (CreateRecipePage.tsx) stand in den ersten qa-check-Läufen hinter 68 Timeouts bei „100 %“ und fiel erst im Volllauf eines Subagenten auf; zwischen zwei Läufen wechselte er dabei zwischen den Mutatoren ObjectLiteral und StringLiteral. Dritter Fall in US-602 run-8 (S144): qa-check meldete 100 % bei 101 Timeouts von 240 Mutanten. Ein gezielter Lauf auf CreateRecipePage.tsx mit timeoutMS 60000 ergab 0 Timeouts und 13 Survivors – darunter Mutanten, die keine Schleife erzeugen können (error={…} → false). Ursache geprüft: der Stryker-Default timeoutMS 5000 reicht für die user-event-Komponententests je Mutant nicht. timeoutMS 60000 ist seitdem gesetzt (ADR-S144-4); der Gesamtlauf deckte dabei noch einen seit run-3/run-4 verdeckten Survivor in RecipeDetailPage.tsx (Query-Key ohne Id) auf. Offen bleibt die Hälfte von qa-check: Timeouts zählen dort weiter still als erkannt, ein künftiger Timeout fiele wieder nicht auf.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-5 als Beobachtung entschieden
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: qa-check listet Timeouts in geänderten Dateien gesondert (Datei:Zeile, Mutant) und gibt ohne Einordnung kein gültiges Verdikt (Exit 1); die Layer-Implementer ordnen jeden solchen Timeout in ihrer Rückgabe ein, der Orchestrator prüft die Einordnung. Gewählt statt eines harten Timeout-Verbots, weil echte Endlosschleifen-Mutanten legitim als Timeout enden – entscheiden kann das nur ein Blick auf den Mutanten. Den Grundfall (Stryker-Default timeoutMS zu knapp) behebt seit run-8 ADR-S144-4.
 
 ## OBS-S143-2 – Edit-Tool löst \uXXXX in String-Literalen zu rohen unsichtbaren Zeichen auf
 - Quelle: Subagent + Orchestrator
@@ -254,7 +254,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: PROZESS    Kontext: Review
-- Beobachtung: US-602 run-6 (S143) brauchte vier Review-Runden; jede fand bei 0 ❌ zwischen 6 und 15 ⚠️. Ab Runde 3 widersprachen Funde direkt früheren Runden: Ein Test-Helfer wurde in Runde 3 verlangt und in Runde 4 als „verbirgt Arrange und Act“ wieder beanstandet; eine explizite Existenz-Assertion wurde in Runde 1 verlangt und in Runde 4 als redundant gemeldet; die Unterscheidung toHaveCount(0) gegenüber toBeHidden() wurde in Runde 2 als begründet gelobt und in Runde 4 als Streuung beanstandet. Die Regel „Auditoren ohne Iterations-Vorwissen“ verhindert gedämpfte Kritik, lässt aber jede Runde neue Politur finden; das Rundenlimit (max. 3) stoppte den Loop, die Fortsetzung entschied der User. Jede Runde kostete vier bis fünf Agentenläufe plus einen Fix-Subagenten und einen qa-check.
+- Beobachtung: US-602 run-6 (S143) brauchte vier Review-Runden; jede fand bei 0 ❌ zwischen 6 und 15 ⚠️. Ab Runde 3 widersprachen Funde direkt früheren Runden: Ein Test-Helfer wurde in Runde 3 verlangt und in Runde 4 als „verbirgt Arrange und Act“ wieder beanstandet; eine explizite Existenz-Assertion wurde in Runde 1 verlangt und in Runde 4 als redundant gemeldet; die Unterscheidung toHaveCount(0) gegenüber toBeHidden() wurde in Runde 2 als begründet gelobt und in Runde 4 als Streuung beanstandet. Die Regel „Auditoren ohne Iterations-Vorwissen“ verhindert gedämpfte Kritik, lässt aber jede Runde neue Politur finden; das Rundenlimit (max. 3) stoppte den Loop, die Fortsetzung entschied der User. Jede Runde kostete vier bis fünf Agentenläufe plus einen Fix-Subagenten und einen qa-check. Weiterer Fall S147 (US-602 run-9): Auch hier drei Runden ohne Konvergenz. Frische Auditoren kehrten in Runde 3 zwei Empfehlungen aus Runde 2 um (Titel-Konstante im E2E-Test, Default eines Test-Data-Builders), und jede Runde brachte neue kosmetische ⚠️. Der User beendete den Loop nach Runde 3 und hängte die inhaltlichen Punkte an einen TD für run-13.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-6 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -275,7 +275,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: GERING    Häufigkeit: häufig
 - Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Der PostToolUse-Hook check-code-quality-nonblocking fährt nach jedem einzelnen Edit an prozesscode/ oder tests/ die gesamte Werkzeug-Suite (10–45 s) und meldet „Tooling-Tests rot“. Werden mehrere zusammengehörige Edits in einem Zug geschickt (Funktion anlegen, Aufruf umstellen, Import ergänzen), meldet er die Zwischenstände dazwischen als rot – in S143 gut ein Dutzend Mal, jedes Mal Rauschen, das der Agent als solches erkennen und übergehen musste; ruff meldete dabei auch fehlende Imports, die das nächste Edit schon ergänzte. Die Meldung selbst weist auf beabsichtigte RED-Phasen hin, unterscheidet aber nicht zwischen Zwischenstand und Endstand.
+- Beobachtung: Der PostToolUse-Hook check-code-quality-nonblocking fährt nach jedem einzelnen Edit an prozesscode/ oder tests/ die gesamte Werkzeug-Suite (10–45 s) und meldet „Tooling-Tests rot“. Werden mehrere zusammengehörige Edits in einem Zug geschickt (Funktion anlegen, Aufruf umstellen, Import ergänzen), meldet er die Zwischenstände dazwischen als rot – in S143 gut ein Dutzend Mal, jedes Mal Rauschen, das der Agent als solches erkennen und übergehen musste; ruff meldete dabei auch fehlende Imports, die das nächste Edit schon ergänzte. Die Meldung selbst weist auf beabsichtigte RED-Phasen hin, unterscheidet aber nicht zwischen Zwischenstand und Endstand. Weiterer Fall S147 (US-602 run-9): Der ESLint-Teil desselben Hooks meldet bei mehrstufigen Umbauten im Frontend (Hook extrahieren, Aufrufer umstellen) jeden Zwischenstand als Fehler; beide Frontend-Subagenten nannten das in ihrer Rückgabe als Rauschen. Auch beim Orchestrator meldete der Hook in derselben Session ruff F821/F401 zwischen zwei zusammengehörigen Edits (Import und Nutzung in getrennten Edits).
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – im Session-Abschluss S143 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -292,11 +292,51 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S144-4 – Hintergrund-Lauf weckt den Layer-Subagenten nach seinem Ende nicht
 - Quelle: Orchestrator + Subagent
-- Status: IN BEOBACHTUNG bis S150
+- Status: NEU
 - Impact: MITTEL    Häufigkeit: häufig
 - Kategorie: AGENT    Kontext: Agent-Prompt
-- Beobachtung: In S144 (US-602 run-8) meldeten zwei Frontend-Subagenten „Warte auf qa-check (Hintergrund)“ und beendeten ihren Zug. Beide Male war der Lauf Minuten später fertig (einmal Exit 1 an ESLint, einmal Score 99,6 % nach 5 Minuten), ohne dass der Subagent sich meldete; erst der User bemerkte, dass nichts mehr lief, nach rund 10 bzw. 20 Minuten Stillstand. Ein Subagent sagte im Nachgang, der Wake-up sei erst nach einer Nachricht des Orchestrators gekommen. implementing-scenario (Innerer Loop, „Arbeitende Subagenten nicht pollen“) stützt sich auf einen Harness-Test vom 2026-10-29 (Claude Code 2.1.312), nach dem das Laufende den Subagenten selbst weckt – die Beobachtung widerspricht dem. Auch die ausdrückliche Anweisung im Spawn-Prompt, qa-check im Vordergrund laufen zu lassen, wurde einmal nicht befolgt. Der Orchestrator hat qa-check beide Male selbst gefahren.
+- Beobachtung: In S144 (US-602 run-8) meldeten zwei Frontend-Subagenten „Warte auf qa-check (Hintergrund)“ und beendeten ihren Zug. Beide Male war der Lauf Minuten später fertig (einmal Exit 1 an ESLint, einmal Score 99,6 % nach 5 Minuten), ohne dass der Subagent sich meldete; erst der User bemerkte, dass nichts mehr lief, nach rund 10 bzw. 20 Minuten Stillstand. Ein Subagent sagte im Nachgang, der Wake-up sei erst nach einer Nachricht des Orchestrators gekommen. implementing-scenario (Innerer Loop, „Arbeitende Subagenten nicht pollen“) stützt sich auf einen Harness-Test vom 2026-10-29 (Claude Code 2.1.312), nach dem das Laufende den Subagenten selbst weckt – die Beobachtung widerspricht dem. Auch die ausdrückliche Anweisung im Spawn-Prompt, qa-check im Vordergrund laufen zu lassen, wurde einmal nicht befolgt. Der Orchestrator hat qa-check beide Male selbst gefahren. Rückfall S147 (CROSS-text/run-1, Claude Code 2.1.318): Der Backend-Subagent startete qa-check mit run_in_background, wurde durch eine Orchestrator-Nachricht geweckt, beendete seinen Zug; der Lauf endete 2 min später, die Task-Notification wurde in die Warteschlange der Haupt-Session eingereiht (queue-operation enqueue, kein remove) und kam im Subagent-Log nie an. Ursache (geprüft: Session-Logs der letzten 40 Sessions, Analyse-Script über queue-operation und Subagent-Logs): Betroffen sind benannte Subagenten (meta.json taskKind in_process_teammate – implementing-scenario vergibt immer einen Namen), die beim Laufende idle sind: 3 von 3 Fällen nie bzw. erst nach der nächsten Orchestrator-Nachricht zugestellt (e7e1f0f1/2.1.309 nie, 99223889/2.1.312 nach 18 min direkt nach einer Teammate-Nachricht, 9fd1a54c/2.1.318 nie). Zugestellt wurde sofort, wenn der Subagent beim Laufende noch im Zug war (9fd1a54c, 0,2 s) oder unbenannt war (taskKind plain). Der Harness-Test S146 (65f02267, 2.1.318) nutzte einen unbenannten Subagenten und konnte den Fall deshalb nicht nachstellen. Nicht geprüft: welchen Subagenten der Harness-Test vom 2026-10-29 nutzte; die interne Zustellung in Claude Code ist eine Deutung der Logs, nicht dokumentiert.
 - Zusammen-erledigen: keiner
-- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden; Ursache ungeklärt (geprüft: nur die Rückmeldungen der Subagenten, kein Harness-Test)
-- Entscheidung/Maßnahme: User, S146: noch nicht schließen, zu frisch. Harness-Test S146: Ein Subagent startete mutmut (5:26 min) mit run_in_background, beendete den Zug und wachte ohne Nachricht von außen durch die Task-Notification selbst auf; die Agent-Meldung an den Orchestrator sagte ausdrücklich, dass er auf eigene Hintergrundarbeit wartet. Beleg in implementing-scenario ergänzt. S144 damit nicht reproduziert (dort qa-check statt mutmut). Schließen beim nächsten Drain, wenn bis dahin Subagenten wiederholt in Implementierungs-Sessions liefen und kein Rückfall auftrat. Re-Trigger: Rückfall → sofort untersuchen, warum der Test ihn nicht nachstellte (Claude-Code-Version, Befehl, Vorder-/Hintergrund, wer den Lauf startete).
+- Aufschubgrund: User – S147 entschieden: Hook (run_in_background für qa-check/dotnet-stryker/stryker-frontend blocken) und Korrektur des Skill-Satzes „Arbeitende Subagenten nicht pollen“ als eigener Schritt; bis dahin Vordergrund-Vorgabe im Spawn-Prompt
+- Entscheidung/Maßnahme: User, S146: noch nicht schließen. S147: Rückfall, Ursache geklärt (s. Beobachtung); Maßnahme vom User gewählt: Subagenten fahren qa-check/Stryker im Vordergrund, mechanisch per Hook erzwungen; der Satz in implementing-scenario („wird von dessen Ende selbst geweckt“) wird für benannte Subagenten korrigiert. Verworfen: Orchestrator weckt nach erwarteter Laufzeit per Nachricht (fehleranfällig, widerspricht „nicht pollen“).
 
+## OBS-S147-1 – Beispielzeilen eines Grundrisses werden nicht gegen die Testfälle abgeglichen
+- Quelle: Subagent + Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Hook/Script
+- Beobachtung: Die Zeilen einer Gherkin-Beispieltabelle stehen dreifach von Hand: im Feature-File, in der Testdaten-Liste des Backend-Tests und in der des E2E-Tests (S147: text-input.feature, Grundriss „Ein nach der Normalisierung gleicher Name gilt als Duplikat“ mit 9 Zeilen; die Reihenfolge weicht im C#-Test schon ab). Ein Test mit `// Beispiel: alle` besteht den Spec-Verweis-Hook, ohne dass geprüft wird, ob jede Zeile einen Testfall hat (laut Hook-Beschreibung check-test-spec-ref.py, nicht nachgestellt). Kommt eine Zeile hinzu und eine Testliste wird vergessen, wird nichts rot – die zeilengenaue Rückverfolgbarkeit Spec ↔ Test hängt am Review. Bald konkret: US-602 run-12 hat einen Grundriss mit 6 Zeilen. Gemeldet vom test-quality-auditor (Review-Runde 3, CROSS-text/run-1).
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – S147 entschieden: als OBS für den Drain, ein Check braucht einen Entwurf (Anzeigenamen im Backend, Titelzusatz im E2E, „Beispiel: alle“)
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S147-2 – mutmut-Sperrklinke meldet ohne --frisch einen Schein-Rückschritt
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: In US-602 run-9 (S147) meldete mutmut-run --ratchet für prozesscode.qa-check ohne --frisch einen Rückschritt (90,1 % → 90,0 %), obwohl gerade Tests hinzugekommen waren. Derselbe Stand mit --frisch ergab 90,6 % und hielt die Sperrklinke. Der Test, der die neue Meldung prüfte, war dem betroffenen Mutanten im Lauf ohne --frisch nicht zugeordnet. Ungeprüft ist, ob die Zuordnung Test → Mutant aus einem früheren Lauf im Verzeichnis mutants/ wiederverwendet wurde. Folge: Ein roter Ratchet-Lauf ohne --frisch ist kein verlässlicher Befund, und wer das nicht weiß, sucht eine Lücke, die es nicht gibt.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-9 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: OBS-S143-4
+
+## OBS-S147-3 – Mengenangaben-Hinweis schlägt in Testkommentaren mit lokal definierter Menge an
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: In US-602 run-9 (S147) meldete der nicht-blockierende Mengenangaben-Check (prozesscode/hooks/checks/mengenangaben.py) beim Frontend-Review-Fix-Subagenten „Alle drei Felder“ in einem Testkommentar von RecipesPage.test.tsx. Die Menge ist dort im selben Test festgelegt (drei Felder des Formulars, die der Test selbst befüllt) und kann nicht still veralten – die Klasse, gegen die der Check gebaut ist (eine anderswo definierte, wachsende Menge), liegt nicht vor. Der Subagent erkannte das und änderte nichts; der Hinweis kostete nur Aufmerksamkeit. Die Sichtung S133 kannte nur Prosa in Doku-Dateien (2 echte von 20 Treffern); ob Code-Kommentare in Testdateien ein eigenes Fehlalarm-Profil haben, ist nicht erhoben.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-9 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S147-4 – PLANUNG benannter Subagenten kommt beim Orchestrator abgeschnitten an
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: häufig
+- Kategorie: AGENT    Kontext: Agent-Prompt
+- Beobachtung: In US-602 run-9 (S147) kam die PLANUNG beider Schicht-Subagenten beim Orchestrator gekürzt an (Hinweis des Harness: „result truncated — ask the agent for the rest“): beim Frontend ab Punkt P6, beim Backend ab P5. Gerade die Rückfragen an den Orchestrator standen hinter dem Schnitt; je Subagent kostete das einen zusätzlichen Nachrichtenwechsel. Die Layer-Implementer-Definitionen ordnen für den Abschlussbericht schon an, das Unverzichtbare vorn zu bringen („Ein zu langer Bericht kommt … am Ende abgeschnitten an“), für die PLANUNG gibt es keine solche Reihenfolge. Ab welcher Länge gekürzt wird, ist nicht gemessen.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-9 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

@@ -158,3 +158,11 @@ Eintrag-Format:
 **Fällig:** Phase:MVP – UI-Feinschliff gehört nach Entscheidung des Users ab MVP dazu
 **Hintergrund:** UX-Review US-602 run-4: Client/index.html setzt fest „Mahl", kein document.title in Client/src. Alle Tabs und Lesezeichen heißen gleich; gerade Lesezeichen auf Rezepte (ADR-S135-5) sind so nicht unterscheidbar. Der User sieht es als Querschnittsthema für alle Seiten, das auch die Rezept-Detailansicht betrifft.
 **Aufschubgrund:** User – im Review von US-602 run-4 als Querschnittsthema eingeordnet; neues Verhalten braucht erst ein Szenario (gherkin-workshop)
+
+---
+
+## OQ-S147-1 — Zeichenmenge der Text-Normalisierung erweitern?
+**Frage:** Soll die Normalisierung (ADR-S135-1) über die vier unsichtbaren Zeichen hinaus weitere Format- und Steuerzeichen entfernen oder ablehnen – etwa Bidi-Steuerzeichen U+202A–U+202E und U+2066–U+2069, Hangul Filler U+3164, U+0000 –, und wenn ja, wie mit U+200C/U+200D (für Emoji und manche Schriften nötig) umgehen? Davon hängt ab, welche Gegenproben an den Bereichsgrenzen (z. B. U+0008, U+000E) die Spec bekommt.
+**Fällig:** Phase:MVP – im SKELETON vom User bewusst nicht entschieden („wenn überhaupt, dann später“)
+**Hintergrund:** S147, Review von CROSS-text/run-1: Heute gelten diese Zeichen als Inhalt; dadurch lassen sich optisch leere oder optisch gleiche Namen anlegen (security-auditor SEC-4, functional-correctness-auditor F-10). Außerdem prüft kein Test die Bereichsgrenzen der Zeichenmenge nach außen; Stryker mutiert Zahlenliterale nach Einschätzung des Reviewers nicht, ein aufgeweiteter Bereich fiele also nicht auf (test-quality-auditor R3, TQ-1). Betroffen: Server/Types/NonEmptyNormalizedString.cs, Client/src/domain/text.ts, features/text-input.feature. U+0000 und einzelne Surrogate enden heute vermutlich in 500 (vermerkt bei TD-S106-1).
+**Aufschubgrund:** User – S147 entschieden: im SKELETON nicht, wenn überhaupt dann später

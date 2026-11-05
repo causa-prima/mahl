@@ -67,7 +67,7 @@ Verwende den richtigen Typ je nach Rolle:
 
 | Ebene | Ort | `Create()`-Signatur | Rolle |
 |---|---|---|---|
-| **Constraint-Typ** (`NonEmptyTrimmedString`, `Bounded<…>` …) | `Server/Types/` | Nimmt Primitives (`string`, `decimal`) | Ein **Prädikat über einer Repräsentation** – feldagnostisch, über Fachkonzepte hinweg wiederverwendbar. *Hier ist* die Validierungsmechanik |
+| **Constraint-Typ** (`NonEmptyNormalizedString`, `Bounded<…>` …) | `Server/Types/` | Nimmt Primitives (`string`, `decimal`) | Ein **Prädikat über einer Repräsentation** – feldagnostisch, über Fachkonzepte hinweg wiederverwendbar. *Hier ist* die Validierungsmechanik |
 | **Domänentyp** (`IngredientName`, `Unit` …) | `Server/Domain/` | Nimmt Primitives | Eine **Rolle in der Fachsprache** – an *ein* Fachkonzept gebunden, dort aber überall geteilt ([Rolle ≠ Typ](#CGC-regel-rolle-typ)). Baut sich aus Constraint-Typen und trägt die Feldregeln |
 | **Entity** (`Ingredient`, `Recipe` …) | `Server/Domain/` | Nimmt Domänentypen | Vertraut den Typen; prüft nur Entity-Invarianten (Cross-Field, etc.) |
 
@@ -115,17 +115,17 @@ Eine Grenze wie „max. 30 Zeichen" ist kein handgeschriebener Check in `Create(
 // Server/Domain/IngredientName.cs
 internal readonly record struct IngredientName
 {
-    private readonly Bounded<NonEmptyTrimmedString, Max30> _value;   // ADR-S051-3: Grenze steht im Typ
+    private readonly Bounded<NonEmptyNormalizedString, Max30> _value;   // ADR-S051-3: Grenze steht im Typ
     public string Value => _value.Value;                             // wirft transitiv
 
     // Stryker disable once Statement,String : parameterless ctor (ADR-S041-9)
     public IngredientName() => throw new InvalidOperationException("Uninitialized");
-    private IngredientName(Bounded<NonEmptyTrimmedString, Max30> value) => _value = value;
+    private IngredientName(Bounded<NonEmptyNormalizedString, Max30> value) => _value = value;
 
     // Meldungen an die Grenze: der Typ liefert die Fehlerfälle SEINES Konzepts, keine Texte und keinen Feldbezug.
     public static OneOf<IngredientName, IngredientNameError> Create(string input) =>
-        Bounded<NonEmptyTrimmedString, Max30>.Create(input)
-            .MapError<Bounded<NonEmptyTrimmedString, Max30>, StringViolation, IngredientNameError>(v => v switch
+        Bounded<NonEmptyNormalizedString, Max30>.Create(input)
+            .MapError<Bounded<NonEmptyNormalizedString, Max30>, StringViolation, IngredientNameError>(v => v switch
             {
                 StringViolation.Empty   => IngredientNameError.Empty,
                 StringViolation.TooLong => IngredientNameError.TooLong,
@@ -135,7 +135,7 @@ internal readonly record struct IngredientName
 }
 ```
 
-Die Träger (`IStringConstraint<TSelf>`, `IMaxLength`, `NonEmptyTrimmedString`, `Bounded<TInner, TMax>`, Marker je Grenzwert) liegen in `Server/Types/StringConstraints.cs` – bewusst eine Datei, weil sie nur gemeinsam les- und änderbar sind (dafür ein `MA0048`-Block in `.editorconfig`). Warum Trimmen und Nicht-Leer in **einem** Träger stecken statt in zwei komponierbaren, und wann die Aufspaltung fällig wird: ADR-S119-1, Abschnitt „Warum `NonEmptyTrimmedString`".
+Die Träger (`IStringConstraint<TSelf>`, `IMaxLength`, `NonEmptyNormalizedString`, `Bounded<TInner, TMax>`, Marker je Grenzwert) liegen in `Server/Types/StringConstraints.cs` – bewusst eine Datei, weil sie nur gemeinsam les- und änderbar sind (dafür ein `MA0048`-Block in `.editorconfig`). Warum Trimmen und Nicht-Leer in **einem** Träger stecken statt in zwei komponierbaren, und wann die Aufspaltung fällig wird: ADR-S119-1, Abschnitt „Warum `NonEmptyNormalizedString`".
 
 Ein geteilter Domänentyp wie `Unit` ([Rolle ≠ Typ](#CGC-regel-rolle-typ)) baut sich genauso, nur mit `Max20` und `UnitError` – der Fehlertyp gehört zum Konzept, nicht zur Entität, und trägt deshalb über alle Entitäten (ADR-S120-1).
 
@@ -152,7 +152,7 @@ Ein geteilter Domänentyp wie `Unit` ([Rolle ≠ Typ](#CGC-regel-rolle-typ)) bau
 - **`default(T)` absichern:** `default(T)` ruft den Konstruktor **nicht** auf – er null-initialisiert alle Felder. Properties, die auf Felder zeigen, die dadurch einen ungültigen Zustand haben können, müssen einen Guard enthalten:
   - Referenztypen (z. B. `string _value`): `_value ?? throw new InvalidOperationException("Uninitialized")`
   - Value Types ohne sinnvollen Default (z. B. `Guid _id`): `_id == default ? throw new InvalidOperationException("Uninitialized") : _id`
-  - Domain-Typen, die selbst einen Guard haben (z. B. `NonEmptyTrimmedString _name`), werfen transitiv beim Zugriff auf deren Property – kein zusätzlicher Guard nötig.
+  - Domain-Typen, die selbst einen Guard haben (z. B. `NonEmptyNormalizedString _name`), werfen transitiv beim Zugriff auf deren Property – kein zusätzlicher Guard nötig.
 **Defensive Guards – Konzept:**
 
 "Make Illegal States Unrepresentable" schützt zur Compile-Zeit. Manche Sprachfeatures umgehen das: `new T()` auf Structs und `default(T)` rufen den privaten Konstruktor nicht auf. Ein Defensive Guard ist ein Laufzeit-Check der diese Sprach-Bypasses auffängt – **kein Business-Code**. Er ist defensiv, wenn er über normalen Aufrufpfaden strukturell unerreichbar ist.
@@ -184,6 +184,8 @@ Suppression bekommt, regelt [Welcher Survivor bekommt welche Reaktion?](../proce
 
 <a id="CGC-constraint-typ-beispiel"></a>
 ### Constraint-Typ (nimmt Primitives – hier findet die Validierung statt)
+
+Vereinfachtes Muster (nur Trimmen); der echte Träger `NonEmptyNormalizedString` normalisiert vollständig nach ADR-S135-1.
 
 ```csharp
 internal readonly record struct TrimmedNonEmpty
@@ -287,7 +289,7 @@ Domain-Typ    DbType    DTO
 ### Ort
 
 - `Server/Domain/` für **Domain-Entities** (Rezept, Zutat, …) **und Domänentypen** (`IngredientName`, `Unit`) – beide Ebenen der Drei-Ebenen-Regel aus [Primitive Obsession](#CGC-primitive-obsession) liegen hier
-- `Server/Types/` ausschließlich für **Constraint-Typen** (z.B. `NonEmptyTrimmedString`, `Bounded<TInner, TMax>`) und geteilte Bausteine (`SumType`, `NonEmptyImmutableArray<T>`)
+- `Server/Types/` ausschließlich für **Constraint-Typen** (z.B. `NonEmptyNormalizedString`, `Bounded<TInner, TMax>`) und geteilte Bausteine (`SumType`, `NonEmptyImmutableArray<T>`)
 
 <a id="CGC-kanonisches-beispiel"></a>
 ### Kanonisches Beispiel

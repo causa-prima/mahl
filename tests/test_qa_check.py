@@ -397,6 +397,19 @@ def test_is_test_file_recognizes_repo_conventions():
     assert not qa._is_test_file("Client/src/services/conditionalGet.ts")
 
 
+def test_is_test_file_recognizes_test_helpers_by_directory():
+    # // Given Testhelfer, deren Name keiner Test-Endung folgt (run-9: RecipeRequests.cs,
+    #          EndpointsTestsBase.cs liefen am Freigabe-Audit vorbei)
+    # // Then zählen sie über ihr Verzeichnis als Testdatei
+    assert qa._is_test_file("Server.Tests/Helpers/RecipeRequests.cs")
+    assert qa._is_test_file("Server.Tests/Helpers/EndpointsTestsBase.cs")
+    assert qa._is_test_file("Client/src/test/setup.ts")
+    assert qa._is_test_file("Client/src/mocks/server.ts")
+    # // And ein gleichnamiges Verzeichnis tiefer im Produktcode zählt nicht
+    assert not qa._is_test_file("Server/Types/StringConstraints.cs")
+    assert not qa._is_test_file("Client/src/pages/test/Foo.ts")
+
+
 def test_audit_approved_tests_recognizes_test_tsx(tmp_path, monkeypatch):
     # // Given eine freigegebene .test.tsx (echte Vitest-Konvention), danach in einer
     #        Assertion geändert und vom Subagent gestaged. Regression: früher war

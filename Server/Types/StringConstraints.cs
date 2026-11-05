@@ -7,7 +7,7 @@ namespace mahl.Server.Types;
 // Feldagnostisch: sie melden einen Verstoß, keinen Meldungstext und keinen Feldnamen – die
 // Zuordnung Fehlerfall -> deutscher Text liegt an der API-Grenze (ADR-S051-2; Meldungen an die Grenze).
 // Der Ertrag ist, dass die parametrisierte Grenze Teil des Feldtyps wird
-// (Bounded<NonEmptyTrimmedString, Max30>) statt ein handgeschriebener Check in Create().
+// (Bounded<NonEmptyNormalizedString, Max30>) statt ein handgeschriebener Check in Create().
 internal enum StringViolation { Empty, TooLong }
 
 // CRTP: TSelf erlaubt es einem Träger, seinen inneren Träger über TInner.Create(...) aufzurufen,
@@ -37,7 +37,7 @@ internal readonly record struct Bounded<TInner, TMax>
 
     private Bounded(TInner inner) => _inner = inner;
 
-    // ADR-S051-3: die Länge wird auf dem bereits getrimmten Wert gemessen – der innere Träger
+    // ADR-S051-3: die Länge wird auf dem bereits normalisierten Wert gemessen (ADR-S135-1) – der innere Träger
     // normalisiert, bevor hier gemessen wird.
     public static OneOf<Bounded<TInner, TMax>, StringViolation> Create(string? input) =>
         TInner.Create(input).Bind<TInner, Bounded<TInner, TMax>, StringViolation>(inner =>
@@ -51,3 +51,8 @@ internal readonly record struct Bounded<TInner, TMax>
 internal readonly struct Max30 : IMaxLength { public static int MaxLength => 30; }
 
 internal readonly struct Max20 : IMaxLength { public static int MaxLength => 20; }
+
+// ADR-S135-3: Rezepttitel max. 100, Schritt-Anweisung max. 1000 Zeichen.
+internal readonly struct Max100 : IMaxLength { public static int MaxLength => 100; }
+
+internal readonly struct Max1000 : IMaxLength { public static int MaxLength => 1000; }

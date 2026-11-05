@@ -4,6 +4,7 @@ Der Zeilenbereich ist der eigentliche Zweck: Er macht den Folge-Read gezielt sta
 Deshalb prüfen die Tests nicht nur, dass Namen gefunden werden, sondern dass Anfang UND Ende
 stimmen – auch wenn Klammern in Zeichenketten oder Kommentaren stehen.
 """
+from importlib import import_module
 from pathlib import Path
 
 
@@ -14,6 +15,8 @@ from prozesscode._test_inventory import (
     parse_python,
     parse_typescript,
 )
+
+inventur = import_module("prozesscode.test-inventory")
 
 
 def _lines(text: str) -> list[str]:
@@ -294,3 +297,49 @@ def test_real_project_files_are_parsed(tmp_path):
         tests = [e for e in inventar(datei) if not e.ist_suite]
         assert len(tests) >= mindestens, f"{pfad}: nur {len(tests)} Tests erkannt"
         assert all(e.end >= e.start for e in tests)
+
+
+# --- Ausgabe mit --grep --------------------------------------------------------
+FILTER_TS = """
+describe('US602_Error: Titel ungültig', () => {
+  it('leerer Titel', () => {
+    expect(1).toBe(1);
+  });
+});
+
+describe('Anderes', () => {
+  it('Titel zu lang', () => {
+    expect(1).toBe(1);
+  });
+
+  it('unbeteiligt', () => {
+    expect(1).toBe(1);
+  });
+});
+"""
+
+
+def test_grep_auf_einen_suite_namen_zeigt_deren_tests(tmp_path, capsys):
+    # // Given eine Suite, deren Name den Filter trifft, ihre Tests aber nicht (run-9:
+    #          --grep US602_Error zeigte nur die Suite-Zeile und „0 Tests")
+    datei = tmp_path / "x.spec.ts"
+    datei.write_text(FILTER_TS)
+    # // When nach dem Suite-Namen gefiltert wird
+    anzahl = inventur.zeige(datei, nur_namen=True, muster="us602_error")
+    # // Then erscheinen die Suite und ihr Test, sonst nichts
+    assert anzahl == 1
+    assert capsys.readouterr().out.splitlines()[1:] == [
+        "  US602_Error: Titel ungültig",
+        "    leerer Titel",
+    ]
+
+
+def test_grep_auf_einen_testnamen_zeigt_nur_diesen_test(tmp_path, capsys):
+    # // Given ein Filter, der nur einen Testnamen trifft, keine Suite
+    datei = tmp_path / "x.spec.ts"
+    datei.write_text(FILTER_TS)
+    # // When gefiltert wird
+    anzahl = inventur.zeige(datei, nur_namen=True, muster="zu lang")
+    # // Then bleibt es beim Treffer – Geschwister derselben Suite fallen weg
+    assert anzahl == 1
+    assert capsys.readouterr().out.splitlines()[1:] == ["    Titel zu lang"]

@@ -29,7 +29,11 @@ def zeige(path: Path, nur_namen: bool, muster: str | None) -> int:
 
     if muster:
         gesucht = muster.lower()
-        eintraege = [e for e in eintraege if gesucht in e.name.lower()]
+        treffer = [e for e in eintraege if gesucht in e.name.lower()]
+        # Trifft der Filter eine Suite, will man deren Inhalt sehen – nicht nur ihre Kopfzeile.
+        bereiche = [(s.start, s.end) for s in treffer if s.ist_suite]
+        eintraege = [e for e in eintraege
+                     if e in treffer or any(a <= e.start and e.end <= b for a, b in bereiche)]
 
     tests = [e for e in eintraege if not e.ist_suite]
     suiten = [e for e in eintraege if e.ist_suite]

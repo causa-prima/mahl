@@ -170,7 +170,9 @@ Alle drei Ebenen tragen denselben Identifier – das ermöglicht direktes Grep (
 
 `ScenarioType` = Gherkin-Tag-Suffix des Primär-Szenarios (das den Test im inneren ATDD-Loop erzwungen hat): `HappyPath`, `Error`, `EdgeCase`. Bei mehreren Szenarien, die dasselbe Verhalten exercisen: Primär-Szenario taggen, kein Mehrfach-Tagging.
 
-**Pflicht:** Kein Backend-Integrationstest ohne erkennbare Szenario-Zuordnung (US-Tag + ScenarioType). Neue Komponenten- und Integrationstests nennen zusätzlich ihre Spec per `// Szenario:` (bei Grundrissen `// Beispiel:`), erzwungen vor dem Schreiben – [Spec-Verweis über jedem neuen Test](tdd-process.md#TDD-spec-verweis).
+**Querschnitts-Szenarien (`@CROSS-<domain>-<typ>`, `@NFR-<domain>-<typ>`):** Statt `USxxx_ScenarioType` steht `CROSS_<Domain>_<Typ>` bzw. `NFR_<Domain>_<Typ>` vorn, `<Typ>` in PascalCase aus dem Szenario-Tag (`@CROSS-text-invisible-only` → `CROSS_Text_InvisibleOnly_CreateIngredient_…`) – in E2E- und Backend-Tests gleich, damit ein Grep beide Schichten findet.
+
+**Pflicht:** Kein Backend-Integrationstest ohne erkennbare Szenario-Zuordnung (US-Tag + ScenarioType, bei Querschnitts-Szenarien das `CROSS_`/`NFR_`-Präfix oben). Neue Komponenten- und Integrationstests nennen zusätzlich ihre Spec per `// Szenario:` (bei Grundrissen `// Beispiel:`), erzwungen vor dem Schreiben – [Spec-Verweis über jedem neuen Test](tdd-process.md#TDD-spec-verweis).
 
 > **Ausnahme (ADR-S106-3):** Querschnitts-**Protokoll-/Infra-Tests** (ETag/If-Match-Mechanik, POST-liefert-ETag) und **Stryker-blinde Invarianten-Tests** (Reihenfolge-/Prioritäts-Pins, die kein Mutant fängt) haben per Definition kein treibendes Szenario → **kein US-Tag**. Sie MÜSSEN per Kommentar als solche ausgewiesen sein (welche ADR / welche Invariante). Alles andere ohne Szenario bleibt eine Outside-In-Verletzung.
 
@@ -178,7 +180,7 @@ Alle drei Ebenen tragen denselben Identifier – das ermöglicht direktes Grep (
 ### Test-Audit (Teil jedes Reviews)
 
 Bei jedem Code-Review prüfen:
-- Trägt jeder neue E2E-Test mindestens einen `@US-ID`-Tag?
+- Trägt jeder neue E2E-Test mindestens einen `@US-ID`-Tag (bei Querschnitts-Szenarien das `CROSS_`/`NFR_`-Präfix)?
 - Hat jedes neue Gherkin-Szenario mindestens einen grünen E2E-Test?
 - Stimmt das Szenario noch mit dem implementierten Verhalten überein (kein Silent Drift)?
 - Gibt es Backend- oder E2E-Tests ohne darüberliegendes Gherkin-Szenario? → Outside-In-Verletzung

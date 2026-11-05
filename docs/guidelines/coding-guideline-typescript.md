@@ -22,7 +22,7 @@ kritische-regeln:
 | [Railway-Oriented Programming](#CGT-rop) | neverthrow ok/err/Result/ResultAsync, .andThen()/.match() | Beim Schreiben von Validierungs- oder API-Verkettungen |
 | [React Query](#CGT-react-query) | useResultMutation/useResultQuery, MutationState, QueryCache-Setup | Bei jedem Datenzugriff aus einer Komponente |
 | [Validierung](#CGT-validierung) | Backend setzt Domänenregeln durch; Ausnahme für offline-schreibfähige Bereiche | Bevor eine Eingabe oder Zustandsänderung geprüft wird |
-| [Pure Functions & Separation](#CGT-pure-functions) | src/domain/ für Logik, src/services/ für API, Komponenten nur UI | Beim Anlegen neuer Dateien oder Funktionen |
+| [Pure Functions & Separation](#CGT-pure-functions) | src/domain/ für Logik, src/services/ für API, Komponenten nur UI; Refs in Hooks (react-hooks/refs) | Beim Anlegen neuer Dateien oder Funktionen; wenn ein Hook Refs hält oder zurückgibt |
 | [Test-Architektur](#CGT-test-architektur) | Teststrategie und HTTP-Mocking (MSW), DOM-Matcher | Bevor du entscheidest, auf welcher Ebene ein Verhalten getestet wird |
 | [Test-Code](#CGT-test-code) | Was gilt, was ist gelockert (_unsafeUnwrap, as, try/catch in Tests OK) | Beim Schreiben von Frontend-Tests |
 
@@ -370,6 +370,16 @@ function RecipeForm({ onSubmit }: Props) {
   // ...
 }
 ```
+
+<a id="CGT-refs-in-hooks"></a>
+### Refs in Hooks: was der React-Compiler-Lint zulässt
+
+`react-hooks/refs` meldet „Cannot access refs during render“ in zwei Fällen, die im Code nicht nach
+Render-Zugriff aussehen. Erstens lehnt er Closures über `ref.current[i]` ab, die in einem `.map` je
+Element entstehen, auch wenn sie über eine Hilfsfunktion gebaut werden. Ausweg ist, nur die Kandidaten
+zu bilden, die gebraucht werden: Für den Fokus etwa genügt das erste Feld mit Meldung, nicht eine
+Closure je Feld. Zweitens akzeptiert er ein Hook-Rückgabeobjekt, das Refs trägt, nur memoisiert
+(`useMemo`). Beispiel für beides: `src/hooks/useRecipeFieldMessages.ts`.
 
 ---
 

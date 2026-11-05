@@ -1,5 +1,9 @@
+using System.Net;
+using System.Net.Http.Json;
+using AwesomeAssertions;
 using mahl.Infrastructure;
 using mahl.Infrastructure.DatabaseTypes;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -40,6 +44,35 @@ public class EndpointsTestsBase : IAsyncLifetime
 
     protected static StepDbType AStep(Guid recipeId, int stepNumber, string instruction = "Teig rühren.") =>
         new() { RecipeId = recipeId, StepNumber = stepNumber, Instruction = instruction };
+
+    // Request-Builder: kommt ein Pflichtfeld hinzu, wird nur er angepasst. Tests nennen die Werte, auf
+    // die es ihnen ankommt; der Rest ist ein gültiges Rezept (Zutat "Mehl" muss dafür existieren).
+    protected static StepPayload AStepPayload(string instruction = "Teig rühren.") => new(instruction);
+
+    protected static CreateRecipeRequest ACreateRecipe(
+        string title = "Pfannkuchen", string ingredients = "250 g Mehl", IReadOnlyList<StepPayload>? steps = null) =>
+        new(title, ingredients, steps ?? [AStepPayload()]);
+
+    // Gemeinsamer Then-Teil der Ablehnungen: 422 (ADR-S090-1) mit genau diesen Feldmeldungen (Full State)
+    // und nichts gespeichert.
+    protected async Task AssertRejectedWithAsync(HttpResponseMessage response, IReadOnlyDictionary<string, IReadOnlyList<string>> expectedErrors)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(expectedErrors);
+        await AssertNothingPersistedAsync();
+    }
+
+    protected static IReadOnlyDictionary<string, IReadOnlyList<string>> SingleError(string key, string message) =>
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal) { [key] = [message] };
+
+    protected async Task AssertNothingPersistedAsync()
+    {
+        (await Db.Recipes.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no recipe row may be written");
+        (await Db.RecipeIngredients.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no recipe ingredient row may be written");
+        (await Db.Steps.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty("no step row may be written");
+    }
 
     public async ValueTask InitializeAsync()
     {

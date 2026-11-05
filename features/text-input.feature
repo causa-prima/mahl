@@ -24,8 +24,8 @@ Feature: Texteingaben werden einheitlich normalisiert
   # Bestehende Daten: im SKELETON per Drop+Recreate; eine Migration bestehender Werte ist
   # nicht vorgesehen.
   #
-  # Ein Lauf für die ganze Datei (Lauf-Kommentar statt Einzel-Läufe): US-602/run-7 setzt den
-  # geteilten Texttyp voraus und braucht dafür ein Ziel für seine Kante.
+  # Ein Lauf für die ganze Datei (Lauf-Kommentar statt Einzel-Läufe): US-602/run-7, run-9 und
+  # run-12 setzen den geteilten Texttyp voraus und brauchen dafür ein Ziel für ihre Kante.
 
   Background:
     Given die Anwendung ist gestartet
@@ -53,15 +53,16 @@ Feature: Texteingaben werden einheitlich normalisiert
     And steht "<Vorhanden>" genau einmal in der Zutaten-Liste
 
     Examples:
-      | Vorhanden   | Eingabe                                                                   | Normalisiert |
-      | rote Linsen | "rote" und "Linsen" mit zwei Leerzeichen dazwischen                       | rote Linsen  |
-      | rote Linsen | "rote" und "Linsen" mit einem geschützten Leerzeichen dazwischen          | rote Linsen  |
-      | rote Linsen | "rote" und "Linsen" mit einem schmalen geschützten Leerzeichen dazwischen | rote Linsen  |
-      | Käse        | "Käse" mit einem „ä“ aus „a“ und kombinierendem Trema                     | Käse         |
-      | Käse        | "Käse" mit einem Leerzeichen ohne Breite nach dem „K“                     | Käse         |
-      | Käse        | "Käse" mit einem weichen Trennzeichen nach dem „K“                        | Käse         |
-      | Käse        | "Käse" mit einem Wortverbinder nach dem „K“                               | Käse         |
-      | Käse        | "Käse" mit einer Byte-Order-Mark nach dem „K“          | Käse         |
+      | Vorhanden   | Eingabe                                                                        | Normalisiert |
+      | rote Linsen | "rote" und "Linsen" mit zwei Leerzeichen dazwischen                            | rote Linsen  |
+      | rote Linsen | "rote" und "Linsen" mit einem geschützten Leerzeichen dazwischen               | rote Linsen  |
+      | rote Linsen | "rote" und "Linsen" mit einem schmalen geschützten Leerzeichen dazwischen      | rote Linsen  |
+      | Käse        | "Käse" mit einem „ä“ aus „a“ und kombinierendem Trema                          | Käse         |
+      | Käse        | "Käse" mit einem Leerzeichen ohne Breite nach dem „K“                          | Käse         |
+      | Käse        | "Käse" mit einem weichen Trennzeichen nach dem „K“                             | Käse         |
+      | Käse        | "Käse" mit einem Wortverbinder nach dem „K“                                    | Käse         |
+      | Käse        | "Käse" mit einer Byte-Order-Mark nach dem „K“                                  | Käse         |
+      | Käse        | "Käse" mit einem Leerzeichen ohne Breite zwischen „a“ und kombinierendem Trema | Käse         |
 
   # @run-1 · Normalisierung · Full-Stack
   @CROSS-text-length
@@ -80,3 +81,20 @@ Feature: Texteingaben werden einheitlich normalisiert
     And ich "g" als Einheit eingebe
     And ich auf "Speichern" klicke
     Then sehe ich die Fehlermeldung "Name darf nicht leer sein."
+
+  # Jede Zeile meint jedes Zeichen ihrer Menge einzeln; der E2E-Test nimmt je Zeile einen
+  # Vertreter, der Backend-Test alle. Die Mengen sind dieselben wie im Client (ADR-S135-1).
+  # @run-1 · Normalisierung · Full-Stack
+  @CROSS-text-character-set
+  Scenario Outline: Genau die Leerraum- und die unsichtbaren Zeichen werden behandelt
+    When ich auf "Zutat anlegen" klicke
+    And ich als Name <Eingabe> eingebe
+    And ich "g" als Einheit eingebe
+    And ich auf "Speichern" klicke
+    Then <Ergebnis>
+
+    Examples:
+      | Eingabe                                                                                            | Ergebnis                                                    |
+      | "rote" und "Linsen" mit zwei gleichen Leerraum-Zeichen dazwischen, je eines der 25 aus White_Space | steht "rote Linsen" in der Zutaten-Liste                    |
+      | nur ein Leerraum- oder unsichtbares Zeichen, zweimal, je eines der 29                              | sehe ich die Fehlermeldung "Name darf nicht leer sein."     |
+      | "rote" und "Linsen" mit dem Steuerzeichen U+001C dazwischen                                        | steht der Name mit U+001C unverändert in der Zutaten-Liste |

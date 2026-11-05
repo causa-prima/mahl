@@ -345,8 +345,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.qa-check": {
-    "beurteilbar": 1047,
-    "getoetet": 943,
+    "beurteilbar": 1116,
+    "getoetet": 1013,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.read-breakdown": {
@@ -410,8 +410,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.test-inventory": {
-    "beurteilbar": 101,
-    "getoetet": 43,
+    "beurteilbar": 109,
+    "getoetet": 55,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.tool-usage": {

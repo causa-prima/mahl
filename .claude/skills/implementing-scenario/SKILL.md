@@ -293,7 +293,7 @@ python3 -m prozesscode.qa-check --layer frontend --verify <hash-aus-return> --ap
 - `✅` (Exit 0) → Hash stimmt überein UND Score == 100 % → frischer, gültiger Übergabe-Lauf, mechanische Findings vertrauenswürdig.
 - `❌` (Exit 1) → zwei Fälle, unterscheidbar am `=== VERIFY ===`-Block:
   - **Hash-Mismatch** (kein frischer Lauf / Zustand geändert) → Subagent auffordern, `qa-check.py` erneut auszuführen.
-  - **Hash ✅, aber Score < 100 %** → Hat der Subagent jeden verbleibenden Survivor im Return nach [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung) gemeldet (Datei:Zeile, Mutant, Tabellenzeile), ist das eine gültige Übergabe: weiter mit der Inhaltlichen Bewertung, dort Punkt „Stryker-Score & Survivor-Fix". Sonst Subagent auffordern, die Survivors zu behandeln.
+  - **Hash ✅, aber Score < 100 % oder Timeouts in geänderten Dateien** → Hat der Subagent jeden verbleibenden Survivor im Return nach [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung) gemeldet (Datei:Zeile, Mutant, Tabellenzeile) und jeden ausgewiesenen Timeout eingeordnet, ist das eine gültige Übergabe: weiter mit der Inhaltlichen Bewertung, dort Punkt „Stryker-Score & Survivor-Fix". Sonst Subagent auffordern, die Survivors und Timeouts zu behandeln.
 
   Bleibt es nach einem Retry aus anderem Grund rot → STOP, User fragen.
 
@@ -325,11 +325,12 @@ dazu Stryker-Score sowie den **TEST-FREIGABE-AUDIT**.
    gemeldete Survivors → je Survivor nach [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung)
    (dort auch, welche Fälle der User entscheidet). Bleibt der Score nach einer Korrekturrunde unter
    100 % → STOP, User fragen; zusätzlich als `lessons_learned` dokumentieren.
-   **Timeouts zählen bei Stryker als erkannt** – ein Score von 100 % mit nennenswertem
-   Timeout-Anteil ist deshalb noch kein Beleg. Vor „verifiziert" jeden Timeout im geänderten Code
-   ansehen (`--verbose`): Kann der Mutant eine Schleife oder ein Warten ohne Ende erzeugen? Wenn
-   nicht, wie einen Survivor behandeln. Grund: 101 Timeouts verdeckten schon einmal 13 Survivors,
-   der Lauf war trotzdem als verifiziert gemeldet.
+   **Timeouts zählen bei Stryker als erkannt** – ein Score von 100 % mit Timeouts ist deshalb noch
+   kein Beleg. `qa-check` weist jeden Timeout in einer geänderten Datei gesondert aus und gibt dann
+   kein gültiges Verdikt (Exit 1). Die Einordnung des Subagenten je Timeout prüfen: Kann der Mutant
+   eine Schleife oder ein Warten ohne Ende erzeugen? Wenn nicht, wie einen Survivor behandeln.
+   Grund: 101 Timeouts verdeckten schon einmal 13 Survivors, der Lauf war trotzdem als verifiziert
+   gemeldet.
 
 4. **Unit-Test-Autorisierung:** Für jeden Treffer aus dem Check „Unit-Test-Muster": Wurde dieser Test explizit
    vom Orchestrator beauftragt, nach Freigabe durch den User (Survivor nicht via Schicht-Grenze beobachtbar)?

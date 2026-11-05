@@ -76,6 +76,14 @@ ordnen und flaggen das fertige Ergebnis (Zustands-Abhängigkeiten, Erstmaligkeit
    Wirkung nicht, sondern verlässt sich darauf, dass jemand die Nummern in der richtigen
    Reihenfolge vergeben hat.
 
+   **Neben Zuständen hängen Läufe auch an Regeln.** Prüffrage je Cluster, zusätzlich zur
+   `Given`-Frage oben: *Setzt ein `When` oder `Then` eine Regel aus einer Querschnitts-Feature-Datei
+   voraus (`@CROSS-…`, `@NFR-…`), deren Lauf noch offen ist?* Dann bekommt der Lauf die Kante auf
+   diesen Lauf – auch wenn nur eine Beispielzeile die Regel berührt. Beispiel: Ein Grenzwert-Szenario
+   gibt einen Titel mit doppeltem Leerzeichen ein und erwartet ihn mit einfachem gespeichert; das
+   geht nur mit `CROSS-text/run-1` (Leerraum zusammenfassen). Fehlt die Kante, legt `next_run.py`
+   den Lauf zu früh als fällig vor.
+
 6. <a id="CLU-erstmaligkeiten"></a>**Erstmaligkeiten flaggen** – vor der Implementierung, nicht während:
    Prüfe je Lauf in der festgelegten Reihenfolge: *Was tut dieser Lauf, das noch kein Lauf zuvor
    getan hat?* Führt er den ersten Vertreter einer Klasse ein (erster mutierender

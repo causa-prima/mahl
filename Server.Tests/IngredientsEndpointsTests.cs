@@ -20,7 +20,6 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
     // Nullable: ein explizit null gesetztes JSON-Property ist ein realer Client-Input (System.Text.Json
     // erzwingt die NRT-Annotationen des Server-DTOs nicht) und muss wie leer behandelt werden.
     private sealed record CreateIngredientRequest(string? Name, string? BaseUnit);
-    private sealed record ValidationErrorResponse(Dictionary<string, string[]> Errors);
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
     // ADR-S004-1/ADR-S111-2: 409-Body von POST bei soft-deleted-Namenskonflikt.
     private sealed record SoftDeletedConflictResponse(string Code, Guid Id);
@@ -973,5 +972,183 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
 
         // Then: the row is soft-deleted again (full-state DB assertion)
         await AssertSoftDeletedAsync(AnIngredient(name: "Liebstöckel", unit: "Bund", id: created.Id));
+    }
+
+    // ADR-S135-1: DIESELBE Zeichenmengen wie Client/src/domain/text.ts (isBlank) und
+    // Client/src/pages/RecipesPage.test.tsx. Quelle der Leerraum-Liste: Unicode-Eigenschaft White_Space,
+    // empirisch per Node (\p{White_Space}) ermittelt, nicht char.IsWhiteSpace (das kennt zusätzlich U+001C–U+001F).
+    // Als Codepunkte statt Literale: unsichtbare Zeichen im Quelltext wären unlesbar und nicht editorfest.
+    public static IEnumerable<TheoryDataRow<int>> WhiteSpaceCodePoints => CodePointRows(
+        0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x0020, 0x0085, 0x00A0, 0x1680,
+        0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A,
+        0x2028, 0x2029, 0x202F, 0x205F, 0x3000);
+
+    // U+200B, U+00AD, U+2060, U+FEFF
+    public static IEnumerable<TheoryDataRow<int>> InvisibleCodePoints => CodePointRows(0x200B, 0x00AD, 0x2060, 0xFEFF);
+
+    public static IEnumerable<TheoryDataRow<int>> VanishingCodePoints => [.. WhiteSpaceCodePoints, .. InvisibleCodePoints];
+
+    // Anzeigename "U+2028" statt Dezimalzahl, damit ein roter Lauf das Zeichen lesbar benennt.
+    private static IEnumerable<TheoryDataRow<int>> CodePointRows(params int[] codePoints) =>
+        codePoints.Select(codePoint => new TheoryDataRow<int>(codePoint) { TestDisplayName = $"U+{codePoint:X4}" });
+
+    // Anzeigename = Zelle "Eingabe" aus features/text-input.feature; Parameter: Vorhanden, Request-Name, Normalisiert.
+    public static IEnumerable<TheoryDataRow<string, string, string>> NormalizedDuplicates =>
+    [
+        Duplicate("rote Linsen", "rote  Linsen", "rote Linsen", "\"rote\" und \"Linsen\" mit zwei Leerzeichen dazwischen"),
+        Duplicate("rote Linsen", $"rote{Character(0x00A0)}Linsen", "rote Linsen", "\"rote\" und \"Linsen\" mit einem geschützten Leerzeichen dazwischen"),
+        Duplicate("rote Linsen", $"rote{Character(0x202F)}Linsen", "rote Linsen", "\"rote\" und \"Linsen\" mit einem schmalen geschützten Leerzeichen dazwischen"),
+        Duplicate("Käse", $"Ka{Character(0x0308)}se", "Käse", "\"Käse\" mit einem „ä“ aus „a“ und kombinierendem Trema"),
+        Duplicate("Käse", $"Ka{Character(0x200B)}{Character(0x0308)}se", "Käse", "\"Käse\" mit einem Leerzeichen ohne Breite zwischen „a“ und kombinierendem Trema"),
+        Duplicate("Käse", $"K{Character(0x200B)}äse", "Käse", "\"Käse\" mit einem Leerzeichen ohne Breite nach dem „K“"),
+        Duplicate("Käse", $"K{Character(0x00AD)}äse", "Käse", "\"Käse\" mit einem weichen Trennzeichen nach dem „K“"),
+        Duplicate("Käse", $"K{Character(0x2060)}äse", "Käse", "\"Käse\" mit einem Wortverbinder nach dem „K“"),
+        Duplicate("Käse", $"K{Character(0xFEFF)}äse", "Käse", "\"Käse\" mit einer Byte-Order-Mark nach dem „K“"),
+    ];
+
+    private static TheoryDataRow<string, string, string> Duplicate(
+        string existingName, string requestName, string expectedNameInMessage, string eingabe) =>
+        new(existingName, requestName, expectedNameInMessage) { TestDisplayName = eingabe };
+
+    private static string Character(int codePoint) => char.ConvertFromUtf32(codePoint);
+
+    private async Task<HttpResponseMessage> PostIngredientAsync(string name, string baseUnit) =>
+        await Client.PostAsJsonAsync(
+            "/api/ingredients",
+            new CreateIngredientRequest(Name: name, BaseUnit: baseUnit),
+            TestContext.Current.CancellationToken);
+
+    private async Task AssertEmptyNameRejectedAsync(HttpResponseMessage response) =>
+        await AssertNameRejectedAsync(response, "Name darf nicht leer sein.", []);
+
+    private async Task AssertNameRejectedAsync(HttpResponseMessage response, string expectedMessage, IngredientDbType[] expectedPersisted)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        body.Errors.Should().BeEquivalentTo(new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["name"] = [expectedMessage],
+        });
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo(expectedPersisted);
+    }
+
+    private async Task AssertCreatedAndPersistedAsync(HttpResponseMessage response, string expectedName, string expectedUnit)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<IngredientResponse>(TestContext.Current.CancellationToken);
+        body.Should().NotBeNull();
+        // Id: serverseitig vergeben, daher aus der Antwort übernommen; die DB-Prüfung bindet sie an die gespeicherte Zeile.
+        body.Should().BeEquivalentTo(new IngredientResponse(Id: body.Id, Name: expectedName, BaseUnit: expectedUnit));
+        var persisted = await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken);
+        persisted.Should().BeEquivalentTo([AnIngredient(name: expectedName, unit: expectedUnit, id: body.Id)]);
+    }
+
+    // Szenario: Mehrfacher Leerraum im Inneren wird zu einem Leerzeichen
+    [Fact]
+    public async Task CROSS_Text_Collapse_CreateIngredient_RepeatedInnerWhitespace_PersistsSingleSpaces()
+    {
+        // Given: keine Zutaten vorhanden
+        // When: Name mit mehrfachen Leerzeichen und Tabulator, Einheit mit mehrfachen Leerzeichen
+        var response = await PostIngredientAsync("rote   \tLinsen", "kleine   Dose");
+
+        // Then: Antwort und DB tragen je ein Leerzeichen
+        await AssertCreatedAndPersistedAsync(response, "rote Linsen", "kleine Dose");
+    }
+
+    // Szenario: Genau die Leerraum- und die unsichtbaren Zeichen werden behandelt
+    // Beispiel: | "rote" und "Linsen" mit zwei gleichen Leerraum-Zeichen dazwischen, je eines der 25 aus White_Space | steht "rote Linsen" in der Zutaten-Liste |
+    // Client-Menge: Client/src/domain/text.ts (isBlank), Testliste Client/src/pages/RecipesPage.test.tsx.
+    [Theory]
+    [MemberData(nameof(WhiteSpaceCodePoints))]
+    public async Task CROSS_Text_CharacterSet_CreateIngredient_EachWhiteSpaceCharacterAsSeparator_PersistsSingleSpace(int whiteSpaceCodePoint)
+    {
+        // Given: keine Zutaten vorhanden
+        // When: das Zeichen trennt zwei Wörter
+        var whiteSpace = Character(whiteSpaceCodePoint);
+        var response = await PostIngredientAsync($"rote{whiteSpace}{whiteSpace}Linsen", "g");
+
+        // Then: ein Leerzeichen
+        await AssertCreatedAndPersistedAsync(response, "rote Linsen", "g");
+    }
+
+    // Szenario: Genau die Leerraum- und die unsichtbaren Zeichen werden behandelt
+    // Beispiel: | "rote" und "Linsen" mit dem Steuerzeichen U+001C dazwischen | steht der Name mit U+001C unverändert in der Zutaten-Liste |
+    // Gegenprobe: U+001C ist für char.IsWhiteSpace Leerraum, nicht aber White_Space; der Client hält es für
+    // sichtbar (Client/src/domain/text.ts), der Server muss es unverändert lassen.
+    [Fact]
+    public async Task CROSS_Text_CharacterSet_CreateIngredient_ControlCharacterOutsideWhiteSpace_PersistsUnchanged()
+    {
+        // Given: keine Zutaten vorhanden
+        // When: Name enthält ein Steuerzeichen außerhalb von White_Space
+        var control = Character(0x001C);
+        var response = await PostIngredientAsync($"rote{control}Linsen", "g");
+
+        // Then: unverändert gespeichert
+        await AssertCreatedAndPersistedAsync(response, $"rote{control}Linsen", "g");
+    }
+
+    // Szenario: Ein nach der Normalisierung gleicher Name gilt als Duplikat
+    // Beispiel: alle
+    [Theory]
+    [MemberData(nameof(NormalizedDuplicates))]
+    public async Task CROSS_Text_Duplicate_CreateIngredient_NormalizedEqualName_Returns422WithNormalizedName(
+        string existingName, string requestName, string expectedNameInMessage)
+    {
+        // Given: die Zutat existiert
+        var existing = AnIngredient(name: existingName, unit: "g");
+        Db.Ingredients.Add(existing);
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // When: derselbe Name in abweichender Kodierung wird angelegt
+        var response = await PostIngredientAsync(requestName, "g");
+
+        // Then: 422, die Meldung nennt den normalisierten Namen; nur die vorhandene Zutat bleibt
+        await AssertNameRejectedAsync(
+            response, $"Eine Zutat mit dem Namen '{expectedNameInMessage}' existiert bereits.", [existing]);
+    }
+
+    // Szenario: Die Längengrenze gilt für den normalisierten Wert
+    [Fact]
+    public async Task CROSS_Text_Length_CreateIngredient_NameOf30CharsWithDoubleInnerSpace_Returns201()
+    {
+        // Given: 30 Zeichen normalisiert, 31 roh (doppeltes statt einfaches Leerzeichen)
+        var normalized = $"{new string('a', 14)} {new string('b', 15)}";
+        normalized.Length.Should().Be(30);
+
+        // When: angelegt
+        var response = await PostIngredientAsync(normalized.Replace(" ", "  ", StringComparison.Ordinal), "g");
+
+        // Then: akzeptiert, mit einfachem Leerzeichen gespeichert
+        await AssertCreatedAndPersistedAsync(response, normalized, "g");
+    }
+
+    // Szenario: Ein Wert nur aus unsichtbaren Zeichen gilt als leer
+    [Fact]
+    public async Task CROSS_Text_InvisibleOnly_CreateIngredient_NameOfZeroWidthSpaces_Returns422Empty()
+    {
+        // Given: keine Zutaten vorhanden
+        // When: Name nur aus Leerzeichen ohne Breite
+        var response = await PostIngredientAsync(string.Concat(Enumerable.Repeat(Character(0x200B), 3)), "g");
+
+        // Then: leer
+        await AssertEmptyNameRejectedAsync(response);
+    }
+
+    // Szenario: Genau die Leerraum- und die unsichtbaren Zeichen werden behandelt
+    // Beispiel: | nur ein Leerraum- oder unsichtbares Zeichen, zweimal, je eines der 29 | sehe ich die Fehlermeldung "Name darf nicht leer sein." |
+    // Menge = Client/src/domain/text.ts (isBlank).
+    [Theory]
+    [MemberData(nameof(VanishingCodePoints))]
+    public async Task CROSS_Text_CharacterSet_CreateIngredient_EachVanishingCharacterAlone_Returns422Empty(int vanishingCodePoint)
+    {
+        // Given: keine Zutaten vorhanden
+        // When: Name nur aus diesem Zeichen
+        var vanishing = Character(vanishingCodePoint);
+        var response = await PostIngredientAsync($"{vanishing}{vanishing}", "g");
+
+        // Then: leer
+        await AssertEmptyNameRejectedAsync(response);
     }
 }

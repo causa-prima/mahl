@@ -21,8 +21,8 @@ internal enum UnitError { Empty, TooLong }
 // seine Regeln auf mehrere Änderungsorte.
 internal readonly record struct Unit
 {
-    // ADR-S051-3: max. 20 Zeichen, nach Trimming gemessen – die Grenze ist Teil des Typs.
-    private readonly Bounded<NonEmptyTrimmedString, Max20> _value;
+    // ADR-S051-3: max. 20 Zeichen, am normalisierten Wert gemessen – die Grenze ist Teil des Typs.
+    private readonly Bounded<NonEmptyNormalizedString, Max20> _value;
     public string Value => _value.Value; // wirft transitiv – der Guard sitzt im Constraint-Typ
 
     // Parameterless ctor must be public (record struct limitation) – catches new Unit():
@@ -30,11 +30,11 @@ internal readonly record struct Unit
     [ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
     public Unit() => throw new InvalidOperationException("Uninitialized");
 
-    private Unit(Bounded<NonEmptyTrimmedString, Max20> value) => _value = value;
+    private Unit(Bounded<NonEmptyNormalizedString, Max20> value) => _value = value;
 
     public static OneOf<Unit, UnitError> Create(string? input) =>
-        Bounded<NonEmptyTrimmedString, Max20>.Create(input)
-            .MapError<Bounded<NonEmptyTrimmedString, Max20>, StringViolation, UnitError>(v => v switch
+        Bounded<NonEmptyNormalizedString, Max20>.Create(input)
+            .MapError<Bounded<NonEmptyNormalizedString, Max20>, StringViolation, UnitError>(v => v switch
             {
                 StringViolation.Empty => UnitError.Empty,
                 StringViolation.TooLong => UnitError.TooLong,

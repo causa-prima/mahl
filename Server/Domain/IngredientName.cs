@@ -20,8 +20,8 @@ internal enum IngredientNameError { Empty, TooLong }
 // Marker im Feldtyp, nicht als const in Create() (ADR-S119-1).
 internal readonly record struct IngredientName
 {
-    // ADR-S051-3: max. 30 Zeichen, nach Trimming gemessen – die Grenze ist Teil des Typs.
-    private readonly Bounded<NonEmptyTrimmedString, Max30> _value;
+    // ADR-S051-3: max. 30 Zeichen, am normalisierten Wert gemessen – die Grenze ist Teil des Typs.
+    private readonly Bounded<NonEmptyNormalizedString, Max30> _value;
     public string Value => _value.Value; // wirft transitiv – der Guard sitzt im Constraint-Typ
 
     // Parameterless ctor must be public (record struct limitation) – catches new IngredientName():
@@ -29,13 +29,13 @@ internal readonly record struct IngredientName
     [ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
     public IngredientName() => throw new InvalidOperationException("Uninitialized");
 
-    private IngredientName(Bounded<NonEmptyTrimmedString, Max30> value) => _value = value;
+    private IngredientName(Bounded<NonEmptyNormalizedString, Max30> value) => _value = value;
 
     // Meldungen an die Grenze: der Typ liefert die Fehlerfälle SEINES Konzepts – der Constraint-Typ und sein
     // StringViolation bleiben Implementierungsdetail (Domänentyp = Schnittstelle, ADR-S120-1).
     public static OneOf<IngredientName, IngredientNameError> Create(string? input) =>
-        Bounded<NonEmptyTrimmedString, Max30>.Create(input)
-            .MapError<Bounded<NonEmptyTrimmedString, Max30>, StringViolation, IngredientNameError>(v => v switch
+        Bounded<NonEmptyNormalizedString, Max30>.Create(input)
+            .MapError<Bounded<NonEmptyNormalizedString, Max30>, StringViolation, IngredientNameError>(v => v switch
             {
                 StringViolation.Empty => IngredientNameError.Empty,
                 StringViolation.TooLong => IngredientNameError.TooLong,

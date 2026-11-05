@@ -65,7 +65,7 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
 
 - [ ] Neue Properties/Parameter verwenden einen eingebauten Typ (`string`, `int`, `decimal`, ...) obwohl es ungültige Werte gibt?
   → Frage: *Welche Werte wären für dieses Konzept ungültig?* Wenn es solche Werte gibt, braucht das Konzept einen eigenen Typ.
-  → C#: `NonEmptyTrimmedString`, `PositiveInt`, etc. (`Server/Types/` als Referenz)
+  → C#: `NonEmptyNormalizedString`, `PositiveInt`, etc. (`Server/Types/` als Referenz)
   → TypeScript: Branded Type (`type RecipeId = string & { readonly __brand: 'RecipeId' }`)
   → Gilt auch für Methodenparameter und Props, nicht nur Properties/State.
 

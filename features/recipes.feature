@@ -319,7 +319,7 @@ Feature: Rezepte erfassen
     And bin ich weiterhin im Formular
     And ist die Rezept-Liste unverändert
 
-  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack
+  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack · braucht:CROSS-text/run-1
   @US-602-error
   Scenario Outline: Ungültiger Titel
     Given die Zutat "Mehl" mit Einheit "g" existiert
@@ -341,7 +341,7 @@ Feature: Rezepte erfassen
 
   # Umlaut „Käsekuchen"/„KÄSEKUCHEN": prüft Case-Insensitivität auch jenseits von ASCII.
   # Zerlegtes „ä" und „apfel   strudel": Die Eindeutigkeit gilt für den normalisierten Titel.
-  # @run-12 · Anlegen·Validierung Titel eindeutig · Full-Stack
+  # @run-12 · Anlegen·Validierung Titel eindeutig · Full-Stack · braucht:CROSS-text/run-1
   @US-602-error
   Scenario Outline: Titel existiert bereits – unabhängig von Schreibweise und Leerraum
     Given das Rezept "<Vorhanden>" existiert
@@ -484,7 +484,7 @@ Feature: Rezepte erfassen
     And bin ich weiterhin im Formular mit allen Eingaben
     And ist die Rezept-Liste unverändert
 
-  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack
+  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack · braucht:CROSS-text/run-1
   @US-602-error
   Scenario: Schritt-Anweisung mit mehr als 1000 Zeichen
     Given die Zutat "Mehl" mit Einheit "g" existiert
@@ -503,7 +503,7 @@ Feature: Rezepte erfassen
 
   # Leere Schrittfelder werden nicht mitgeschickt – die Meldung muss trotzdem am Formularfeld
   # erscheinen, nicht an der Position in der gesendeten Liste (dort wäre es das zweite Feld).
-  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack
+  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack · braucht:CROSS-text/run-1
   @US-602-error
   Scenario: Meldungen erscheinen am richtigen Schritt, auch hinter leeren Schrittfeldern
     Given die Zutat "Mehl" mit Einheit "g" existiert
@@ -521,7 +521,7 @@ Feature: Rezepte erfassen
     And sind der erste und der zweite Schritt nicht als fehlerhaft markiert
     And liegt der Fokus auf dem dritten Schrittfeld
 
-  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack
+  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack · braucht:CROSS-text/run-1
   @US-602-error
   Scenario: Alle fehlerhaften Schritte werden gemeldet, der Fokus liegt auf dem ersten
     Given die Zutat "Mehl" mit Einheit "g" existiert
@@ -572,7 +572,7 @@ Feature: Rezepte erfassen
     And zeigt sie die Zutat "250 g Mehl"
     And steht "Pfannkuchen" genau einmal in der Rezept-Liste
 
-  # @run-12 · Anlegen·Validierung Titel eindeutig · Full-Stack
+  # @run-12 · Anlegen·Validierung Titel eindeutig · Full-Stack · braucht:CROSS-text/run-1
   @US-602-error
   Scenario: Titel-Eindeutigkeit wird erst geprüft, wenn alle übrigen Prüfungen bestanden sind
     Given das Rezept "Pfannkuchen" existiert
@@ -629,7 +629,7 @@ Feature: Rezepte erfassen
     And zeigt sie den Schritt 1 "Linsen kochen." ohne Zeilenumbruch
     And steht "linsensuppe vom blech" in der Rezept-Liste
 
-  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack
+  # @run-9 · Anlegen·Validierung Titel und Anweisung · Full-Stack · braucht:CROSS-text/run-1
   @US-602-edge-case
   Scenario: Titel und Anweisung mit genau der zulässigen Länge werden gespeichert
     Given die Zutat "Mehl" mit Einheit "g" existiert

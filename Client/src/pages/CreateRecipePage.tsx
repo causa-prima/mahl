@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react'
+import { useId, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Container from '@mui/material/Container'
@@ -18,9 +18,9 @@ import { useResultMutation } from '../hooks/useResultMutation'
 import { createRecipe } from '../services/recipesApi'
 import { useDiscardQuestion } from '../hooks/useDiscardQuestion'
 import { useRecipeFieldMessages } from '../hooks/useRecipeFieldMessages'
-import type { FieldMessage } from '../hooks/useRecipeFieldMessages'
+import type { FieldMessage, InputRefCallback } from '../hooks/useRecipeFieldMessages'
 import { useRecipeForm } from '../hooks/useRecipeForm'
-import { toNewRecipe } from '../domain/recipe'
+import { sentStepFieldIndexes, toNewRecipe } from '../domain/recipe'
 import type { Recipe } from '../domain/recipe'
 
 const ingredientsHint = 'Eine Zutat je Zeile: Menge, Einheit, Zutat – z. B. „250 g Mehl“ oder „Salz“.'
@@ -33,7 +33,9 @@ export default function CreateRecipePage() {
   const [save, error] = useResultMutation(createRecipe, (created: Recipe) => {
     void navigate(`/recipes/${created.id}`)
   })
-  const field = useRecipeFieldMessages(error)
+  // Stand beim Speichern: welches Formularfeld welchen gesendeten Schritt trug (ADR-S144-1).
+  const [sentFieldIndexes, setSentFieldIndexes] = useState<readonly number[]>([])
+  const field = useRecipeFieldMessages(error, sentFieldIndexes)
 
   const leaveToList = () => { void navigate('/recipes') }
   const discardQuestion = useDiscardQuestion(hasInput, leaveToList)
@@ -44,6 +46,7 @@ export default function CreateRecipePage() {
         component="form"
         onSubmit={(e: Readonly<React.SyntheticEvent>) => {
           e.preventDefault()
+          setSentFieldIndexes(sentStepFieldIndexes(values.steps))
           save(toNewRecipe(values))
         }}
       >
@@ -59,7 +62,9 @@ export default function CreateRecipePage() {
         <Stack spacing={2}>
           <StepsSection
             steps={values.steps}
-            stepsField={field.steps}
+            stepsMessage={field.steps.message}
+            instructionMessage={field.steps.instructionMessage}
+            inputRef={field.steps.inputRef}
             onChange={changeStep}
             onAdd={addStep}
           />
@@ -164,8 +169,6 @@ function IngredientsField({ value, field, onChange }: Readonly<IngredientsFieldP
   const hintId = useId()
   const messageId = useId()
   const { message } = field
-  // Stryker disable next-line ConditionalExpression: Meldungselement nur bei vorhandener Meldung (ADR-S144-3)
-  const messageElement = message !== undefined && <FormHelperText id={messageId}>{message}</FormHelperText>
   // error={false}: Der Hinweis bleibt grau, auch wenn das Feld im Fehlerzustand ist.
   // Stryker disable next-line BooleanLiteral: reine Farbe des Hinweises ohne Semantik (ADR-S144-3)
   const hintElement = <FormHelperText id={hintId} error={false}>{ingredientsHint}</FormHelperText>
@@ -189,7 +192,7 @@ function IngredientsField({ value, field, onChange }: Readonly<IngredientsFieldP
         onChange={(e) => { onChange(e.target.value) }}
       />
       {hintElement}
-      {messageElement}
+      <FieldMessageText id={messageId} message={message} />
     </FormControl>
   )
 }
@@ -198,16 +201,16 @@ type StepsSectionProps = {
   readonly steps: readonly string[]
   readonly onChange: (index: number, instruction: string) => void
   readonly onAdd: () => void
-  readonly stepsField: FieldMessage<HTMLTextAreaElement>
+  readonly stepsMessage: string | undefined
+  readonly instructionMessage: (fieldIndex: number) => string | undefined
+  readonly inputRef: (fieldIndex: number) => InputRefCallback
 }
 
-function StepsSection({ steps, onChange, onAdd, stepsField }: Readonly<StepsSectionProps>) {
+function StepsSection(props: Readonly<StepsSectionProps>) {
+  const { steps, onChange, onAdd, stepsMessage: message, instructionMessage, inputRef } = props
   const messageId = useId()
-  const { message } = stepsField
   // Stryker disable next-line ConditionalExpression: Verknüpfung nur bei vorhandener Meldung (ADR-S144-3)
   const describedBy = message === undefined ? undefined : messageId
-  // Stryker disable next-line ConditionalExpression: Meldungselement nur bei vorhandener Meldung (ADR-S144-3)
-  const messageElement = message !== undefined && <FormHelperText id={messageId}>{message}</FormHelperText>
   return (
     // aria-label: Der Asterisk der Legende ist aria-hidden und eine Gruppe kennt kein aria-required;
     // der zugängliche Name trägt deshalb die Pflichtangabe (enthält den sichtbaren Namen, WCAG 2.5.3).
@@ -219,35 +222,71 @@ function StepsSection({ steps, onChange, onAdd, stepsField }: Readonly<StepsSect
       error={message !== undefined}
     >
       <FormLabel component="legend" required>Schritte</FormLabel>
-      {messageElement}
+      <FieldMessageText id={messageId} message={message} />
       {steps.map((instruction, index) => (
-        <TextField
+        <StepField
           // Schritte haben keine Identität außer ihrer Position; es wird nur angehängt.
           key={index}
           label={`Schritt ${String(index + 1)}`}
+          value={instruction}
           // Nur nachträglich hinzugefügte Schrittfelder (Index > 0) übernehmen beim Einhängen den Fokus
           // (ADR-S135-4); das erste würde sonst mit dem Titel konkurrieren.
           autoFocus={index > 0}
-          fullWidth
-          multiline
-          minRows={2}
-          margin="normal"
-          value={instruction}
-          inputRef={index === 0 ? stepsField.ref : undefined}
-          // Der Fokus springt auf das erste Schrittfeld: es trägt die Meldung selbst, ohne roten Rahmen (UI-Entwurf).
-          slotProps={{
-            htmlInput: {
-              'aria-invalid': index === 0 && message !== undefined,
-              // Nur das erste Schrittfeld trägt die Meldung (Fokusziel, ADR-S135-4).
-              'aria-describedby': index === 0 ? describedBy : undefined,
-            },
-          }}
-          onChange={(e) => { onChange(index, e.target.value) }}
+          inputRef={inputRef(index)}
+          message={instructionMessage(index)}
+          // Nur das erste Feld ist Fokusziel der Listen-Meldung (ADR-S135-4); `describedBy` ist nur bei
+          // vorhandener Meldung gesetzt.
+          listMessageId={index === 0 ? describedBy : undefined}
+          onChange={(text) => { onChange(index, text) }}
         />
       ))}
       <Box>
         <Button onClick={onAdd}>Schritt hinzufügen</Button>
       </Box>
     </FormControl>
+  )
+}
+
+// ADR-S144-3: Meldungselement nur bei vorhandener Meldung.
+function FieldMessageText({ id, message }: Readonly<{ id: string, message: string | undefined }>) {
+  // Stryker disable next-line ConditionalExpression: Meldungselement nur bei vorhandener Meldung (ADR-S144-3)
+  return message !== undefined && <FormHelperText id={id}>{message}</FormHelperText>
+}
+
+type StepFieldProps = {
+  readonly label: string
+  readonly value: string
+  readonly autoFocus: boolean
+  readonly inputRef: InputRefCallback
+  // Meldung zur Anweisung dieses Schritts (Hilfetext unter dem Feld)
+  readonly message: string | undefined
+  // Id der Listen-Meldung an der Legende, nur gesetzt am Fokusziel dieser Meldung: Das Feld trägt sie selbst
+  // (aria-invalid, aria-describedby), ohne roten Rahmen (UI-Entwurf).
+  readonly listMessageId: string | undefined
+  readonly onChange: (instruction: string) => void
+}
+
+function StepField(props: Readonly<StepFieldProps>) {
+  const { label, value, autoFocus, inputRef, message, listMessageId, onChange } = props
+  return (
+    <TextField
+      label={label}
+      autoFocus={autoFocus}
+      fullWidth
+      multiline
+      minRows={2}
+      margin="normal"
+      value={value}
+      inputRef={inputRef}
+      // error trägt aria-invalid und die Verknüpfung des Hilfetextes an das Eingabefeld (Semantik, getestet).
+      // Annahme: Das Feld mit Listen-Meldung hat keine Anweisungs-Meldung (bei der Listen-Meldung wurde
+      // kein Schritt gesendet) – die beiden aria-Quellen kollidieren nie.
+      error={message !== undefined}
+      helperText={message}
+      slotProps={{
+        htmlInput: listMessageId === undefined ? {} : { 'aria-invalid': true, 'aria-describedby': listMessageId },
+      }}
+      onChange={(e) => { onChange(e.target.value) }}
+    />
   )
 }

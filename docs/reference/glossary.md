@@ -88,7 +88,7 @@ Die zeitliche Aufwandsabschätzung für ein *Rezept*.
 <a id="GLO-quantity"></a>
 ### Quantity (Menge)
 Eine Mengenangabe, bestehend aus einer positiven Zahl und einer Einheit – oder keine Angabe.
-*   **Varianten:** `Specified(value: decimal > 0, unit: NonEmptyTrimmedString)` | `Unspecified`
+*   **Varianten:** `Specified(value: decimal > 0, unit: NonEmptyNormalizedString)` | `Unspecified`
 *   **Verwendung:** Rezept-Zutaten, Einkaufslisten-Einträge, Basis-Portion.
 *   **Code-Typ:** `Quantity` (Sum-Type im Domain-Layer)
 *   **In der Rezept-Zutat:** Die Einheit ist die Basiseinheit der Zutat (ADR-S135-2); der Code-Typ trägt dort nur den Zahlwert (ADR-S020-1, Addendum S141).

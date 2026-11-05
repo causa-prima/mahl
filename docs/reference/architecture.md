@@ -18,7 +18,7 @@ kritische-regeln:
 | [Wie Regeln lesen](#ARC-regeln-lesen) | Guidelines ≠ absolute Gesetze; Abweichungen sofort kommunizieren und dokumentieren | Bei Unsicherheit über Regelauslegung |
 | [Hexagonal Architecture](#ARC-hexagonal) | Ports & Adapters, Projekt-Visibility (public/internal), kein InternalsVisibleTo | Beim Anlegen neuer Projekte, beim Verstehen der Test-Strategie |
 | [Tech Stack](#ARC-tech-stack) | Backend (.NET 10, Minimal APIs, EF Core 10), Frontend (React 19, MUI v7, Vite, React Query), DB (PostgreSQL) | Beim Einrichten der Umgebung oder Wahl neuer Abhängigkeiten |
-| [Domain Modeling](#ARC-domain-modeling) | Make Illegal States Unrepresentable, Validation = Konstruktion, Dependency Rule, bestehende Typen (NonEmptyTrimmedString etc.) | Beim Erstellen neuer Domain-Typen oder Validierungslogik |
+| [Domain Modeling](#ARC-domain-modeling) | Make Illegal States Unrepresentable, Validation = Konstruktion, Dependency Rule, bestehende Typen (NonEmptyNormalizedString etc.) | Beim Erstellen neuer Domain-Typen oder Validierungslogik |
 | [Endpoint-Pattern](#ARC-endpoint-pattern) | Dateistruktur für Minimal API Endpoints, EF Core Include-Pflicht | Beim Anlegen neuer Endpoints |
 | [Projekt-Struktur](#ARC-projekt-struktur) | Verzeichnis-Layout: mahl.Infrastructure (public) / mahl.Server (internal) – strikt getrennt | Beim Anlegen neuer Dateien oder Projekte |
 | [SKELETON-Phase: Scope-Constraints](#ARC-skeleton-constraints) | Was in der SKELETON-Phase bewusst nicht gebaut wird | Bevor Umfang über den Walking Skeleton hinaus wächst |
@@ -201,7 +201,7 @@ Server.Tests/                     Integration-Tests (kein InternalsVisibleTo)
 - `Server`: Referenziert `Infrastructure` für DbContext; alle eigenen Typen sind `internal`
 - `Server.Tests`: Greift nur auf HTTP-Ports und `MahlDbContext` zu – nie direkt auf `internal`-Typen
 
-Shared-Typen (`NonEmptyTrimmedString`, `NonEmptyList<T>`, etc.) liegen in `Server/Types/` und sind ebenfalls `internal`.
+Shared-Typen (`NonEmptyNormalizedString`, `NonEmptyList<T>`, etc.) liegen in `Server/Types/` und sind ebenfalls `internal`.
 
 ---
 

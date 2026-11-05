@@ -448,6 +448,16 @@ async function pasteText(user: User, field: Readonly<HTMLElement>, value: string
   await user.paste(value)
 }
 
+// When (Szenario): "Schritt hinzufügen" klicken.
+async function clickAddStep(user: User) {
+  await user.click(screen.getByRole('button', { name: 'Schritt hinzufügen' }))
+}
+
+// When (Szenario): "Speichern" klicken.
+async function clickSave(user: User) {
+  await user.click(screen.getByRole('button', { name: 'Speichern' }))
+}
+
 function clickCancel() {
   fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
 }
@@ -774,7 +784,7 @@ describe('Rezept ohne Pflichtangaben', () => {
     await openCreateFormFromEmptyList()
 
     // When: ich ohne Eingaben speichere
-    await user.click(screen.getByRole('button', { name: 'Speichern' }))
+    await clickSave(user)
 
     // Then: alle Meldungen stehen an ihren Feldern, die Felder sind als fehlerhaft markiert,
     // der Fokus liegt auf dem Titel, das leere Schrittfeld wurde nicht gesendet
@@ -843,7 +853,7 @@ describe('Rezept ohne Pflichtangaben', () => {
       await user.type(screen.getByLabelText(/^Titel/), 'Pfannkuchen')
       await pasteText(user, screen.getByLabelText(/^Zutaten/), zutaten)
       await pasteText(user, screen.getByLabelText('Schritt 1'), schritt)
-      await user.click(screen.getByRole('button', { name: 'Speichern' }))
+      await clickSave(user)
 
       // Then: die Meldung steht nur am betroffenen Feld, nur dieses ist als fehlerhaft markiert und hat den Fokus,
       // Eingaben bleiben, leere Schritte wurden nicht gesendet
@@ -873,8 +883,8 @@ describe('Rezept ohne Pflichtangaben', () => {
     await openCreateFormFromEmptyList()
 
     // When: ich einen zweiten, leeren Schritt hinzufüge und speichere
-    await user.click(screen.getByRole('button', { name: 'Schritt hinzufügen' }))
-    await user.click(screen.getByRole('button', { name: 'Speichern' }))
+    await clickAddStep(user)
+    await clickSave(user)
 
     // Then: nur Schritt 1 trägt Meldung und Fehlermarkierung und hat den Fokus
     await screen.findByText(stepsRequired)
@@ -884,5 +894,126 @@ describe('Rezept ohne Pflichtangaben', () => {
     expect(screen.getByLabelText('Schritt 1')).toHaveFocus()
     expect(screen.getByLabelText('Schritt 2')).toHaveAccessibleDescription('')
     expect(screen.getByLabelText('Schritt 2')).toHaveAttribute('aria-invalid', 'false')
+  })
+})
+
+const stepTooLong = 'Schritt-Anweisung darf maximal 1000 Zeichen lang sein.'
+const tooLongInstruction = 'x'.repeat(1001)
+const validStep = 'Teig rühren.'
+const recipeTitle = 'Pfannkuchen'
+const recipeIngredients = '250 g Mehl'
+
+// When (Szenario): Formular mit Titel und Zutat füllen.
+async function fillTitleAndIngredients(user: User) {
+  await openCreateFormFromEmptyList()
+  await user.type(screen.getByLabelText(/^Titel/), recipeTitle)
+  await user.type(screen.getByLabelText(/^Zutaten/), recipeIngredients)
+}
+
+// When (Szenario): die Anweisung in das Schrittfeld mit dieser Nummer einfügen.
+async function enterStep(user: User, number: number, instruction: string) {
+  await pasteText(user, await screen.findByLabelText(`Schritt ${String(number)}`), instruction)
+}
+
+// Then: Schrittfeld trägt die Meldung (zugängliche Beschreibung, aria-invalid) – oder nichts davon.
+function expectStepMarked(number: number, message: string) {
+  const field = screen.getByLabelText(`Schritt ${String(number)}`)
+  expect(field).toHaveAccessibleDescription(message)
+  expect(field).toHaveAttribute('aria-invalid', 'true')
+}
+
+function expectStepUnmarked(number: number) {
+  const field = screen.getByLabelText(`Schritt ${String(number)}`)
+  expect(field).toHaveAccessibleDescription('')
+  expect(field).toHaveAttribute('aria-invalid', 'false')
+}
+
+// @US-602-error
+describe('Rezept mit ungültiger Schritt-Anweisung', () => {
+  // Szenario: Schritt-Anweisung mit mehr als 1000 Zeichen
+  it('US602_Error_CreateRecipe_InstructionTooLong_ShowsMessageAtThatStepAndKeepsInput', async () => {
+    // Given: der Server lehnt die Anweisung des zweiten gesendeten Schritts ab
+    const postedBody = usePostRejectedWith({ 'steps[1].instruction': [stepTooLong] })
+    const user = userEvent.setup()
+
+    // When: ich Schritt 1 und einen zweiten Schritt mit 1001 Zeichen eingebe und speichere
+    await fillTitleAndIngredients(user)
+    await enterStep(user, 1, validStep)
+    await clickAddStep(user)
+    await enterStep(user, 2, tooLongInstruction)
+    await clickSave(user)
+
+    // Then: die Meldung steht am zweiten Schrittfeld, das den Fokus hat; Eingaben bleiben
+    expect(await screen.findByText(stepTooLong)).toBeInTheDocument()
+    expectStepMarked(2, stepTooLong)
+    expectStepUnmarked(1)
+    expect(stepsGroup()).toHaveAccessibleDescription('')
+    expect(screen.getByLabelText('Schritt 2')).toHaveFocus()
+    expect(screen.getByLabelText(/^Titel/)).toHaveValue(recipeTitle)
+    expect(screen.getByLabelText('Schritt 1')).toHaveValue(validStep)
+    expect(screen.getByLabelText('Schritt 2')).toHaveValue(tooLongInstruction)
+    expect(postedBody).toHaveBeenCalledExactlyOnceWith({
+      title: recipeTitle, ingredients: recipeIngredients,
+      steps: [{ instruction: validStep }, { instruction: tooLongInstruction }],
+    })
+    expectStillInForm()
+  })
+
+  // Szenario: Meldungen erscheinen am richtigen Schritt, auch hinter leeren Schrittfeldern
+  it('US602_Error_CreateRecipe_InstructionTooLong_BehindBlankStepField_MessageAtOwnField', async () => {
+    // Given: Das leere Feld wird nicht gesendet; der lange Schritt hat in der gesendeten Liste Index 1
+    // (steps[1]), obwohl er das dritte Feld ist.
+    const postedBody = usePostRejectedWith({ 'steps[1].instruction': [stepTooLong] })
+    const user = userEvent.setup()
+
+    // When: Schritt 1 gefüllt, Schritt 2 nur Leerraum, Schritt 3 mit 1001 Zeichen; speichern
+    await fillTitleAndIngredients(user)
+    await enterStep(user, 1, validStep)
+    await clickAddStep(user)
+    await enterStep(user, 2, '   ')
+    await clickAddStep(user)
+    await enterStep(user, 3, tooLongInstruction)
+    await clickSave(user)
+
+    // Then: die Meldung steht am dritten Schrittfeld, Schritt 1 und 2 sind unmarkiert, der Fokus liegt auf Schritt 3
+    expect(await screen.findByText(stepTooLong)).toBeInTheDocument()
+    expectStepMarked(3, stepTooLong)
+    expectStepUnmarked(1)
+    expectStepUnmarked(2)
+    expect(screen.getByLabelText('Schritt 3')).toHaveFocus()
+    expect(postedBody).toHaveBeenCalledExactlyOnceWith({
+      title: recipeTitle, ingredients: recipeIngredients,
+      steps: [{ instruction: validStep }, { instruction: tooLongInstruction }],
+    })
+  })
+
+  // Szenario: Alle fehlerhaften Schritte werden gemeldet, der Fokus liegt auf dem ersten
+  it('US602_Error_CreateRecipe_SeveralInstructionsTooLong_AllMessagesShownAndFocusOnFirst', async () => {
+    // Given: Alle drei Felder werden gesendet (Index 0 bis 2); der Server meldet steps[1] und steps[2],
+    // also das zweite und dritte Feld.
+    const postedBody = usePostRejectedWith({
+      'steps[1].instruction': [stepTooLong], 'steps[2].instruction': [stepTooLong],
+    })
+    const user = userEvent.setup()
+
+    // When: Schritt 1 gültig, Schritt 2 und 3 mit je 1001 Zeichen; speichern
+    await fillTitleAndIngredients(user)
+    await enterStep(user, 1, validStep)
+    await clickAddStep(user)
+    await enterStep(user, 2, tooLongInstruction)
+    await clickAddStep(user)
+    await enterStep(user, 3, tooLongInstruction)
+    await clickSave(user)
+
+    // Then: Schritt 2 und 3 tragen je die Meldung, Schritt 1 ist unmarkiert, der Fokus liegt auf Schritt 2
+    expect(await screen.findAllByText(stepTooLong)).toHaveLength(2)
+    expectStepMarked(2, stepTooLong)
+    expectStepMarked(3, stepTooLong)
+    expectStepUnmarked(1)
+    expect(screen.getByLabelText('Schritt 2')).toHaveFocus()
+    expect(postedBody).toHaveBeenCalledExactlyOnceWith({
+      title: recipeTitle, ingredients: recipeIngredients,
+      steps: [{ instruction: validStep }, { instruction: tooLongInstruction }, { instruction: tooLongInstruction }],
+    })
   })
 })

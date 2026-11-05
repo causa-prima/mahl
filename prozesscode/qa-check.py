@@ -47,6 +47,7 @@ from ._stryker_report import (
     format_scope,
     format_status_breakdown,
     has_no_mutants,
+    short_path,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -168,6 +169,67 @@ def _is_fresh(report_path: Path, run_started_at: float) -> bool:
         return False
 
 
+TIMEOUT_TITEL = "⏱  {anzahl} Timeout(s) in geänderten Dateien – Stryker zählt sie als erkannt, belegt ist das nicht:"
+TIMEOUT_ACHTUNG = (
+    "\n⚠️  ACHTUNG: {anzahl} Timeout(s) in geänderten Dateien – Stryker zählt sie als erkannt, belegt ist das "
+    "nicht: Eine zu knappe Zeitgrenze hat schon Survivors verdeckt. Dieser Lauf ist KEINE gültige Übergabe, bis "
+    "jeder geklärt ist. Kann der Mutant eine Schleife oder ein Warten ohne Ende erzeugen, ist er erkannt; sonst "
+    "ist er wie ein Survivor zu behandeln (docs/process/tdd-process.md#TDD-survivor-entscheidung). Jeden "
+    "einzeln mit Einordnung im Return aufführen."
+)
+SCORE_ACHTUNG = (
+    "\n⚠️  ACHTUNG: Mutation-Score {score} < 100 % – dieser Lauf ist KEINE gültige Übergabe. Survivors/NoCoverage "
+    "oben klären, bevor übergeben wird – außer solche, die laut „Welcher Survivor bekommt welche Reaktion?“ "
+    "(docs/process/tdd-process.md#TDD-survivor-entscheidung) an den Orchestrator gemeldet werden: dann "
+    "übergeben und jeden einzeln im Return aufführen."
+)
+EXIT_ACHTUNG = (
+    "\n⚠️  ACHTUNG: Stryker endete mit Exit {rc}, der Report zeigt aber {score} – der Score ist nicht der Grund. "
+    "Dieser Lauf ist KEINE gültige Übergabe: Ursache im Stryker-Output oben suchen, beheben und qa-check "
+    "erneut laufen lassen."
+)
+
+
+def _is_changed(report_key: str, changed: list[str]) -> bool:
+    """True, wenn der Report-Pfad eine der geänderten Dateien ist.
+
+    Die Schlüssel unterscheiden sich je Stryker: StrykerJS schreibt `src/…` relativ zu Client/,
+    Stryker.NET den absoluten Pfad – `short_path` bringt beide auf ein Repo-Pfad-Ende.
+    """
+    kurz = short_path(report_key)
+    return any(pfad == kurz or pfad.endswith("/" + kurz) for pfad in changed)
+
+
+def timeouts_in_changed_files(files: dict, changed: list[str]) -> dict[str, list]:
+    """Timeout-Mutanten je geänderter Datei (Kurzpfad). Ein Timeout zählt bei Stryker als erkannt;
+    in geändertem Code ist er bis zur Klärung kein Beleg (zu knappe Zeitgrenze verdeckt Survivors)."""
+    gruppen: dict[str, list] = {}
+    for key, file_data in files.items():
+        # `mutants` ist im Report-Schema (mutation-testing-elements) Pflicht je Datei.
+        timeouts = [m for m in file_data["mutants"] if m.get("status") == "Timeout"]
+        if timeouts and _is_changed(key, changed):
+            gruppen[short_path(key)] = timeouts
+    return gruppen
+
+
+def anzahl_mutanten(gruppen: dict[str, list]) -> int:
+    """Anzahl der Mutanten über alle Dateien einer Gruppe."""
+    return sum(len(mutanten) for mutanten in gruppen.values())
+
+
+def gate_messages(*, metrics: dict, timeouts: dict[str, list], stryker_rc: int) -> list[str]:
+    """Die Gründe, aus denen der Lauf keine gültige Übergabe ist – leer, wenn er gültig ist."""
+    anzahl_timeouts = anzahl_mutanten(timeouts)
+    gruende = []
+    if metrics["score"] < 100.0:
+        gruende.append(SCORE_ACHTUNG.format(score=format_score(metrics)))
+    elif stryker_rc != 0:
+        gruende.append(EXIT_ACHTUNG.format(rc=stryker_rc, score=format_score(metrics)))
+    if anzahl_timeouts:
+        gruende.append(TIMEOUT_ACHTUNG.format(anzahl=anzahl_timeouts))
+    return gruende
+
+
 def _parse_report(report_path: Path) -> tuple[dict, dict, str]:
     """Gibt (files, metrics, report_content_hash) zurück.
 
@@ -189,9 +251,13 @@ def _parse_report(report_path: Path) -> tuple[dict, dict, str]:
 # ── Git-Checks (layer-scoped) ─────────────────────────────────────────────────
 
 def _is_test_file(path: str) -> bool:
-    # Vitest-Unit-Tests (.test.ts/.test.tsx, Frontend-Regelfall unter Client/src/),
-    # Playwright-E2E (.spec.ts/.spec.tsx) und Backend-xUnit (…Tests.cs/…Test.cs).
-    return bool(re.search(r'(\.test\.tsx?|\.spec\.tsx?|Tests\.cs|Test\.cs)$', path))
+    # Vitest-Unit-Tests (.test.ts/.test.tsx, Frontend-Regelfall unter Client/src/) und
+    # Playwright-E2E (.spec.ts/.spec.tsx) über die Endung; Backend-xUnit und Testhelfer über ihr
+    # Verzeichnis. Ohne das liefen geänderte Helfer (Server.Tests/Helpers/, Client/src/test/,
+    # Client/src/mocks/) am Freigabe-Audit vorbei – Assertions in einem Helfer wären nach der
+    # Freigabe still änderbar.
+    return bool(re.search(r'(\.test\.tsx?|\.spec\.tsx?)$', path)
+                or re.match(r'(Server\.Tests|Client/src/test|Client/src/mocks)/', path))
 
 
 def check_changed_test_files(layer: str) -> list[str]:
@@ -548,7 +614,7 @@ def main() -> None:
             sys.exit(1)
 
     # ── Stryker ──────────────────────────────────────────────────────────────
-    stryker_gate_failed = False
+    stryker_rc = 0
     if run_stryker_now:
         print(f"[qa-check] Starte Stryker ({args.layer}) …")
         run_started_at = time.time()
@@ -574,7 +640,7 @@ def main() -> None:
             sys.exit(rc)
 
         if rc != 0:
-            stryker_gate_failed = True
+            stryker_rc = rc
             fresh = _find_report(args.layer)
             if fresh is None or not _is_fresh(fresh, run_started_at):
                 print(
@@ -585,9 +651,10 @@ def main() -> None:
                     file=sys.stderr,
                 )
                 sys.exit(rc)   # rc ist hier nie 0
+            # Meist das Score-Gate; welcher Grund es war, sagt das Gate am Ende (gate_messages).
             print(
-                f"[qa-check] ⚠️  Stryker-Score-Gate fehlgeschlagen (Score < 100 %, Exit {rc}) – "
-                f"frischer Report vorhanden, führe restliche Checks dennoch aus.",
+                f"[qa-check] ⚠️  Stryker endete mit Exit {rc} – frischer Report vorhanden, führe restliche "
+                f"Checks dennoch aus.",
                 file=sys.stderr,
             )
 
@@ -634,6 +701,10 @@ def main() -> None:
     # Survivors direkt hier zeigen: der Lauf HAT die Information, sie separat über
     # stryker-summary/stryker-frontend nachzuholen ist ein zweiter Lauf für nichts (OBS-S100-3).
     survivors, nocoverage = collect_undetected(files)
+    timeouts = timeouts_in_changed_files(files, _changed_paths(_LAYER_PATHS[args.layer]))
+    if timeouts:
+        print("\n" + TIMEOUT_TITEL.format(anzahl=anzahl_mutanten(timeouts)))
+        print("\n".join(format_mutant_group(timeouts)))
     if survivors:
         print(f"\n⚠️  {metrics['counts']['Survived']} Survivor(s):")
         print("\n".join(format_mutant_group(survivors)))
@@ -731,14 +802,11 @@ def main() -> None:
     # Score-Gate als Exit-Code – aber erst NACH vollständiger Ausgabe aller Checks + Hash,
     # damit ein zu niedriger Score keine anderen Check-Probleme verdeckt. Der Hash bleibt
     # verifizierbar; der nicht-null Exit-Code signalisiert: keine gültige Übergabe.
-    if stryker_gate_failed or metrics["score"] < 100.0:
+    gruende = gate_messages(metrics=metrics, timeouts=timeouts, stryker_rc=stryker_rc)
+    if gruende:
         sys.stdout.flush()  # Checks zuerst, damit die Warnung danach erscheint (stderr ist ungepuffert)
-        print(f"\n⚠️  ACHTUNG: Mutation-Score {format_score(metrics)} < 100 % – dieser Lauf ist KEINE "
-              f"gültige Übergabe. Survivors/NoCoverage oben klären, bevor übergeben wird – "
-              f"außer solche, die laut „Welcher Survivor bekommt welche Reaktion?“ "
-              f"(docs/process/tdd-process.md#TDD-survivor-entscheidung) an den Orchestrator "
-              f"gemeldet werden: dann übergeben und jeden einzeln im Return aufführen.",
-              file=sys.stderr)
+        for grund in gruende:
+            print(grund, file=sys.stderr)
         sys.exit(1)
 
 

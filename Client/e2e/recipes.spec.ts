@@ -5,6 +5,10 @@ import {
   createRecipeViaApi, fetchRecipeTitlesViaApi, postRecipeViaApi, seedRecipesWithSaltViaApi, UNKNOWN_RECIPE_ID,
 } from './api/recipesApi'
 import { discardQuestion } from './pages/recipesPage'
+import { exactly } from './exactText'
+
+// Then „sehe ich die Detailansicht des neuen Rezepts": die eigene Adresse mit der Kennung (ADR-S135-5).
+const RECIPE_DETAIL_URL = /\/recipes\/[0-9a-f-]{36}$/
 
 // @US-602-happy-path
 test.describe('US602_HappyPath: Rezepte erfassen', () => {
@@ -44,7 +48,7 @@ test.describe('US602_HappyPath: Rezepte erfassen', () => {
     await saveForm(page)
 
     // Then: die Detailansicht des Rezepts "Pfannkuchen" (eigene Adresse, ADR-S135-5)
-    await expect(page).toHaveURL(/\/recipes\/[0-9a-f-]{36}$/)
+    await expect(page).toHaveURL(RECIPE_DETAIL_URL)
     await expect(page.getByRole('heading', { name: 'Pfannkuchen' })).toBeVisible()
     // Then: die Zutaten in der eingegebenen Reihenfolge, so angezeigt wie eingegeben
     await expect(page.getByRole('list', { name: 'Zutaten' }).getByRole('listitem'))
@@ -130,6 +134,69 @@ async function expectMessageAtIngredients(page: Readonly<Page>, message: string)
   await expect(page.getByText(message, { exact: true })).toBeVisible()
   await expect(page.getByText(INGREDIENTS_HINT)).toBeVisible()
   await expect(page.getByLabel('Zutaten')).toHaveAccessibleDescription(`${INGREDIENTS_HINT} ${message}`)
+}
+
+// Eingaben und Meldung der Szenarien von „Anlegen·Validierung Titel und Anweisung".
+const PANCAKES = 'Pfannkuchen'
+const INGREDIENTS_MEHL = '250 g Mehl'
+const FIRST_STEP = 'Teig rühren.'
+const INSTRUCTION_OF_1001_CHARS = 'a'.repeat(1001)
+const STEP_TOO_LONG = 'Schritt-Anweisung darf maximal 1000 Zeichen lang sein.'
+
+// Je zwei Leerzeichen davor und dahinter, im Inneren jedes einfache Leerzeichen verdoppelt.
+const withExtraSpaces = (text: string): string => `  ${text.replaceAll(' ', '  ')}  `
+
+// Das Schrittfeld mit der sichtbaren Nummer „Schritt N".
+function stepField(page: Readonly<Page>, number: number): Locator {
+  return stepsSection(page).getByLabel(`Schritt ${String(number)}`)
+}
+
+// When „ich <Titel> als Titel eingebe", „ich "250 g Mehl" als Zutaten eingebe" und je Schritt „ich … als
+// Schritt eingebe", vor jedem weiteren Schritt „ich auf "Schritt hinzufügen" klicke". Nacheinander per
+// reduce: Die Reihenfolge ist Teil der Eingabe, und `functional/no-loop-statements` verbietet for…of.
+async function fillRecipeForm(page: Readonly<Page>, title: string, steps: readonly [string, ...string[]]): Promise<void> {
+  const [firstStep, ...furtherSteps] = steps
+  await page.getByLabel('Titel').fill(title)
+  await page.getByLabel('Zutaten').fill(INGREDIENTS_MEHL)
+  await stepField(page, 1).fill(firstStep)
+  await furtherSteps.reduce(async (previous, instruction, index) => {
+    await previous
+    await page.getByRole('button', { name: 'Schritt hinzufügen' }).click()
+    await stepField(page, index + 2).fill(instruction)
+  }, Promise.resolve())
+}
+
+// Then „bin ich weiterhin im Formular mit allen Eingaben": Formular, Titel, Zutaten und jedes Schrittfeld
+// mit seinem eingegebenen Wert (roh – auch Leerraum bleibt stehen).
+async function expectFormWithInputs(page: Readonly<Page>, title: string, steps: readonly string[]): Promise<void> {
+  await expectForm(page)
+  await expect(page.getByLabel('Titel')).toHaveValue(title)
+  await expect(page.getByLabel('Zutaten')).toHaveValue(INGREDIENTS_MEHL)
+  await expectStepNumbers(page, steps.map((_, index) => index + 1))
+  await Promise.all(steps.map(async (instruction, index) => {
+    await expect(stepField(page, index + 1)).toHaveValue(instruction)
+  }))
+}
+
+// Then „sehe ich am <n.> Schritt die Fehlermeldung …": je genanntem Schrittfeld eine sichtbare Meldung, als
+// Beschreibung mit dem Feld verknüpft, und das Feld ist als fehlerhaft markiert. Die Anzahl der sichtbaren
+// Meldungen pinnt, dass keine weitere dazukommt.
+async function expectMessageAtSteps(page: Readonly<Page>, numbers: readonly number[], message: string): Promise<void> {
+  const messages = stepsSection(page).getByText(message, { exact: true })
+  await expect(messages).toHaveCount(numbers.length)
+  await Promise.all(numbers.map(async (number, index) => {
+    await expect(messages.nth(index)).toBeVisible()
+    await expect(stepField(page, number)).toHaveAccessibleDescription(message)
+    await expect(stepField(page, number)).toHaveAttribute('aria-invalid', 'true')
+  }))
+}
+
+// Then „ist der <n.> Schritt nicht als fehlerhaft markiert": ohne Meldung und nicht als fehlerhaft ausgezeichnet.
+async function expectStepsNotMarked(page: Readonly<Page>, numbers: readonly number[]): Promise<void> {
+  await Promise.all(numbers.map(async (number) => {
+    await expect(stepField(page, number)).toHaveAccessibleDescription('')
+    await expect(stepField(page, number)).not.toHaveAttribute('aria-invalid', 'true')
+  }))
 }
 
 // @US-602-happy-path
@@ -601,5 +668,118 @@ test.describe('US602_Error: Rezept ohne Pflichtangaben', () => {
     expect(body.errors).toEqual({ 'steps[1].instruction': ['Schritt-Anweisung darf nicht leer sein.'] })
     // Then: die Rezept-Liste ist unverändert
     expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
+  })
+})
+
+// @US-602-error
+test.describe('US602_Error: Titel und Anweisung ungültig', () => {
+  const invalidTitles = [
+    { eingabe: '"   "', title: '   ', message: 'Titel darf nicht leer sein.' },
+    { eingabe: 'einen Text aus 101 Zeichen', title: 'T'.repeat(101), message: 'Titel darf maximal 100 Zeichen lang sein.' },
+  ] as const
+  invalidTitles.forEach(({ eingabe, title, message }) => {
+    // Szenario: Ungültiger Titel
+    test(`US602_Error_CreateRecipe_InvalidTitle_ShowsMessageAtTitleAndKeepsInput (${eingabe})`, async ({ page, request }) => {
+      // Given: die Zutat "Mehl" mit Einheit "g" existiert
+      await seedIngredientViaApi(request, 'Mehl', 'g')
+      const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+      // When: Formular öffnen, <Titel>, "250 g Mehl" und den Schritt "Teig rühren." eingeben, speichern
+      await openCreateForm(page)
+      await fillRecipeForm(page, title, [FIRST_STEP])
+      await saveForm(page)
+
+      // Then: am Titel die Meldung, der Fokus auf dem Titel-Feld
+      await expectMessageAt(page, page.getByLabel('Titel'), message)
+      await expect(page.getByLabel('Titel')).toBeFocused()
+      // Then: weiterhin im Formular mit allen Eingaben
+      await expectFormWithInputs(page, title, [FIRST_STEP])
+      // Then: die Rezept-Liste ist unverändert
+      expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
+    })
+  })
+
+  // Szenario: Schritt-Anweisung mit mehr als 1000 Zeichen
+  test('US602_Error_CreateRecipe_SecondStepOf1001Chars_ShowsMessageAtSecondStepAndKeepsInput', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+    // When: "Pfannkuchen", "250 g Mehl", Schritt 1 "Teig rühren.", Schritt 2 aus 1001 Zeichen, speichern
+    const steps = [FIRST_STEP, INSTRUCTION_OF_1001_CHARS] as const
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, steps)
+    await saveForm(page)
+
+    // Then: am zweiten Schritt die Meldung, der Fokus auf dem zweiten Schrittfeld
+    await expectMessageAtSteps(page, [2], STEP_TOO_LONG)
+    await expect(stepField(page, 2)).toBeFocused()
+    // Then: weiterhin im Formular mit allen Eingaben
+    await expectFormWithInputs(page, PANCAKES, steps)
+    // Then: die Rezept-Liste ist unverändert
+    expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
+  })
+
+  // Szenario: Meldungen erscheinen am richtigen Schritt, auch hinter leeren Schrittfeldern
+  // Das leere zweite Feld schickt das Formular nicht mit (ADR-S135-3): Der Server meldet den dritten
+  // Schritt unter dem Index 1 der gesendeten Liste, das Formular zeigt die Meldung trotzdem am dritten Feld.
+  test('US602_Error_CreateRecipe_LongThirdStepBehindBlankStep_ShowsMessageAtThirdStepOnly', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+
+    // When: Schritt 1 "Teig rühren.", Schritt 2 "   ", Schritt 3 aus 1001 Zeichen, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP, '   ', INSTRUCTION_OF_1001_CHARS])
+    await saveForm(page)
+
+    // Then: am dritten Schritt die Meldung, der erste und der zweite nicht als fehlerhaft markiert
+    await expectMessageAtSteps(page, [3], STEP_TOO_LONG)
+    await expectStepsNotMarked(page, [1, 2])
+    // Then: der Fokus auf dem dritten Schrittfeld
+    await expect(stepField(page, 3)).toBeFocused()
+  })
+
+  // Szenario: Alle fehlerhaften Schritte werden gemeldet, der Fokus liegt auf dem ersten
+  test('US602_Error_CreateRecipe_TwoStepsOf1001Chars_ShowsMessageAtBothAndFocusOnFirst', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+
+    // When: Schritt 1 "Teig rühren.", Schritte 2 und 3 je aus 1001 Zeichen, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP, INSTRUCTION_OF_1001_CHARS, INSTRUCTION_OF_1001_CHARS])
+    await saveForm(page)
+
+    // Then: am zweiten und am dritten Schritt je die Meldung, der erste nicht als fehlerhaft markiert
+    await expectMessageAtSteps(page, [2, 3], STEP_TOO_LONG)
+    await expectStepsNotMarked(page, [1])
+    // Then: der Fokus auf dem zweiten Schrittfeld – dem ersten fehlerhaften
+    await expect(stepField(page, 2)).toBeFocused()
+  })
+})
+
+// @US-602-edge-case
+test.describe('US602_EdgeCase: Titel und Anweisung an der Längengrenze', () => {
+  // Szenario: Titel und Anweisung mit genau der zulässigen Länge werden gespeichert
+  test('US602_EdgeCase_CreateRecipe_TitleOf100AndInstructionOf1000Chars_ShowsDetailWithSingleSpaces', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+
+    // When: Titel aus 100 und Anweisung aus 1000 Zeichen (normalisiert), je mit zusätzlichem Leerraum eingegeben
+    const title = `${'T'.repeat(49)} ${'t'.repeat(50)}`
+    const instruction = `${'A'.repeat(499)} ${'a'.repeat(500)}`
+    expect(title).toHaveLength(100)
+    expect(instruction).toHaveLength(1000)
+    await openCreateForm(page)
+    await fillRecipeForm(page, withExtraSpaces(title), [withExtraSpaces(instruction)])
+    await saveForm(page)
+
+    // Then: die Detailansicht des neuen Rezepts
+    await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+    // Then: der Titel ist genau der Text aus 100 Zeichen, mit einfachem Leerzeichen (roher Text, exactText.ts)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(exactly(title))
+    // Then: der einzige Schritt ist genau die Anweisung aus 1000 Zeichen, mit einfachem Leerzeichen
+    const stepItems = page.getByRole('list', { name: 'Zubereitung' }).getByRole('listitem')
+    await expect(stepItems).toHaveCount(1)
+    await expect(stepItems.getByText(instruction, { exact: true })).toHaveText(exactly(instruction))
   })
 })

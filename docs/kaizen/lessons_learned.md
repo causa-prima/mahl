@@ -82,3 +82,17 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Eine Nullnutzung hat mehrere Ursachen – nicht gewollt, vergessen, nicht erreichbar –, und eine Nutzungszählung unterscheidet sie nicht. Die Pilot-Kriterien setzten die Erreichbarkeit voraus, statt sie je Runde zu prüfen; die Anweisung im Prompt galt als Teil des Aufbaus, nicht als Behauptung über Tool-Verhalten, die altern kann. Fast wäre auf dieser Basis verworfen worden.
   Regel: Ein Pilot, der Nutzung misst, prüft zu Beginn jeder Runde im echten Zielagenten, dass die Anweisung ausführbar ist (Tool sichtbar, Ladeweg stimmt, ein Aufruf gelingt) – erst dann sagt eine Nullnutzung etwas über das Werkzeug.
   CM-Bezug: CM-S116-1
+
+## Session 147 – 2026-11-05
+
+- **[MITTEL] [AGENT] [Review] LL-S147-1 – Vorgabe oder Prüfurteil aus dem Gedächtnis statt aus der Quelle**
+  Quelle: Orchestrator
+  Was: S147, CROSS-text/run-1, drei Fälle: (a) Im Test-Review bestätigte ich „Given/When/Then: vorhanden“, obwohl fünf Tests kein // Given hatten – erst das Gate von qa-check fing es. (b) Mein Subagenten-Auftrag verlangte als // Beispiel: die Zelle „Eingabe“; TDD-spec-verweis und der Hook verlangen die ganze Tabellenzeile – ein Fehlversuch des Subagenten. (c) Mein Gegenprobe-Auftrag „NFC vor das Entfernen ziehen“ war mehrdeutig; der Subagent setzte NFC zusätzlich davor, das abschließende NFC heilte den Fehler, der erste Versuch war wirkungslos.
+  Warum: Ich schrieb die Vorgabe bzw. das Urteil aus der Erinnerung an die Regel, statt die Quelle (Diff, TDD-spec-verweis, gewünschte Mutation) nachzusehen. Bei (c) beschrieb ich die Absicht statt des herzustellenden Codezustands.
+  Regel: Prüfpunkte im Test-Review am Diff zählen, nicht schätzen; Formatvorgaben in Aufträgen aus der Regelquelle kopieren; eine Gegenprobe als exakten Zielzustand des Codes formulieren („Zeile X durch Y ersetzen“), nicht als Absicht.
+
+- **[MITTEL] [AGENT] [Review] LL-S147-2 – Testumfang im Subagenten-Auftrag gegen die Full-State-Regel beschnitten**
+  Quelle: Orchestrator
+  Was: S147, US-602 run-9: Im Auftrag an den Frontend-Subagenten gab ich vor, im Komponententest zu zwei zu langen Schritten den gesendeten Request-Body nicht zu prüfen. Die TS-Guideline (CGT-full-state-assertions) verlangt den vollständigen beobachtbaren Zustand, also auch den Body. Der Test-Auditor verlangte die Prüfung in Review-Runde 2 zu Recht; sie kam per Fix-Subagent nach, eine zusätzliche Runde. Vierter Fall derselben Klasse in dieser Session nach LL-S147-1.
+  Warum: Die Vorgabe beruhte auf meiner Einschätzung, der Body sei an anderer Stelle schon geprüft; gegen die Regelquelle habe ich sie nicht gehalten. Die genaue Überlegung von damals ist nach zwei Kontext-Kompaktierungen nicht mehr rekonstruierbar.
+  Regel: Wer im Auftrag eine Prüfung ausdrücklich ausschließt, hält das vorher gegen die Test-Regeln der Guideline (CGT-full-state-assertions, CGC-Pendant) – ein Ausschluss ist eine Vorgabe wie jede andere und braucht ihre Quelle.

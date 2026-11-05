@@ -8,15 +8,15 @@ namespace mahl.Server.Domain;
 // MA0048: File name must match type name – der Fehlertyp ist der Fehlerkanal von StepInstruction.Create,
 //         außerhalb dieses Typs bedeutungslos und ändert sich ausschließlich mit ihm.
 #pragma warning disable MA0048
-internal enum StepInstructionError { Empty }
+internal enum StepInstructionError { Empty, TooLong }
 #pragma warning restore MA0048
 
 // Domänentyp (docs/guidelines/coding-guideline-csharp.md#CGC-primitive-obsession): die Anweisung
-// eines Schritts (docs/reference/glossary.md, "Schritt"). Die Längengrenze (ADR-S135-3) kommt mit dem
-// Szenario, das sie prüft.
+// eines Schritts (docs/reference/glossary.md, "Schritt"). Höchstens 1000 Zeichen am normalisierten Wert
+// (ADR-S135-3, ADR-S119-1).
 internal readonly record struct StepInstruction
 {
-    private readonly NonEmptyTrimmedString _value;
+    private readonly Bounded<NonEmptyNormalizedString, Max1000> _value;
     public string Value => _value.Value; // wirft transitiv – der Guard sitzt im Constraint-Typ
 
     // Parameterless ctor must be public (record struct limitation) – catches new StepInstruction():
@@ -24,15 +24,16 @@ internal readonly record struct StepInstruction
     [ExcludeFromCoverageGate("parameterless ctor unreachable via normal construction (ADR-S041-9)")]
     public StepInstruction() => throw new InvalidOperationException("Uninitialized");
 
-    private StepInstruction(NonEmptyTrimmedString value) => _value = value;
+    private StepInstruction(Bounded<NonEmptyNormalizedString, Max1000> value) => _value = value;
 
-    // ADR-S051-1: getrimmt gespeichert.
+    // ADR-S135-1: normalisiert gespeichert.
     public static OneOf<StepInstruction, StepInstructionError> Create(string? input) =>
-        NonEmptyTrimmedString.Create(input)
-            .MapError<NonEmptyTrimmedString, StringViolation, StepInstructionError>(v => v switch
+        Bounded<NonEmptyNormalizedString, Max1000>.Create(input)
+            .MapError<Bounded<NonEmptyNormalizedString, Max1000>, StringViolation, StepInstructionError>(v => v switch
             {
                 StringViolation.Empty => StepInstructionError.Empty,
-                _ => SumType.Unreachable<StepInstructionError>(), // ADR-S040-1: bis zur Längengrenze nur Empty möglich
+                StringViolation.TooLong => StepInstructionError.TooLong,
+                _ => SumType.Unreachable<StepInstructionError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
             })
             .Map(v => new StepInstruction(v));
 }

@@ -1,0 +1,14 @@
+namespace mahl.Server.Tests.Helpers;
+
+// MA0048: File name must match type name – diese Records sind die Wire-Formate der Rezept-Tests
+//         (Request, Schritt, 422-Body) und ändern sich nur gemeinsam mit dem Endpoint-Vertrag.
+#pragma warning disable MA0048, CA1812 // CA1812: instantiated by JSON deserializer via reflection
+// ADR-S027-1: ein Schritt trägt nur die Anweisung – die Nummer ist die Listenposition.
+public sealed record StepPayload(string Instruction);
+
+// ADR-S135-2: die Zutaten gehen als roher Text des Zutatenfelds hinaus, eine Zutat je Zeile.
+public sealed record CreateRecipeRequest(string Title, string Ingredients, IReadOnlyList<StepPayload> Steps);
+
+// ADR-S090-1: 422-Body feld-keyed.
+public sealed record ValidationErrorResponse(IReadOnlyDictionary<string, IReadOnlyList<string>> Errors);
+#pragma warning restore MA0048, CA1812

@@ -149,14 +149,14 @@ Beide Tests gehören zu dieser Behebung: Sie werden sinnvoll, sobald ein fremder
 
 ## TD-S102-1 — Backend: kein explizites app-weites Request-Body-Size-Limit
 **Fällig:** Phase:MVP – vor MVP-Auth; spätestens sobald ein Endpoint authentifizierte oder größere Payloads annimmt.
-**Problem:** `POST /api/ingredients` deserialisiert/bindet den vollständigen Request-Body, BEVOR die Feld-Validierung greift (`name.Value.Length > 30` läuft erst nach Model-Binding). Ein anonymer Client kann daher wiederholt große Bodies (bis Kestrels implizitem ~30-MB-Default, in `Program.cs` nirgends explizit gesetzt) senden → Parsing-/Trimming-Last vor jeder Ablehnung. Heute entschärft durch SKELETON ohne Auth und Kestrels impliziten Default; kein durch run-3 verschärftes Risiko – der Zustand ist ggü. vorher unverändert. Quelle: security-auditor (Review run-3, SR-2).
-**Behebung:** Explizites app-weites `MaxRequestBodySize` in `Program.cs`, statt sich auf den impliziten Framework-Default zu verlassen.
+**Problem:** `POST /api/ingredients` deserialisiert/bindet den vollständigen Request-Body, BEVOR die Feld-Validierung greift (`name.Value.Length > 30` läuft erst nach Model-Binding). Ein anonymer Client kann daher wiederholt große Bodies (bis Kestrels implizitem ~30-MB-Default, in `Program.cs` nirgends explizit gesetzt) senden → Parsing-/Trimming-Last vor jeder Ablehnung. Heute entschärft durch SKELETON ohne Auth und Kestrels impliziten Default; kein durch run-3 verschärftes Risiko – der Zustand ist ggü. vorher unverändert. Quelle: security-auditor (Review run-3, SR-2). Verschärft seit S147 (CROSS-text/run-1): Die Normalisierung im geteilten Texttyp (`NonEmptyNormalizedString.Normalize`, ADR-S135-1) kopiert den Rohwert mehrfach (Filtern, Falten, Split/Join, NFC), bevor die Längengrenze greift – statt einer Kopie durch `Trim()` (abgeleitet aus dem Code, nicht gemessen; Quelle: security-auditor S147, SEC-5).
+**Behebung:** Explizites app-weites `MaxRequestBodySize` in `Program.cs`, statt sich auf den impliziten Framework-Default zu verlassen. Zusätzlich prüfen, ob `NonEmptyNormalizedString` vor dem Normalisieren eine Obergrenze für die Rohlänge braucht (z. B. ein Vielfaches der größten Feldgrenze).
 
 ---
 
 ## TD-S106-1 — Backend: kein globaler Exception-Handler / ProblemDetails-Fallback
 **Fällig:** Phase:MVP – dort greift die tragende Anforderung (`docs/process/nfr.md`, Sektion Security: „Fehlerantworten enthalten keine technischen Details"). **Vorbedingung:** ein geklärtes Logging-Konzept (s. TD-S112-2); der Stack-Trace soll ins Log wandern, ein gestaltetes Log existiert noch nicht.
-**Problem:** `Server/Program.cs` registriert keinen `app.UseExceptionHandler(...)` / kein `AddProblemDetails`. Eine unbehandelte Exception in irgendeinem Endpoint schlägt daher als roher 500 durch. DELETE war der erste Endpoint mit client-steuerbarem Input, der das sichtbar machte; der konkrete run-10-Pfad (malformed If-Match) ist mit `XminETag.TryParse` → 400 (ADR-S106-2) geschlossen, aber die systemische Verteidigungslinie fehlt weiterhin. Quelle: security-auditor (Review run-10, SEC-2).
+**Problem:** `Server/Program.cs` registriert keinen `app.UseExceptionHandler(...)` / kein `AddProblemDetails`. Eine unbehandelte Exception in irgendeinem Endpoint schlägt daher als roher 500 durch. DELETE war der erste Endpoint mit client-steuerbarem Input, der das sichtbar machte; der konkrete run-10-Pfad (malformed If-Match) ist mit `XminETag.TryParse` → 400 (ADR-S106-2) geschlossen, aber die systemische Verteidigungslinie fehlt weiterhin. Quelle: security-auditor (Review run-10, SEC-2). Weitere bekannte Pfade (S147, CROSS-text/run-1, nicht nachgestellt): ein Name mit U+0000 (Postgres lehnt NUL in text ab → DbUpdateException) und ein einzelnes Surrogat (`string.Normalize` in `NonEmptyNormalizedString` wirft vermutlich ArgumentException, sofern System.Text.Json es durchlässt) enden vermutlich in 500 statt 422 (Quelle: security-auditor SEC-6, functional-correctness-auditor F-9). Ob U+0000 und Surrogate als Verstoß gelten sollen, hängt an der offenen Frage zur Zeichenmenge der Normalisierung.
 **Reichweite präzisiert (an learn.microsoft.com verifiziert, Kommentar an der Stelle in `Server/Program.cs`):** Ohne Handler liefert Kestrel in Production einen **500 ohne Response-Body** – dort leakt nichts. Der Stack-Trace-Leak über die Developer-Exception-Page setzt `ASPNETCORE_ENVIRONMENT=Development` voraus, was ausschließlich `Server/Properties/launchSettings.json` beim lokalen Start setzt, nie ein Deployment. Zu korrigieren ist außerdem die frühere Begründung: Der NFR „keine Stack-Traces für User" (`nfr.md`, Reliability) ist eine **Frontend**-Anforderung – die UI zeigt nichts Technisches an – und trägt diesen Backend-Eintrag nicht.
 **Behebung:** Unbedingte Registrierung von `UseExceptionHandler`, damit der Fehlerpfad keinen Umgebungs-Zweig mehr hat – Entscheidung, Begründung, Verworfenes und offene Punkte stehen in **ADR-S112-1**. Prüfbar als Backend-Integrationstest (`WebApplicationFactory`), nicht per E2E – die Eigenschaft ist an der Oberfläche nicht beobachtbar. Zieht `TD-S084-1(b)` (try/finally in der ETag-Middleware) unmittelbar nach sich.
 
@@ -303,7 +303,7 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 
 ## TD-S141-10 — Rezept-Eingaben ohne Obergrenze für Zutatentext, Zeilen- und Schrittzahl
 **Fällig:** Phase:MVP – im Workshop der MVP-Stufe von US-602 als Szenario festlegen, ggf. später
-**Problem:** POST /api/recipes begrenzt weder die Länge des Zutatentexts noch die Zahl der Zutatenzeilen oder Schritte; die Spalten sind text ohne Constraint, die einzige Schranke ist Kestrels Default-Body-Grenze (30 MB). features/recipes.feature begrenzt nur Titel (100) und Schritt-Anweisung (1000). Versehentlich unsinnige Eingaben (z.B. eingefügter Großtext) werden so ungeprüft gespeichert. Seit US-602 run-8 wächst auch die 422-Antwort mit der Schrittzahl: jeder leere Schritt ergibt einen eigenen Eintrag steps[i].instruction – eine Schrittobergrenze begrenzt damit auch die Fehlerantwort (Security-Review run-8).
+**Problem:** POST /api/recipes begrenzt weder die Länge des Zutatentexts noch die Zahl der Zutatenzeilen oder Schritte; die Spalten sind text ohne Constraint, die einzige Schranke ist Kestrels Default-Body-Grenze (30 MB). features/recipes.feature begrenzt nur Titel (100) und Schritt-Anweisung (1000). Versehentlich unsinnige Eingaben (z.B. eingefügter Großtext) werden so ungeprüft gespeichert. Die 422-Antwort wächst zudem mit der Schrittzahl: Jeder leere (seit US-602 run-8) und jeder zu lange Schritt (seit run-9) ergibt einen eigenen Eintrag steps[i].instruction – 10 000 Schritte mit je 1001 Zeichen liefern 10 000 Meldungen. Eine Schrittobergrenze begrenzt damit auch die Fehlerantwort (Security-Review run-8).
 **Behebung:** Fachliche Obergrenzen als Szenario festlegen – Zweck wie bei den Zutaten-Namen: versehentliche unsinnige Eingaben abfangen, nicht Lastschutz (der liegt bei TD-S102-1) – und mit Meldung am Feld umsetzen.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden: für den SKELETON egal, frühestens MVP
 
@@ -353,16 +353,6 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Behebung:** Eine Baseline-Regel für Dialog-Aktionen auf schmalen Bildschirmen festlegen (z. B. auf xs untereinander in voller Breite) und in DialogActions umsetzen; Beleg per Screenshot bei 320 px.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-6 entschieden: Schönheitsmangel, eine Einzellösung ohne Szenario lohnt nicht
 
----
-
-## TD-S143-5 — Leer-Definition: Server muss dieselbe Zeichenmenge verwenden wie isBlank im Client
-**Fällig:** Szenario:„Ein Wert nur aus unsichtbaren Zeichen gilt als leer" – mit @CROSS-text run-1 entsteht die Normalisierung auf dem Server
-**Problem:** ADR-S135-1 verlangt, dass der Client über „leer“ gleich entscheidet wie der Server. Der Client entscheidet seit US-602 run-6 mit Client/src/domain/text.ts (isBlank: Unicode-Eigenschaft White_Space plus U+200B, U+00AD, U+2060, U+FEFF), der Server seit run-8 per Trim (NonEmptyTrimmedString, char.IsWhiteSpace) – ohne die vier unsichtbaren Zeichen, und char.IsWhiteSpace weicht von Unicode White_Space möglicherweise ab (etwa bei U+001C–U+001F, U+0085). Kein Test prüft beide Seiten gegeneinander. Konkrete Folge: Hält der Client ein Schrittfeld für nicht leer, der Server es aber für leer, kommt ein 422 nur mit steps[i].instruction, den das Formular bis run-9 nicht anzeigt – Speichern ohne sichtbare Reaktion; umgekehrt filtert der Client Schritte aus U+200B weg, die der Server annähme.
-**Behebung:** Beim Bau der Server-Normalisierung dieselbe Zeichenmenge festlegen (Unicode White_Space plus die vier unsichtbaren Zeichen), am besten in ADR-S135-1 ausdrücklich benennen, und mit einem Test gegen dieselbe Zeichenliste wie in RecipesPage.test.tsx (wegfallende Zeichen) absichern.
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-6 entschieden: der Server-Teil entsteht erst mit @CROSS-text
-
----
-
 ## TD-S144-1 — Backend: Zutatenzeile, die sich nicht zerlegen lässt, endet in 500 und verdeckt die gesammelten Meldungen
 **Fällig:** Szenario:„Ungültige Menge in einer Zutatenzeile" – erster Lauf mit Zeilenprüfung
 **Problem:** RecipesEndpoints.ToIngredientLines zerlegt jede nicht leere Zeile schon in der Validierung (Select(ParseLine)). ParseLine wirft bei Zeilen wie „1 g“ (IndexOutOfRange auf words[2]) oder „1x g Mehl“ (FormatException in decimal.Parse), eine unbekannte Zutat wirft später in SaveRecipe (KeyNotFoundException auf ingredientsByName). Seit US-602 run-8 verdeckt das auch die gesammelten Pflichtmeldungen: ein Request mit leerem Titel und einer solchen Zeile endet in 500 statt 422 mit der Titelmeldung.
@@ -385,18 +375,16 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Behebung:** Eine kurze Zusammenfassung per role="status" (z.B. „3 Angaben fehlen“) oder role="alert" an den eigenen Meldungselementen; als Szenario bzw. UX-Guideline-Regel festlegen, dann umsetzen.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden: Erweiterung über den freigegebenen UI-Entwurf hinaus
 
----
-
-## TD-S144-4 — Rezeptformular und Rezept-Tests: Extraktionen vor den Schritt-Meldungen
-**Fällig:** Szenario:„Meldungen erscheinen am richtigen Schritt, auch hinter leeren Schrittfeldern" – run-9 fasst genau diese Stellen an
-**Problem:** Client/src/pages/CreateRecipePage.tsx: StepsSection wiederholt die Bedingung „erstes Schrittfeld“ (index === 0) für inputRef, aria-invalid und aria-describedby; das Meldungselement samt ADR-S144-3-Suppression steht in IngredientsField und StepsSection je einmal. Server.Tests/RecipesEndpointsTests.cs: Request-DTOs werden überall per new CreateRecipeRequest(...) gebaut, die Fehler-Helfer (AssertRejectedWithAsync, SingleError, AssertNothingPersistedAsync) sind privat in der Klasse. Code- und Testqualitäts-Review US-602 run-8.
-**Behebung:** Komponenten StepField und FieldMessageText extrahieren (Suppression an einer Stelle); Request-Builder (ACreateRecipe…) und Fehler-Helfer in EndpointsTestsBase heben (tdd-process.md, Test-Data-Builder).
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden: mit run-9 im selben Code erledigen
-
----
-
 ## TD-S144-5 — Frontend: createRecipe wertet jede Antwort außer 422 als Erfolg
 **Fällig:** Szenario:„Backend liefert Serverfehler beim Speichern – Formular bleibt offen", Phase:MVP – wenn der Querschnitt auf das Rezeptformular angewendet wird (ADR-S112-5), spätestens mit dem öffentlichen API
 **Problem:** Client/src/services/recipesApi.ts createRecipe behandelt nur 422 als Fehler (toFieldErrors); bei 400 oder 500 wird der Problem-Body als Recipe gelesen, created.id ist undefined und die Seite navigiert nach /recipes/undefined. Ein 500 ohne JSON-Body lässt response.json() rejecten (fromSafePromise, unbehandelt). Seit US-602 run-8 gibt es zusätzlich den 400-Pfad für fehlende Properties (ADR-S144-2), über das Formular nicht erreichbar.
 **Behebung:** response.ok prüfen; 422 → FieldErrors, sonst UnexpectedError, sodass das Formular mit allen Eingaben stehen bleibt (Querschnittsvertrag „Formular speichern“, recipes.feature).
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden
+
+---
+
+## TD-S147-1 — Rezeptformular: Meldungs-Zuordnung beim erneuten Speichern
+**Fällig:** Szenario:„Meldungen bleiben beim Bearbeiten bis zum nächsten Speichern stehen" – run-13 legt das Verhalten zwischen zwei Speichervorgängen fest
+**Problem:** Client/src/pages/CreateRecipePage.tsx und hooks/useRecipeFieldMessages.ts (US-602 run-9): sentFieldIndexes wird in onSubmit per useState neu gesetzt, useResultMutation hält bis zur neuen Antwort aber die alte Fehlerantwort. Während ein zweites Speichern läuft, ordnet der Hook die alten Meldungen steps[i].instruction deshalb über die neuen Indizes zu – eine Meldung kann an einem anderen Schrittfeld erscheinen, und der Fokus springt dorthin. Ursache ist, dass Fehlerantwort und Feld-Zuordnung zwei getrennte Zustände sind, die nicht gemeinsam wechseln. Dazu aus dem Code-Review run-9 (Runde 3): Der Typ von StepField lässt Listenmeldung und eigene Anweisungsmeldung zugleich zu, obwohl immer nur eine erscheinen darf; der Fokus-Kandidat für die erste Anweisungsmeldung liest sich schwer (Tupel-Index firstInstruction?.[0], Fallback ?? 0).
+**Behebung:** Fehlerantwort und Indizes beim Speichern als ein Zustand führen (die Zuordnung gehört zur Antwort, nicht zum Formular), mit dem Szenario aus run-13 als Test für das Verhalten während eines laufenden zweiten Speicherns; StepField-Props als Union (Listenmeldung | Anweisungsmeldung) und den Fokus-Kandidaten mit benannten Feldern statt Tupel-Index.
+**Aufschubgrund:** User – in run-9 entschieden: zurückstellen an run-13, dessen Szenario das Verhalten bis zum nächsten Speichern festlegt; Review-Loop nach drei Runden beendet, Rest ebenfalls an run-13
