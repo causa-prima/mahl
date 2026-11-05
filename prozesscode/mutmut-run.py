@@ -22,13 +22,11 @@ aber nicht, ob es beim letzten Mal 12 waren. `--ratchet` hält den Score je Modu
 `mutation-baseline.json` fest und meldet einen Rückschritt als `✗`. Zwei Festlegungen:
 Gleichstand geht durch (sonst wäre es eine Steigerungspflicht), und eine Verbesserung zieht
 die Baseline nach (sonst friert sie beim ersten Glücksfall ein). Verglichen wird als Bruch,
-nicht in gerundeten Prozenten.
-
-Grenze des Bruchs: Zieht ein Refactoring gut getestete Logik in ein anderes Modul, verliert
-das Quellmodul getötete Mutanten, seine Überlebenden bleiben – der Anteil sinkt ohne jeden
-Güteverlust (S133: Feldwert-Regex aus zwei Capture-Hooks nach `eintrag_felder`). Dann die
-Überlebenden vor/nach vergleichen und, wenn sie gleich sind, `mutation-baseline.json` von Hand
-auf den neuen Stand setzen – mit Begründung in der Commit-Nachricht.
+nicht in gerundeten Prozenten. Als Rückschritt zählt erst, wenn zugleich die offenen Befunde
+steigen: Löscht oder verschiebt ein Refactoring gut getesteten Code, verliert das Modul
+getötete Mutanten, seine Überlebenden bleiben – der Anteil sinkt ohne jeden Güteverlust (etwa
+ein Feldwert-Regex, der aus zwei Capture-Hooks nach `eintrag_felder` zog, oder eine entfernte
+Schleife im Bash-Guard). Ein solcher Stand wird fortgeschrieben.
 
 **Pflicht vor jedem Commit**, der ein Modul des Prozess-Codes ändert (Skill `committing`),
 aber kein Hook je Edit; Grund und Laufzeiten in `docs/process/dev-workflow.md#DEV-python-werkzeuge`.
@@ -48,8 +46,10 @@ import shutil
 import subprocess
 import sys
 import tokenize
+from collections import Counter
 from pathlib import Path
 
+from ._cli import Parser
 from ._mutmut_ausnahmen import UNTER_MUTMUT_UEBERSPRUNGEN
 from ._wrapper_output import emit
 
@@ -167,9 +167,7 @@ def baue_verdikt(eintraege: list[tuple[str, str]],
     bewertet = [(n, s) for n, s in eintraege if s != NICHT_BEWERTET]
     auffaellig = [(n, s) for n, s in bewertet if s != GETOETET]
 
-    nach_status: dict[str, list[str]] = {}
-    for name, status in auffaellig:
-        nach_status.setdefault(status, []).append(name)
+    nach_status = Counter(s for _n, s in auffaellig)
 
     befunde = [(n, s) for n, s in auffaellig if s in BEFUND]
     umfang = f"{len(bewertet)} Mutant{'' if len(bewertet) == 1 else 'en'} bewertet"
@@ -194,17 +192,17 @@ def baue_verdikt(eintraege: list[tuple[str, str]],
         zeilen.append(f"  … und {len(auffaellig) - MAX_ZEILEN} weitere")
 
     if not befunde:
-        offen = sum(len(v) for k, v in nach_status.items() if k not in BEFUND)
+        offen = sum(n for k, n in nach_status.items() if k not in BEFUND)
         verdikt = f"✓ mutmut: {umfang}, keiner überlebt"
         if offen:
             verdikt += f" ({offen} ohne Aussage: timeout/suspicious)"
         return verdikt, zeilen or None
 
     teile = []
-    if nach_status.get("survived"):
-        teile.append(f"{len(nach_status['survived'])} überlebt")
-    if nach_status.get("no tests"):
-        teile.append(f"{len(nach_status['no tests'])} ohne deckenden Test")
+    if nach_status["survived"]:
+        teile.append(f"{nach_status['survived']} überlebt")
+    if nach_status["no tests"]:
+        teile.append(f"{nach_status['no tests']} ohne deckenden Test")
     zeilen.append(
         "  „überlebt\" heißt: die Änderung an dieser Stelle bricht keinen Test – die Lücke "
         "liegt im Test.\n"
@@ -314,9 +312,17 @@ def ratchet(gemessen: dict[str, tuple[int, int]],
     **Verbesserung wird fortgeschrieben** – sonst friert die Klinke beim ersten Glücksfall
     ein und deckt jede spätere Verschlechterung bis auf das alte Niveau.
 
-    Verglichen wird als **Bruch**, nicht in gerundeten Prozenten: 100/300 und 33/100 sind
-    auf zwei Nachkommastellen gleich, als Bruch ist das zweite kleiner. Eine Klinke, die
-    kleine Rückschritte wegrundet, fängt genau die, die niemand bemerkt, nicht.
+    Verglichen wird als **Bruch**, nicht in gerundeten Prozenten: 10000/30000 und
+    10001/30004 sind auf zwei Nachkommastellen gleich, als Bruch ist das zweite kleiner. Eine
+    Klinke, die kleine Rückschritte wegrundet, fängt genau die, die niemand bemerkt, nicht.
+
+    **Rückschritt heißt: Der Bruch sinkt UND die offenen Befunde steigen** (überlebt plus
+    ohne deckenden Test). Sinkt nur der Bruch, sind getötete Mutanten weggefallen –
+    mit gelöschtem Code, oder in den Timeout, der außerhalb des Bruchs steht. Belegt am
+    Bash-Guard: Eine Schleife zu entfernen machte aus 1175/1197 bei 22 Überlebenden
+    1171/1193 bei denselben 22, und die Klinke meldete einen Rückschritt. Wer so gemessen
+    wird, löscht gut getesteten Code nicht mehr. Ein solcher Stand wird fortgeschrieben:
+    Bliebe die alte Zahl offener Befunde stehen, deckte sie später neue bis zu ihrer Höhe.
 
     **Ein unvollständiger Lauf wird nicht verglichen** (`offen`, S130). Kam der Lauf nicht
     durch alle Mutanten, steht der Score über einem anderen Nenner als die Baseline – die
@@ -338,7 +344,6 @@ def ratchet(gemessen: dict[str, tuple[int, int]],
     zeilen: list[str] = []
     verschlechtert = False
     neu = dict(baseline)  # fremde Module bleiben unberührt – ein Ausschnitt löscht nichts
-    geaendert = False
     kennung = {"messung": messung} if messung is not None else {}
 
     for modul in sorted(gemessen):
@@ -360,7 +365,6 @@ def ratchet(gemessen: dict[str, tuple[int, int]],
         if vorher is None:
             zeilen.append(f"  {modul}: {_prozent(getoetet, beurteilbar)} – neu aufgenommen")
             neu[modul] = {"getoetet": getoetet, "beurteilbar": beurteilbar, **kennung}
-            geaendert = True
             continue
 
         if messung is not None and vorher.get("messung") != messung:
@@ -368,27 +372,32 @@ def ratchet(gemessen: dict[str, tuple[int, int]],
                           f"(Messung {vorher.get('messung', 'ohne Kennung')} → {messung}), "
                           f"kein Vergleich")
             neu[modul] = {"getoetet": getoetet, "beurteilbar": beurteilbar, **kennung}
-            geaendert = True
             continue
 
         alt_g, alt_b = vorher["getoetet"], vorher["beurteilbar"]
+        alt_offen, offen_jetzt = alt_b - alt_g, beurteilbar - getoetet
         # Kreuzmultiplikation statt Division: exakt, ohne Float-Rundung.
         links, rechts = getoetet * alt_b, alt_g * beurteilbar
-        if links < rechts:
+        if links < rechts and offen_jetzt > alt_offen:
             verschlechtert = True
             zeilen.append(f"  {modul}: {_prozent(alt_g, alt_b)} → "
                           f"{_prozent(getoetet, beurteilbar)}  VERSCHLECHTERT")
+        elif links < rechts:
+            zeilen.append(f"  {modul}: {_prozent(alt_g, alt_b)} → "
+                          f"{_prozent(getoetet, beurteilbar)}  (offene Befunde nicht "
+                          f"gestiegen: {alt_offen} → {offen_jetzt}, Baseline nachgezogen)")
+            neu[modul] = {"getoetet": getoetet, "beurteilbar": beurteilbar, **kennung}
         elif links > rechts:
             zeilen.append(f"  {modul}: {_prozent(alt_g, alt_b)} → "
                           f"{_prozent(getoetet, beurteilbar)}  (Baseline nachgezogen)")
             neu[modul] = {"getoetet": getoetet, "beurteilbar": beurteilbar, **kennung}
-            geaendert = True
         else:
             zeilen.append(f"  {modul}: {_prozent(getoetet, beurteilbar)} – unverändert")
 
     # Eine gerissene Klinke schreibt NIE fort: Sonst wäre der schlechtere Stand beim
     # nächsten Lauf die neue Messlatte, und der Rückschritt hätte sich selbst legalisiert.
-    if verschlechtert or not geaendert:
+    # Jeder Eintrag oben ändert seinen Modulwert – gleich bleibt `neu` nur ohne Eintrag.
+    if verschlechtert or neu == baseline:
         return zeilen, verschlechtert, None
     return zeilen, verschlechtert, neu
 
@@ -482,7 +491,7 @@ def _laufe(*argv: str) -> subprocess.CompletedProcess:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mutate", metavar="NAMENSRAUM",
                         help="Nur diesen Mutanten-Namensraum, z.B. prozesscode.anchors")
@@ -545,6 +554,9 @@ def main(argv: list[str] | None = None) -> int:
         if fortschreibung is not None:
             schreibe_baseline(fortschreibung)
         details = (details or []) + [""] + zeilen
+        # --verbose zeigt die Rohausgabe statt der Details; die Tabelle je Modul entsteht
+        # aber erst hier und stünde sonst nirgends.
+        lauf_ausgabe = "\n".join([lauf_ausgabe.rstrip(), *zeilen])
         ohne_aussage = sorted(m for m, (_g, beurteilbar) in gemessen.items()
                               if beurteilbar and offen.get(m))
         verdikt, code = klinken_verdikt(verdikt, schlechter=schlechter,

@@ -23,6 +23,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from ._cli import Parser
 from ._util import REPO_ROOT, run_npm
 from ._wrapper_output import emit, strip_noise
 
@@ -109,7 +110,7 @@ def entfallene_klone(paare: list[tuple[str, str]]) -> list[tuple[str, str]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

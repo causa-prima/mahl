@@ -21,6 +21,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from ._cli import Parser
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -64,7 +65,7 @@ def befehle(modul: str) -> str:
 
 
 def main() -> int:
-    argparse.ArgumentParser(
+    Parser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
     ).parse_args()
 

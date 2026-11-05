@@ -76,10 +76,10 @@ def main() -> None:
     try:
         data = json.load(sys.stdin)
     except Exception:
-        sys.exit(0)  # kein parsbarer Input → nichts blocken
+        return  # kein parsbarer Input → nichts blocken
 
-    if data.get("tool_name", "") not in ("Edit", "Write"):
-        sys.exit(0)
+    if data.get("tool_name") not in ("Edit", "Write"):
+        return
 
     reasons = collect_reasons(data)
     if reasons:
@@ -91,8 +91,6 @@ def main() -> None:
                 "permissionDecisionReason": separator.join(reasons),
             }
         }))
-
-    sys.exit(0)
 
 
 if __name__ == "__main__":

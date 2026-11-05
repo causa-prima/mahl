@@ -11,12 +11,12 @@ Formel (Start 100):
   -1  pro GERING-Finding
 """
 
-import argparse
 import os
 import re
 import sys
 from collections import defaultdict
 
+from ._cli import Parser
 from .kaizen_constants import IMPACT_WEIGHTS
 from ._util import REPO_ROOT
 
@@ -117,7 +117,7 @@ def render_table(findings: list[dict]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Berechnet den Jenga-Score.")
+    parser = Parser(description="Berechnet den Jenga-Score.")
     parser.add_argument("--file", default=DEFAULT_FILE, help="Pfad zur lessons_learned.md")
     parser.add_argument("--verbose", action="store_true",
                         help="Zeigt Details: Sessions, Findings, Zähltabelle")

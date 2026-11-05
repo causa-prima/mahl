@@ -22,6 +22,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from ._cli import Parser
 from ._run_lock import RunLock
 from ._stryker_target import resolve_mutate
 from ._wrapper_output import error_lines
@@ -50,7 +51,7 @@ def _copy_reports(timestamp: str) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -77,7 +78,8 @@ def main() -> None:
     # ohne Flush erscheint dessen Score VOR dieser Startzeile (OBS-S108-4 c).
     sys.stdout.flush()
 
-    with RunLock(_TMP_FILE), open(_TMP_FILE, "w", encoding="utf-8") as out:
+    # Binär: Python schreibt selbst nichts hinein, der Stryker-Prozess beschreibt den Deskriptor.
+    with RunLock(_TMP_FILE), open(_TMP_FILE, "wb") as out:
         # Pre-Clean innerhalb des Locks: liegengebliebene Sandboxes aus gekillten/gecrashten
         # Läufen entfernen. Stryker räumt .stryker-tmp/sandbox-XXX nur bei sauberem Abschluss
         # weg; ein Rest poisont den nächsten Lauf (ENOENT beim copyfile) und verfälscht ESLint.
@@ -88,8 +90,9 @@ def main() -> None:
     # Rohoutput nur zeigen, wenn er zur Analyse gebraucht wird: bei Erfolg trägt er nichts bei,
     # was die Auswertung unten nicht besser sagt. Datei bewusst NICHT löschen – sie ist der
     # einzige Weg, einen laufenden Lauf zu beobachten, und erlaubt danach das vollständige
-    # Nachlesen. Der nächste Lauf überschreibt sie ohnehin ("w").
-    if _TMP_FILE.exists() and (result.returncode != 0 or args.verbose):
+    # Nachlesen. Der nächste Lauf überschreibt sie ohnehin ("wb"); dass sie existiert, garantiert
+    # das `open` oben.
+    if result.returncode != 0 or args.verbose:
         lines = _TMP_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
         print("\n".join(error_lines(lines, verbose=args.verbose)))
 

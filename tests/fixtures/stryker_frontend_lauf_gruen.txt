@@ -1,0 +1,161 @@
+[32m09:34:31 (3265065) INFO ProjectReader[39m Found 20 of 53 file(s) to be mutated.
+[32m09:34:32 (3265065) INFO Instrumenter[39m Instrumented 20 source file(s) with 437 mutant(s)
+[32m09:34:32 (3265065) INFO ConcurrencyTokenProvider[39m Creating 10 checker process(es) and 9 test runner process(es).
+[32m09:34:50 (3265065) INFO BroadcastReporter[39m Detected that current console does not support the "progress" reporter, downgrading to "progress-append-only" reporter
+[32m09:34:50 (3265065) INFO DryRunExecutor[39m Starting initial test run (vitest test runner with "perTest" coverage analysis). This may take a while.
+[32m09:35:13 (3265065) INFO DryRunExecutor[39m Initial test run succeeded. Ran 87 tests in 22 seconds (net 16596.58116400001 ms, overhead 6199.41883599999 ms).
+Mutation testing 6% (elapsed: <1m, remaining: ~2m) 25/418 tested (0 survived, 0 timed out)
+Mutation testing 12% (elapsed: <1m, remaining: ~2m) 50/418 tested (0 survived, 0 timed out)
+Mutation testing 18% (elapsed: <1m, remaining: ~2m) 74/418 tested (0 survived, 0 timed out)
+Mutation testing 21% (elapsed: <1m, remaining: ~2m) 86/418 tested (0 survived, 0 timed out)
+Mutation testing 25% (elapsed: <1m, remaining: ~2m) 99/418 tested (0 survived, 0 timed out)
+Mutation testing 30% (elapsed: ~1m, remaining: ~2m) 114/418 tested (0 survived, 0 timed out)
+Mutation testing 37% (elapsed: ~1m, remaining: ~2m) 136/418 tested (0 survived, 0 timed out)
+Mutation testing 40% (elapsed: ~1m, remaining: ~2m) 154/418 tested (0 survived, 0 timed out)
+Mutation testing 44% (elapsed: ~1m, remaining: ~2m) 173/418 tested (0 survived, 0 timed out)
+Mutation testing 51% (elapsed: ~1m, remaining: ~1m) 195/418 tested (0 survived, 0 timed out)
+Mutation testing 55% (elapsed: ~1m, remaining: ~1m) 210/418 tested (0 survived, 0 timed out)
+Mutation testing 58% (elapsed: ~2m, remaining: ~1m) 223/418 tested (0 survived, 0 timed out)
+Mutation testing 61% (elapsed: ~2m, remaining: ~1m) 234/418 tested (0 survived, 0 timed out)
+Mutation testing 64% (elapsed: ~2m, remaining: ~1m) 249/418 tested (0 survived, 0 timed out)
+Mutation testing 69% (elapsed: ~2m, remaining: ~1m) 263/418 tested (0 survived, 0 timed out)
+Mutation testing 72% (elapsed: ~2m, remaining: ~1m) 275/418 tested (0 survived, 0 timed out)
+Mutation testing 75% (elapsed: ~3m, remaining: <1m) 290/418 tested (0 survived, 0 timed out)
+Mutation testing 78% (elapsed: ~3m, remaining: <1m) 311/418 tested (0 survived, 0 timed out)
+Mutation testing 81% (elapsed: ~3m, remaining: <1m) 327/418 tested (0 survived, 0 timed out)
+Mutation testing 82% (elapsed: ~3m, remaining: <1m) 342/418 tested (0 survived, 0 timed out)
+Mutation testing 87% (elapsed: ~3m, remaining: <1m) 364/418 tested (0 survived, 0 timed out)
+Mutation testing 92% (elapsed: ~3m, remaining: <1m) 395/418 tested (0 survived, 0 timed out)
+Mutation testing 97% (elapsed: ~4m, remaining: <1m) 414/418 tested (0 survived, 0 timed out)
+
+All tests
+  pages
+    IngredientsPage.test.tsx
+      ✓ IngredientsPage > US904_HappyPath_IngredientsPage_MultipleIngredients_RendersServerOrderUnchanged [line 102] (killed 8)
+      ~ IngredientsPage > US904_HappyPath_IngredientsPage_EmptyDb_ShowsEmptyList [line 123] (covered 70)
+      ✓ IngredientsPage > US904_HappyPath_OpenCreateDialog_FieldsAreEmpty [line 132] (killed 5)
+      ~ IngredientsPage > US904_HappyPath_OpenCreateDialog_ClosedInitially_FieldsAbsent [line 148] (covered 68)
+      ✓ IngredientsPage > US904_HappyPath_ReopenDialogAfterCancel_FieldsAreEmpty [line 159] (killed 12)
+      ~ IngredientsPage > US904_HappyPath_OpenCreateDialog_RequiredFieldsAreMarked [line 194] (covered 73)
+      ~ IngredientsPage > US904_HappyPath_OpenCreateDialog_FocusOnFirstField [line 208] (covered 75)
+      ~ IngredientsPage > US904_HappyPath_CancelDialog_ClosesDialogAndDiscardsInput [line 223] (covered 88)
+      ✓ IngredientsPage – Zutat anlegen > US904_HappyPath_GetIngredients_SettledEmptyArray_ShowsEmptyState [line 250] (killed 1)
+      ✓ IngredientsPage – Zutat anlegen > US904_HappyPath_CreateIngredient_ValidData_IngredientAppearsInList [line 295] (killed 21)
+      ✓ IngredientsPage – Zutat anlegen > US904_HappyPath_CreateDialog_Submit_NativeFormSubmitIsPrevented [line 331] (killed 1)
+      ~ IngredientsPage – Zutat anlegen > US904_HappyPath_SaveInFlight_SaveButtonIsDisabled [line 348] (covered 124)
+      ~ IngredientsPage – Zutat anlegen > US904_HappyPath_SaveInFlight_CancelButtonIsDisabled [line 368] (covered 120)
+      ✓ IngredientsPage – Zutat anlegen > US904_HappyPath_SaveInFlight_EscapeDoesNotCloseDialog [line 386] (killed 1)
+      ~ IngredientsPage – Zutat anlegen > US904_HappyPath_SaveInFlight_BackdropClickDoesNotCloseDialog [line 417] (covered 123)
+      ✓ IngredientsPage – Zutat anlegen schlägt fehl (leerer Name) > US904_Error_CreateIngredient_EmptyName_ShowsErrorMessage [line 467] (killed 8)
+      ~ IngredientsPage – Zutat anlegen schlägt fehl (leerer Name) > US904_Error_CreateIngredient_EmptyName_KeepsDialogOpen [line 485] (covered 104)
+      ~ IngredientsPage – Zutat anlegen schlägt fehl (leerer Name) > US904_Error_CreateIngredient_EmptyName_ListUnchanged [line 498] (covered 104)
+      ~ IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit) > US904_Error_CreateIngredient_EmptyUnit_ShowsErrorMessage [line 549] (covered 104)
+      ~ IngredientsPage – Zutat anlegen schlägt fehl (leere Einheit) > US904_Error_CreateIngredient_EmptyUnit_MarksOnlyUnitField [line 562] (covered 104)
+      ✓ IngredientsPage – Reopen nach fehlgeschlagenem Speichern > US904_EdgeCase_ReopenDialogAfterFailedSaveAndCancel_IsErrorFree [line 584] (killed 3)
+      ✓ IngredientsPage – Reopen nach fehlgeschlagenem Speichern > US904_EdgeCase_ReopenDialogAfterFailedThenSuccessfulSave_IsErrorFree [line 619] (killed 1)
+      ✓ IngredientsPage – Zutat löschen > US904_HappyPath_DeleteIngredient_FromList_ListEmptyAndUndoToastShown [line 733] (killed 12)
+      ✓ IngredientsPage – Zutat löschen > US904_HappyPath_UndoDelete_ViaToast_IngredientReappearsInList [line 754] (killed 9)
+      ✓ IngredientsPage – Undo-Toast-Verlässlichkeit > US904_EdgeCase_UndoToast_ClickBesideToast_ToastRemainsVisible [line 783] (killed 7)
+      ~ IngredientsPage – Undo-Toast-Verlässlichkeit > US904_EdgeCase_SecondDelete_RestartsUndoWindow [line 823] (covered 100)
+      ~ IngredientsPage – Undo-Toast-Verlässlichkeit > US904_EdgeCase_TwoDeletes_UndoRestoresOnlyTheLatest [line 867] (covered 116)
+      ✓ IngredientsPage – Löschen·Pending > US904_HappyPath_DeleteInFlight_DeleteButtonIsDisabled [line 915] (killed 2)
+      ✓ IngredientsPage – Löschen·Pending > US904_HappyPath_UndoDelete_RestoredRow_DeleteButtonIsEnabledAgain [line 943] (killed 1)
+      ✓ IngredientsPage – Zutat reaktivieren > US904_EdgeCase_CreateIngredient_SoftDeletedSameName_ReactivatesIngredient [line 995] (killed 7)
+      ~ IngredientsPage – Zutat reaktivieren > US904_EdgeCase_ReactivateIngredient_NewUnit_ListShowsNewUnit [line 1032] (covered 146)
+      ~ IngredientsPage – Zutat reaktivieren > US904_EdgeCase_ReactivateIngredient_DifferentCasing_ListShowsNewSpelling [line 1060] (covered 146)
+      ~ IngredientsPage – Zutat reaktivieren > UndoDelete_RestoreRequestCarriesOriginalNameAndUnit [line 1091] (covered 116)
+      ✓ IngredientsPage – Zutat reaktivieren > UndoToast_ReactivateSameIngredientViaCreate_DismissesUndoToast [line 1135] (killed 1)
+      ✓ IngredientsPage – Reaktivierungs-Konflikt > US904_Error_ReactivateIngredient_ParallelRestoreDifferentData_ShowsConflictHint [line 1184] (killed 8)
+      ✓ IngredientsPage – Reaktivierungs-Konflikt > ReactivationConflictToast_Escape_HidesToast [line 1223] (killed 2)
+      ✓ IngredientsPage – Reaktivierungs-Konflikt > ReactivationConflictToast_WhitespacePaddedInput_ShowsTrimmedNameInHint [line 1249] (killed 1)
+      ~ IngredientsPage – Reaktivierungs-Konflikt > ReactivationConflictToast_SucceedingCreateAfterConflict_HidesToast [line 1303] (covered 157)
+    RecipesPage.test.tsx
+      ✓ Rezepte erfassen > US602_HappyPath_RecipesPage_EmptyDb_ShowsEmptyListAndCreateButton [line 115] (killed 3)
+      ✓ Rezepte erfassen > US602_HappyPath_RecipesPage_ExistingRecipe_ShowsTitleInNamedList [line 135] (killed 2)
+      ~ Rezepte erfassen > US602_HappyPath_RecipesPage_MultipleRecipes_RendersServerOrderUnchanged [line 152] (covered 29)
+      ✓ Rezepte erfassen > US602_HappyPath_CreateRecipe_ValidData_SendsRequestContract [line 171] (killed 39)
+      ✓ Rezepte erfassen > US602_HappyPath_CreateRecipe_Submit_NativeFormSubmitIsPrevented [line 199] (killed 1)
+      ✓ Rezepte erfassen > US602_HappyPath_CreateRecipe_ValidData_ShowsDetailViewOfCreatedRecipe [line 219] (killed 8)
+      ✓ Rezepte erfassen > US602_HappyPath_OpenRecipe_FromList_ShowsDetailOfClickedRecipe [line 243] (killed 1)
+      ✓ Rezepte erfassen > US602_HappyPath_OpenRecipe_SecondRecipeAfterFirst_NeverShowsFirstRecipe [line 265] (killed 1)
+      ~ Rezepte erfassen > US602_HappyPath_OpenRecipe_ByDirectLink_ShowsDetail [line 291] (covered 49)
+      ~ Rezepte erfassen > RecipeDetailLoading_ResponsePending_ShowsNeitherNotFoundNorRecipe [line 304] (covered 23)
+      ~ Rezeptformular öffnen > US602_HappyPath_CreateForm_Opened_FieldsAreEmptyWithOneNumberedStep [line 347] (covered 123)
+      ~ Rezeptformular öffnen > US602_HappyPath_CreateForm_Opened_RequiredFieldsAndStepsSectionAreMarked [line 357] (covered 123)
+      ✓ Rezeptformular öffnen > US602_HappyPath_CreateForm_IngredientsField_KeepsHintWhileTyping [line 371] (killed 3)
+      ✓ Rezeptformular öffnen > US602_HappyPath_CreateForm_Opened_FocusIsOnTitle [line 387] (killed 3)
+      ~ Rezeptformular öffnen > US602_HappyPath_CreateForm_AddStepTwice_StepsAreNumbered123 [line 397] (covered 127)
+      ✓ Rezeptformular öffnen > US602_HappyPath_CreateForm_AddStep_FocusMovesToNewStepField [line 414] (killed 1)
+      ~ Rezeptformular direkt öffnen > US602_EdgeCase_CreateForm_DirectAddress_OpensEmptyForm [line 431] (covered 95)
+      ✓ Rezeptformular abbrechen > US602_HappyPath_CreateForm_CancelWithoutInput_ShowsListWithoutQuestion [line 490] (killed 5)
+      ✓ Rezeptformular abbrechen > US602_HappyPath_CreateForm_CancelWithInput_DiscardShowsList (Titel) [line 511] (killed 7)
+      ~ Rezeptformular abbrechen > US602_HappyPath_CreateForm_CancelWithInput_DiscardShowsList (Zutaten) [line 511] (covered 129)
+      ~ Rezeptformular abbrechen > US602_HappyPath_CreateForm_CancelWithInput_DiscardShowsList (Schritt) [line 511] (covered 135)
+      ~ Rezeptformular abbrechen > US602_HappyPath_CreateForm_CancelWithInput_DiscardShowsList (zweiter Schritt) [line 511] (covered 139)
+      ✓ Rezeptformular abbrechen > US602_HappyPath_CreateForm_CancelWithInput_KeepEditingKeepsInputs [line 531] (killed 2)
+      ✓ Rezeptformular abbrechen > US602_HappyPath_CreateForm_DiscardQuestion_Opened_FocusIsOnKeepEditing [line 548] (killed 3)
+      ✓ Rezeptformular abbrechen – Randfälle > US602_EdgeCase_CreateForm_CancelWithOnlyBlankInput_ShowsListWithoutQuestion [line 561] (killed 1)
+      ~ Rezeptformular abbrechen – Randfälle > US602_EdgeCase_CreateForm_CancelWithTitleOnlyVanishingCharacters_ShowsListWithoutQuestion (U+00AD) [line 585] (covered 127)
+      ~ Rezeptformular abbrechen – Randfälle > US602_EdgeCase_CreateForm_CancelWithTitleOnlyVanishingCharacters_ShowsListWithoutQuestion (U+2060) [line 585] (covered 127)
+      ~ Rezeptformular abbrechen – Randfälle > US602_EdgeCase_CreateForm_CancelWithTitleOnlyVanishingCharacters_ShowsListWithoutQuestion (U+FEFF) [line 585] (covered 127)
+      ~ Rezeptformular abbrechen – Randfälle > US602_EdgeCase_CreateForm_CancelWithTitleOnlyVanishingCharacters_ShowsListWithoutQuestion (U+0085) [line 585] (covered 127)
+      ~ Rezeptformular abbrechen – Randfälle > US602_EdgeCase_CreateForm_DiscardQuestion_DismissedBy_KeepsInputs (Escape) [line 612] (covered 131)
+      ~ Rezeptformular abbrechen – Randfälle > US602_EdgeCase_CreateForm_DiscardQuestion_DismissedBy_KeepsInputs (Klick neben die Nachfrage) [line 612] (covered 129)
+      ~ Rezeptformular abbrechen – Randfälle > US602_EdgeCase_CreateForm_DiscardThenReopen_FormIsEmpty [line 626] (covered 135)
+      ✓ Rezepte erfassen – Fehlerfälle > US602_Error_OpenRecipe_NetworkFailure_DoesNotClaimRecipeIsMissing [line 650] (killed 2)
+      ✓ Rezepte erfassen – Fehlerfälle > US602_Error_OpenRecipe_UnknownLink_ShowsNotFoundAndWayBack (einer gültig aufgebauten, unbekannten Kennung) [line 674] (killed 2)
+      ~ Rezepte erfassen – Fehlerfälle > US602_Error_OpenRecipe_UnknownLink_ShowsNotFoundAndWayBack (einer ungültigen Kennung) [line 674] (covered 56)
+      ~ Rezepte erfassen – Fehlerfälle > US602_Error_OpenRecipe_IdWithEncodedSlash_ShowsNotFoundInsteadOfFollowingPath [line 700] (covered 42)
+      ~ Rezepte erfassen – Fehlerfälle > RecipeDetailPage_RouteWithoutId_ShowsNotFoundWithoutRequest [line 719] (covered 5)
+      ✓ Rezept ohne Pflichtangaben > US602_Error_CreateRecipe_EmptyForm_ShowsAllRequiredMessagesAndFocusOnTitle [line 768] (killed 26)
+      ✓ Rezept ohne Pflichtangaben > US602_Error_CreateRecipe_WithoutIngredientOrStep_ShowsMessageAndKeepsInput (ohne Zutaten) [line 831] (killed 5)
+      ~ Rezept ohne Pflichtangaben > US602_Error_CreateRecipe_WithoutIngredientOrStep_ShowsMessageAndKeepsInput (nur leere Zeilen als Zutaten) [line 831] (covered 162)
+      ✓ Rezept ohne Pflichtangaben > US602_Error_CreateRecipe_WithoutIngredientOrStep_ShowsMessageAndKeepsInput (ohne Schritt) [line 831] (killed 3)
+      ~ Rezept ohne Pflichtangaben > US602_Error_CreateRecipe_WithoutIngredientOrStep_ShowsMessageAndKeepsInput (leerer Schritt) [line 831] (covered 160)
+      ✓ Rezept ohne Pflichtangaben > US602_Error_CreateRecipe_WithoutStep_SeveralStepFields_OnlyFirstFieldCarriesMessageAndFocus [line 869] (killed 3)
+  services
+    conditionalGet.test.ts
+      ~ conditionalGetJson > sendet beim ersten GET ohne Cache keinen If-None-Match-Header und liefert den 200-Body [line 25] (covered 17)
+      ✓ conditionalGetJson > sendet beim zweiten GET den zuvor erhaltenen ETag als If-None-Match [line 46] (killed 4)
+      ✓ conditionalGetJson – Cache & 304 > liefert bei 304 den gecachten Body aus der vorherigen 200-Antwort [line 67] (killed 1)
+      ✓ conditionalGetJson – Cache & 304 > aktualisiert bei 200 mit neuem ETag den Cache, sodass der Folge-Request den neuen ETag sendet [line 91] (killed 2)
+    ingredientsApi.test.ts
+      ✓ deleteIngredient > sendet DELETE auf die Zutat mit dem Zeilen-ETag als If-Match [line 16] (killed 1)
+      ✓ restoreIngredient > erkennt eine 200-Antwort als Reaktivierung, nicht als Konflikt [line 47] (killed 1)
+
+Ran 4.64 tests per mutant on average.
+-----------------------------------------|------------------|----------|-----------|------------|----------|----------|
+                                         | % Mutation score |          |           |            |          |          |
+File                                     |  total | covered | # killed | # timeout | # survived | # no cov | # errors |
+-----------------------------------------|--------|---------|----------|-----------|------------|----------|----------|
+All files                                | 100.00 |  100.00 |      241 |         0 |          0 |        0 |      177 |
+ domain                                  | 100.00 |  100.00 |       18 |         0 |          0 |        0 |       14 |
+  ingredient.ts                          |    n/a |     n/a |        0 |         0 |          0 |        0 |        4 |
+  recipe.ts                              | 100.00 |  100.00 |       11 |         0 |          0 |        0 |        9 |
+  text.ts                                | 100.00 |  100.00 |        7 |         0 |          0 |        0 |        1 |
+ hooks                                   | 100.00 |  100.00 |       49 |         0 |          0 |        0 |       59 |
+  useCreateIngredientWithReactivation.ts | 100.00 |  100.00 |        6 |         0 |          0 |        0 |       17 |
+  useDeleteIngredientWithUndo.ts         | 100.00 |  100.00 |       11 |         0 |          0 |        0 |        7 |
+  useDiscardQuestion.ts                  | 100.00 |  100.00 |        5 |         0 |          0 |        0 |        2 |
+  useRecipeFieldMessages.ts              | 100.00 |  100.00 |        7 |         0 |          0 |        0 |       20 |
+  useRecipeForm.ts                       | 100.00 |  100.00 |       11 |         0 |          0 |        0 |        6 |
+  useResultMutation.ts                   | 100.00 |  100.00 |        9 |         0 |          0 |        0 |        3 |
+  useResultQuery.ts                      |    n/a |     n/a |        0 |         0 |          0 |        0 |        4 |
+ pages                                   | 100.00 |  100.00 |      120 |         0 |          0 |        0 |       50 |
+  CreateRecipePage.tsx                   | 100.00 |  100.00 |       54 |         0 |          0 |        0 |        7 |
+  IngredientsPage.tsx                    | 100.00 |  100.00 |       54 |         0 |          0 |        0 |       25 |
+  RecipeDetailPage.tsx                   | 100.00 |  100.00 |        5 |         0 |          0 |        0 |       15 |
+  RecipesPage.tsx                        | 100.00 |  100.00 |        7 |         0 |          0 |        0 |        3 |
+ services                                | 100.00 |  100.00 |       54 |         0 |          0 |        0 |       49 |
+  conditionalGet.ts                      | 100.00 |  100.00 |       11 |         0 |          0 |        0 |        9 |
+  fieldErrors.ts                         |    n/a |     n/a |        0 |         0 |          0 |        0 |        4 |
+  ingredientsApi.ts                      | 100.00 |  100.00 |       30 |         0 |          0 |        0 |       25 |
+  recipesApi.ts                          | 100.00 |  100.00 |       13 |         0 |          0 |        0 |       11 |
+ types                                   |    n/a |     n/a |        0 |         0 |          0 |        0 |        3 |
+  apiError.ts                            |    n/a |     n/a |        0 |         0 |          0 |        0 |        3 |
+ App.tsx                                 |    n/a |     n/a |        0 |         0 |          0 |        0 |        2 |
+-----------------------------------------|--------|---------|----------|-----------|------------|----------|----------|
+[32m09:39:26 (3265065) INFO MutationTestReportHelper[39m Final mutation score of 100.00 is greater than or equal to break threshold 100
+[32m09:39:27 (3265065) INFO HtmlReporter[39m Your report can be found at: file:///home/kieritz/repos/mahl/Client/reports/mutation/mutation.html
+[32m09:39:27 (3265065) INFO JsonReporter[39m Your report can be found at: file:///home/kieritz/repos/mahl/Client/reports/mutation/mutation.json
+[32m09:39:27 (3265065) INFO MutationTestExecutor[39m Done in 4 minutes and 55 seconds.

@@ -22,7 +22,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from ._util import REPO_ROOT
+from ._util import REPO_ROOT, projekt_verzeichnis
 
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
 MAPPING_FILE = REPO_ROOT / ".claude" / "session-types.json"
@@ -52,9 +52,9 @@ UNBEKANNT = "unbekannt"
 SONSTIGES = "sonstiges"
 
 
-def project_log_dir(repo_root: Path = REPO_ROOT) -> Path:
-    """Log-Verzeichnis dieses Repos (Claude Code kodiert das cwd, `/` → `-`)."""
-    return PROJECTS_DIR / str(repo_root).replace("/", "-")
+def project_log_dir(projekt: Path | None = None) -> Path:
+    """Log-Verzeichnis dieses Projekts (Claude Code kodiert sein Startverzeichnis, `/` → `-`)."""
+    return PROJECTS_DIR / str(projekt or projekt_verzeichnis()).replace("/", "-")
 
 
 def load_mapping(path: Path = MAPPING_FILE) -> dict[str, str]:

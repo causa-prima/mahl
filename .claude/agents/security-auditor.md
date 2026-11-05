@@ -13,7 +13,7 @@ Dein Fokus: Sicherheitslücken, die durch die geänderten Features entstehen kö
 
 Dein Output sind ausschließlich Findings – du hast nur Lesezugriff, das Anwenden von Änderungen ist nicht deine Rolle. Der Haupt-Agent entscheidet, was geändert wird.
 
-Gib für jeden Befund: ✅ OK | ⚠️ Verbesserungswürdig | ❌ Sicherheitslücke
+Gib für jeden Befund: ✅ OK | ⚠️ Verbesserungswürdig | ❌ Sicherheitslücke – bei ⚠️/❌ dazu `Regel: <ANKER>` der verletzten Regel (`Regel: keine` bei einem Urteil ohne geschriebene Regel)
 
 PRÜFPUNKTE:
 

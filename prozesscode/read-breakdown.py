@@ -27,6 +27,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 
+from ._cli import Parser
 from ._session_logs import (  # noqa: E402
     MAPPING_FILE,
     UNBEKANNT,
@@ -204,7 +205,7 @@ def print_sessions(zuordnung: list[tuple[str, str, str]]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description="Read-Volumen nach Session-Art, Bereich und Datei.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,

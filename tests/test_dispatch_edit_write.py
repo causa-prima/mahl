@@ -4,8 +4,15 @@ Der Dispatcher ersetzt die sechs zuvor einzeln in settings.json registrierten Ch
 (OBS-S088-1). Geprüft wird der Dispatcher-Vertrag, nicht die Check-Logik selbst –
 die hat je Check eigene Tests.
 """
+import io
+import json
+import sys
 from importlib import import_module
 from pathlib import Path
+
+import pytest
+
+from prozesscode.hooks.checks import guard_log
 
 dispatcher = import_module("prozesscode.hooks.dispatch-edit-write")
 
@@ -129,3 +136,66 @@ def test_real_checks_pass_on_an_unrelated_file():
         },
     }
     assert dispatcher.collect_reasons(data) == []
+
+
+# --- main(): was bei Claude Code ankommt ---------------------------------------
+class _Grund:
+    def __init__(self, grund):
+        self.grund = grund
+
+    def check(self, data):
+        return self.grund
+
+
+def _main(monkeypatch, gruende: dict, stdin: str) -> int:
+    monkeypatch.setattr(dispatcher, "CHECKS", list(gruende))
+    monkeypatch.setattr(dispatcher, "import_module",
+                        lambda name: _Grund(gruende[name.removeprefix(dispatcher.PAKET)]))
+    monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+    try:
+        dispatcher.main()
+    except SystemExit as ende:
+        return ende.code
+    return 0
+
+
+@pytest.mark.parametrize("werkzeug", ["Edit", "Write"])
+def test_main_gibt_alle_gruende_als_deny_im_hook_format_aus(monkeypatch, capsys, werkzeug):
+    code = _main(monkeypatch, {"a": "Grund A", "b": None, "c": "Grund C"},
+                 json.dumps({"tool_name": werkzeug, "tool_input": {}}))
+    assert code == 0  # Den Block trägt das JSON, nicht der Exit-Code.
+    assert json.loads(capsys.readouterr().out) == {"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "Grund A\n" + "─" * 60 + "\nGrund C",
+    }}
+
+
+@pytest.mark.parametrize("stdin, grund", [
+    (json.dumps({"tool_name": "Read", "tool_input": {}}), "Grund A"),  # anderes Werkzeug
+    (json.dumps({"tool_input": {}}), "Grund A"),                       # ohne Werkzeugnamen
+    ("kein JSON", "Grund A"),
+    (json.dumps({"tool_name": "Edit", "tool_input": {}}), None),       # kein Einwand
+])
+def test_main_ohne_einwand_gibt_nichts_aus(monkeypatch, capsys, stdin, grund):
+    assert _main(monkeypatch, {"a": grund}, stdin) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_fehler_eines_checks_geht_mit_namen_auf_stderr(monkeypatch, capsys):
+    def wirft(name):
+        raise ImportError("gibt es nicht")
+
+    monkeypatch.setattr(dispatcher, "CHECKS", ["check-fehlt"])
+    monkeypatch.setattr(dispatcher, "import_module", wirft)
+    dispatcher.collect_reasons({})
+    assert capsys.readouterr().err == (
+        "dispatch-edit-write: Fehler in check-fehlt (gibt es nicht) – Check übersprungen.\n")
+
+
+def test_protokolliert_den_blockierenden_check(monkeypatch):
+    monkeypatch.setattr(dispatcher, "CHECKS", ["check-still", "check-blockt"])
+    monkeypatch.setattr(dispatcher, "import_module", lambda name: _Grund(
+        "Grund" if name.endswith("blockt") else None))
+    dispatcher.collect_reasons({})
+    assert guard_log.zaehlstand() == {"check-blockt": 1}

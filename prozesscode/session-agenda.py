@@ -48,7 +48,6 @@ Schnittstelle:
 Ausfallverhalten: Jedes Modul scheitert EINZELN und sichtbar; die Agenda läuft weiter. Ein
 Totalausfall wäre von „nichts zu tun" ununterscheidbar.
 """
-import argparse
 import io
 import json
 import re
@@ -60,6 +59,7 @@ from datetime import date
 from importlib import import_module
 from pathlib import Path
 
+from ._cli import Parser
 from . import anchors
 from . import open_questions
 from . import ordinale
@@ -870,7 +870,7 @@ def rendere_alles() -> str:
 
 def main() -> int:
     # `or ""`: Im Mutantenbaum von mutmut ist `__doc__` None (S133, s. td_due.main).
-    ap = argparse.ArgumentParser(description=(__doc__ or "").partition("\n")[0])
+    ap = Parser(description=(__doc__ or "").partition("\n")[0])
     gruppe = ap.add_mutually_exclusive_group()
     gruppe.add_argument("--block", metavar="NAME",
                         help="einen Injektionsblock ausgeben (so ruft der SessionStart-Hook)")

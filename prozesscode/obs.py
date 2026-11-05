@@ -19,6 +19,7 @@ import argparse
 import sys
 
 
+from ._cli import Parser
 from .obs_parse import parse_entries, score  # noqa: E402
 from .obs_entry import (  # noqa: E402
     HAEUFIGKEIT_WERTE,
@@ -128,7 +129,7 @@ def cmd_set(args) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description="Einzelne OBS-Einträge lesen und schreiben.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
@@ -177,10 +178,7 @@ def main() -> None:
                             help="offene Einträge als Titelliste mit Score (Basis für --zusammen-erledigen)")
     p_list.set_defaults(func=cmd_list_offen)
 
-    # allow_abbrev=False: Sonst ergänzt argparse eindeutige Präfixe still – ohne eigene Option
-    # liefe `--beobachtung` als `--beobachtung-anhängen` und hängte an, statt zu ersetzen.
-    p_set = sub.add_parser("set", allow_abbrev=False,
-                           help="Felder eines Eintrags ändern (Drain, Korrektur einer Erfassung)")
+    p_set = sub.add_parser("set", help="Felder eines Eintrags ändern (Drain, Korrektur einer Erfassung)")
     p_set.add_argument("id", metavar="OBS-ID")
     p_set.add_argument("--titel", help="Titel korrigieren – er ist zugleich der Kurztitel, "
                                        "unter dem der Eintrag im Gespräch läuft")

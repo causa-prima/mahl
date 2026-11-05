@@ -82,7 +82,7 @@ def test_vitest_filter_ohne_treffer_zeigt_mit_verbose_die_rohausgabe(monkeypatch
     assert cli_aufruf(monkeypatch, modul, "--filter", "Tippfehler", "--verbose") == 1
     ausgabe = capsys.readouterr().out
     assert "Tests  87 skipped (87)" in ausgabe
-    assert "✗" not in ausgabe
+    assert ausgabe.endswith(modul.FILTER_OHNE_TREFFER + "\n")
 
 
 def test_vitest_abbruch_ohne_zusammenfassung_meldet_rot_statt_abzustuerzen(monkeypatch, capsys):
@@ -321,11 +321,3 @@ def test_atdd_gate_meldet_unbekannten_tag(monkeypatch, capsys):
     code = cli_aufruf(monkeypatch, import_module("prozesscode.check-atdd-gate"), "@US-999")
     assert code == 1
     assert "@US-999" in capsys.readouterr().out
-
-
-@pytest.mark.aufrufpfad("test-stryker-guards")
-def test_stryker_guard_suite_ist_gruen(capsys):
-    """Die Suite bringt einen eigenen Runner mit und heißt mit Bindestrich – pytest sammelt sie
-    nicht. Über `main()` läuft sie jetzt im Werkzeug-Gate mit (wie der Bash-Permission-Runner)."""
-    import_module("prozesscode.test-stryker-guards").main()
-    assert "Alle Tests bestanden" in capsys.readouterr().out

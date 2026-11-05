@@ -225,6 +225,12 @@ def test_project_log_dir_encodes_the_repo_path(tmp_path):
     assert sl.project_log_dir(Path("/home/kieritz/repos/mahl")).name == "-home-kieritz-repos-mahl"
 
 
+def test_project_log_dir_folgt_dem_startverzeichnis_von_claude_code(monkeypatch):
+    """Im Worktree liegt der Code woanders als das Verzeichnis, nach dem die Logs heißen."""
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/home/x/haupt-repo")
+    assert sl.project_log_dir() == sl.PROJECTS_DIR / "-home-x-haupt-repo"
+
+
 # --- session_datum -----------------------------------------------------------
 # Ohne Datum je Session lässt sich eine Messung nicht in „vor" und „nach einer Maßnahme"
 # trennen – und eine Wirksamkeitsprüfung, die beides zusammenwirft, kann Erfolg und

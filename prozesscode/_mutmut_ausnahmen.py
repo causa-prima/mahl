@@ -17,9 +17,4 @@ Hier statt in `conftest.py`, weil beide Seiten dieselbe Quelle brauchen – der 
 keinen Testcode importieren.
 """
 
-UNTER_MUTMUT_UEBERSPRUNGEN: dict[str, str] = {
-    "tests/test_aufrufpfad_wrapper.py::test_stryker_guard_suite_ist_gruen":
-        "Die Suite prüft `resolve_mutate` gegen die echten Verzeichnisse Server/ und Client/; "
-        "mutmut kopiert sie nicht in den Mutantenbaum (`also_copy` in setup.cfg – Client/ "
-        "brächte node_modules mit). Außerhalb von mutmut läuft der Test im Werkzeug-Gate.",
-}
+UNTER_MUTMUT_UEBERSPRUNGEN: dict[str, str] = {}

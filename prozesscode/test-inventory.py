@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 
+from ._cli import Parser
 from ._test_inventory import inventar, zeilenzahl  # noqa: E402
 
 
@@ -48,7 +49,7 @@ def zeige(path: Path, nur_namen: bool, muster: str | None) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description="Testnamen samt Zeilenbereich – als Ersatz für das Lesen der ganzen Datei.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,

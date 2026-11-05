@@ -26,16 +26,26 @@ export async function lies($: EngineInterface): Promise<Stand> {
   }
 }
 
+async function zeige($: EngineInterface): Promise<void> {
+  await update($, stand, () => ({ art: 'laedt' }))
+  // Im Hintergrund: Die Agenda braucht rund zwei Sekunden, der Start soll darauf nicht warten.
+  $.clock.after(0, async () => {
+    const neu = await lies($)
+    await update($, stand, alt => (alt.art === 'aus' ? alt : neu))
+  })
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const ergebnis = await next(e)
-    if (!e.isInteractive) return ergebnis
-    await update($, stand, () => ({ art: 'laedt' }))
-    // Im Hintergrund: Die Agenda braucht rund zwei Sekunden, der Start soll darauf nicht warten.
-    $.clock.after(0, async () => {
-      const neu = await lies($)
-      await update($, stand, alt => (alt.art === 'aus' ? alt : neu))
-    })
+    if (e.isInteractive) await zeige($)
+    return ergebnis
+  })
+
+  // `/clear` beginnt eine neue Session ohne `session.start`; nur der Settings-Hook läuft.
+  on('classic.SessionStart', async ($, e, next) => {
+    const ergebnis = await next(e)
+    if (e.source === 'clear') await zeige($)
     return ergebnis
   })
 

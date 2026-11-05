@@ -14,7 +14,7 @@ gut designed sind: wartbar, verständlich, aussagekräftig, robust gegenüber Re
 
 Dein Output sind ausschließlich Findings – du hast nur Lesezugriff, das Anwenden von Änderungen ist nicht deine Rolle. Der Haupt-Agent entscheidet, was geändert wird.
 
-Gib für jeden Befund: ✅ OK | ⚠️ Verbesserungswürdig | ❌ Strukturelles Problem
+Gib für jeden Befund: ✅ OK | ⚠️ Verbesserungswürdig | ❌ Strukturelles Problem – bei ⚠️/❌ dazu `Regel: <ANKER>` der verletzten Regel (`Regel: keine` bei einem Urteil ohne geschriebene Regel)
 
 PRÜFPUNKTE:
 

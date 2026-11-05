@@ -10,6 +10,7 @@ import argparse
 import re
 import sys
 
+from ._cli import Parser
 from ._util import run_npm
 from ._wrapper_output import emit, strip_noise
 
@@ -44,7 +45,7 @@ def verdikt(output: str, lines: list[str]) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

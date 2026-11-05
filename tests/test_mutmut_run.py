@@ -256,6 +256,215 @@ def test_ohne_ausnahmen_kein_nachsatz(monkeypatch):
     assert mr.ausnahmen_nachsatz() == ""
 
 
+def test_genau_ein_bewerteter_mutant_steht_im_singular():
+    assert mr.baue_verdikt([("m.x_f__mutmut_1", "killed")], pragmas=1) == (
+        "✓ mutmut: 1 Mutant bewertet, 1 Zeile per Pragma ausgenommen, keiner überlebt", None)
+
+
+def test_zwei_bewertete_mutanten_stehen_im_plural():
+    assert mr.baue_verdikt([("m.x_f__mutmut_1", "killed"), ("m.x_f__mutmut_2", "killed")],
+                           pragmas=2) == (
+        "✓ mutmut: 2 Mutanten bewertet, 2 Zeilen per Pragma ausgenommen, keiner überlebt", None)
+
+
+def test_genau_so_viele_befunde_wie_zeilen_brauchen_keine_sammelzeile():
+    eintraege = [(f"a.x__mutmut_{i}", "timeout") for i in range(mr.MAX_ZEILEN)]
+    _verdikt, details = mr.baue_verdikt(eintraege)
+    assert len(details) == mr.MAX_ZEILEN
+    assert not any("weitere" in z for z in details)
+
+
+def test_die_sammelzeile_nennt_den_rest():
+    eintraege = [(f"a.x__mutmut_{i}", "timeout") for i in range(mr.MAX_ZEILEN + 1)]
+    _verdikt, details = mr.baue_verdikt(eintraege)
+    assert details[-1] == "  … und 1 weitere"
+
+
+# --- Aufrufpfad: vollständige Ausgabe ----------------------------------------
+_HINWEIS_BEFUND = (
+    "  „überlebt\" heißt: die Änderung an dieser Stelle bricht keinen Test – die Lücke "
+    "liegt im Test.\n"
+    "  „ohne deckenden Test\" heißt: kein Test berührt die Stelle überhaupt.\n"
+    "  Eine Stelle ansehen: python3 -m prozesscode.mutmut-run --show <name>\n"
+    "  Liegt sie in einem Meldungstext: als Modulkonstante auslagern (dort mutiert mutmut "
+    "nicht) oder eigene Anweisung mit `# pragma: no mutate – <Grund>` am Ende (mitten "
+    "in einem mehrzeiligen Ausdruck liest mutmut es nicht)."
+)
+_HINT = "   (vollständiger Output: --verbose)"
+
+
+def _lauf_mit(monkeypatch, tmp_path, ergebnisse, *argv,
+              lauf=None, quelle=None, ausnahmen=None):
+    """Startet `main` gegen einen ersetzten mutmut-Prozess und feste Ergebnisse.
+
+    `quelle` wird als `prozesscode/a.py` unter einem eigenen ROOT abgelegt – dort zählt
+    `pragma_zeilen` die Ausnahmen. Rückgabe: (Exit-Code, Ausschnitte an `lies_ergebnisse`).
+    """
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    monkeypatch.setattr(mr, "ROOT", tmp_path)
+    if quelle is not None:
+        (tmp_path / "prozesscode").mkdir()
+        (tmp_path / "prozesscode" / "a.py").write_text(quelle, encoding="utf-8")
+    lauf = lauf or subprocess.CompletedProcess([], 0, stdout="", stderr="")
+    monkeypatch.setattr(mr, "_laufe", lambda *a: lauf)
+    ausschnitte = []
+
+    def fake_lies(ausschnitt):
+        ausschnitte.append(ausschnitt)
+        return ergebnisse
+
+    monkeypatch.setattr(mr, "lies_ergebnisse", fake_lies)
+    monkeypatch.setattr(mr, "UNTER_MUTMUT_UEBERSPRUNGEN", ausnahmen or {})
+    return mr.main(list(argv)), ausschnitte
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_befund_im_ausschnitt_vollstaendige_ausgabe(tmp_path, monkeypatch, capsys):
+    """Das ganze Verdikt über `main`: Liste, Erklärung, Zählung, Pragma, Ausschnitt,
+    Ausnahmen – und der Ausschnitt geht an `lies_ergebnisse` weiter (sonst meldete ein Lauf
+    auf Modul B die Überlebenden von Modul A mit)."""
+    ergebnisse = [("prozesscode.a.x_f__mutmut_1", "survived"),
+                  ("prozesscode.a.x_f__mutmut_2", "killed"),
+                  ("prozesscode.a.x_f__mutmut_3", "no tests"),
+                  ("prozesscode.a.x_f__mutmut_4", "timeout")]
+    code, ausschnitte = _lauf_mit(
+        monkeypatch, tmp_path, ergebnisse, "--mutate", "prozesscode.a",
+        quelle="X = 1  # pragma: no mutate – Text\n",
+        ausnahmen={"tests/x.py::test_a": "Grund"})
+    assert code == 1
+    assert ausschnitte == ["prozesscode.a"]
+    assert capsys.readouterr().out == (
+        "  survived    prozesscode.a.x_f__mutmut_1\n"
+        "  no tests    prozesscode.a.x_f__mutmut_3\n"
+        "  timeout     prozesscode.a.x_f__mutmut_4\n"
+        f"{_HINWEIS_BEFUND}\n"
+        "\n"
+        "✗ mutmut: 4 Mutanten bewertet, 1 Zeile per Pragma ausgenommen, 1 überlebt, "
+        "1 ohne deckenden Test\n"
+        "  (Ausschnitt: prozesscode.a)\n"
+        "  (1 Test(e) unter mutmut übersprungen – Begründungen in "
+        "prozesscode/_mutmut_ausnahmen.py)\n"
+        f"{_HINT}\n")
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_gruener_volllauf_vollstaendige_ausgabe(tmp_path, monkeypatch, capsys):
+    """Ohne `--mutate` kein Ausschnitt-Filter; Timeouts sind genannt, aber kein Befund."""
+    ergebnisse = [("prozesscode.a.x_f__mutmut_1", "killed"),
+                  ("prozesscode.a.x_f__mutmut_2", "timeout"),
+                  ("prozesscode.a.x_f__mutmut_3", "not checked")]
+    code, ausschnitte = _lauf_mit(
+        monkeypatch, tmp_path, ergebnisse,
+        quelle="X = 1  # pragma: no mutate\nY = 2  # pragma: no mutate\n")
+    assert code == 0
+    assert ausschnitte == [None]
+    assert capsys.readouterr().out == (
+        "  timeout     prozesscode.a.x_f__mutmut_2\n"
+        "\n"
+        "✓ mutmut: 2 Mutanten bewertet, 1 offen (weiterer Lauf nötig), 2 Zeilen per Pragma "
+        "ausgenommen, keiner überlebt (1 ohne Aussage: timeout/suspicious)\n"
+        f"{_HINT}\n")
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_verbose_gibt_die_rohausgabe_aus(tmp_path, monkeypatch, capsys):
+    lauf = subprocess.CompletedProcess([], 0, stdout="Running mutation testing\n",
+                                       stderr="done\n")
+    code, _ = _lauf_mit(monkeypatch, tmp_path, [("prozesscode.a.x_f__mutmut_1", "killed")],
+                        "--verbose", lauf=lauf)
+    assert code == 0
+    assert capsys.readouterr().out == (
+        "Running mutation testing\ndone\n✓ mutmut: 1 Mutant bewertet, keiner überlebt\n")
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_abbruch_ohne_ausgabe_vollstaendige_meldung(tmp_path, monkeypatch, capsys):
+    lauf = subprocess.CompletedProcess([], 2, stdout="", stderr="")
+    code, ausschnitte = _lauf_mit(monkeypatch, tmp_path, [], lauf=lauf)
+    assert code == 1
+    assert ausschnitte == []  # alte Ergebnisse im Baum werden gar nicht erst gelesen
+    assert capsys.readouterr().out == (
+        "✗ mutmut ist abgebrochen (Exit 2): keine Ausgabe\n"
+        "  Kein Ergebnis dieses Laufs – die Ursache steht davor: --verbose.\n"
+        "  Häufig ein Fehler im Testcode, der nur im Mutantenbaum auftritt (Import, Pfad).\n"
+        "  Nennt sie eine Datei, die es im Repo nicht mehr gibt: --frisch (s. raeume_baum).\n"
+        f"{_HINT}\n")
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_abbruch_mit_verbose_zeigt_die_echte_ausgabe(tmp_path, monkeypatch, capsys):
+    lauf = subprocess.CompletedProcess([], 1, stdout=_ABBRUCH_SAMMELN, stderr="")
+    code, _ = _lauf_mit(monkeypatch, tmp_path, [], "--verbose", lauf=lauf)
+    assert code == 1
+    verdikt = mr._ABBRUCH.format(code=1, zeile="Failed to collect list of tests")
+    assert capsys.readouterr().out == _ABBRUCH_SAMMELN.rstrip() + "\n" + verdikt + "\n"
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_show_reicht_ausgabe_und_exit_code_unveraendert_durch(tmp_path, monkeypatch, capsys):
+    """Auch stderr und ein Fehler-Exit kommen an – ohne angehängten Zeilenumbruch."""
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    monkeypatch.setattr(mr, "_laufe", lambda *argv: subprocess.CompletedProcess(
+        argv, 1, stdout="- alt\n+ neu\n", stderr="Fehler"))
+    assert mr.main(["--show", "prozesscode.anchors.x_f__mutmut_3"]) == 1
+    assert capsys.readouterr().out == "- alt\n+ neu\nFehler"
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_ohne_venv_nennt_es_den_weg_zur_umgebung(tmp_path, monkeypatch, capsys):
+    fehlt = tmp_path / "fehlt"
+    monkeypatch.setattr(mr, "MUTMUT", fehlt)
+    monkeypatch.setattr(mr, "_laufe", lambda *a: pytest.fail("ohne venv kein Lauf"))
+    assert mr.main([]) == 2
+    assert capsys.readouterr().out == (
+        f"✗ Werkzeug-Umgebung fehlt ({fehlt}).\n"
+        "  Herstellen:\n"
+        "    python3 -m venv .venv\n"
+        "    .venv/bin/pip install -r requirements-dev.txt\n")
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_frisch_raeumt_den_baum_ueber_main(tmp_path, monkeypatch):
+    (tmp_path / "mutants").mkdir()
+    code, _ = _lauf_mit(monkeypatch, tmp_path, [("prozesscode.a.x_f__mutmut_1", "killed")],
+                        "--frisch")
+    assert code == 0
+    assert not (tmp_path / "mutants").exists()
+
+
+def test_ohne_frisch_bleibt_der_baum(tmp_path, monkeypatch):
+    (tmp_path / "mutants").mkdir()
+    _lauf_mit(monkeypatch, tmp_path, [("prozesscode.a.x_f__mutmut_1", "killed")])
+    assert (tmp_path / "mutants").exists()
+
+
+def test_der_mutmut_prozess_laeuft_im_repo_mit_zeitdeckel_und_ohne_dumps(monkeypatch):
+    """Ohne `cwd` fände mutmut seine `setup.cfg` nicht, ohne `timeout` hinge ein Volllauf
+    beliebig lange. Das Core-Limit lässt sich im Mutantenbaum nicht am Kind prüfen: mutmut
+    setzt es dort schon für den Testprozess, das Kind erbt es auch ohne `preexec_fn`."""
+    aufrufe = []
+    monkeypatch.setattr(mr.subprocess, "run",
+                        lambda cmd, **kw: aufrufe.append((cmd, kw)) or "lauf")
+    assert mr._laufe("show", "x") == "lauf"
+    assert aufrufe == [([str(mr.MUTMUT), "show", "x"], {
+        "cwd": mr.ROOT, "capture_output": True, "text": True,
+        "timeout": mr.TIMEOUT_S, "preexec_fn": mr._ohne_core_dump})]
+
+
+def test_das_core_limit_wird_auf_eins_gesetzt_und_das_harte_bleibt(monkeypatch):
+    """0 genügt nicht: Bei einem Pipe-Ziel in `core_pattern` wirkt erst 1 (core(5))."""
+    gesetzt = []
+    monkeypatch.setattr(mr.resource, "getrlimit",
+                        lambda art: (0, 4711) if art == mr.resource.RLIMIT_CORE else None)
+    monkeypatch.setattr(mr.resource, "setrlimit", lambda art, wert: gesetzt.append((art, wert)))
+    mr._ohne_core_dump()
+    assert gesetzt == [(mr.resource.RLIMIT_CORE, (1, 4711))]
+
+
 # --- Timeouts und Verdächtige ------------------------------------------------
 def test_timeouts_gelten_nicht_als_ueberlebende():
     """Ein Timeout sagt nichts über die Testgüte – meist ist es eine Endlosschleife, die

@@ -29,13 +29,13 @@ Harness mit den noch laufenden Tasks (live gemessen). Benannte Agenten stehen do
 `teammate` unter einer eigenen Task-ID; für sie zählt ersatzweise die Beschreibung. Fehlt das
 Feld, gilt alles als fertig – ein Fehlalarm, kein stilles Übergehen.
 """
-import argparse
 import json
 import os
 import shutil
 import sys
 import time
 from pathlib import Path
+from ._cli import Parser
 
 ROOT = Path(__file__).resolve().parent.parent
 VERZEICHNIS = ROOT / ".claude" / "tmp" / "rueckgaben"
@@ -189,7 +189,7 @@ def _session_aus_umgebung() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description="Offene Rückgaben (Agenten, Hintergrund-Befehle) zeigen und abhaken.")
     befehle = parser.add_subparsers(dest="befehl", required=True)
     erledigt = befehle.add_parser("erledigt", help="Rückgabe als verarbeitet abhaken")

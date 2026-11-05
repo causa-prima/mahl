@@ -21,13 +21,13 @@ Nur mit --verbose (visuell / für Menschen):
   Trendanalyse per Kategorie
 """
 
-import argparse
 import os
 import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from ._cli import Parser
 from . import kontext_tags
 from .kaizen_constants import IMPACT_WEIGHTS
 from ._util import REPO_ROOT
@@ -785,7 +785,7 @@ def render_escalated(cms: list[Countermeasure], archive_dir: str) -> str:
 # Main
 # ---------------------------------------------------------------------------
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Kaizen-Retro-Bericht.")
+    parser = Parser(description="Kaizen-Retro-Bericht.")
     parser.add_argument("--current",  default=DEFAULT_CURRENT)
     parser.add_argument("--archive",  default=DEFAULT_ARCHIVE)
     parser.add_argument("--cm",       default=DEFAULT_CM)

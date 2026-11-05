@@ -7,11 +7,11 @@ durch das Skill `draining-observations` (Hygiene-Schritt) oder von Hand; NICHT v
 (der bleibt read-only/advisory – obs-drain.py erinnert nur per Hygiene-Reminder).
 Mechanismus & Begründung: docs/kaizen/process.md#KPR-drain ("Backlog-Abbau").
 """
-import argparse
 import re
 import sys
 from pathlib import Path
 
+from ._cli import Parser
 from .obs_parse import OBS_FILE, parse_entries, is_resolved  # noqa: E402
 from .repo_kontext import repo_root  # noqa: E402
 
@@ -50,7 +50,7 @@ def archive_resolved(obs_text: str, archive_text: str):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Verschiebt aufgelöste OBS mechanisch ins Archiv.")
+    ap = Parser(description="Verschiebt aufgelöste OBS mechanisch ins Archiv.")
     ap.add_argument("--file", help="Pfad zu observations.md (Default: Repo-Standard)")
     ap.add_argument("--archive", help="Pfad zum Archiv (Default: Repo-Standard)")
     ap.add_argument("--dry-run", action="store_true", help="nur anzeigen, was verschoben würde")

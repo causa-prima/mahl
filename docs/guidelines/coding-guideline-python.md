@@ -16,7 +16,7 @@ kritische-regeln:
 |-----------|--------|------------|
 | [Geltungsbereich](#CGP-geltungsbereich) | Was dieser Code ist und was ihn von Produktcode trennt | Einmal, zum Einordnen |
 | [Das Fehlerprofil](#CGP-fehlerprofil) | Warum hier andere Maßgaben gelten als für C#/TypeScript | Vor jeder Diskussion über Qualitätswerkzeuge |
-| [Was gilt](#CGP-was-gilt) | Tests, Linter, Gegenprobe, echtes Artefakt, Protokoll | Bevor du etwas schreibst |
+| [Was gilt](#CGP-was-gilt) | Tests, Linter, Gegenprobe, Mutanten sichten, echtes Artefakt, Protokoll | Bevor du etwas schreibst |
 | [Was nicht gilt](#CGP-was-nicht-gilt) | Bewusst nicht übernommene Produktcode-Regeln, mit Grund | Wenn du eine Regel vermisst |
 | [Werkzeuge](#CGP-werkzeuge) | venv, ruff, Wrapper | Beim ersten Aufsetzen |
 
@@ -101,6 +101,26 @@ löschen. Das kostet zwei Minuten und ist der einzige Beleg, den es für Klasse 
 Die Regel steht kanonisch in
 [`principles.md`](../kaizen/principles.md#KPI-kommunikation) – hier steht sie, weil sie beim
 Schreiben von Guards der wichtigste Einzelschritt ist.
+
+<a id="CGP-mutanten-sichten"></a>
+### Überlebende Mutanten sichten – was geschlossen wird und was offen bleibt
+
+Die Sperrklinke verhindert nur Rückschritte. Geschlossen wird eine Lücke erst, wenn jemand die
+Überlebenden ansieht (`mutmut-run --show <name>`). Je Mutant eine von drei Antworten:
+
+- **Mit Folge** – er ändert ein Verdikt, einen Exit-Code, die Wahl eines Unterbefehls oder
+  Pfads, einen Schreibvorgang oder einen Fehlerpfad: ein Test über den echten Aufrufpfad
+  (`main()` mit argv/stdin, `conftest.cli_aufruf`), Abhängigkeiten ersetzt durch Attrappen im
+  [echten Format](#CGP-echtes-artefakt).
+- **Meldung oder Format** – ein Test, der die Ausgabe exakt vergleicht, tötet die Text-Mutanten
+  einer Stelle meist auf einmal; oder der Text steht als Modulkonstante
+  ([Meldungen](#CGP-meldungen)). argparse-Hilfetexte bleiben offen.
+- **Äquivalent** – kein Test kann ihn unterscheiden (`sys.exit(0)` → `sys.exit(None)`, ein
+  Vorgabewert, der nie greift, `rsplit(".", 1)[-1]` → `[+1]`): den Code verhaltensgleich so
+  vereinfachen, dass er nicht entsteht (`return` statt `sys.exit(0)`, `rpartition`), sonst
+  begründet offen lassen.
+
+Gesichtet ist ein Modul, wenn kein Mutant mit Folge mehr überlebt – das Ziel ist nicht 100 %.
 
 <a id="CGP-echtes-artefakt"></a>
 ### Tests laufen gegen das echte Artefakt, nicht gegen einen Ersatz

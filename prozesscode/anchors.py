@@ -36,6 +36,7 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
+from ._cli import Parser
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -489,7 +490,7 @@ def cmd_refs(args) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(
+    p = Parser(
         description="Abschnitts-Anker prüfen und auflisten.",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)

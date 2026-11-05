@@ -82,11 +82,11 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S085-4 – Kein Language-Server für die Agenten-Programmierung im Einsatz
 - Quelle: User
-- Status: IN BEOBACHTUNG bis S145 – S130: fünfte Runde, mit Abbruchklausel gegen die Selbstblockade
+- Status: IN BEOBACHTUNG bis S152 – S146: sechste Runde mit korrigiertem Hinweis
 - Impact: MITTEL–HOCH (von GERING revidiert)    Häufigkeit: häufig
 - Kategorie: TOOLING    Kontext: Sonstiges
 - Beobachtung: Wir nutzen aktuell **keinen** Language-Server, der Claude Code Code-Intelligence bereitstellt. Recherche (S086): Claude Code v2.1.172 unterstützt LSP (`ENABLE_LSP_TOOL` + Marketplace-Plugin pro Sprache). Nutzen potenziell **hoch** (Auto-Typfehler nach jedem Edit, find-refs, Symbole, Call-Hierarchie → kürzere Edit-Fix-Schleifen) → Impact GERING→MITTEL/HOCH revidiert.
-- Entscheidung/Maßnahme: S130-Drain-Entscheid (User): aufgeschoben, obwohl der Eintrag selbst 'vierte Nullrunde = verwerfen, ohne weitere Verlaengerung' festlegt. Grund fuer die Abweichung: Die Klausel zielt auf eine Nullrunde des WERKZEUGS, hier fehlte aber die GELEGENHEIT – seit S125 lief keine einzige Implementierungs-Session, und der Re-Trigger verlangt 3 Sessions mit realem TS-Lauf eines frontend-layer-implementer oder code-quality-auditor. Genau diese Unterscheidung (Urteil ueber das Werkzeug vs. ueber die Gelegenheit) hat der Eintrag in S114 selbst eingefuehrt. Messstand unveraendert gegenueber S114 und S115: 9 Calls gesamt, davon 7 im Aktivierungstest, 1 in 26 implementierung-Sessions (dieser vom 2026-07-10, also vor der Sichtbarkeitsmassnahme), 1 in einer Drain-Session. ABBRUCHKLAUSEL fuer die naechste Runde: Laufen bis S145 drei TS-Sessions mit den beiden Agenten und bleibt die Nutzung null, wird VERWORFEN. Laeuft bis S145 erneut keine solche Session, wird ebenfalls verworfen – dann ist belegt, dass dieser Pilot unter den realen Arbeitsverhaeltnissen nicht bewertbar ist, und ein Pilot, der nie zur Bewertung kommt, ist keine offene Frage mehr, sondern ein Dauerposten. Keine sechste Verlaengerung. Messluecke am Rande (S130): tool-usage --lsp ignoriert die Option --since still, die Zahl 'TS-Sessions seit S115' ist damit nicht direkt erhebbar.
+- Entscheidung/Maßnahme: S146 (User): Ursache geklärt, eine Runde mit deutlicherem Hinweis. Befund S146: (1) Subagenten-Logs seit S130 – 20 frontend-layer-implementer, 32 code-quality-auditor: null ToolSearch-, null LSP-Aufrufe, aber 262 grep-Suchen über Client/, davon 86 mit -r/-w (ein Teil echte Referenzsuchen, z.B. grep -rn seedIngredientViaApi). (2) Harness-Test mit einem frontend-layer-implementer: LSP steht DIREKT in seiner Tool-Liste, ToolSearch fehlt. Die Prompt-Anweisung 'deferred: einmal ToolSearch select:LSP laden' war also falsch und konnte ein Agent als 'nicht ladbar' lesen; documentSymbol und findReferences liefen auf Anhieb. Damit Ursache (a): Gewohnheit/Schwelle, nicht Unerreichbarkeit; über den Mehrwert sagt die Nullnutzung nichts. Maßnahme: ToolSearch-Hinweis in frontend-layer-implementer, code-quality-auditor und coding-guideline-typescript entfernt; Regel an den Entscheidungspunkt gelegt ('bevor du per grep nach dem NAMEN eines TS-Symbols suchst → LSP findReferences/workspaceSymbol; grep für Textmuster'); Implementer meldet beim Return eine Zeile 'LSP: genutzt für … / nicht genutzt, weil …'. Bewertung: nach 3 Sessions mit TS-Implementierung oder TS-Review (Messung tool-usage --lsp plus die Return-Zeilen). Bleibt die Nutzung null → VERWORFEN samt Aufräumen (Plugin, LSP in den tools der Agenten, Pilot-Blöcke), ohne weitere Verlängerung. Backstop S152.
 - **Pilot-Bound & Abschluss-Kriterien:** Bewertung beim **nächsten Kaizen/Retro** (bewertet OBS ohnehin). Mindest-Evidenz: LSP in **≥ ~3 Sessions mit echter TS-Arbeit** verfügbar; sonst Ergebnis = „eine Runde verlängern" (kein Urteil auf Null-Daten).
   - **Erfolg → adoptieren** (alle drei): (1) tatsächlich genutzt (Frequenz, s. Messung); (2) materieller Mehrwert nachweisbar (konkrete HELP-Vorfälle, wo grep+Read schlechter gewesen wäre); (3) keine Zuverlässigkeits-Blocker über die umgehbare Kalt-Index-Caveat hinaus. → permanente Ein-Zeilen-Regel in `coding-guideline-typescript.md`, Pilot-Notiz raus, Status = UMGESETZT.
   - **Fehlschlag → verwerfen/parken** (eines): kaum genutzt / kein Vorteil ggü. grep+Read; oder Kosten > Nutzen (stale/Flakiness/Setup-Fragilität). → Plugin + Pilot-Notiz entfernen, Status = VERWORFEN (Grund).
@@ -108,13 +108,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ---
 
-## OBS-S114-2 – Pflichtlektüre ist der zweitgrößte Leseposten und wird nie gefiltert
+## OBS-S114-2 – Pflichtlektüre: ob jeder Abschnitt seinen Lesepreis wert ist, ist nicht messbar
 - Quelle: Orchestrator
-- Status: IN BEOBACHTUNG bis S142 – S130: der im Eintrag vorgesehene Fall trat ein (0 statt 3 Implementierungs-Sessions)
+- Status: IN BEOBACHTUNG bis S152 – S146: Messung wird aufgebaut
 - Impact: MITTEL    Häufigkeit: dauerhaft
 - Kategorie: PROZESS    Kontext: Agent-Prompt
 - Beobachtung: Gemessen über 48 Sessions (`read-breakdown.py`): `docs/guidelines` und `docs/process` machen zusammen 21,4 % des gesamten Read-Volumens aus – in Implementierungs-Sessions sogar 27,9 %, hinter Client/ und Server/ der zweitgrößte Block. Die Einzelwerte sind hoch: Ø 12.234 Zeichen je Read auf `docs/guidelines`, 11.410 auf `docs/process`, und der Anteil gezielter Reads (mit offset/limit) liegt bei 3 % bzw. 7 % – praktisch jeder Aufruf liest das ganze Dokument. Ursache ist die Konstruktion: Die Agenten-Prompts schreiben diese Dateien als Pflichtlektüre vor, und jeder Subagent startet kalt. Anders als bei ADRs (`decisions.py` filtert nach Tags) und seit S114 bei Testdateien (`test-inventory.py` liefert eine Inventur) existiert für Guidelines kein Weg, gezielt nur den relevanten Abschnitt zu holen. Für die Gegenrichtung liegt eine Rechnung vor: Einen ADR in eine Guideline zu überführen kostet das 7- bis 12-Fache, weil eine Guideline von jedem Subagenten gelesen wird (180 Reads im Messzeitraum) statt on demand von den wenigen, die sie brauchen (14). Offen ist die umgekehrte Frage – ob selten gebrauchte Guideline-Abschnitte aus der Pflichtlektüre gelöst und abrufbar gemacht werden können, und woran „selten gebraucht" überhaupt erkennbar wäre. Der Block wächst mit +21 % über fünf Sessions langsamer als der Code, aber er schrumpft nicht.
-- Entscheidung/Maßnahme: S130-Drain-Entscheid: aufgeschoben nach der Regel, die dieser Eintrag selbst festhaelt – 'Sind bis S130 keine 3 Implementierungs-Sessions gelaufen, bleibt der Eintrag IN BEOBACHTUNG und bekommt einen neuen Termin, statt auf duenner Basis entschieden zu werden.' Genau das ist eingetreten: Seit S125 lief KEINE Implementierungs-Session (S126 Session-Historie, S127 Retro, S128 und S129 Prozess-Code, S130 Drain). Der Vollstaendigkeit halber trotzdem erhoben (read-breakdown --by-area, S130): docs/guidelines 13,8 Prozent bei 6 Prozent gezielten Reads, gegen den S125-Ausgangswert von 13,9 Prozent bei 6 Prozent – also unveraendert. Diese Zahl ist NICHT als Wirkungsurteil zu lesen: Das Lesevolumen entsteht ganz ueberwiegend in Implementierungs-Sessions (69,3 Prozent des Gesamtvolumens), und davon lief seit der Massnahme keine. Gemessen wurde damit erneut die Gelegenheit, nicht die Wirkung. Re-Trigger unveraendert: dieselbe Erhebung nach mindestens 3 Implementierungs-Sessions. Backstop S142.
+- Entscheidung/Maßnahme: S146 (User): K2 – aufschieben, aber erst messbar machen. ZIEL (User): Jeder Agent liest gezielt nur das Nötige, ohne Wichtiges wegzulassen; entstehen durch zu wenig Information Fehler (Mehrarbeit, schlechterer Code), ist das Ziel ebenso verfehlt. BEFUND S146 (Logs seit 2026-09-10, Reads auf docs/guidelines + docs/process je Agententyp): Auditoren 6,4 Mio. Zeichen (test-quality 3,17 Mio., code-quality 2,11 Mio., ux 0,70 Mio., functional 0,32 Mio., security 0,12 Mio.), Implementer zusammen ~20k Zeichen bei 70 doc.py-get-Abrufen, Hauptsession 269 doc.py-get. Auditoren lesen laut review-code absichtlich vollständig. Das ist der AKTUELLE Stand – früher lasen womöglich auch andere Agenten vollständig; die Aufteilung kann sich wieder verschieben. Von 157 Ankern in den beiden Ordnern wurden in Agenten-Texten nur 26 je zitiert, von Auditoren fast nie: 'gebraucht' ist heute nicht messbar. MASSNAHMEN: M1 (S146 umgesetzt): Jedes Finding nennt den Anker der verletzten Regel ('Regel: <ANKER>' bzw. 'Regel: keine'), in review-code und allen fünf Auditor-Definitionen. M2 (zur Auswertung bauen): read-breakdown-Option für Lesevolumen je Agententyp und Datei sowie Zitate/Abrufe je Anker (Vorlage: Erhebungsscript S146). M3 (zur Auswertung): Fehlerspur – je Finding mit Anker prüfen, ob der Implementer des Laufs den Abschnitt vorher abgerufen hatte bzw. im Prompt hatte; 'nicht abgerufen' = Mehrarbeit durch nicht gelesene Doku. Auswertung nach 3 Implementierungs-Sessions mit Review-Loop, Backstop S152: Kandidaten zum Auslagern sind Abschnitte, die in N Reviews nie eine Regel lieferten (Vorbehalt: ohne Finding kann ein Abschnitt trotzdem geprüft und nötig gewesen sein); Gegenmaß ist die Fehlerspur aus M3.
 
 ## OBS-S122-1 – Drain-Trigger-Kalibrierung beruht auf einer gerechneten, nicht gemessenen Frequenz
 - Quelle: Orchestrator
@@ -124,54 +124,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: Der in S122 eingefuehrte Drain-Trigger (Top-5-Summe >= 9 ODER >= 4 Eintraege aelter als 15 Sessions) entscheidet jede Session darueber, ob der Drain die Session beansprucht. Seine Schwellwerte sind aus Bestandsdaten abgeleitet, aber nie im Betrieb geprueft: Die tragende Groesse - 1,32 behandlungswuerdige Eintraege je Session - stammt aus einer Auswertung von S100 bis S121 und wurde mit der neuen Score-Skala rueckwirkend auf Eintraege angewandt, die unter der alten Skala erfasst und bewertet wurden. Daraus folgt die Erwartung, der Wert-Ausloeser feuere etwa jede dritte Session. Ob das eintritt, haengt an zwei Unbekannten: wie Agenten Impact und Haeufigkeit unter der neuen Skala tatsaechlich vergeben (GERING zaehlt jetzt 0, was die Vergabe veraendern kann), und wie oft Cluster entstehen, seit das Feld Zusammen-erledigen gepflegt wird. Faellt der Trigger zu selten, waechst der Rueckstau wieder; faellt er zu haeufig, ist genau die Verdraengung der Feature-Arbeit zurueck, gegen die er gebaut wurde. Beides zeigt sich erst an mehreren Sessions Betrieb und ist ohne bewusste Wiedervorlage nicht auffaellig, weil ein Trigger, der schweigt, keine Spur hinterlaesst.
 - Zusammen-erledigen: keiner
 - Entscheidung/Maßnahme: S138-Drain (User): weiter beobachten, nicht urteilen. Der Re-Trigger (Drain schweigt fünf Sessions am Stück) ist erreicht, die Stichprobe trägt aber kein Urteil: S132–S137 waren Retro, Tooling, Theme, Workshop und Doku-Review – kein einziger implementing-scenario-Lauf, und gerade Läufe erzeugen vermutlich die meisten und gewichtigsten OBS (unbelegt). BASISLINIE DER NICHT-IMPLEMENTIERUNGSPHASE (rekonstruiert, nicht die damals gezeigte Agenda – heutiger Trigger-Code auf alte Dateistände; der Code änderte sich S128–S131): S128–S131 beansprucht (Top-5 15→10, alt 4→1, Backlog 19→14), S132–S137 sechsmal geschwiegen (Top-5 konstant 6,0, alt 1–2, Backlog 11→16), S138 beansprucht (Top-5 10, Backlog 18). Frequenz damit etwa 1 von 7 statt der in S122 gerechneten 1 von 3; der Zulauf waren fast nur Bagatellen. RE-TRIGGER: nach dem dritten implementing-scenario-Lauf ab US-602 run-1 (gleiches Ereignis wie OBS-S109-1), Backstop S150. METHODE (das S138-Script lag im Scratchpad und ist weg): für jede Session N den Commit mit Trailer „Session-Ende: N-1" suchen (git log --grep "^Session-Ende: N-1$"), daraus docs/kaizen/observations.md holen (git show <commit>:…), mit obs_parse.parse_entries parsen und obs-drain.triggers(eintraege, N) sowie Top-5-Summe (unit_score über wert_einheiten[:TOP_N]) und Alt-Zahl (_alter > ALT_AB) ausgeben. Urteilsfrage dann: Beansprucht der Drain in der Implementierungsphase etwa jede dritte Session, und sinkt dabei der Backlog? Weicht es ab, TRIGGER_WERT/TRIGGER_ALT nachziehen, nicht das Modell.
-
-## OBS-S126-1 – Prozessarbeit verdrängt Implementierung, ohne erkennbare Konvergenz
-- Quelle: User
-- Status: IN BEOBACHTUNG bis S145
-- Impact: MITTEL    Häufigkeit: dauerhaft
-- Kategorie: PROZESS    Kontext: Skill-Nutzung
-- Beobachtung: Rund die Haelfte der Sessions geht an Prozessarbeit statt an Implementierung, und ein Rueckgang ist nicht erkennbar. Gemessen in S126. (a) ZUFLUSS ins OBS-Backlog ueber S111-S125: 7,27 Score je Session, Median der Session-Summe 6,0; je Eintrag Mittel 2,60 und Median 2,0; 67 Prozent der neuen Eintraege sind behandlungswuerdig (Score >= 2), nur 10 Prozent GERING. Die Trigger-Schwelle des Drains liegt bei 9 auf den fuenf staerksten Einheiten - ein Drain, der den Bestand auf ~8 drueckt, ist nach etwa anderthalb Sessions Zufluss wieder ausgeloest. Daraus folgt: Drain in rund 40 Prozent der Sessions, Retro mit ~12 Prozent dazu (Ist-Kadenz 8,3 Sessions; Modell aus dem Jenga-Gewicht 6,6). (b) GEGENCHECK ueber S085-S125: 2,85 Eintraege je Session erfasst gegen 2,44 aufgeloest - der Bestand wuchs um 0,4 je Session, was die heute offenen 17 erklaert. (c) KONVERGENZ: LL-Gewicht je Session ueber vier vollstaendige Perioden 5,9 / 8,3 / 14,7 / 16,4 (steigend); OBS-Score je Session nach der Rubrik-Kalibrierung von S107 6,89 / 7,43 / 6,00 (flach). In keiner der beiden Reihen ein Rueckgang. DREI STOERFAKTOREN, die einen Anstieg auch ohne echte Zunahme erzeugen koennen: die Impact-Rubrik wurde in S107 neu kalibriert und der OBS-Vergleich laeuft quer darueber; die Erfassung wurde ueber die Zeit mechanisiert (mehr erfasste Reibung ist nicht mehr Reibung); und Prozessarbeit erzeugt Prozess-Beobachtungen, also eine Rueckkopplung ueber den Session-Mix. VIERTER, NICHT HERAUSGERECHNETER STOERFAKTOR (User-Hinweis bei der Erfassung): Alle Raten sind je SESSION gemessen, aber Sessions sind unterschiedlich gross. Dieselbe Arbeit auf zwei Sessions verteilt halbiert jede Rate, ohne dass sich etwas geaendert haette. Die Auswertung unterstellt im Mittel gleich grosse Sessions - ueber lange Zeitraeume vertretbar, fuer den Vergleich einzelner Perioden verrauscht. Wer den Trend belastbar entscheiden will, braucht ein Groessenmass je Session (Volumen, Dauer oder Commits) als Normierung. ZU ENTSCHEIDEN ist zweierlei, und beides haengt zusammen: Ist der Prozess-Anteil so gewollt, und konvergiert die Reibung? Konvergierte sie, loeste sich die Verdraengung von selbst - deshalb ein Eintrag und nicht zwei. Kriterium fuer die Konvergenzfrage: Sinkt der OBS-Score-Zufluss ueber drei aufeinanderfolgende Retro-Perioden nach S107? Bisher drei Datenpunkte, flach; in zwei bis drei weiteren Perioden entscheidbar. Hebel fuer den Anteil, falls er nicht gewollt ist: strenger erfassen, TRIGGER_WERT anheben, oder mehr Eintraege je Drain-Session entscheiden.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: K1 (User, S128): weiter beobachten, nicht jetzt entscheiden. Das Konvergenzkriterium des Eintrags - sinkt der OBS-Score-Zufluss ueber drei aufeinanderfolgende Retro-Perioden nach S107 - hat bisher drei Datenpunkte (6,89 / 7,43 / 6,00, flach). Bei der Ist-Retro-Kadenz von 8,3 Sessions sind zwei weitere Perioden um S145 erreicht, dann ist die Konvergenzfrage entscheidbar. Zusatzindiz aus S128, ausdruecklich keine Messung des Session-Anteils: Codevolumen Produkt (C#+TS inkl. Tests) 5.522 Zeilen gegen Prozess-Infrastruktur 37.381 Zeilen (23.944 Python + 13.437 Markdown), Verhaeltnis 6,8:1. Re-Trigger vor Termin: wenn eine Retro-Periode einen deutlichen Rueckgang oder Anstieg des OBS-Score-Zuflusses zeigt. Offen geblieben und Teil der Wiedervorlage: der vierte Stoerfaktor (Raten je Session ohne Groessennormierung) ist nicht behoben - ohne Groessenmass je Session bleibt auch der Befund in S145 verrauscht.
-
-## OBS-S126-2 – Repo-Wurzel wird an drei Stellen verschieden bestimmt
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Die Wurzel des Repos wird in .claude/ auf drei Arten ermittelt, und eine davon kann etwas, das die anderen nicht koennen. (1) _util.REPO_ROOT liest CLAUDE_PROJECT_DIR aus der Umgebung und faellt erst dann auf den Dateipfad zurueck; genutzt von den Toolchain-Wrappern und _session_logs. (2) repo_kontext.repo_root() rechnet ausschliesslich ueber Path(__file__).parents[2] und ignoriert die Umgebungsvariable; daran haengen alle fuenf Erfassungswerkzeuge (obs/lessons/td/oq/adr). (3) Rund zehn Inline-Berechnungen in anchors.py, next_run.py, qa-check.py, check-atdd-gate.py, check-dangling-refs.py, check-ref-direction.py, check-e2e-scenario-ref.py, dotnet-stryker.py, stryker-frontend.py und stryker-parse-survivors.py, teils als parents[2], teils als parent.parent.parent, teils als abgeleitete Konstante. Das ist dasselbe Divergenz-Muster wie CM-S116-1: zwei Implementierungen desselben Begriffs, von denen eine einen Fall kennt und die andere nicht. Aufgefallen ist es in S126 beim Herausloesen von repo_kontext.py aus obs_parse.py; ein Schaden ist bisher NICHT beobachtet - er traete auf, sobald ein Script aus einem anderen Arbeitsverzeichnis oder einem git-Worktree laeuft, wo CLAUDE_PROJECT_DIR und der Dateipfad auseinanderfallen. Zu klaeren ist, ob die Umgebungsvariable ueberhaupt die maszgebliche Quelle sein soll; ist sie es, gehoert eine einzige Implementierung an einen Ort und die uebrigen Stellen ziehen nach. Ist sie es nicht, gehoert sie aus _util entfernt, damit nicht zwei Begriffe unter demselben Namen laufen.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
-## OBS-S127-1 – Die vier Maßnahmen der Belegkette sind nach Fehlerform geschnitten, nicht nach Mechanisierbarkeit
-- Quelle: User + Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: PROZESS    Kontext: Doku
-- Beobachtung: CM-S064-1, CM-S116-1, CM-S095-2 und CM-S127-1 besetzen je eine Bruchstelle derselben Kette (Frage - Erhebung - Aussage). Der Schnitt ist diagnostisch: er sagt, WO die Kette reisst. Fuer die Maßnahme ist er unergiebig, denn alle vier lauten woertlich "Prinzip in principles.md dokumentiert" - keine hat ein Poka-yoke. Folge: keine kann je BEWAEHRT werden (irgendein Zweig faellt immer zurueck) und keine kann obsolet werden; sie erzeugen in jeder Retro Nachtrags-Ritual ohne Entscheidung. CM-S064-1 wurde seit S064 dreimal verbreitert und wird zum Auffangbecken. Zugleich zerfallen die sieben Rueckfaelle auf CM-S116-1 in zwei Gruppen mit voellig verschiedenen Antworten: solche, die ein Werkzeug fangen koennte (LL-S125-2 zeigt, dass prozesscode/ kein Mutation-Testing hat, obwohl Handmutationen dort nachweislich deckungsgleich mit den vorhandenen Tests waren; LL-S123-7 und LL-S126-7 sind beide "gegen eine Fixture statt gegen das echte Artefakt geprueft"), und solche, die reines Urteil bleiben (LL-S123-5: Kuerzen aendert die Bedeutung eines Textes). Ein Schnitt nach Mechanisierbarkeit statt nach Fehlerform wuerde diese beiden Gruppen trennen und der ersten eine abhakbare Bauliste geben. Zu klaeren ist auch, was mit den Rueckfall-Chroniken der vier bestehenden Eintraege geschieht - sie neu zu verteilen ist Handarbeit, und ein Fehler dabei ist still.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: CM-S064-1, CM-S095-2, CM-S116-1, CM-S127-1
-
-## OBS-S128-1 – test-inventory.py kennt kein Python und sieht damit die groesste Testsuite des Repos nicht
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: GERING    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: In S128 beim Erweitern von test_session_agenda.py aufgefallen. 'test-inventory.py tests/test_session_agenda.py' antwortet 'keine Tests erkannt (unterstuetzt: .cs, .ts/.tsx/.js/.jsx)'. Das Werkzeug steht in der AGENTS.md-Navigationstabelle als Antwort auf 'Was steht schon in einer Testdatei?' und deckt die 1.021 Python-Tests unter tests nicht ab - also die groesste Testsuite im Repo. Wer es nutzt, faellt auf grep zurueck oder liest die Volldatei, was der Zweck des Werkzeugs gerade vermeiden soll. Die Meldung ist immerhin ehrlich (sie nennt die unterstuetzten Endungen), der Ausfall ist also nicht stumm - deshalb GERING und nicht hoeher. Offen ist, ob sich der Aufwand lohnt: Python-Testnamen sind per 'def test_' trivial zu finden, der Mehrwert gegenueber grep liegt allein im Zeilenbereich je Test.
-- Zusammen-erledigen: keiner
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
-## OBS-S133-1 – Die Logik in main() der Prozess-Werkzeuge ist nur an der Verdrahtung getestet
-- Quelle: User + Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: QUALITÄT    Kontext: Testing
-- Beobachtung: Seit S133 erzwingt tests/test_aufrufpfad.py für jedes der 51 Werkzeuge einen Test über den echten Aufrufpfad (main bzw. check). Die Mutationssichtung zeigt aber, dass diese Tests die Argument-Verdrahtung halten, nicht die Logik in main dahinter. Gesichtet wurden drei Werkzeuge: vitest-run (34 überlebende main-Mutanten), lessons (56) und check-atdd-gate (12). Darunter waren fünf echte Lücken, die ein Fehlurteil still durchgelassen hätten: ein ignorierter Titel-Filter im ATDD-Gate, ein ungetesteter get-Unterbefehl, ein grünes Verdikt bei rotem Exit-Code. Diese fünf sind in S133 geschlossen. Die übrigen 48 Werkzeuge sind nicht gesichtet; wahrscheinlich, aber nicht belegt, gibt es dort dieselbe Klasse: ungetestete Unterbefehle und Aufrufformen, Verdikt-Bedingungen ohne Test. Ein großer Teil der Überlebenden sind argparse-Hilfetexte und Meldungstexte ohne Aussagekraft; wie groß der Anteil echter Lücken ist, hängt je Werkzeug davon ab, wie viel Logik in main statt im Kern liegt.
-- Zusammen-erledigen: keiner
-- Aufschubgrund: Umfang – 48 Werkzeuge je mit Mutationslauf (1–2 min) und Sichtung der Überlebenden; sprengt die Retro-Session
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: CM-S133-1, LL-S128-1
 
 ## OBS-S133-2 – qa-check nummeriert seine Prüfungen als CHECK 1 bis 6
 - Quelle: Orchestrator
@@ -236,16 +188,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Aufschubgrund: User – Vorgabe des Users: Fälle, die nie vorkommen, werden nicht behandelt, wenn das den Code komplexer oder schwerer wartbar macht.
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S138-2 – argparse ergänzt in den Prozess-Werkzeugen Optionspräfixe still
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: argparse nimmt standardmäßig jedes eindeutige Präfix einer Option an (allow_abbrev=True). In S138 lief dadurch obs set --beobachtung unbemerkt als --beobachtung-anhängen – der Aufruf hängte Text an, statt ihn zu ersetzen, ohne jede Fehlermeldung; aufgefallen nur, weil ein neuer Test mit Exit 1 statt 2 endete. obs set ist seither mit allow_abbrev=False gebaut, alle übrigen CLIs unter prozesscode/ nicht. Kommt dort eine Option hinzu, deren Name Präfix einer bestehenden ist, oder vertippt man sich zu einem Präfix, wird der Aufruf still umgedeutet statt abgewiesen; bei den schreibenden Tracker-Werkzeugen landet das in den Tracker-Dateien. Häufigkeit geschätzt, nicht gemessen.
-- Zusammen-erledigen: OBS-S133-1
-- Aufschubgrund: Umfang – über 50 Werkzeuge, je zu prüfen, ob Abkürzungen bewusst genutzt werden (etwa per Meta-Test über alle Parser)
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
 ## OBS-S139-1 – Ein nacktes cd bleibt trotz Regel ungehindert und wiederholte sich in derselben Session
 - Quelle: Orchestrator
 - Status: NEU
@@ -277,16 +219,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden; die Auflösung braucht Analyse
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S141-3 – qa-check --approved-tests prüft nicht, ob der Freigabe-Blob existiert
-- Quelle: Orchestrator + Subagent
-- Status: UMGESETZT (S142)
-- Impact: MITTEL    Häufigkeit: gelegentlich
-- Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: In S141 berechnete der Orchestrator einen Test-Freigabe-Anker mit git hash-object ohne -w. Der Blob landete nicht im Objektspeicher; der Subagent konnte den Diff gegen den Anker nicht bilden (git show: bad object) und gab stattdessen die ganze Datei aus. Aufgefallen ist es nur, weil der Subagent es meldete – qa-check akzeptiert --approved-tests pfad=sha, ohne die Auflösbarkeit zu prüfen, und der Fehler wäre erst beim Verify sichtbar geworden. Der Orchestrator musste auf den letzten gültigen Anker ausweichen.
-- Zusammen-erledigen: keiner
-- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
-- Entscheidung/Maßnahme: Im Abschluss von US-602 run-4 nach Wiederholung behoben: audit_approved_tests prüft per git cat-file, ob der Freigabe-Blob existiert; fehlt er, zählt die Datei als geändert und die Meldung nennt den Ausweg git hash-object -w statt eines still leeren Diffs (Test test_audit_approved_tests_names_missing_blob_and_way_out). Früher als beim Verify prüfbar ist es nicht – erst dort erreichen die Anker qa-check.
-
 ## OBS-S141-4 – qa-check Check 1 übersieht geänderte Test-Hilfsdateien
 - Quelle: Orchestrator
 - Status: NEU
@@ -295,16 +227,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: In S141 war Server.Tests/Helpers/EndpointsTestsBase.cs laut git geändert (neue Test-Data-Builder) und per --approved-tests freigegeben, erschien aber nicht unter „CHECK 1: GEÄNDERTE TEST-DATEIEN“. Der Test-Freigabe-Audit meldete nur „freigegeben, taucht aber nicht unter den geänderten Test-Dateien auf (committet/zurückgesetzt?)“ – eine irreführende Vermutung. Eine Änderung an einer Hilfsdatei, die alle Integrationstests trägt, läuft so am Audit vorbei.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
-## OBS-S142-1 – Sichtprüfung bei Handybreite hat keinen regulären Weg
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Die UX-Guideline und mehrere TD-Einträge verlangen, eine Ansicht bei 375 px im Browser zu prüfen. Dafür gibt es kein Werkzeug: Ein eigener Playwright-Spec für Screenshots wird vom E2E-Szenario-Hook geblockt (kein // Szenario:-Kommentar), ein Script im Scratchpad müsste Backend und Vite selbst starten und braucht eine Einzelfreigabe. In S142 (US-602 run-4) half nur, eine bestehende Spec vorübergehend um setViewportSize und page.screenshot zu erweitern, aus einer Sicherung im Scratchpad zurückzuspielen und den Blob-Hash zu vergleichen – zweimal in derselben Session, mit dem Risiko, die Test-Datei verändert zurückzulassen. Eine frühere Session (2026-09-29, Zutaten-Seite, accessibility.spec.ts) ging denselben Umweg. Dritter Fall in S143 (US-602 run-6): Für die Nachfrage „Eingaben verwerfen?“ bei 320 px blockte der E2E-Szenario-Hook erst eine eigene Screenshot-Spec (kein // Szenario:), dann denselben Kommentar als Dublette; es blieb wieder nur, recipes.spec.ts zu sichern, vorübergehend zu erweitern und per Blob-Hash zurückzuspielen.
-- Zusammen-erledigen: keiner
-- Aufschubgrund: User – im Abschluss von US-602 run-4 entschieden: weder schnell noch riskant, eigener Schritt mit Entwurf
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
 ## OBS-S143-1 – Stryker-Timeouts können Survivors verdecken
@@ -337,7 +259,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-6 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S143-4 – mutmut-Sperrklinke reißt durch schwankende Timeouts; die Baseline speichert keine Mutanten
+## OBS-S143-4 – mutmut-Baseline speichert keine Mutanten – ein Tausch von Überlebenden bleibt unsichtbar
 - Quelle: Orchestrator
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: gelegentlich
@@ -345,7 +267,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Beobachtung: In S143 riss die Sperrklinke für prozesscode.hooks.check-bash-permission zweimal (98,1 % → 98,1 % VERSCHLECHTERT), obwohl die Änderung nur Modulkonstanten betraf, die mutmut nicht mutiert. Beide Läufe hatten 22 Überlebende wie die Baseline (1171 beurteilbar, 1149 getötet); gesunken war nur der Nenner, weil mehr Mutanten in _maskiere_strings im Timeout endeten und Timeouts als „ohne Aussage“ aus dem Bruch fallen. Dass es dieselben 22 Überlebenden sind, ließ sich nicht prüfen: mutation-baseline.json hält je Modul nur zwei Zahlen. Der Riss wurde auf User-Entscheid als Rauschen hingenommen, die Baseline nicht nachgezogen. Verwandt mit OBS-S143-1 (Stryker), aber ein anderes Werkzeug. Vorlauf: Dieselbe Klasse trat in S139 auf (Commit 4672f72): Timeouts in main verschoben den Nenner, damals mit Exit -24 als getötet gezählt; behoben durch höheres timeout_constant, der Nenner sank von 1228 auf 1170 bei denselben 22 Überlebenden. S143 zeigt, dass Timeouts den Bruch auch danach noch um einzelne Mutanten verschieben.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – im Session-Abschluss S143 entschieden: als Rauschen hinnehmen und beobachten
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: S146: Teil 'Klinke reißt durch schwankende Timeouts' behoben – Rückschritt gilt seit S146 nur noch, wenn der Bruch sinkt UND die offenen Befunde (überlebt + ohne deckenden Test) steigen; ein neutraler Stand wird fortgeschrieben (mutmut-run.ratchet, Tests in test_mutmut_ratchet). In S146 trat die Klasse erneut auf: x_expand_segment__mutmut_43 kippte je nach Testreihenfolge zwischen getötet (Fehlschlag) und timeout (Endlosschleife), die Schleife ist inzwischen durch einen Ausdruck ersetzt. OFFEN bleibt der zweite Teil: mutation-baseline.json hält je Modul nur zwei Zahlen, sodass 'dieselben 22 Überlebenden' nicht prüfbar ist und ein Tausch (ein Mutant neu getötet, ein anderer neu überlebend) bei gleicher Zahl unbemerkt bleibt – das war vor S146 ebenso. Beim Drain Kandidaten bilden.
 - Bezug: OBS-S143-1
 
 ## OBS-S143-5 – Post-Edit-Suite meldet Zwischenstände von Edit-Bündeln als rot
@@ -358,16 +280,6 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Aufschubgrund: User – im Session-Abschluss S143 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S144-1 – ESLint läuft erst im qa-check – Lint-Fehler blockieren nach der Test-Freigabe
-- Quelle: Subagent
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: PROZESS    Kontext: TDD
-- Beobachtung: In S144 (US-602 run-8) fiel functional/no-conditional-statements an Testtabellen mit if/else erst im qa-check auf: einmal im vom Orchestrator geschriebenen E2E-Spec (der qa-check der Frontend-Schicht brach deshalb vor Stryker ab, obwohl der Subagent die Datei nie berührt hatte), zweimal im Komponententest nach der Test-Freigabe – die Korrektur änderte freigegebene Assertions und lief damit am Freigabe-Anker vorbei. vitest-run und das Test-Review prüfen kein Lint; qa-check lintet das ganze Client-Projekt. Vorschlag der Subagenten: eslint-run und den Typecheck vor dem TEST-REVIEW-Signal laufen lassen bzw. der Orchestrator vor dem Spawn.
-- Zusammen-erledigen: keiner
-- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
 ## OBS-S144-2 – Test-Wrapper verschweigen Filter-Fehlgriffe und Testausgaben
 - Quelle: Subagent
 - Status: NEU
@@ -378,33 +290,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 
-## OBS-S144-3 – Subagenten-Berichte kommen abgeschnitten beim Orchestrator an
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: MITTEL    Häufigkeit: häufig
-- Kategorie: AGENT    Kontext: Agent-Prompt
-- Beobachtung: In S144 (US-602 run-8) kamen vier Berichte von Layer-Subagenten mit „[result truncated – ask the agent for the rest via SendMessage]“ an – zweimal fehlte genau der VERIFIKATIONS-HASH, je einmal der Rest der PLANUNG und die Prozessverbesserungs-Vorschläge. Jedes Mal war eine Nachforderung per SendMessage und ein weiterer Rundlauf nötig. Die Berichte sind lang (Dateiliste, Testläufe, Pflicht-Output, Report); was am Ende steht, geht verloren.
-- Zusammen-erledigen: keiner
-- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-
 ## OBS-S144-4 – Hintergrund-Lauf weckt den Layer-Subagenten nach seinem Ende nicht
 - Quelle: Orchestrator + Subagent
-- Status: NEU
+- Status: IN BEOBACHTUNG bis S150
 - Impact: MITTEL    Häufigkeit: häufig
 - Kategorie: AGENT    Kontext: Agent-Prompt
 - Beobachtung: In S144 (US-602 run-8) meldeten zwei Frontend-Subagenten „Warte auf qa-check (Hintergrund)“ und beendeten ihren Zug. Beide Male war der Lauf Minuten später fertig (einmal Exit 1 an ESLint, einmal Score 99,6 % nach 5 Minuten), ohne dass der Subagent sich meldete; erst der User bemerkte, dass nichts mehr lief, nach rund 10 bzw. 20 Minuten Stillstand. Ein Subagent sagte im Nachgang, der Wake-up sei erst nach einer Nachricht des Orchestrators gekommen. implementing-scenario (Innerer Loop, „Arbeitende Subagenten nicht pollen“) stützt sich auf einen Harness-Test vom 2026-10-29 (Claude Code 2.1.312), nach dem das Laufende den Subagenten selbst weckt – die Beobachtung widerspricht dem. Auch die ausdrückliche Anweisung im Spawn-Prompt, qa-check im Vordergrund laufen zu lassen, wurde einmal nicht befolgt. Der Orchestrator hat qa-check beide Male selbst gefahren.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden; Ursache ungeklärt (geprüft: nur die Rückmeldungen der Subagenten, kein Harness-Test)
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: User, S146: noch nicht schließen, zu frisch. Harness-Test S146: Ein Subagent startete mutmut (5:26 min) mit run_in_background, beendete den Zug und wachte ohne Nachricht von außen durch die Task-Notification selbst auf; die Agent-Meldung an den Orchestrator sagte ausdrücklich, dass er auf eigene Hintergrundarbeit wartet. Beleg in implementing-scenario ergänzt. S144 damit nicht reproduziert (dort qa-check statt mutmut). Schließen beim nächsten Drain, wenn bis dahin Subagenten wiederholt in Implementierungs-Sessions liefen und kein Rückfall auftrat. Re-Trigger: Rückfall → sofort untersuchen, warum der Test ihn nicht nachstellte (Claude-Code-Version, Befehl, Vorder-/Hintergrund, wer den Lauf startete).
 
-## OBS-S145-1 – Edit/Write-Dispatcher (Hinweise und blockierend): main() kaum mutationsgetestet
-- Quelle: Orchestrator
-- Status: NEU
-- Impact: HOCH    Häufigkeit: dauerhaft
-- Kategorie: QUALITÄT    Kontext: Hook/Script
-- Beobachtung: In S145 erstmals unter der Sperrklinke: check-code-quality-nonblocking steht bei 47,5 % (40 Mutanten, 21 überlebt). Zwei Lücken mit Folge: (a) continue → break nach einem werfenden Check überlebt – wirft ein früher Check, laufen alle späteren nicht mehr, darunter tooling_tests, das einzige Gate der Werkzeug-Suite, und kein Test merkt es; (b) der Name, unter dem guard_log.protokolliere eine Auslösung zählt (rsplit/Index), ist ungeprüft – guard-stats könnte still falsch zuordnen. Dazu Exit-Codes ohne Eingabe, Fehlermeldungstext auf stderr und der Trenner zwischen Meldungen. Die Lücke ist alt (Bestand), nicht aus S145. Dieselbe Klasse im blockierenden Dispatcher: dispatch-edit-write steht in S145 bei 57,8 % (64 Mutanten, 27 überlebt, u. a. in collect_reasons und main) – erstmals mit Messkennung, ohne Vergleichswert. Beide Dispatcher in einem Zug.
-- Zusammen-erledigen: keiner
-- Aufschubgrund: User – Umfang: in S145 zum Session-Abschluss als ‚aufschieben' entschieden; Tests für Fehlerpfad, Protokollname und Trenner, etwa 25 Minuten
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
-- Bezug: CM-S116-1

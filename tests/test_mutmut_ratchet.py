@@ -10,7 +10,9 @@ Die Klinke greift nur, wenn jemand sie zieht.
 """
 from importlib import import_module
 
-mr = import_module("prozesscode.mutmut-run")
+import pytest
+
+mr =import_module("prozesscode.mutmut-run")
 
 
 def eintraege(**je_status) -> list[tuple[str, str]]:
@@ -108,13 +110,42 @@ def test_wachsender_code_mit_ungetesteten_stellen_ist_eine_verschlechterung():
 
 
 def test_vergleich_rechnet_in_bruechen_nicht_in_prozenten():
-    """1/3 und 33 % sind nicht dasselbe: Gerundet verschwinden kleine Rückschritte.
+    """Gerundet verschwinden kleine Rückschritte: 10000/30000 und 10001/30004 sind auf zwei
+    Nachkommastellen beide 33.33 %, als Bruch ist der zweite kleiner – und drei offene
+    Befunde mehr."""
+    basis = {"prozesscode.a": {"getoetet": 10000, "beurteilbar": 30000}}
+    _zeilen, schlechter, _neu = mr.ratchet({"prozesscode.a": (10001, 30004)}, basis)
+    assert schlechter
 
-    33.33…% vs. 33.33…% – bei zwei Nachkommastellen wären 100/300 und 33/100 gleich, als
-    Bruch ist 33/100 kleiner.
-    """
-    basis = {"prozesscode.a": {"getoetet": 100, "beurteilbar": 300}}
-    _zeilen, schlechter, _neu = mr.ratchet({"prozesscode.a": (33, 100)}, basis)
+
+@pytest.mark.parametrize("gemessen", [
+    (1171, 1193),  # vier getötete Mutanten mit ihrem Code gelöscht (Bash-Guard)
+    (1174, 1196),  # ein getöteter Mutant kippt je nach Testreihenfolge in den Timeout
+])
+def test_sinkender_bruch_ohne_neue_offene_befunde_ist_kein_rueckschritt(gemessen):
+    """Rückschritt heißt: Der Bruch sinkt UND es gibt mehr offene Befunde (überlebt oder
+    ohne deckenden Test). Sinkt nur der Bruch, sind getötete Mutanten weggefallen – mit
+    gelöschtem Code oder in den Timeout, der außerhalb des Bruchs steht. Ein Rückschritt
+    dafür bestrafte das Löschen gut getesteten Codes."""
+    basis = {"prozesscode.a": {"getoetet": 1175, "beurteilbar": 1197}}
+    zeilen, schlechter, neu = mr.ratchet({"prozesscode.a": gemessen}, basis)
+    assert not schlechter
+    # Fortgeschrieben – sonst deckte der alte Stand später neue offene Befunde bis zur
+    # Höhe der weggefallenen.
+    assert neu == {"prozesscode.a": {"getoetet": gemessen[0], "beurteilbar": gemessen[1]}}
+    assert zeilen == [
+        "  prozesscode.a: 98.2 % → 98.2 %  (offene Befunde nicht gestiegen: 22 → 22, "
+        "Baseline nachgezogen)"]
+
+
+def test_nach_geloeschtem_code_zaehlen_neue_offene_befunde_ab_dem_neuen_stand():
+    """Gelöschter Code mit 5 Überlebenden (und vielen getöteten – der Bruch sinkt), danach
+    neuer mit 5: Gegen die alte Baseline (22 offen) wäre das kein Anstieg; gegen die
+    nachgezogene (17) schon."""
+    basis = {"prozesscode.a": {"getoetet": 1175, "beurteilbar": 1197}}
+    _z, geloescht_schlechter, nachgezogen = mr.ratchet({"prozesscode.a": (900, 917)}, basis)
+    assert not geloescht_schlechter
+    _z, schlechter, _neu = mr.ratchet({"prozesscode.a": (900, 922)}, nachgezogen)
     assert schlechter
 
 
@@ -258,6 +289,8 @@ def test_der_aufrufpfad_meldet_den_teillauf(tmp_path, monkeypatch, capsys):
         ("prozesscode.a.x_f__mutmut_2", mr.NICHT_BEWERTET)])
     assert mr.main(["--mutate", "prozesscode.a", "--ratchet"]) == 1
     assert "ohne Aussage" in capsys.readouterr().out
+    # Die offenen Mutanten kommen auch bei der Klinke an: Der Teilscore 1/1 zieht nichts nach.
+    assert mr.lies_baseline() == {"prozesscode.a": {"getoetet": 1, "beurteilbar": 2}}
 
 
 # --- Wechsel des Messinstruments ---------------------------------------------
@@ -304,6 +337,170 @@ def test_der_aufrufpfad_traegt_die_messung_ein(tmp_path, monkeypatch):
         ("prozesscode.a.x_f__mutmut_1", "killed")])
     assert mr.main(["--mutate", "prozesscode.a", "--ratchet"]) == 0
     assert mr.lies_baseline()["prozesscode.a"]["messung"] == "m-test"
+
+
+def test_mehrere_offene_im_selben_modul_summieren_sich():
+    eintr = [("prozesscode.a.x_f__mutmut_1", mr.NICHT_BEWERTET),
+             ("prozesscode.a.x_f__mutmut_2", mr.NICHT_BEWERTET),
+             ("prozesscode.a.x_f__mutmut_3", "killed")]
+    assert mr.offene_je_modul(eintr) == {"prozesscode.a": 2}
+
+
+def test_messung_ohne_mutmut_im_venv(tmp_path, monkeypatch):
+    """Fail-open: Ohne `dist-info` bleibt die Version offen, der Lauf geht weiter."""
+    monkeypatch.setattr(mr, "MUTMUT", tmp_path / "bin" / "mutmut")
+    assert mr.messung() == f"mutmut ?, Wertung {mr.WERTUNG_STAND}"
+
+
+# --- Vollständige Meldungen --------------------------------------------------
+def test_jeder_zweig_der_klinke_meldet_sich_und_laesst_die_folgenden_module_zu():
+    """Ein Lauf über mehrere Module, je eines pro Zweig, in Sortierreihenfolge – kein Zweig
+    darf die Auswertung der übrigen abbrechen, und jede Zeile steht exakt so da."""
+    basis = {"prozesscode.b": {"getoetet": 1, "beurteilbar": 1, "messung": "m"},
+             "prozesscode.d": {"getoetet": 1, "beurteilbar": 1, "messung": "alt"},
+             "prozesscode.d2": {"getoetet": 1, "beurteilbar": 1},
+             "prozesscode.e": {"getoetet": 1, "beurteilbar": 4, "messung": "m"},
+             "prozesscode.f": {"getoetet": 1, "beurteilbar": 2, "messung": "m"},
+             "prozesscode.z": {"getoetet": 9, "beurteilbar": 9, "messung": "m"}}
+    gemessen = {"prozesscode.a": (0, 0), "prozesscode.b": (1, 2), "prozesscode.c": (2, 3),
+                "prozesscode.d": (1, 4), "prozesscode.d2": (1, 4), "prozesscode.e": (3, 4),
+                "prozesscode.f": (2, 4)}
+    zeilen, schlechter, neu = mr.ratchet(gemessen, basis, offen={"prozesscode.b": 3},
+                                         messung="m")
+    assert zeilen == [
+        "  prozesscode.a: kein bewerteter Mutant – nichts zu vergleichen",
+        "  prozesscode.b: 50.0 % über 2 von 5 Mutanten – Lauf unvollständig, kein Vergleich "
+        "mit der Baseline",
+        "    Erneut laufen lassen; bleibt die Zahl stehen, kommt mutmut auf diesem Modul nicht "
+        "durch – dann ist die Klinke hier ohne Aussage, und das Modul braucht eine eigene "
+        "Untersuchung.",
+        "  prozesscode.c: 66.7 % – neu aufgenommen",
+        "  prozesscode.d: 25.0 % – Baseline neu gesetzt (Messung alt → m), kein Vergleich",
+        "  prozesscode.d2: 25.0 % – Baseline neu gesetzt (Messung ohne Kennung → m), "
+        "kein Vergleich",
+        "  prozesscode.e: 25.0 % → 75.0 %  (Baseline nachgezogen)",
+        "  prozesscode.f: 50.0 % – unverändert",
+    ]
+    assert schlechter is False
+    assert neu == {**basis,
+                   "prozesscode.c": {"getoetet": 2, "beurteilbar": 3, "messung": "m"},
+                   "prozesscode.d": {"getoetet": 1, "beurteilbar": 4, "messung": "m"},
+                   "prozesscode.d2": {"getoetet": 1, "beurteilbar": 4, "messung": "m"},
+                   "prozesscode.e": {"getoetet": 3, "beurteilbar": 4, "messung": "m"}}
+
+
+def test_die_verschlechterung_nennt_vorher_und_nachher():
+    basis = {"prozesscode.a": {"getoetet": 3, "beurteilbar": 4}}
+    zeilen, _schlechter, _neu = mr.ratchet({"prozesscode.a": (2, 4)}, basis)
+    assert zeilen == ["  prozesscode.a: 75.0 % → 50.0 %  VERSCHLECHTERT"]
+
+
+def test_ohne_beurteilbare_kein_prozentwert():
+    assert mr._prozent(0, 0) == "–"
+
+
+@pytest.mark.parametrize("schlechter, nachgezogen, ohne_aussage, erwartet", [
+    (True, False, ["prozesscode.b"],
+     ("✗ Sperrklinke gerissen – die Testgüte ist unter den festgehaltenen Stand gefallen\n"
+      f"  {_BEFUND[2:]}", 1)),
+    (False, False, ["prozesscode.a", "prozesscode.b"],
+     ("⚠ Sperrklinke ohne Aussage – Lauf unvollständig für prozesscode.a, prozesscode.b "
+      f"(Einzelheiten oben)\n  {_BEFUND[2:]}", 1)),
+    (False, True, [], (f"✓ Sperrklinke gehalten (Baseline nachgezogen)\n  {_BEFUND[2:]}", 0)),
+    (False, False, None, (f"✓ Sperrklinke gehalten\n  {_BEFUND[2:]}", 0)),
+])
+def test_klinken_verdikt_vollstaendig(schlechter, nachgezogen, ohne_aussage, erwartet):
+    assert mr.klinken_verdikt(_BEFUND, schlechter=schlechter, nachgezogen=nachgezogen,
+                              ohne_aussage=ohne_aussage) == erwartet
+
+
+def test_die_baseline_wird_sortiert_und_eingerueckt_geschrieben(tmp_path, monkeypatch):
+    """Die Datei ist getrackt – stabile Form, damit ein Diff nur zeigt, was sich änderte."""
+    monkeypatch.setattr(mr, "BASELINE", tmp_path / "b.json")
+    mr.schreibe_baseline({"prozesscode.b": {"getoetet": 1, "beurteilbar": 2},
+                          "prozesscode.a": {"messung": "m", "beurteilbar": 4, "getoetet": 3}})
+    assert (tmp_path / "b.json").read_text(encoding="utf-8") == (
+        '{\n'
+        '  "prozesscode.a": {\n'
+        '    "beurteilbar": 4,\n'
+        '    "getoetet": 3,\n'
+        '    "messung": "m"\n'
+        '  },\n'
+        '  "prozesscode.b": {\n'
+        '    "beurteilbar": 2,\n'
+        '    "getoetet": 1\n'
+        '  }\n'
+        '}\n')
+
+
+# --- Aufrufpfad: Klinke über main --------------------------------------------
+_HINWEIS_ANFANG = "  „überlebt\" heißt"
+
+
+def _klinke_ueber_main(tmp_path, monkeypatch, basis, ergebnisse, *zusatz, roh=""):
+    import subprocess
+    binaer = tmp_path / "mutmut"
+    binaer.touch()
+    monkeypatch.setattr(mr, "MUTMUT", binaer)
+    monkeypatch.setattr(mr, "ROOT", tmp_path)
+    monkeypatch.setattr(mr, "BASELINE", tmp_path / "b.json")
+    monkeypatch.setattr(mr, "UNTER_MUTMUT_UEBERSPRUNGEN", {})
+    monkeypatch.setattr(mr, "messung", lambda: "m")
+    mr.schreibe_baseline(basis)
+    monkeypatch.setattr(mr, "_laufe", lambda *argv: subprocess.CompletedProcess(argv, 0, roh, ""))
+    monkeypatch.setattr(mr, "lies_ergebnisse", lambda _a=None: ergebnisse)
+    return mr.main(["--ratchet", *zusatz])
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_nachgezogene_klinke_ueber_main(tmp_path, monkeypatch, capsys):
+    ergebnisse = eintraege(killed=3, survived=1)
+    code = _klinke_ueber_main(tmp_path, monkeypatch,
+                              {"prozesscode.a": {"getoetet": 1, "beurteilbar": 2, "messung": "m"}},
+                              ergebnisse)
+    assert code == 0
+    ausgabe = capsys.readouterr().out
+    vor_hinweis, _, nach_hinweis = ausgabe.partition(_HINWEIS_ANFANG)
+    assert vor_hinweis == f"  survived    {ergebnisse[-1][0]}\n"
+    assert nach_hinweis.endswith(
+        "liest mutmut es nicht).\n"
+        "\n"
+        "  prozesscode.a: 50.0 % → 75.0 %  (Baseline nachgezogen)\n"
+        "\n"
+        "✓ Sperrklinke gehalten (Baseline nachgezogen)\n"
+        "  mutmut: 4 Mutanten bewertet, 1 überlebt\n"
+        "   (vollständiger Output: --verbose)\n")
+    assert mr.lies_baseline() == {"prozesscode.a": {"getoetet": 3, "beurteilbar": 4,
+                                                    "messung": "m"}}
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_gerissene_klinke_ueber_main(tmp_path, monkeypatch, capsys):
+    basis = {"prozesscode.a": {"getoetet": 3, "beurteilbar": 4, "messung": "m"}}
+    code = _klinke_ueber_main(tmp_path, monkeypatch, basis, eintraege(killed=2, survived=2))
+    assert code == 1
+    assert capsys.readouterr().out.endswith(
+        "  prozesscode.a: 75.0 % → 50.0 %  VERSCHLECHTERT\n"
+        "\n"
+        "✗ Sperrklinke gerissen – die Testgüte ist unter den festgehaltenen Stand gefallen\n"
+        "  mutmut: 4 Mutanten bewertet, 2 überlebt\n"
+        "   (vollständiger Output: --verbose)\n")
+    assert mr.lies_baseline() == basis
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+def test_gerissene_klinke_mit_verbose_nennt_das_modul(tmp_path, monkeypatch, capsys):
+    """Die Tabelle je Modul entsteht erst nach dem Lauf und steht nicht in dessen Rohausgabe.
+    Ohne sie meldet ein Volllauf mit --verbose „gerissen", ohne zu sagen, wo."""
+    basis = {"prozesscode.a": {"getoetet": 3, "beurteilbar": 4, "messung": "m"}}
+    code = _klinke_ueber_main(tmp_path, monkeypatch, basis, eintraege(killed=2, survived=2),
+                              "--verbose", roh="Running mutation testing\n\n")
+    assert code == 1
+    assert capsys.readouterr().out == (
+        "Running mutation testing\n"
+        "  prozesscode.a: 75.0 % → 50.0 %  VERSCHLECHTERT\n"
+        "✗ Sperrklinke gerissen – die Testgüte ist unter den festgehaltenen Stand gefallen\n"
+        "  mutmut: 4 Mutanten bewertet, 2 überlebt\n")
 
 
 def test_offene_mutanten_werden_je_modul_gezaehlt():

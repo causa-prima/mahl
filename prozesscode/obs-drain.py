@@ -13,10 +13,10 @@ Drei Lanes + zwei Zusatz-Marker (Begriffe kanonisch in docs/kaizen/process.md#KP
   - Kolokation (Marker): andere drainbare OBS an derselben Datei.
   - Hygiene (Marker): aufgelöste (UMGESETZT/VERWORFEN), noch nicht archivierte Items → Verschiebe-Reminder.
 """
-import argparse
 import sys
 from pathlib import Path
 
+from ._cli import Parser
 from .obs_parse import (  # noqa: E402
     OBS_FILE, WUERDIG_AB, parse_entries, score,
     is_parked, is_due_parked, is_resolved,
@@ -251,7 +251,7 @@ def render(root: Path, entries):
 
 
 def main(argv: list[str] | None = None):
-    ap = argparse.ArgumentParser(description="Berechnet den OBS-Drain-Satz.")
+    ap = Parser(description="Berechnet den OBS-Drain-Satz.")
     ap.add_argument("--file", help="Pfad zu observations.md (Default: Repo-Standard)")
     args = ap.parse_args(argv)
     root = repo_root()

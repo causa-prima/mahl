@@ -20,6 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ._cli import Parser
 from ._run_lock import RunLock
 from ._stryker_target import resolve_mutate
 from ._wrapper_output import error_lines
@@ -47,15 +48,18 @@ def _move_new_run(before: set[Path]) -> Path | None:
     new_dirs = after - before
     if not new_dirs:
         return None
-    src = max(new_dirs, key=lambda p: p.stat().st_mtime)
-    _BACKEND_OUT.mkdir(parents=True, exist_ok=True)
+    # Stryker benennt die Ordner nach Zeitstempel (yyyy-MM-dd.HH-mm-ss): lexikographisch ist
+    # chronologisch, der größte Name ist der jüngste Lauf.
+    src = max(new_dirs)
+    # Ohne parents: StrykerOutput/ existiert hier immer – der neue Ordner liegt darin.
+    _BACKEND_OUT.mkdir(exist_ok=True)
     dest = _BACKEND_OUT / src.name
     shutil.move(str(src), dest)
     return dest
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -82,14 +86,16 @@ def main() -> None:
     sys.stdout.flush()
 
     before = _snapshot_run_dirs()
-    with RunLock(_TMP_FILE), open(_TMP_FILE, "w", encoding="utf-8") as out:
+    # Binär: Stryker schreibt über den Dateideskriptor, eine Textkodierung griffe hier nie.
+    with RunLock(_TMP_FILE), open(_TMP_FILE, "wb") as out:
         result = subprocess.run(stryker_args, cwd=str(_REPO_ROOT), stdout=out, stderr=subprocess.STDOUT)
 
     # Rohoutput nur zeigen, wenn er zur Analyse gebraucht wird: bei Erfolg trägt er nichts bei,
     # was die Auswertung unten nicht besser sagt. Datei bewusst NICHT löschen – sie ist der
     # einzige Weg, einen laufenden Lauf zu beobachten, und erlaubt danach das vollständige
-    # Nachlesen. Der nächste Lauf überschreibt sie ohnehin ("w").
-    if _TMP_FILE.exists() and (result.returncode != 0 or args.verbose):
+    # Nachlesen. Der nächste Lauf überschreibt sie ohnehin ("wb"); sie existiert, weil sie oben
+    # eben angelegt wurde.
+    if result.returncode != 0 or args.verbose:
         lines = _TMP_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
         print("\n".join(error_lines(lines, verbose=args.verbose)))
 

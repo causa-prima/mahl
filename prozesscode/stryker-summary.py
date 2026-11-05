@@ -15,6 +15,7 @@ import sys
 import time
 from pathlib import Path
 
+from ._cli import Parser
 from ._stryker_report import (
     NO_MUTANTS_HINT,
     collect_undetected,
@@ -54,7 +55,7 @@ def find_latest_report(base_dir: str = "StrykerOutput/Backend") -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

@@ -3,20 +3,20 @@
 import sys
 
 from .checks.common import parse_input
-from .checks import guard_log, mengenangaben, ruff_lint, test_patterns
+from .checks import eslint_lint, guard_log, mengenangaben, ruff_lint, test_patterns
 from .checks import tooling_tests
 from .checks.primitives import check_nonblocking as primitives_nonblocking
 
 # Kein Check, der schon im blockierenden Dispatcher steht: Der läuft vor dem Schreiben, ein
 # Verstoß kommt hier also nie an (tests/test_dispatcher_listen.py).
 CHECKS = [test_patterns.check, primitives_nonblocking,
-          tooling_tests.check, ruff_lint.check, mengenangaben.check]
+          tooling_tests.check, ruff_lint.check, eslint_lint.check, mengenangaben.check]
 
 
 def main() -> None:
     inp = parse_input()
     if inp is None:
-        sys.exit(0)
+        return
 
     warnings: list[str] = []
     for check_fn in CHECKS:
@@ -28,15 +28,13 @@ def main() -> None:
         if treffer:
             # Wer gefeuert hat, wird protokolliert – ein Guard ohne jede Auslösung ist
             # entweder kaputt oder überflüssig, und ohne Protokoll fiele beides nie auf.
-            guard_log.protokolliere(check_fn.__module__.rsplit(".", 1)[-1])
+            guard_log.protokolliere(check_fn.__module__.rpartition(".")[2])
         warnings.extend(treffer)
 
     if warnings:
         separator = "\n" + "─" * 60 + "\n"
         print(separator.join(warnings), file=sys.stderr)
         sys.exit(2)
-
-    sys.exit(0)
 
 
 if __name__ == "__main__":

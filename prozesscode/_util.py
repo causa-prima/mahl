@@ -4,9 +4,15 @@ import subprocess
 from pathlib import Path
 
 
-REPO_ROOT: Path = Path(
-    os.environ.get("CLAUDE_PROJECT_DIR", str(Path(__file__).resolve().parents[1]))
-)
+# Wo dieser Code liegt – maßgeblich für jede Repo-Datei und jeden dotnet-/npm-Aufruf. Bewusst
+# nicht `CLAUDE_PROJECT_DIR`: In einem git-Worktree zeigte das aufs Hauptrepo.
+REPO_ROOT: Path = Path(__file__).resolve().parents[1]
+
+
+def projekt_verzeichnis() -> Path:
+    """Wo Claude Code läuft – danach ist der Ordner der Session-Logs benannt. Ohne Claude Code
+    (Werkzeug von Hand gestartet) das Repo selbst."""
+    return Path(os.environ.get("CLAUDE_PROJECT_DIR", REPO_ROOT))
 
 
 def run_npm(args: list[str], subdir: str = "Client") -> tuple[str, int]:

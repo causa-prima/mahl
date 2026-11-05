@@ -27,7 +27,6 @@ Verwendung (Orchestrator-Verifikation – kein neuer Stryker-Lauf):
   python3 -m prozesscode.qa-check --layer frontend --skip-stryker
 """
 
-import argparse
 import hashlib
 import json
 import re
@@ -36,6 +35,7 @@ import sys
 import time
 from pathlib import Path
 
+from ._cli import Parser
 from ._run_lock import LOCK_BUSY_EXIT_CODE
 from ._wrapper_output import VERBOSE_HINT
 from ._stryker_report import (
@@ -71,9 +71,7 @@ def _git(*args: str) -> str:
 
 def _porcelain_path(line: str) -> str:
     """Pfad aus einer `git status --porcelain`-Zeile (XY<space>PATH); Rename/Copy → Ziel."""
-    if len(line) < 4:
-        return ""
-    path = line[3:]
+    path = line[3:]                  # eine zu kurze Zeile ergibt "" und fällt beim Aufrufer heraus
     if " -> " in path:               # Rename/Copy: „alt -> neu" → das neue Ziel zählt
         path = path.split(" -> ", 1)[1]
     return path.strip('"')
@@ -94,8 +92,7 @@ def _changed_paths(prefixes: tuple[str, ...]) -> list[str]:
 
 def _file_in_head(path: str) -> bool:
     """True wenn der Pfad in HEAD existiert (index-unabhängig – entscheidet neu vs. modifiziert)."""
-    r = subprocess.run(["git", "cat-file", "-e", f"HEAD:{path}"], capture_output=True, text=True)
-    return r.returncode == 0
+    return subprocess.run(["git", "cat-file", "-e", f"HEAD:{path}"], capture_output=True).returncode == 0
 
 
 def _worktree_content_fingerprint(layer: str) -> str:
@@ -180,12 +177,12 @@ def _parse_report(report_path: Path) -> tuple[dict, dict, str]:
     `stryker-summary.py`, damit beide Gates nicht auseinanderdriften können.
     """
     data = json.loads(report_path.read_bytes())
-    for file_data in data.get("files", {}).values():
+    files = data.get("files", {})
+    for file_data in files.values():
         if "mutants" in file_data:
             file_data["mutants"] = sorted(file_data["mutants"], key=lambda m: str(m.get("id", "")))
     normalized = json.dumps(data, sort_keys=True, ensure_ascii=False)
     content_hash = hashlib.sha256(normalized.encode()).hexdigest()[:16]
-    files = data.get("files", {})
     return files, compute_metrics(files), content_hash
 
 
@@ -210,9 +207,8 @@ def check_new_suppressions(layer: str) -> list[tuple[str, str]]:
     for line in out.splitlines():
         if line.startswith("+++ b/"):
             current_file = line[6:]
-        elif line.startswith("+") and not line.startswith("+++"):
-            if current_file.startswith(prefixes) and re.search(r'(Stryker disable|v8 ignore)', line):
-                findings.append((current_file, line[1:].strip()))
+        elif line.startswith("+") and not line.startswith("+++") and re.search(r'(Stryker disable|v8 ignore)', line):
+            findings.append((current_file, line[1:].strip()))
     return findings
 
 
@@ -232,7 +228,7 @@ def check_unit_test_patterns(layer: str) -> list[tuple[str, str]]:
             context.append(line)
             if len(context) > 12:
                 context.pop(0)
-        if not (line.startswith("+") and not line.startswith("+++") and current_file.startswith(prefixes)):
+        if not (line.startswith("+") and not line.startswith("+++")):
             continue
         content = line[1:]
         ctx = " ".join(context)
@@ -259,10 +255,10 @@ def check_test_structure(layer: str) -> list[tuple[str, str]]:
     out = _worktree_diff(prefixes, 40)
     findings: list[tuple[str, str]] = []
     current_file = ""
-    # Collect added lines per test block: (file, trigger_line, [added_lines_in_block])
+    # Hinzugefügte Zeilen je Test-Block: (Datei, Auslöser-Zeile, [hinzugefügte Zeilen im Block]).
+    # Ein Block wird beim Auslöser angelegt und danach über `current_block` befüllt.
     blocks: list[tuple[str, str, list[str]]] = []
     current_block: list[str] | None = None
-    current_trigger = ""
 
     if layer == "backend":
         test_marker = re.compile(r'^\+\s*\[(Fact|Theory)\]')
@@ -271,23 +267,15 @@ def check_test_structure(layer: str) -> list[tuple[str, str]]:
 
     for line in out.splitlines():
         if line.startswith("+++ b/"):
-            if current_block is not None:
-                blocks.append((current_file, current_trigger, current_block))
             current_file = line[6:]
             current_block = None
-            current_trigger = ""
-        elif not current_file.startswith(prefixes) or not _is_test_file(current_file):
+        elif not _is_test_file(current_file):
             continue
         elif test_marker.match(line):
-            if current_block is not None:
-                blocks.append((current_file, current_trigger, current_block))
-            current_trigger = line[1:].strip()
             current_block = []
+            blocks.append((current_file, line[1:].strip(), current_block))
         elif current_block is not None and line.startswith("+") and not line.startswith("+++"):
             current_block.append(line[1:])
-
-    if current_block is not None:
-        blocks.append((current_file, current_trigger, current_block))
 
     for filepath, trigger, added_lines in blocks:
         block_text = "\n".join(added_lines)
@@ -506,7 +494,7 @@ def verify_hash(expected: str, **kwargs) -> bool:
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="QA-Check + Stryker für implementing-scenario")
+    parser = Parser(description="QA-Check + Stryker für implementing-scenario")
     parser.add_argument("--layer", choices=["backend", "frontend"], required=True,
                         help="Welche Schicht wird geprüft")
     parser.add_argument("--skip-stryker", action="store_true",
@@ -596,7 +584,7 @@ def main() -> None:
                     f"Output beheben und neu starten.",
                     file=sys.stderr,
                 )
-                sys.exit(rc or 1)
+                sys.exit(rc)   # rc ist hier nie 0
             print(
                 f"[qa-check] ⚠️  Stryker-Score-Gate fehlgeschlagen (Score < 100 %, Exit {rc}) – "
                 f"frischer Report vorhanden, führe restliche Checks dennoch aus.",

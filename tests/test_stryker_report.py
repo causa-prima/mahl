@@ -13,7 +13,11 @@ Ersetzung. Zwei Verluste sind handlungsrelevant:
 Nicht abgedeckt vom alten Vorwurf: Die Unterscheidung Survived/NoCoverage ging NIE verloren,
 `collect_undetected` trennt sie über `status` in zwei Gruppen (in S115 am Code geprüft).
 """
+import json
 from importlib import import_module
+from pathlib import Path
+
+import pytest
 
 sr = import_module("prozesscode._stryker_report")
 
@@ -116,4 +120,120 @@ def test_mutator_and_replacement_are_kept():
 def test_missing_replacement_falls_back():
     m = _mutant(318)
     del m["replacement"]
-    assert "?" in _out(m)
+    assert _out(m).splitlines()[2] == "           → ?"
+
+
+# --- exakte Ausgabe der Mutanten-Gruppe ---------------------------------------
+def test_gruppe_ohne_grund_und_ohne_deckung_hat_genau_drei_zeilen_und_eine_leerzeile():
+    assert sr.format_mutant_group({"Foo.cs": [_mutant(318)]}) == [
+        "  Foo.cs (1)",
+        "    Zeile  318  Equality mutation",
+        "           → >=",
+        "",
+    ]
+
+
+def test_mutant_ohne_endposition_zeigt_nur_die_startzeile():
+    m = _mutant(318)
+    del m["location"]["end"]
+    assert _out(m).splitlines()[1] == "    Zeile  318  Equality mutation"
+
+
+def test_kurzer_einzeiliger_grund_bleibt_unveraendert():
+    assert _out(_mutant(318, status_reason="Layout-Wert")).splitlines()[3] == "             (Layout-Wert)"
+
+
+def test_mehrzeiliger_grund_wird_mit_auslassungszeichen_markiert():
+    """Zwei Zeilen genügen: Was nach der ersten kommt, ist abgeschnitten und muss es sagen."""
+    zeile = _out(_mutant(318, status_reason="Erwartet: fokussiert\n<div/>")).splitlines()[3]
+    assert zeile == "             (Erwartet: fokussiert…)"
+
+
+def test_grund_genau_an_der_laengengrenze_wird_nicht_gekuerzt():
+    grund = "A" * sr._MAX_REASON
+    assert _out(_mutant(318, status_reason=grund)).splitlines()[3] == f"             ({grund})"
+
+
+def test_grund_ueber_der_laengengrenze_wird_auf_die_grenze_gekuerzt():
+    grund = "A" * (sr._MAX_REASON + 1)
+    zeile = _out(_mutant(318, status_reason=grund)).splitlines()[3]
+    assert zeile == f"             ({'A' * sr._MAX_REASON}…)"
+
+
+# --- Kurzpfade ----------------------------------------------------------------
+@pytest.mark.parametrize("voll, kurz", [
+    # Stryker.NET: absolute Pfade
+    ("/home/kieritz/repos/mahl/Server/Types/NonEmptyImmutableArray.cs",
+     "Server/Types/NonEmptyImmutableArray.cs"),
+    # Windows-Trenner, Testprojekt
+    ("C:\\repos\\mahl\\Server.Tests\\RecipesEndpointsTests.cs", "Server.Tests/RecipesEndpointsTests.cs"),
+    # StrykerJS: schon projekt-relativ
+    ("src/pages/IngredientsPage.tsx", "src/pages/IngredientsPage.tsx"),
+    # kein bekannter Anker: nur der Dateiname
+    ("/home/kieritz/repos/mahl/Tools/Program.cs", "Program.cs"),
+])
+def test_kurzpfad_schneidet_ab_dem_projektanker(voll, kurz):
+    assert sr.short_path(voll) == kurz
+
+
+# --- echter Report (Stryker.NET) ------------------------------------------------
+# Auszug aus StrykerOutput/Backend/2026-10-29.14-35-47/reports/mutation-report.json: vier der
+# Dateien unverändert übernommen (Mutanten, `language`), nur das Feld `source` entfernt. Er
+# enthält je einen Survivor (mit Deckung) und einen NoCoverage-Mutanten (mit `statusReason`),
+# Ignored-, Killed- und mehrzeilige Mutanten sowie eine Datei ganz ohne Mutanten.
+_ECHTER_REPORT = json.loads(
+    (Path(__file__).parent / "fixtures" / "stryker_backend_auszug.json").read_text(encoding="utf-8"))
+
+
+def test_echter_report_ergibt_metriken_und_gate():
+    metriken = sr.compute_metrics(_ECHTER_REPORT["files"])
+    assert metriken == {
+        "counts": {"Ignored": 3, "Killed": 4, "Survived": 1, "NoCoverage": 1},
+        "detected": 4,
+        "undetected": 2,
+        "total_valid": 6,
+        "mutated_files": 2,
+        "score": 4 / 6 * 100,
+    }
+    assert sr.format_score(metriken) == "66.7%"
+    assert sr.gate_code(metriken) == 1
+    assert (sr.format_status_breakdown(metriken)
+            == "   Status-Verteilung: Ignored: 3, Killed: 4, NoCoverage: 1, Survived: 1")
+
+
+def test_echter_report_trennt_survivor_und_no_coverage():
+    survivors, nocoverage = sr.collect_undetected(_ECHTER_REPORT["files"])
+    datei = "Server/Types/NonEmptyImmutableArray.cs"
+    assert {k: [m["id"] for m in v] for k, v in survivors.items()} == {datei: ["186"]}
+    assert {k: [m["id"] for m in v] for k, v in nocoverage.items()} == {datei: ["187"]}
+
+
+def test_echter_report_formatiert_survivor_und_no_coverage():
+    survivors, nocoverage = sr.collect_undetected(_ECHTER_REPORT["files"])
+    assert sr.format_mutant_group(survivors) == [
+        "  Server/Types/NonEmptyImmutableArray.cs (1)",
+        "    Zeile   15  Conditional (false) mutation",
+        '           → (false?throw new InvalidOperationException("Uninitialized") :_items)'
+        "   (2 Tests decken ab)",
+        "",
+    ]
+    assert sr.format_mutant_group(nocoverage) == [
+        "  Server/Types/NonEmptyImmutableArray.cs (1)",
+        "    Zeile   15  String mutation",
+        '           → ""',
+        "             (Not covered by any test.)",
+        "",
+    ]
+
+
+def test_mehrere_dateien_mit_survivors_landen_getrennt_und_eine_datei_ohne_mutanten_stoert_nicht():
+    files = {
+        "/r/Server/A.cs": {"mutants": [_mutant(3) | {"status": "Survived"},
+                                       _mutant(1) | {"status": "Survived"}]},
+        "/r/Server/B.cs": {"mutants": [_mutant(7) | {"status": "NoCoverage"},
+                                       _mutant(8) | {"status": "Killed"}]},
+        "/r/Server/C.cs": {},
+    }
+    survivors, nocoverage = sr.collect_undetected(files)
+    assert {k: len(v) for k, v in survivors.items()} == {"Server/A.cs": 2}
+    assert {k: len(v) for k, v in nocoverage.items()} == {"Server/B.cs": 1}

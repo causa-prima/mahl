@@ -1,5 +1,13 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// Sichtprüfung bei Handybreite (`playwright-test --handybreite <px>`): Der Wrapper setzt die
+// Breite per Umgebungsvariable; jeder Test läuft dann schmal und zeichnet einen Trace mit
+// einem Bild je Aktion auf. Ohne Variable bleibt alles beim Desktop-Viewport.
+const handybreite = Number(process.env.MAHL_HANDYBREITE) || undefined
+const sichtpruefung = handybreite
+  ? { viewport: { width: handybreite, height: 800 }, trace: 'on' as const }
+  : {}
+
 export default defineConfig({
   testDir: './e2e',
   // workers: 1 – harte Serialisierung. Die E2E-DB-Isolation (ADR-S084-4 Addendum) teilt sich EINE
@@ -12,7 +20,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], ...sichtpruefung },
     },
   ],
   // Poka-Yoke (ADR-S084-4) gegen "E2E testet gegen veraltetes Backend": Playwright besitzt den

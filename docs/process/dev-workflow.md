@@ -256,6 +256,11 @@ npm --prefix Client audit fix
 
 **Vite-Proxy:** Entwicklung proxied `/api/*` auf `http://localhost:5059` (Backend).
 
+**ESLint je Edit:** ESLint läuft **automatisch** über jede geänderte TypeScript-Datei des
+Clients (PostToolUse, `prozesscode/hooks/checks/eslint_lint.py`, nicht-blockierend, rund 1,5 s
+je Edit). Er meldet nur Fehler, keine Warnungen, denn blockieren kann auch der qa-check nur an
+Fehlern. Der volle Lauf mit allen Warnungen bleibt `python3 -m prozesscode.eslint-run`.
+
 <a id="DEV-dependency-updates"></a>
 ### Nach Dependency-Updates: Pflicht-Verifikation
 

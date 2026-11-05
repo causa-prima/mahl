@@ -58,6 +58,13 @@ def test_ein_pragma_mitten_in_einem_ausdruck_ist_keines(tmp_path, monkeypatch, a
     assert mr.pragma_zeilen(quelle(tmp_path, monkeypatch, text=text)) == 1
 
 
+def test_nach_geschlossenen_klammern_zaehlt_das_pragma_wieder(tmp_path, monkeypatch):
+    """Verschachtelte runde, eckige und geschweifte Klammern schließen sich vollständig –
+    das Pragma am Ende der Anweisung steht wieder auf oberster Ebene."""
+    text = "X = ((1), [2], {3: 4})  # pragma: no mutate\n"
+    assert mr.pragma_zeilen(quelle(tmp_path, monkeypatch, text=text)) == 1
+
+
 def test_fehlende_quelle_zaehlt_null(tmp_path, monkeypatch):
     """Fail-open: Ohne Datei keine Zählung, kein Abbruch."""
     monkeypatch.setattr(mr, "ROOT", tmp_path)

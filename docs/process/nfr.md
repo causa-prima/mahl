@@ -79,7 +79,9 @@ Am Ende jeder Phase (SKELETON, MVP, V1, ...) zusätzlich:
 ### Non-Functional (gilt immer)
 
 - [ ] Performance: UI-Interaktionen < 100ms (Optimistic UI)
-- [ ] Responsiveness: Mobile getestet (375px–428px)
+- [ ] Responsiveness: Mobile getestet (375px–428px) – Sichtprüfung über die E2E-Szenarien:
+  `python3 -m prozesscode.playwright-test --filter <Szenario> --handybreite 375` legt je Test
+  die Bilder des Laufs ab (Pfad im Verdikt)
 - [ ] Error Handling: Nutzerfreundliche Fehlermeldungen (kein Stack-Trace für User)
 - [ ] Security: Input-Validierung, keine XSS/SQL-Injection-Risiken
 

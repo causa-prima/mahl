@@ -32,7 +32,7 @@ Geänderte Dateien → `git diff` (staged + unstaged) als Standard verwenden.
 Gehe in `docs/process/review-checklist.md` jeden Abschnitt Punkt für Punkt durch, dessen „Wann lesen"
 in der [Inhaltstabelle](../../../docs/process/review-checklist.md#RCL-inhalt) auf die Änderung zutrifft.
 
-Für jedes Finding: Schweregrad ❌/⚠️/✅ + Guideline-Referenz (Datei + Sektion) notieren.
+Für jedes Finding: Schweregrad ❌/⚠️/✅ + Regel-Anker notieren (Format und Grund: Agent-Prompts unten).
 Findings werden gesammelt – nicht sofort selbst behoben.
 
 <a id="RVC-suppression-report"></a>
@@ -77,8 +77,12 @@ Alle zutreffenden Agenten parallel spawnen – sie reviewen denselben Diff und h
 
 Agent-Prompts enthalten (je Agent):
 - Geänderte Dateien / git diff
-- Anforderung: jedes Finding nennt Schweregrad (❌/⚠️), Guideline-Referenz
-  (konkrete Datei + Sektion) und Begründung (nicht nur Guideline zitieren)
+- Anforderung: jedes Finding nennt Schweregrad (❌/⚠️), den **Anker** der verletzten Regel
+  (`Regel: CGT-result`; `Regel: keine`, wenn es ein Urteil ohne geschriebene Regel ist) und
+  eine Begründung (nicht nur die Guideline zitieren). Der Anker, nicht Datei + Abschnittstitel:
+  Nur an ihm lässt sich aus den Logs zählen, welche Abschnitte der Guidelines Findings tragen
+  und ob der Implementer den Abschnitt vorher abgerufen hatte – die Grundlage dafür, die
+  Pflichtlektüre auf das Nötige zu kürzen, ohne dass Fehler durch Nichtgelesenes entstehen.
 - Hinweis: Projekt-Guidelines (`docs/guidelines/coding-guideline-*.md`) haben Vorrang vor
   agenten-eigenen Checklisten
 - **Auftrag, jedes Finding vor der Meldung am Stand zu belegen** – `git diff`, `grep`, `pytest`,
@@ -202,10 +206,10 @@ Schuld-Punkte, darunter eine dauerhaft deaktivierbare Schaltfläche ohne Retry-W
 
 ```
 ❌ Must Fix:
-- [Quelle: Selbstcheck|Agent] [Datei:Zeile] [Guideline: <Pfad>, <Sektion>] <Beschreibung>
+- [Quelle: Selbstcheck|Agent] [Datei:Zeile] [Regel: <ANKER>|keine] <Beschreibung>
 
 ⚠️ Improvements:
-- [Quelle: Selbstcheck|Agent] [Datei:Zeile] [Guideline: <Pfad>, <Sektion>] <Beschreibung>
+- [Quelle: Selbstcheck|Agent] [Datei:Zeile] [Regel: <ANKER>|keine] <Beschreibung>
 
 Suppression-Bewertung:
 - [Datei:Zeile] → valide | ❌ Begründung unzureichend: <Warum>

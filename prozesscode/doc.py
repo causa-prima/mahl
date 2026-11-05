@@ -39,6 +39,7 @@ import argparse
 import re
 import sys
 
+from ._cli import Parser
 from . import anchors
 
 # Bis zu drei Leerzeichen sind nach CommonMark noch eine Überschrift; ab vier beginnt ein
@@ -532,7 +533,7 @@ def cmd_audit(args) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(
+    p = Parser(
         description="Doku-Abschnitt gezielt abrufen statt die ganze Datei zu lesen.",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)

@@ -11,23 +11,20 @@ import sys
 from pathlib import Path
 
 
-def _strip_decorations(pattern: str) -> tuple[str, bool]:
-    """Trennt Glob-Deko ab: `!`-Negation und StrykerJS-Mutation-Range (`datei.ts:1:3-1:5`).
+def _strip_range(pattern: str) -> str:
+    """Trennt die StrykerJS-Mutation-Range ab (`datei.ts:1:3-1:5` → `datei.ts`).
 
-    Gibt (nacktes Muster, ist_negation) zurück.
+    Die Range hängt hinten am Dateinamen; der Pfad selbst enthält nie ':'.
     """
-    negated = pattern.startswith("!")
-    bare = pattern[1:] if negated else pattern
-    # Mutation-Range hängt hinten am Dateinamen; der Pfad selbst enthält nie ':'.
-    bare = bare.split(":", 1)[0]
-    return bare, negated
+    return pattern.partition(":")[0]
 
 
 def _matches(base: Path, pattern: str) -> bool:
     try:
         return any(base.glob(pattern))
-    except (ValueError, IndexError):
-        # Ungültiges Glob-Muster (z.B. Reste einer zerlegten Brace-Expansion).
+    except (ValueError, IndexError, NotImplementedError):
+        # Ungültiges Glob-Muster (z.B. Reste einer zerlegten Brace-Expansion, leeres Muster)
+        # oder ein absoluter Pfad, den `Path.glob` gar nicht annimmt.
         return False
 
 
@@ -50,9 +47,11 @@ def resolve_mutate(raw: str, project_dir: Path, repo_root: Path) -> list[str]:
         _fail(f"--mutate ist leer: {raw!r}")
 
     for pattern in patterns:
-        bare, negated = _strip_decorations(pattern)
-        if negated or _matches(project_dir, bare):
-            continue  # Ausschlussmuster dürfen ins Leere zeigen; Treffer ist Treffer.
+        if pattern.startswith("!"):
+            continue  # Ausschlussmuster dürfen ins Leere zeigen.
+        bare = _strip_range(pattern)
+        if _matches(project_dir, bare):
+            continue
 
         hint = _correction_hint(bare, project_dir, repo_root)
         _fail(

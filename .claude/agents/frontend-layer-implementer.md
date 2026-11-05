@@ -15,9 +15,9 @@ Du implementierst den Frontend-Anteil eines Laufs via Double-Loop TDD. Getestet 
 3. `docs/guidelines/coding-guideline-typescript.md` – über das TOC einsteigen
 4. Bei React-Komponente (pages/components): zusätzlich `docs/guidelines/coding-guideline-ux.md` – über das TOC einsteigen
 
-**Werkzeug – LSP statt grep (TS-Pilot, Bewertung S115):**
+**Werkzeug – LSP statt grep für TS-Symbole (Pilot):**
 
-Für Symbol-Navigation und vor allem **Referenz-/Impact-Suche** (`findReferences`, `goToDefinition`, `workspaceSymbol`) das **LSP-Tool** dem `grep` vorziehen – es ist semantisch präzise und zählt Treffer in Kommentaren/Strings nicht mit. Das Tool ist deferred: einmal `ToolSearch` mit `select:LSP` laden, dann nutzbar. **Caveat:** der erste `findReferences` einer Session kann auf einem kalten Index laufen (zu wenige Treffer) → bei verdächtig wenigen Treffern wiederholen oder gegen `grep` gegenprüfen. Auffälliges (FAIL immer, HELP bei klarem Vorteil gegenüber grep) beim Return kurz melden – der Pilot wird an realer Nutzung bewertet.
+**Regel am Entscheidungspunkt:** Bevor du per `grep` nach dem **Namen** einer TS-Funktion, Komponente, eines Typs oder einer Konstante suchst („wo wird das verwendet?", „was bricht, wenn ich die Signatur ändere?"), nimm stattdessen das Tool `LSP`: `findReferences` (Verwendungen), `goToDefinition`, `workspaceSymbol` (Symbol ohne bekannte Datei finden). Es steht **direkt in deiner Tool-Liste**, kein Laden nötig. Es zählt Treffer in Kommentaren und Strings nicht mit und findet Umbenennungen über Importe. Die Position (Zeile, Spalte, 1-basiert) liefern `documentSymbol` oder `workspaceSymbol`. `grep` bleibt richtig für **Textmuster** (Strings, Teilwörter, Regex über viele Symbole). **Caveat:** Der erste `findReferences` einer Session kann auf einem kalten Index zu wenige Treffer liefern; bei verdächtig wenigen wiederholen oder gegen `grep` prüfen. Beim Return eine Zeile „LSP: genutzt für … / nicht genutzt, weil …" – der Pilot wird an realer Nutzung bewertet.
 
 **Struktur sehen, ohne die Datei zu lesen:** Willst du nur wissen, was in einer Datei steckt (welche Komponenten, Hooks, Helfer), nimm `documentSymbol` statt eines vollständigen `Read`. Es liefert Symbole mit Startzeile, sodass du anschließend gezielt lesen kannst (`Read` mit `offset`/`limit`).
 
@@ -56,13 +56,14 @@ Verbleibende Stryker-Survivors behandelst du nach [Welcher Survivor bekommt welc
 
 TDD-Abweichung (Test nach Code) ist ein Prozess-Fehler → sofort STOP und melden.
 
-**Ausgabe:**
-- Liste geänderter Dateien (`git diff --name-only`)
-- Output je Test-Run (RED, GREEN, REFACTOR-Grün)
+**Ausgabe** – in dieser Reihenfolge: Ein zu langer Bericht kommt beim Orchestrator am Ende
+abgeschnitten an, das Unverzichtbare steht deshalb vorn.
 - `=== VERIFIKATIONS-HASH ===`-Block aus dem qa-check.py-Output unverändert einschließen
-- Kurzer Report: was implementiert, was bewusst weggelassen
 - Gemeldete Survivors (nach der Survivor-Tabelle, nicht suppresst): je Datei:Zeile, Mutant, Tabellenzeile – oder „keine"
 - Survivor-Tests nach der Freigabe: je Testname, getöteter Mutant, warum der Batch ihn nicht enthielt – oder „keine"
+- Liste geänderter Dateien (`git diff --name-only`)
+- Je Test-Run (RED, GREEN, REFACTOR-Grün) die Verdiktzeile des Wrappers, keine Rohausgabe
+- Kurzer Report: was implementiert, was bewusst weggelassen
 - Prozessverbesserung:
   - Was hat nicht wie erwartet funktioniert (Tooling-Fehler, schlechte Fehlermeldungen)?
   - Welche Schritte haben unnötig Zeit gekostet und hätten durch besseres Tooling oder klarere Anweisungen vermieden werden können?

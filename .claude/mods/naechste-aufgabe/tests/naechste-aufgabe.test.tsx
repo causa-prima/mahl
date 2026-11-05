@@ -32,6 +32,7 @@ function engine(on: On, laeufe: Lauf[], stdout: string, exitCode = 0): MockClock
                       isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('prompt.submit', (_$, e) => ({ text: e.text }))
+  on('classic.SessionStart', () => ({}))
   // Was die Engine selbst über dem Prompt zeichnet – sichtbar, wenn die Mod das Band abgibt.
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
@@ -74,6 +75,36 @@ test('verschwindet mit dem ersten Prompt', async ($, on) => {
   expect(await texte($, 'terminal')).not.toEqual([ENGINE_BAND])  // Gegenprobe: vorher zeigt die Mod
   await $.prompt.submit({ text: 'mach weiter', wait: false, origin: { kind: 'composer' } })
 
+  expect(await texte($, 'terminal')).toEqual([ENGINE_BAND])
+})
+
+test('erscheint nach /clear wieder – dort feuert nur der Settings-Hook SessionStart', async ($, on) => {
+  const laeufe: Lauf[] = []
+  const uhr = engine(on, laeufe, JSON.stringify(UEBERBLICK))
+  await $.session.start(START)
+  await uhr.settle()
+  await $.prompt.submit({ text: 'mach weiter', wait: false, origin: { kind: 'composer' } })
+  await $.prompt.submit({ text: '/clear', wait: false, origin: { kind: 'composer' } })
+  expect(await texte($, 'terminal')).toEqual([ENGINE_BAND])  // Gegenprobe: vor dem Hook ist es aus
+
+  await $.classic.SessionStart({ source: 'clear' })
+  await uhr.settle()
+
+  expect(laeufe).toHaveLength(2)
+  expect((await texte($, 'terminal')).join('\n')).toContain('Als Nächstes:')
+})
+
+test('nach einer Zusammenfassung bleibt es aus – die Session läuft weiter', async ($, on) => {
+  const laeufe: Lauf[] = []
+  const uhr = engine(on, laeufe, JSON.stringify(UEBERBLICK))
+  await $.session.start(START)
+  await uhr.settle()
+  await $.prompt.submit({ text: 'mach weiter', wait: false, origin: { kind: 'composer' } })
+
+  await $.classic.SessionStart({ source: 'compact' })
+  await uhr.settle()
+
+  expect(laeufe).toHaveLength(1)
   expect(await texte($, 'terminal')).toEqual([ENGINE_BAND])
 })
 

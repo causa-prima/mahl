@@ -52,13 +52,14 @@ Verbleibende Stryker-Survivors behandelst du nach [Welcher Survivor bekommt welc
 
 TDD-Abweichung (Test nach Code) ist ein Prozess-Fehler → sofort STOP und melden.
 
-**Ausgabe:**
-- Liste geänderter Dateien (`git diff --name-only`)
-- Output je Test-Run (RED, GREEN, REFACTOR-Grün)
+**Ausgabe** – in dieser Reihenfolge: Ein zu langer Bericht kommt beim Orchestrator am Ende
+abgeschnitten an, das Unverzichtbare steht deshalb vorn.
 - `=== VERIFIKATIONS-HASH ===`-Block aus dem qa-check.py-Output unverändert einschließen
-- Kurzer Report: was implementiert, was bewusst weggelassen
 - Gemeldete Survivors (nach der Survivor-Tabelle, nicht suppresst): je Datei:Zeile, Mutant, Tabellenzeile – oder „keine"
 - Survivor-Tests nach der Freigabe: je Testname, getöteter Mutant, warum der Batch ihn nicht enthielt – oder „keine"
+- Liste geänderter Dateien (`git diff --name-only`)
+- Je Test-Run (RED, GREEN, REFACTOR-Grün) die Verdiktzeile des Wrappers, keine Rohausgabe
+- Kurzer Report: was implementiert, was bewusst weggelassen
 - Prozessverbesserung:
   - Was hat nicht wie erwartet funktioniert (Tooling-Fehler, schlechte Fehlermeldungen)?
   - Welche Schritte haben unnötig Zeit gekostet und hätten durch besseres Tooling oder klarere Anweisungen vermieden werden können?

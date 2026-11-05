@@ -1,0 +1,468 @@
+{
+ "files": {
+  "src/hooks/useDeleteIngredientWithUndo.ts": {
+   "language": "typescript",
+   "mutants": [
+    {
+     "id": "0",
+     "mutatorName": "BlockStatement",
+     "replacement": "{}",
+     "statusReason": "src/hooks/useDeleteIngredientWithUndo.ts(23,69): error TS2355: A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.\n",
+     "status": "CompileError",
+     "static": false,
+     "coveredBy": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "25",
+      "26",
+      "27",
+      "28",
+      "29",
+      "30",
+      "31",
+      "32",
+      "33"
+     ],
+     "location": {
+      "end": {
+       "column": 2,
+       "line": 66
+      },
+      "start": {
+       "column": 94,
+       "line": 23
+      }
+     }
+    },
+    {
+     "id": "5",
+     "mutatorName": "ArrowFunction",
+     "replacement": "() => undefined",
+     "statusReason": "src/hooks/useDeleteIngredientWithUndo.ts(45,11): error TS2322: Type 'undefined' is not assignable to type 'ResultAsync<unknown, unknown>'.\n",
+     "status": "CompileError",
+     "static": false,
+     "coveredBy": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "25",
+      "26",
+      "27",
+      "28",
+      "29",
+      "30",
+      "31",
+      "32",
+      "33"
+     ],
+     "location": {
+      "end": {
+       "column": 59,
+       "line": 46
+      },
+      "start": {
+       "column": 5,
+       "line": 45
+      }
+     }
+    },
+    {
+     "id": "7",
+     "mutatorName": "CallExpression",
+     "replacement": ";",
+     "status": "Survived",
+     "static": false,
+     "testsCompleted": 3,
+     "coveredBy": [
+      "20",
+      "23",
+      "28"
+     ],
+     "location": {
+      "end": {
+       "column": 23,
+       "line": 48
+      },
+      "start": {
+       "column": 7,
+       "line": 48
+      }
+     }
+    },
+    {
+     "id": "4",
+     "mutatorName": "CallExpression",
+     "replacement": ";",
+     "statusReason": "Unable to find an element with the text: Noch keine Zutaten angelegt.. This could be because the text is broken up by multiple elements. In this case, you can p",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 1,
+     "killedBy": [
+      "19"
+     ],
+     "coveredBy": [
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "28",
+      "29"
+     ],
+     "location": {
+      "end": {
+       "column": 18,
+       "line": 37
+      },
+      "start": {
+       "column": 7,
+       "line": 37
+      }
+     }
+    },
+    {
+     "id": "3",
+     "mutatorName": "CallExpression",
+     "replacement": ";",
+     "status": "Survived",
+     "static": false,
+     "testsCompleted": 8,
+     "coveredBy": [
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "28",
+      "29"
+     ],
+     "location": {
+      "end": {
+       "column": 26,
+       "line": 36
+      },
+      "start": {
+       "column": 7,
+       "line": 36
+      }
+     }
+    },
+    {
+     "id": "2",
+     "mutatorName": "BlockStatement",
+     "replacement": "{}",
+     "statusReason": "Unable to find an element with the text: Noch keine Zutaten angelegt.. This could be because the text is broken up by multiple elements. In this case, you can p",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 1,
+     "killedBy": [
+      "19"
+     ],
+     "coveredBy": [
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "28",
+      "29"
+     ],
+     "location": {
+      "end": {
+       "column": 6,
+       "line": 38
+      },
+      "start": {
+       "column": 11,
+       "line": 35
+      }
+     }
+    },
+    {
+     "id": "6",
+     "mutatorName": "BlockStatement",
+     "replacement": "{}",
+     "statusReason": "Unable to find an element by: [data-testid=\"ingredient-list\"]\n\nIgnored nodes: comments, script, style\n\u001b[36m<body>\u001b[39m\n  \u001b[36m<div>\u001b[39m\n    \u001b[36m<main\u001b[39m\n   ",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 1,
+     "killedBy": [
+      "20"
+     ],
+     "coveredBy": [
+      "20",
+      "23",
+      "28"
+     ],
+     "location": {
+      "end": {
+       "column": 6,
+       "line": 50
+      },
+      "start": {
+       "column": 11,
+       "line": 47
+      }
+     }
+    },
+    {
+     "id": "9",
+     "mutatorName": "BlockStatement",
+     "replacement": "{}",
+     "statusReason": "Unable to find an element with the text: Noch keine Zutaten angelegt.. This could be because the text is broken up by multiple elements. In this case, you can p",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 1,
+     "killedBy": [
+      "19"
+     ],
+     "coveredBy": [
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "28",
+      "29"
+     ],
+     "location": {
+      "end": {
+       "column": 4,
+       "line": 57
+      },
+      "start": {
+       "column": 63,
+       "line": 53
+      }
+     }
+    },
+    {
+     "id": "8",
+     "mutatorName": "CallExpression",
+     "replacement": ";",
+     "statusReason": "Unable to find an element by: [data-testid=\"ingredient-list\"]\n\nIgnored nodes: comments, script, style\n\u001b[36m<body>\u001b[39m\n  \u001b[36m<div>\u001b[39m\n    \u001b[36m<main\u001b[39m\n   ",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 1,
+     "killedBy": [
+      "20"
+     ],
+     "coveredBy": [
+      "20",
+      "23",
+      "28"
+     ],
+     "location": {
+      "end": {
+       "column": 18,
+       "line": 49
+      },
+      "start": {
+       "column": 7,
+       "line": 49
+      }
+     }
+    },
+    {
+     "id": "12",
+     "mutatorName": "CallExpression",
+     "replacement": ";",
+     "statusReason": "\u001b[2mexpect(\u001b[22m\u001b[31melement\u001b[39m\u001b[2m).toBeDisabled()\u001b[22m\n\nReceived element is not disabled:\n  \u001b[31m<button\n  aria-label=\"Mehl löschen\"\n  class=\"MuiButtonBase-",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 6,
+     "killedBy": [
+      "24"
+     ],
+     "coveredBy": [
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "28",
+      "29"
+     ],
+     "location": {
+      "end": {
+       "column": 33,
+       "line": 55
+      },
+      "start": {
+       "column": 5,
+       "line": 55
+      }
+     }
+    },
+    {
+     "id": "16",
+     "mutatorName": "BlockStatement",
+     "replacement": "{}",
+     "statusReason": "Unable to find an element by: [data-testid=\"ingredient-list\"]\n\nIgnored nodes: comments, script, style\n\u001b[36m<body>\u001b[39m\n  \u001b[36m<div>\u001b[39m\n    \u001b[36m<main\u001b[39m\n   ",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 1,
+     "killedBy": [
+      "20"
+     ],
+     "coveredBy": [
+      "20",
+      "23",
+      "28"
+     ],
+     "location": {
+      "end": {
+       "column": 111,
+       "line": 63
+      },
+      "start": {
+       "column": 29,
+       "line": 63
+      }
+     }
+    },
+    {
+     "id": "19",
+     "mutatorName": "BlockStatement",
+     "replacement": "{}",
+     "statusReason": "\u001b[2mexpect(\u001b[22m\u001b[31melement\u001b[39m\u001b[2m).not.toBeInTheDocument()\u001b[22m\n\n\u001b[31mexpected document not to contain element, found <div\n  class=\"MuiSnackbarContent-messa",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 6,
+     "killedBy": [
+      "21"
+     ],
+     "coveredBy": [
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "21",
+      "25",
+      "26",
+      "27",
+      "29",
+      "30",
+      "31",
+      "32",
+      "33"
+     ],
+     "location": {
+      "end": {
+       "column": 44,
+       "line": 64
+      },
+      "start": {
+       "column": 24,
+       "line": 64
+      }
+     }
+    },
+    {
+     "id": "20",
+     "mutatorName": "CallExpression",
+     "replacement": ";",
+     "statusReason": "\u001b[2mexpect(\u001b[22m\u001b[31melement\u001b[39m\u001b[2m).not.toBeInTheDocument()\u001b[22m\n\n\u001b[31mexpected document not to contain element, found <div\n  class=\"MuiSnackbarContent-messa",
+     "status": "Killed",
+     "static": false,
+     "testsCompleted": 6,
+     "killedBy": [
+      "21"
+     ],
+     "coveredBy": [
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "21",
+      "25",
+      "26",
+      "27",
+      "29",
+      "30",
+      "31",
+      "32",
+      "33"
+     ],
+     "location": {
+      "end": {
+       "column": 42,
+       "line": 64
+      },
+      "start": {
+       "column": 26,
+       "line": 64
+      }
+     }
+    }
+   ]
+  }
+ },
+ "schemaVersion": "1.0",
+ "thresholds": {
+  "high": 100,
+  "low": 100,
+  "break": 100
+ },
+ "projectRoot": "/home/kieritz/repos/mahl/Client",
+ "framework": {
+  "name": "StrykerJS",
+  "version": "10.0.0",
+  "dependencies": {
+   "@stryker-mutator/typescript-checker": "10.0.0",
+   "typescript": "6.0.3"
+  }
+ }
+}

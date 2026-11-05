@@ -28,6 +28,7 @@ import re
 from collections import Counter, defaultdict
 
 
+from ._cli import Parser
 from ._session_logs import (  # noqa: E402
     content_blocks,
     load_mapping,
@@ -202,7 +203,7 @@ def print_lsp() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description="Werkzeug-Nutzung der Agenten: Filter-Quote und LSP-Nutzung.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,

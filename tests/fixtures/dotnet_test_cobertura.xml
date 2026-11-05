@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<coverage line-rate="1" branch-rate="1" version="1.9" timestamp="1793864316" lines-covered="426" lines-valid="426" branches-covered="34" branches-valid="34">
+  <sources>
+    <source>/home/kieritz/repos/mahl/Server/</source>
+  </sources>
+  <packages>
+    <package name="mahl.Server" line-rate="1" branch-rate="1" complexity="132">
+      <classes>
+        <class name="mahl.Server.Types.Bounded`2" filename="Types/StringConstraints.cs" line-rate="1" branch-rate="1" complexity="3">
+          <methods>
+            <method name="get_Value" signature="()" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="31" hits="202" branch="False" />
+              </lines>
+            </method>
+            <method name="Create" signature="(System.String)" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="43" hits="132" branch="False" />
+                <line number="44" hits="132" branch="False" />
+                <line number="45" hits="132" branch="False" />
+                <line number="46" hits="132" branch="False" />
+              </lines>
+            </method>
+            <method name=".ctor" signature="(TInner)" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="38" hits="121" branch="False" />
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="31" hits="202" branch="False" />
+            <line number="43" hits="132" branch="False" />
+            <line number="44" hits="132" branch="False" />
+            <line number="45" hits="132" branch="False" />
+            <line number="46" hits="132" branch="False" />
+            <line number="38" hits="121" branch="False" />
+          </lines>
+        </class>
+        <class name="mahl.Server.Types.Max30" filename="Types/StringConstraints.cs" line-rate="1" branch-rate="1" complexity="1">
+          <methods>
+            <method name="get_MaxLength" signature="()" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="51" hits="61" branch="False" />
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="51" hits="61" branch="False" />
+          </lines>
+        </class>
+        <class name="mahl.Server.Types.Max20" filename="Types/StringConstraints.cs" line-rate="1" branch-rate="1" complexity="1">
+          <methods>
+            <method name="get_MaxLength" signature="()" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="53" hits="62" branch="False" />
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="53" hits="62" branch="False" />
+          </lines>
+        </class>
+        <class name="mahl.Server.Types.Uuid7" filename="Types/Uuid7.cs" line-rate="1" branch-rate="1" complexity="3">
+          <methods>
+            <method name="New" signature="()" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="35" hits="48" branch="False" />
+              </lines>
+            </method>
+            <method name="Create" signature="(System.Guid)" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="38" hits="4" branch="False" />
+              </lines>
+            </method>
+            <method name=".ctor" signature="(System.Guid)" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="32" hits="52" branch="False" />
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="35" hits="48" branch="False" />
+            <line number="38" hits="4" branch="False" />
+            <line number="32" hits="52" branch="False" />
+          </lines>
+        </class>
+        <class name="mahl.Server.Middleware.ETagMiddleware" filename="Middleware/ETagMiddleware.cs" line-rate="1" branch-rate="1" complexity="1">
+          <methods>
+            <method name="UseCollectionETag" signature="(Microsoft.AspNetCore.Builder.WebApplication)" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="14" hits="77" branch="False" />
+                <line number="15" hits="77" branch="False" />
+                <line number="16" hits="77" branch="False" />
+                <line number="17" hits="77" branch="False" />
+                <line number="18" hits="77" branch="False" />
+                <line number="19" hits="77" branch="False" />
+                <line number="20" hits="77" branch="False" />
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="14" hits="77" branch="False" />
+            <line number="15" hits="77" branch="False" />
+            <line number="16" hits="77" branch="False" />
+            <line number="17" hits="77" branch="False" />
+            <line number="18" hits="77" branch="False" />
+            <line number="19" hits="77" branch="False" />
+            <line number="20" hits="77" branch="False" />
+          </lines>
+        </class>
+        <class name="mahl.Server.Middleware.ETagMiddleware/&lt;ApplyETagAndWriteAsync&gt;d__2" filename="Middleware/ETagMiddleware.cs" line-rate="1" branch-rate="1" complexity="6">
+          <methods>
+            <method name="MoveNext" signature="()" line-rate="1" branch-rate="1" complexity="6">
+              <lines>
+                <line number="33" hits="22" branch="False" />
+                <line number="34" hits="22" branch="True" condition-coverage="100% (2/2)">
+                  <conditions>
+                    <condition number="43" type="jump" coverage="100%" />
+                  </conditions>
+                </line>
+                <line number="35" hits="19" branch="False" />
+                <line number="38" hits="19" branch="False" />
+                <line number="39" hits="19" branch="True" condition-coverage="100% (2/2)">
+                  <conditions>
+                    <condition number="106" type="jump" coverage="100%" />
+                  </conditions>
+                </line>
+                <line number="40" hits="15" branch="False" />
+                <line number="41" hits="15" branch="False" />
+                <line number="42" hits="15" branch="False" />
+                <line number="43" hits="15" branch="False" />
+                <line number="45" hits="19" branch="True" condition-coverage="100% (2/2)">
+                  <conditions>
+                    <condition number="221" type="jump" coverage="100%" />
+                  </conditions>
+                </line>
+                <line number="46" hits="2" branch="False" />
+                <line number="47" hits="2" branch="False" />
+                <line number="50" hits="2" branch="False" />
+                <line number="51" hits="2" branch="False" />
+                <line number="53" hits="17" branch="False" />
+                <line number="55" hits="20" branch="False" />
+                <line number="57" hits="20" branch="False" />
+                <line number="58" hits="22" branch="False" />
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="33" hits="22" branch="False" />
+            <line number="34" hits="22" branch="True" condition-coverage="100% (2/2)">
+              <conditions>
+                <condition number="43" type="jump" coverage="100%" />
+              </conditions>
+            </line>
+            <line number="35" hits="19" branch="False" />
+            <line number="38" hits="19" branch="False" />
+            <line number="39" hits="19" branch="True" condition-coverage="100% (2/2)">
+              <conditions>
+                <condition number="106" type="jump" coverage="100%" />
+              </conditions>
+            </line>
+            <line number="40" hits="15" branch="False" />
+            <line number="41" hits="15" branch="False" />
+            <line number="42" hits="15" branch="False" />
+            <line number="43" hits="15" branch="False" />
+            <line number="45" hits="19" branch="True" condition-coverage="100% (2/2)">
+              <conditions>
+                <condition number="221" type="jump" coverage="100%" />
+              </conditions>
+            </line>
+            <line number="46" hits="2" branch="False" />
+            <line number="47" hits="2" branch="False" />
+            <line number="50" hits="2" branch="False" />
+            <line number="51" hits="2" branch="False" />
+            <line number="53" hits="17" branch="False" />
+            <line number="55" hits="20" branch="False" />
+            <line number="57" hits="20" branch="False" />
+            <line number="58" hits="22" branch="False" />
+          </lines>
+        </class>
+        <class name="mahl.Server.Middleware.ETagMiddleware/&lt;InterceptGetAsync&gt;d__1" filename="Middleware/ETagMiddleware.cs" line-rate="1" branch-rate="1" complexity="1">
+          <methods>
+            <method name="MoveNext" signature="()" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="23" hits="22" branch="False" />
+                <line number="24" hits="22" branch="False" />
+                <line number="25" hits="22" branch="False" />
+                <line number="26" hits="22" branch="False" />
+                <line number="27" hits="22" branch="False" />
+                <line number="28" hits="22" branch="False" />
+                <line number="29" hits="22" branch="False" />
+                <line number="30" hits="22" branch="False" />
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="23" hits="22" branch="False" />
+            <line number="24" hits="22" branch="False" />
+            <line number="25" hits="22" branch="False" />
+            <line number="26" hits="22" branch="False" />
+            <line number="27" hits="22" branch="False" />
+            <line number="28" hits="22" branch="False" />
+            <line number="29" hits="22" branch="False" />
+            <line number="30" hits="22" branch="False" />
+          </lines>
+        </class>
+        <class name="mahl.Server.Middleware.XminETag" filename="Middleware/XminETag.cs" line-rate="1" branch-rate="1" complexity="2">
+          <methods>
+            <method name="Format" signature="(System.UInt32)" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="13" hits="110" branch="False" />
+              </lines>
+            </method>
+            <method name="TryParse" signature="(System.String,System.UInt32&amp;)" line-rate="1" branch-rate="1" complexity="1">
+              <lines>
+                <line number="20" hits="13" branch="False" />
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="13" hits="110" branch="False" />
+            <line number="20" hits="13" branch="False" />
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>

@@ -1,0 +1,109 @@
+
+   _____ _              _               _   _ ______ _______
+  / ____| |            | |             | \ | |  ____|__   __|
+ | (___ | |_ _ __ _   _| | _____ _ __  |  \| | |__     | |
+  \___ \| __| '__| | | | |/ / _ \ '__| | . ` |  __|    | |
+  ____) | |_| |  | |_| |   <  __/ |    | |\  | |____   | |
+ |_____/ \__|_|   \__, |_|\_\___|_| (_)|_| \_|______|  |_|
+                   __/ |
+                  |___/
+
+
+Version: 5.0.0
+
+[08:40:27 INF] Analysis starting.
+[08:40:27 INF] Using solution configuration/platform 'Debug|Any CPU'.
+[08:40:27 INF] Identifying projects to mutate in mahl.slnx. This can take a while.
+[08:40:28 INF] Picking net10.0 for project /home/kieritz/repos/mahl/Server/mahl.Server.csproj.
+[08:40:28 INF] Found project /home/kieritz/repos/mahl/Server/mahl.Server.csproj to mutate.
+[08:40:28 INF] Analysis complete.
+[08:40:28 INF] Building solution mahl.slnx.
+[08:40:29 INF] Building project mahl.slnx using dotnet build mahl.slnx -c Debug --property:Platform="Any CPU" (directory /home/kieritz/repos/mahl.)
+[08:40:40 WRN] The Microsoft Test Platform testrunner is currently in preview. Results should be verified since this feature is still being tested.
+[08:40:41 INF] Number of tests found: 79 for project /home/kieritz/repos/mahl/Server/mahl.Server.csproj. Initial test run started.
+[08:40:51 INF] 215 mutants created
+[08:40:51 INF] Capture mutant coverage using 'CoverageBasedTest' mode.
+[08:40:51 INF] Starting per-test coverage capture for MTP runner
+[08:40:51 INF] Capturing per-test coverage for 79 tests across 1 assemblies
+[08:41:08 INF] Per-test coverage capture complete: 79 tests captured
+Hint: by passing "--open-report or -o" the report will open automatically and
+update the report in real-time.
+[08:41:09 INF] 1     mutants got status Ignored.      Reason: "Unreachable." message in the structurally unreachable sum-type Match arm (ADR-S018-2)
+[08:41:09 INF] 2     mutants got status Ignored.      Reason: DbUpdateConcurrencyException-Zweig nicht deterministisch über HTTP auslösbar (kein If-Match am Restore, Race liegt innerhalb eines einzelnen Requests; ADR-S041-9 Addendum S132, ADR-S111-1)
+[08:41:09 INF] 9     mutants got status Ignored.      Reason: default(T) guard unreachable via normal construction (ADR-S041-9)
+[08:41:09 INF] 4     mutants got status CompileError. Reason: Mutant caused compile errors
+[08:41:09 INF] 13    mutants got status Ignored.      Reason: parameterless ctor unreachable via normal construction (ADR-S041-9)
+[08:41:09 INF] 24    mutants got status Ignored.      Reason: Removed by block already covered filter
+[08:41:09 INF] 18    mutants got status Ignored.      Reason: Removed by mutate filter
+[08:41:09 INF] 4     mutants got status Ignored.      Reason: Tag name has no routing or behavioral impact (ADR-S136-1)
+[08:41:09 INF] 75    total mutants are skipped for the above mentioned reasons
+[08:41:09 INF] 140   total mutants will be tested
+
+
+All mutants have been tested, and your mutation score has been calculated
+╭───────────────────────────────────────┬──────┬─────┬──────┬───────┬─────┬────╮
+│ File                                  │   %  │  #  │   #  │    #  │  #  │ #  │
+│                                       │ sco… │ ki… │ tim… │ surv… │ no  │ e… │
+│                                       │      │     │      │       │ cov │    │
+├───────────────────────────────────────┼──────┼─────┼──────┼───────┼─────┼────┤
+│ /home/kieritz/repos/mahl              │ 100. │ 140 │    0 │    75 │   0 │  4 │
+│                                       │   00 │     │      │       │     │    │
+│ Domain/Ingredient.cs                  │ 100. │   1 │    0 │     1 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ Domain/IngredientId.cs                │  N/A │   0 │    0 │     1 │   0 │  0 │
+│ Domain/IngredientName.cs              │  N/A │   0 │    0 │     1 │   0 │  0 │
+│ Domain/Quantity.cs                    │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Domain/Recipe.cs                      │ 100. │   1 │    0 │     1 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ Domain/RecipeId.cs                    │  N/A │   0 │    0 │     1 │   0 │  0 │
+│ Domain/RecipeIngredient.cs            │ 100. │   1 │    0 │     2 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ Domain/RecipeTitle.cs                 │  N/A │   0 │    0 │     1 │   0 │  0 │
+│ Domain/StepInstruction.cs             │  N/A │   0 │    0 │     1 │   0 │  0 │
+│ Domain/Unit.cs                        │  N/A │   0 │    0 │     1 │   0 │  0 │
+│ Dtos/CreateRecipeDto.cs               │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Dtos/IngredientDto.cs                 │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Dtos/IngredientValuesDto.cs           │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Dtos/RecipeDto.cs                     │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Dtos/RecipeIngredientDto.cs           │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Dtos/RecipeSummaryDto.cs              │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Dtos/StepDto.cs                       │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Endpoints/Collations.cs               │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Endpoints/E2ETestSupport.cs           │ Excl │   0 │    0 │     8 │   0 │  0 │
+│                                       │ uded │     │      │       │     │    │
+│ Endpoints/FieldError.cs               │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Endpoints/IngredientsEndpoints.cs     │ 100. │  63 │    0 │    17 │   0 │  2 │
+│                                       │   00 │     │      │       │     │    │
+│ Endpoints/RecipesEndpoints.cs         │ 100. │  49 │    0 │     6 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ Endpoints/ValidationProblems.cs       │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Middleware/ETagMiddleware.cs          │ 100. │  11 │    0 │     6 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ Middleware/XminETag.cs                │ 100. │   1 │    0 │     0 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ OneOfExtensions.cs                    │ 100. │   4 │    0 │     4 │   0 │  2 │
+│                                       │   00 │     │      │       │     │    │
+│ Program.cs                            │  N/A │   0 │    0 │    10 │   0 │  0 │
+│ Types/ExcludeFromCoverageGateAttribut │ Excl │   0 │    0 │     0 │   0 │  0 │
+│ e.cs                                  │ uded │     │      │       │     │    │
+│ Types/ListViolation.cs                │  N/A │   0 │    0 │     0 │   0 │  0 │
+│ Types/NonEmptyImmutableArray.cs       │ 100. │   2 │    0 │     4 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ Types/NonEmptyTrimmedString.cs        │ 100. │   3 │    0 │     3 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ Types/StringConstraints.cs            │ 100. │   4 │    0 │     1 │   0 │  0 │
+│                                       │   00 │     │      │       │     │    │
+│ Types/SumType.cs                      │  N/A │   0 │    0 │     1 │   0 │  0 │
+│ Types/Uuid7.cs                        │  N/A │   0 │    0 │     5 │   0 │  0 │
+╰───────────────────────────────────────┴──────┴─────┴──────┴───────┴─────┴────╯
+
+Your json report has been generated at:
+file:///home/kieritz/repos/mahl/StrykerOutput/2026-11-05.08-40-27/reports/mutati
+on-report.json
+
+Your html report has been generated at:
+file:///home/kieritz/repos/mahl/StrykerOutput/2026-11-05.08-40-27/reports/mutati
+on-report.html
+You can open it in your browser of choice.
+[08:41:50 INF] Time Elapsed 00:01:15.2272825
+[08:41:50 INF] The final mutation score is 100.00 %

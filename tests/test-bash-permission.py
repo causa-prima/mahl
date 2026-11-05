@@ -1163,6 +1163,8 @@ def test_segment_expansion() -> int:
         # --- Variablenzuweisung --------------------------------------------------
         ('out=$(git status --short); echo "$out"', "allow", "Zuweisung aus Substitution"),
         ("FOO=bar ls -la", "allow", "Zuweisungs-Präfix vor erlaubtem Befehl"),
+        ("A=1 B='x y' ls -la", "allow", "mehrere Zuweisungs-Präfixe vor erlaubtem Befehl"),
+        ("A=1 B=2 rm -rf /tmp/x", "deny", "GEGENPROBE: mehrere Präfixe vor destruktivem Befehl"),
         # Eine alleinstehende Zuweisung führt kein Kommando aus und überlebt den
         # Aufruf nicht – es gibt nichts zu erlauben. Fail-closed statt Durchwinken.
         ("SP=/pfad/zum/ding", "deny", "reine Wertzuweisung führt nichts aus"),

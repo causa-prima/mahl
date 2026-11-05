@@ -168,7 +168,7 @@ Führe diese Checkliste explizit durch und dokumentiere das Ergebnis:
   **PFLICHT-OUTPUT:** *"Stryker: [Score] | Branch Coverage: [Score] | Suppression-Report: [Neue Suppressionen mit Datei:Zeile und Begründung]"* oder *"Kein Survivor, keine Suppression"*. Beide Scores werden vom Orchestrator geprüft.
 
 - [ ] **Linter- und Duplikat-Gate:**
-  - TypeScript: `python3 -m prozesscode.eslint-run` (ESLint inkl. Complexity ≤ 10, Funktionslänge ≤ 20 Zeilen) – muss 0 Errors haben
+  - TypeScript: `python3 -m prozesscode.eslint-run` (ESLint inkl. Complexity ≤ 10, Funktionslänge ≤ 20 Zeilen) – muss 0 Errors haben. Fehler der gerade geänderten Datei meldet schon der Edit-Hook ([DEV-frontend](dev-workflow.md#DEV-frontend))
   - C#: `dotnet build` – SonarAnalyzer (S3776 Cognitive Complexity, S138 Methodenlänge) ist Teil des Builds; kein Fehler erlaubt
   - Duplikate: `python3 -m prozesscode.jscpd-run` (jscpd über TypeScript, C# und Python) – gemeldet wird nur der **Zuwachs** gegenüber dem bekannten Bestand; kein hartes Gate, aber jeder neue Fund muss adressiert oder mit Begründung in die Baseline aufgenommen werden (`BEKANNTE_KLONE` im Wrapper, Politik: [CGP-duplikate](../guidelines/coding-guideline-python.md#CGP-duplikate))
 

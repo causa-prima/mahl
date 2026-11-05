@@ -21,11 +21,19 @@ class _Item:
         self.marker.append(marker)
 
 
-EIN_EINTRAG = next(iter(conftest.UNTER_MUTMUT_UEBERSPRUNGEN))
+# Erfunden statt aus der echten Liste: Die darf leer sein, der Mechanismus muss trotzdem
+# geprüft bleiben.
+EIN_EINTRAG = "tests/test_beispiel.py::test_braucht_echte_verzeichnisse"
+
+
+def _mit_einem_eintrag(monkeypatch):
+    monkeypatch.setattr(conftest, "UNTER_MUTMUT_UEBERSPRUNGEN",
+                        {EIN_EINTRAG: "Braucht Verzeichnisse, die mutmut nicht kopiert."})
 
 
 def test_ohne_mutmut_greift_die_ausnahme_nicht(monkeypatch):
     """Im normalen Lauf muss jeder gelistete Test ganz normal laufen."""
+    _mit_einem_eintrag(monkeypatch)
     monkeypatch.delenv("MUTANT_UNDER_TEST", raising=False)
     item = _Item(EIN_EINTRAG)
     conftest.pytest_collection_modifyitems(None, [item])
@@ -33,6 +41,7 @@ def test_ohne_mutmut_greift_die_ausnahme_nicht(monkeypatch):
 
 
 def test_unter_mutmut_wird_der_gelistete_test_uebersprungen(monkeypatch):
+    _mit_einem_eintrag(monkeypatch)
     monkeypatch.setenv("MUTANT_UNDER_TEST", "stats")
     item = _Item(EIN_EINTRAG)
     conftest.pytest_collection_modifyitems(None, [item])
@@ -40,7 +49,9 @@ def test_unter_mutmut_wird_der_gelistete_test_uebersprungen(monkeypatch):
 
 
 def test_unter_mutmut_bleibt_alles_andere_unberuehrt(monkeypatch):
-    """GEGENPROBE: Die Ausnahme darf nicht die halbe Suite stilllegen."""
+    """GEGENPROBE: Die Ausnahme darf nicht die halbe Suite stilllegen. Gegen eine leere Liste
+    bewiese das nichts – darum auch hier mit dem erfundenen Eintrag."""
+    _mit_einem_eintrag(monkeypatch)
     monkeypatch.setenv("MUTANT_UNDER_TEST", "stats")
     item = _Item("tests/test_anchors.py::test_irgendwas_anderes")
     conftest.pytest_collection_modifyitems(None, [item])

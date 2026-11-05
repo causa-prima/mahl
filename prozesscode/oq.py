@@ -25,6 +25,7 @@ import os
 import sys
 
 
+from ._cli import Parser
 from .oq_entry import (  # noqa: E402
     add,
     entry_spans,
@@ -147,7 +148,7 @@ def cmd_remove(args) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(
+    p = Parser(
         description="Offene Fragen lesen, erfassen, ändern, löschen.",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)

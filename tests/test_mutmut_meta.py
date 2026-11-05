@@ -111,3 +111,22 @@ def test_eine_kaputte_meta_uebergeht_nur_ihre_datei(tmp_path, monkeypatch):
         "{kein json", encoding="utf-8")
     monkeypatch.setattr(mr, "ROOT", wurzel)
     assert len(mr.lies_ergebnisse()) == 1
+
+
+def test_nach_einer_kaputten_meta_geht_es_weiter(tmp_path, monkeypatch):
+    """Die kaputte Datei steht in Sortierreihenfolge VOR der lesbaren – sie darf die
+    Auswertung nicht beenden."""
+    wurzel = meta(tmp_path, x_f__mutmut_1=1)
+    (wurzel / "mutants" / "prozesscode" / "aaa.py.meta").write_text(
+        "{kein json", encoding="utf-8")
+    monkeypatch.setattr(mr, "ROOT", wurzel)
+    assert mr.lies_ergebnisse() == [("prozesscode.beispiel.x_f__mutmut_1", "killed")]
+
+
+def test_eine_meta_ohne_exit_codes_traegt_nichts_bei(tmp_path, monkeypatch):
+    """Eine Datei, für die mutmut noch keinen Code geschrieben hat, ist leer – kein Absturz."""
+    wurzel = meta(tmp_path, x_f__mutmut_1=1)
+    (wurzel / "mutants" / "prozesscode" / "leer.py.meta").write_text(
+        '{"hash_by_function_name": {}}', encoding="utf-8")
+    monkeypatch.setattr(mr, "ROOT", wurzel)
+    assert mr.lies_ergebnisse() == [("prozesscode.beispiel.x_f__mutmut_1", "killed")]

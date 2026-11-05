@@ -24,6 +24,7 @@ import argparse
 import sys
 
 
+from ._cli import Parser
 from . import td_anchors  # noqa: E402
 from . import td_entry as tde  # noqa: E402
 from .eintrag_felder import AUFSCHUB_HILFE, AUFSCHUB_HILFE_SET  # noqa: E402
@@ -151,7 +152,7 @@ def cmd_remove(args) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(
+    p = Parser(
         description="Technische Schuld lesen, erfassen, ändern, löschen.",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)

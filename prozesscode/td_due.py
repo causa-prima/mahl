@@ -21,10 +21,10 @@ Die letzte ist die wertvollste: Sie fängt den Fall „der Lauf ist durch, der E
 liegen", den sonst niemand bemerkt – nachweislich vorgekommen, als ein Lauf den Toast-Bereich
 veränderte, während der zugehörige TD-Eintrag unbemerkt liegen blieb.
 """
-import argparse
 import sys
 from pathlib import Path
 
+from ._cli import Parser
 from . import td_anchors  # noqa: E402
 
 TD_FILE = "docs/tech-debt.md"
@@ -69,7 +69,7 @@ def fuer_szenarien(root: Path, titel: list[str]) -> list[tuple[str, str]]:
 def main() -> int:
     # `or ""`: Im Mutantenbaum von mutmut ist `__doc__` None – ohne Absicherung bräche der
     # Aufrufpfad-Test dort ab und mit ihm jeder Mutationslauf (S133).
-    ap = argparse.ArgumentParser(description=(__doc__ or "").partition("\n")[0])
+    ap = Parser(description=(__doc__ or "").partition("\n")[0])
     ap.add_argument("--szenarien", nargs="+", metavar="TITEL",
                     help="TD-Einträge listen, die auf diese Szenario-Titel ankern "
                          "(implementing-scenario, Offene-Punkte-Triage im Abschluss)")

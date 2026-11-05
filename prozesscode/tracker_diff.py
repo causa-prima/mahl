@@ -31,6 +31,7 @@ from importlib import import_module
 from pathlib import Path
 from unittest import mock
 
+from ._cli import Parser
 from . import tracker_preview
 from ._util import REPO_ROOT
 
@@ -228,8 +229,8 @@ def befund(command: str, root: Path = REPO_ROOT) -> dict | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    argparse.ArgumentParser(description=__doc__,
-                            formatter_class=argparse.RawDescriptionHelpFormatter).parse_args(argv)
+    Parser(description=__doc__,
+           formatter_class=argparse.RawDescriptionHelpFormatter).parse_args(argv)
     print(json.dumps(befund(sys.stdin.read().strip()), ensure_ascii=False))
     return 0
 

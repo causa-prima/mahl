@@ -1223,3 +1223,112 @@ Format der Einträge: wie observations.md zum Zeitpunkt der Archivierung – äl
 - Aufschubgrund: User – Grundsatzfrage für die fällige Retro
 - Entscheidung/Maßnahme: Sperrklinke (mutmut-run --ratchet) ist Pflicht vor jedem Commit, der ein Modul unter prozesscode/ ändert – im Skill committing, nicht als Hook je Edit. Grund: Laufzeiten heute Sekunden je Hook-Modul, rund 2,5 Minuten für den Bash-Guard; ohne Zwang lagen zehn der zwölf Dispatcher-Checks bei 37–70 %, und erst das Schließen der Lücken fand neun echte Guard-Fehler. Verworfen: Hook je Edit (Laufzeitdruck bei jedem Schreibzugriff) und Metrik ohne Gate (Lücken blieben belegt still). Der Volllauf bleibt Sichtung, kein Gate.
 - Bezug: LL-S139-3
+
+## OBS-S126-1 – Prozessarbeit verdrängt Implementierung, ohne erkennbare Konvergenz
+- Quelle: User
+- Status: VERWORFEN (S146: nach Abbau des Rückstaus läuft das Verhältnis wie erwartet)
+- Impact: MITTEL    Häufigkeit: dauerhaft
+- Kategorie: PROZESS    Kontext: Skill-Nutzung
+- Beobachtung: Rund die Haelfte der Sessions geht an Prozessarbeit statt an Implementierung, und ein Rueckgang ist nicht erkennbar. Gemessen in S126. (a) ZUFLUSS ins OBS-Backlog ueber S111-S125: 7,27 Score je Session, Median der Session-Summe 6,0; je Eintrag Mittel 2,60 und Median 2,0; 67 Prozent der neuen Eintraege sind behandlungswuerdig (Score >= 2), nur 10 Prozent GERING. Die Trigger-Schwelle des Drains liegt bei 9 auf den fuenf staerksten Einheiten - ein Drain, der den Bestand auf ~8 drueckt, ist nach etwa anderthalb Sessions Zufluss wieder ausgeloest. Daraus folgt: Drain in rund 40 Prozent der Sessions, Retro mit ~12 Prozent dazu (Ist-Kadenz 8,3 Sessions; Modell aus dem Jenga-Gewicht 6,6). (b) GEGENCHECK ueber S085-S125: 2,85 Eintraege je Session erfasst gegen 2,44 aufgeloest - der Bestand wuchs um 0,4 je Session, was die heute offenen 17 erklaert. (c) KONVERGENZ: LL-Gewicht je Session ueber vier vollstaendige Perioden 5,9 / 8,3 / 14,7 / 16,4 (steigend); OBS-Score je Session nach der Rubrik-Kalibrierung von S107 6,89 / 7,43 / 6,00 (flach). In keiner der beiden Reihen ein Rueckgang. DREI STOERFAKTOREN, die einen Anstieg auch ohne echte Zunahme erzeugen koennen: die Impact-Rubrik wurde in S107 neu kalibriert und der OBS-Vergleich laeuft quer darueber; die Erfassung wurde ueber die Zeit mechanisiert (mehr erfasste Reibung ist nicht mehr Reibung); und Prozessarbeit erzeugt Prozess-Beobachtungen, also eine Rueckkopplung ueber den Session-Mix. VIERTER, NICHT HERAUSGERECHNETER STOERFAKTOR (User-Hinweis bei der Erfassung): Alle Raten sind je SESSION gemessen, aber Sessions sind unterschiedlich gross. Dieselbe Arbeit auf zwei Sessions verteilt halbiert jede Rate, ohne dass sich etwas geaendert haette. Die Auswertung unterstellt im Mittel gleich grosse Sessions - ueber lange Zeitraeume vertretbar, fuer den Vergleich einzelner Perioden verrauscht. Wer den Trend belastbar entscheiden will, braucht ein Groessenmass je Session (Volumen, Dauer oder Commits) als Normierung. ZU ENTSCHEIDEN ist zweierlei, und beides haengt zusammen: Ist der Prozess-Anteil so gewollt, und konvergiert die Reibung? Konvergierte sie, loeste sich die Verdraengung von selbst - deshalb ein Eintrag und nicht zwei. Kriterium fuer die Konvergenzfrage: Sinkt der OBS-Score-Zufluss ueber drei aufeinanderfolgende Retro-Perioden nach S107? Bisher drei Datenpunkte, flach; in zwei bis drei weiteren Perioden entscheidbar. Hebel fuer den Anteil, falls er nicht gewollt ist: strenger erfassen, TRIGGER_WERT anheben, oder mehr Eintraege je Drain-Session entscheiden.
+- Zusammen-erledigen: keiner
+- Entscheidung/Maßnahme: User, S146: verworfen. Nachmessung S146 (Score je Session nach Erfassungs-Session, offen + Archiv): S108–S115 7,75 · S116–S122 7,43 · S123–S126 5,75 · S127–S132 1,00 · S133–S139 2,29 · S140–S145 4,17. Niveau seit S127 deutlich unter dem früheren; das Kriterium 'sinkt über drei Perioden' ist streng genommen nicht erfüllt, die Daten (ohne Größennormierung je Session) tragen die Trendfrage aber ohnehin nicht. Grund des Users: Nach dem Abarbeiten des Rückstaus läuft es wie erwartet; den Anteil steuert der User je Session direkt.
+
+## OBS-S126-2 – Repo-Wurzel wird an drei Stellen verschieden bestimmt
+- Quelle: Orchestrator
+- Status: UMGESETZT (S146)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Die Wurzel des Repos wird in .claude/ auf drei Arten ermittelt, und eine davon kann etwas, das die anderen nicht koennen. (1) _util.REPO_ROOT liest CLAUDE_PROJECT_DIR aus der Umgebung und faellt erst dann auf den Dateipfad zurueck; genutzt von den Toolchain-Wrappern und _session_logs. (2) repo_kontext.repo_root() rechnet ausschliesslich ueber Path(__file__).parents[2] und ignoriert die Umgebungsvariable; daran haengen alle fuenf Erfassungswerkzeuge (obs/lessons/td/oq/adr). (3) Rund zehn Inline-Berechnungen in anchors.py, next_run.py, qa-check.py, check-atdd-gate.py, check-dangling-refs.py, check-ref-direction.py, check-e2e-scenario-ref.py, dotnet-stryker.py, stryker-frontend.py und stryker-parse-survivors.py, teils als parents[2], teils als parent.parent.parent, teils als abgeleitete Konstante. Das ist dasselbe Divergenz-Muster wie CM-S116-1: zwei Implementierungen desselben Begriffs, von denen eine einen Fall kennt und die andere nicht. Aufgefallen ist es in S126 beim Herausloesen von repo_kontext.py aus obs_parse.py; ein Schaden ist bisher NICHT beobachtet - er traete auf, sobald ein Script aus einem anderen Arbeitsverzeichnis oder einem git-Worktree laeuft, wo CLAUDE_PROJECT_DIR und der Dateipfad auseinanderfallen. Zu klaeren ist, ob die Umgebungsvariable ueberhaupt die maszgebliche Quelle sein soll; ist sie es, gehoert eine einzige Implementierung an einen Ort und die uebrigen Stellen ziehen nach. Ist sie es nicht, gehoert sie aus _util entfernt, damit nicht zwei Begriffe unter demselben Namen laufen.
+- Zusammen-erledigen: keiner
+- Entscheidung/Maßnahme: K0 (User): _util.REPO_ROOT (aus dem Modulpfad) und _util.projekt_verzeichnis() (CLAUDE_PROJECT_DIR, sonst REPO_ROOT) als einzige Quelle; _session_logs.project_log_dir nutzt sie. Tests tests/test_util.py und test_session_logs.py.
+
+## OBS-S127-1 – Die vier Maßnahmen der Belegkette sind nach Fehlerform geschnitten, nicht nach Mechanisierbarkeit
+- Quelle: User + Orchestrator
+- Status: UMGESETZT (S133 über CM-S133-1)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Doku
+- Beobachtung: CM-S064-1, CM-S116-1, CM-S095-2 und CM-S127-1 besetzen je eine Bruchstelle derselben Kette (Frage - Erhebung - Aussage). Der Schnitt ist diagnostisch: er sagt, WO die Kette reisst. Fuer die Maßnahme ist er unergiebig, denn alle vier lauten woertlich "Prinzip in principles.md dokumentiert" - keine hat ein Poka-yoke. Folge: keine kann je BEWAEHRT werden (irgendein Zweig faellt immer zurueck) und keine kann obsolet werden; sie erzeugen in jeder Retro Nachtrags-Ritual ohne Entscheidung. CM-S064-1 wurde seit S064 dreimal verbreitert und wird zum Auffangbecken. Zugleich zerfallen die sieben Rueckfaelle auf CM-S116-1 in zwei Gruppen mit voellig verschiedenen Antworten: solche, die ein Werkzeug fangen koennte (LL-S125-2 zeigt, dass prozesscode/ kein Mutation-Testing hat, obwohl Handmutationen dort nachweislich deckungsgleich mit den vorhandenen Tests waren; LL-S123-7 und LL-S126-7 sind beide "gegen eine Fixture statt gegen das echte Artefakt geprueft"), und solche, die reines Urteil bleiben (LL-S123-5: Kuerzen aendert die Bedeutung eines Textes). Ein Schnitt nach Mechanisierbarkeit statt nach Fehlerform wuerde diese beiden Gruppen trennen und der ersten eine abhakbare Bauliste geben. Zu klaeren ist auch, was mit den Rueckfall-Chroniken der vier bestehenden Eintraege geschieht - sie neu zu verteilen ist Handarbeit, und ein Fehler dabei ist still.
+- Zusammen-erledigen: keiner
+- Entscheidung/Maßnahme: S146: Die Neuordnung der Belegkette nach Mechanisierbarkeit ist mit CM-S133-1 erfolgt; der Eintrag war nur nicht geschlossen worden.
+- Bezug: CM-S064-1, CM-S095-2, CM-S116-1, CM-S127-1
+
+## OBS-S128-1 – test-inventory.py kennt kein Python und sieht damit die groesste Testsuite des Repos nicht
+- Quelle: Orchestrator
+- Status: VERWORFEN (Gegenstand entfallen: test-inventory.py kennt Python inzwischen)
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: In S128 beim Erweitern von test_session_agenda.py aufgefallen. 'test-inventory.py tests/test_session_agenda.py' antwortet 'keine Tests erkannt (unterstuetzt: .cs, .ts/.tsx/.js/.jsx)'. Das Werkzeug steht in der AGENTS.md-Navigationstabelle als Antwort auf 'Was steht schon in einer Testdatei?' und deckt die 1.021 Python-Tests unter tests nicht ab - also die groesste Testsuite im Repo. Wer es nutzt, faellt auf grep zurueck oder liest die Volldatei, was der Zweck des Werkzeugs gerade vermeiden soll. Die Meldung ist immerhin ehrlich (sie nennt die unterstuetzten Endungen), der Ausfall ist also nicht stumm - deshalb GERING und nicht hoeher. Offen ist, ob sich der Aufwand lohnt: Python-Testnamen sind per 'def test_' trivial zu finden, der Mehrwert gegenueber grep liegt allein im Zeilenbereich je Test.
+- Zusammen-erledigen: keiner
+- Entscheidung/Maßnahme: S146: am Code geprüft – test-inventory listet Python-Testdateien bereits; nichts mehr zu tun.
+
+## OBS-S133-1 – Die Logik in main() der Prozess-Werkzeuge ist nur an der Verdrahtung getestet
+- Quelle: User + Orchestrator
+- Status: UMGESETZT (S146, terminiert in AGENT_MEMORY)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: QUALITÄT    Kontext: Testing
+- Beobachtung: Seit S133 erzwingt tests/test_aufrufpfad.py für jedes der 51 Werkzeuge einen Test über den echten Aufrufpfad (main bzw. check). Die Mutationssichtung zeigt aber, dass diese Tests die Argument-Verdrahtung halten, nicht die Logik in main dahinter. Gesichtet wurden drei Werkzeuge: vitest-run (34 überlebende main-Mutanten), lessons (56) und check-atdd-gate (12). Darunter waren fünf echte Lücken, die ein Fehlurteil still durchgelassen hätten: ein ignorierter Titel-Filter im ATDD-Gate, ein ungetesteter get-Unterbefehl, ein grünes Verdikt bei rotem Exit-Code. Diese fünf sind in S133 geschlossen. Die übrigen 48 Werkzeuge sind nicht gesichtet; wahrscheinlich, aber nicht belegt, gibt es dort dieselbe Klasse: ungetestete Unterbefehle und Aufrufformen, Verdikt-Bedingungen ohne Test. Ein großer Teil der Überlebenden sind argparse-Hilfetexte und Meldungstexte ohne Aussagekraft; wie groß der Anteil echter Lücken ist, hängt je Werkzeug davon ab, wie viel Logik in main statt im Kern liegt.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: Umfang – 48 Werkzeuge je mit Mutationslauf (1–2 min) und Sichtung der Überlebenden; sprengt die Retro-Session
+- Entscheidung/Maßnahme: User, S146: angehen, im Drain, mit Subagenten. Ursache: Werkzeuge entstanden ohne Tests, Mutationstests liefen lange nur teilweise. Stufe S1 (Gate-Verdikt-Werkzeuge: qa-check, dotnet-test, dotnet-stryker, stryker-frontend, _stryker_*, mutmut-run, Wrapper) in S146 durch vier Subagenten getestet; Sichtungskriterium als CGP-mutanten-sichten in coding-guideline-python. Stufen S2–S4 als Prioritäten 'Mutanten sichten, Stufe 2/3/4' in AGENT_MEMORY (fällig S147–S149) mit Lösung und Done-Kriterium.
+- Bezug: CM-S133-1, LL-S128-1
+
+## OBS-S138-2 – argparse ergänzt in den Prozess-Werkzeugen Optionspräfixe still
+- Quelle: Orchestrator
+- Status: UMGESETZT (S146)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: argparse nimmt standardmäßig jedes eindeutige Präfix einer Option an (allow_abbrev=True). In S138 lief dadurch obs set --beobachtung unbemerkt als --beobachtung-anhängen – der Aufruf hängte Text an, statt ihn zu ersetzen, ohne jede Fehlermeldung; aufgefallen nur, weil ein neuer Test mit Exit 1 statt 2 endete. obs set ist seither mit allow_abbrev=False gebaut, alle übrigen CLIs unter prozesscode/ nicht. Kommt dort eine Option hinzu, deren Name Präfix einer bestehenden ist, oder vertippt man sich zu einem Präfix, wird der Aufruf still umgedeutet statt abgewiesen; bei den schreibenden Tracker-Werkzeugen landet das in den Tracker-Dateien. Häufigkeit geschätzt, nicht gemessen.
+- Zusammen-erledigen: OBS-S133-1
+- Aufschubgrund: Umfang – über 50 Werkzeuge, je zu prüfen, ob Abkürzungen bewusst genutzt werden (etwa per Meta-Test über alle Parser)
+- Entscheidung/Maßnahme: K1 (User): Klasse Parser in prozesscode/_cli.py setzt allow_abbrev=False als Vorgabe; alle 32 Werkzeuge nutzen sie, Unterparser erben die Klasse. Abgesichert durch tests/test_cli_konventionen.py: AST-Meta-Test 'kein ArgumentParser(' plus Verhaltenstests (--beobachtung=x, set --titel=x) mit Gegenprobe gegen argparse. Verworfen: allow_abbrev an 61 Stellen einzeln (Meta-Test brach im Mutantenbaum, neue Überlebende).
+
+## OBS-S141-3 – qa-check --approved-tests prüft nicht, ob der Freigabe-Blob existiert
+- Quelle: Orchestrator + Subagent
+- Status: UMGESETZT (S142)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Mutation-Testing
+- Beobachtung: In S141 berechnete der Orchestrator einen Test-Freigabe-Anker mit git hash-object ohne -w. Der Blob landete nicht im Objektspeicher; der Subagent konnte den Diff gegen den Anker nicht bilden (git show: bad object) und gab stattdessen die ganze Datei aus. Aufgefallen ist es nur, weil der Subagent es meldete – qa-check akzeptiert --approved-tests pfad=sha, ohne die Auflösbarkeit zu prüfen, und der Fehler wäre erst beim Verify sichtbar geworden. Der Orchestrator musste auf den letzten gültigen Anker ausweichen.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
+- Entscheidung/Maßnahme: Im Abschluss von US-602 run-4 nach Wiederholung behoben: audit_approved_tests prüft per git cat-file, ob der Freigabe-Blob existiert; fehlt er, zählt die Datei als geändert und die Meldung nennt den Ausweg git hash-object -w statt eines still leeren Diffs (Test test_audit_approved_tests_names_missing_blob_and_way_out). Früher als beim Verify prüfbar ist es nicht – erst dort erreichen die Anker qa-check.
+
+## OBS-S142-1 – Sichtprüfung bei Handybreite hat keinen regulären Weg
+- Quelle: Orchestrator
+- Status: UMGESETZT (S146)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Die UX-Guideline und mehrere TD-Einträge verlangen, eine Ansicht bei 375 px im Browser zu prüfen. Dafür gibt es kein Werkzeug: Ein eigener Playwright-Spec für Screenshots wird vom E2E-Szenario-Hook geblockt (kein // Szenario:-Kommentar), ein Script im Scratchpad müsste Backend und Vite selbst starten und braucht eine Einzelfreigabe. In S142 (US-602 run-4) half nur, eine bestehende Spec vorübergehend um setViewportSize und page.screenshot zu erweitern, aus einer Sicherung im Scratchpad zurückzuspielen und den Blob-Hash zu vergleichen – zweimal in derselben Session, mit dem Risiko, die Test-Datei verändert zurückzulassen. Eine frühere Session (2026-09-29, Zutaten-Seite, accessibility.spec.ts) ging denselben Umweg. Dritter Fall in S143 (US-602 run-6): Für die Nachfrage „Eingaben verwerfen?“ bei 320 px blockte der E2E-Szenario-Hook erst eine eigene Screenshot-Spec (kein // Szenario:), dann denselben Kommentar als Dublette; es blieb wieder nur, recipes.spec.ts zu sichern, vorübergehend zu erweitern und per Blob-Hash zurückzuspielen.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – im Abschluss von US-602 run-4 entschieden: weder schnell noch riskant, eigener Schritt mit Entwurf
+- Entscheidung/Maßnahme: K1 (User: Schalter am Wrapper statt temporärer Test-Edits): playwright-test --handybreite PX setzt MAHL_HANDYBREITE; playwright.config.ts schaltet dann Viewport (PX x 800) und Trace ein; der Wrapper legt je Test die Bilder des Laufs aus dem Trace ab (test-results/handybreite/<test>/NN-<laufende Aktion>.jpeg, Pfad im Verdikt). Damit sind beliebige Klickpfade der E2E-Szenarien sichtbar. DoD in nfr.md verweist darauf. Live bei 320 px geprüft; Tests auf echtem Trace-Fixture. Nebenbei: ein ✗-Verdikt endet nie mit Exit 0; 'No tests found' als eigenes Verdikt.
+
+## OBS-S144-1 – ESLint läuft erst im qa-check – Lint-Fehler blockieren nach der Test-Freigabe
+- Quelle: Subagent
+- Status: UMGESETZT (S146)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: PROZESS    Kontext: TDD
+- Beobachtung: In S144 (US-602 run-8) fiel functional/no-conditional-statements an Testtabellen mit if/else erst im qa-check auf: einmal im vom Orchestrator geschriebenen E2E-Spec (der qa-check der Frontend-Schicht brach deshalb vor Stryker ab, obwohl der Subagent die Datei nie berührt hatte), zweimal im Komponententest nach der Test-Freigabe – die Korrektur änderte freigegebene Assertions und lief damit am Freigabe-Anker vorbei. vitest-run und das Test-Review prüfen kein Lint; qa-check lintet das ganze Client-Projekt. Vorschlag der Subagenten: eslint-run und den Typecheck vor dem TEST-REVIEW-Signal laufen lassen bzw. der Orchestrator vor dem Spawn.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden
+- Entscheidung/Maßnahme: K1 (User, nach Messung): PostToolUse-Check prozesscode/hooks/checks/eslint_lint.py im Hinweis-Dispatcher – ESLint (JSON-Format) über die geänderte TS-Datei des Clients, meldet nur Fehler (Warnungen sind laut eslint.config.js tolerabel, blockieren kann auch qa-check nur an Fehlern), nicht-blockierend, meldet fehlendes ESLint oder einen Absturz statt stumm auszufallen. Rund 1,5 s je Edit. Live gegengeprüft, Tests auf echten ESLint-Ausgaben, 100 % Mutation Score. Doku: dev-workflow (DEV-frontend), tdd-process.
+
+## OBS-S144-3 – Subagenten-Berichte kommen abgeschnitten beim Orchestrator an
+- Quelle: Orchestrator
+- Status: UMGESETZT (S146)
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: AGENT    Kontext: Agent-Prompt
+- Beobachtung: In S144 (US-602 run-8) kamen vier Berichte von Layer-Subagenten mit „[result truncated – ask the agent for the rest via SendMessage]“ an – zweimal fehlte genau der VERIFIKATIONS-HASH, je einmal der Rest der PLANUNG und die Prozessverbesserungs-Vorschläge. Jedes Mal war eine Nachforderung per SendMessage und ein weiterer Rundlauf nötig. Die Berichte sind lang (Dateiliste, Testläufe, Pflicht-Output, Report); was am Ende steht, geht verloren.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-8 entschieden
+- Entscheidung/Maßnahme: K0 (User): Der Return der Layer-Implementer hat eine feste Reihenfolge, das Wichtigste zuerst – Verifikations-Hash, Survivors, Dateien, Verdiktzeilen der Test-Runs, Report, Prozess (backend- und frontend-layer-implementer). implementing-scenario prüft Diff und Verdiktzeilen. Wird abgeschnitten, fehlt damit der Rest, nicht der Hash.
+
+## OBS-S145-1 – Edit/Write-Dispatcher (Hinweise und blockierend): main() kaum mutationsgetestet
+- Quelle: Orchestrator
+- Status: UMGESETZT (S146)
+- Impact: HOCH    Häufigkeit: dauerhaft
+- Kategorie: QUALITÄT    Kontext: Hook/Script
+- Beobachtung: In S145 erstmals unter der Sperrklinke: check-code-quality-nonblocking steht bei 47,5 % (40 Mutanten, 21 überlebt). Zwei Lücken mit Folge: (a) continue → break nach einem werfenden Check überlebt – wirft ein früher Check, laufen alle späteren nicht mehr, darunter tooling_tests, das einzige Gate der Werkzeug-Suite, und kein Test merkt es; (b) der Name, unter dem guard_log.protokolliere eine Auslösung zählt (rsplit/Index), ist ungeprüft – guard-stats könnte still falsch zuordnen. Dazu Exit-Codes ohne Eingabe, Fehlermeldungstext auf stderr und der Trenner zwischen Meldungen. Die Lücke ist alt (Bestand), nicht aus S145. Dieselbe Klasse im blockierenden Dispatcher: dispatch-edit-write steht in S145 bei 57,8 % (64 Mutanten, 27 überlebt, u. a. in collect_reasons und main) – erstmals mit Messkennung, ohne Vergleichswert. Beide Dispatcher in einem Zug.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – Umfang: in S145 zum Session-Abschluss als ‚aufschieben' entschieden; Tests für Fehlerpfad, Protokollname und Trenner, etwa 25 Minuten
+- Entscheidung/Maßnahme: Beide Dispatcher enden in main() mit return statt sys.exit(0) (so über den echten Aufrufpfad testbar); check-code-quality-nonblocking protokolliert den Modulnamen über rpartition. Neue Tests tests/test_dispatcher_hinweise.py, Ergänzungen in tests/test_dispatch_edit_write.py (Grund, Hook-Format, Fälle ohne Einwand, stderr, Protokoll). dispatch-edit-write 100 % Mutation Score.
+- Bezug: CM-S116-1

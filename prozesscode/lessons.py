@@ -14,6 +14,7 @@ import argparse
 import sys
 
 
+from ._cli import Parser
 from .lessons_entry import (  # noqa: E402
     CM_BEZUG_NEU,
     CM_BEZUG_PFLICHT,
@@ -83,7 +84,7 @@ def cmd_add(args) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description="Einzelne Learnings lesen und erfassen.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,

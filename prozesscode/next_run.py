@@ -62,6 +62,7 @@ import re
 import sys
 from pathlib import Path
 
+from ._cli import Parser
 from ._feature import (
     PHASEN,
     find_malformed_run_comments,
@@ -794,7 +795,7 @@ def _cmd_check() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     group = parser.add_mutually_exclusive_group(required=True)

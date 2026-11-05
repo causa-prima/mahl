@@ -31,6 +31,9 @@ NO_MUTANTS_HINT = (
 )
 
 
+_VALID_STATUSES = ("Killed", "Timeout", "Survived", "NoCoverage")
+
+
 def compute_metrics(files: dict) -> dict:
     """Wertet den `files`-Block eines Stryker-JSON-Reports aus.
 
@@ -42,13 +45,9 @@ def compute_metrics(files: dict) -> dict:
     counts: Counter = Counter()
     mutated_files = 0
     for file_data in files.values():
-        file_valid = 0
-        for m in file_data.get("mutants", []):
-            status = m.get("status")
-            counts[status] += 1
-            if status in ("Killed", "Timeout", "Survived", "NoCoverage"):
-                file_valid += 1
-        if file_valid > 0:
+        statuses = [m.get("status") for m in file_data.get("mutants", [])]
+        counts.update(statuses)
+        if any(s in _VALID_STATUSES for s in statuses):
             mutated_files += 1
     detected = counts["Killed"] + counts["Timeout"]
     undetected = counts["Survived"] + counts["NoCoverage"]

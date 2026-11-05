@@ -1225,7 +1225,7 @@ _LEADING_STRUCT_RE = re.compile(r'^(?:do|then|else)\s+')
 _IF_OPEN_RE = re.compile(r'^(if|case)\b')
 
 # Variablen-Zuweisungs-Präfixe: `FOO=bar cmd`, `out=$(cmd)`, `A=1 B=2 cmd`
-_ASSIGN_PREFIX_RE = re.compile(r'^[A-Za-z_][A-Za-z_0-9]*=(?:"[^"]*"|\'[^\']*\'|[^\s;|&]*)\s*')
+_ASSIGN_PREFIX_RE = re.compile(r'^(?:[A-Za-z_][A-Za-z_0-9]*=(?:"[^"]*"|\'[^\']*\'|[^\s;|&]*)\s*)+')
 
 # Kommando-Substitution und Prozess-Substitution
 _SUBST_RE = re.compile(r'\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)|`([^`]*)`|<\(([^()]*)\)|>\(([^()]*)\)')
@@ -1356,12 +1356,11 @@ def expand_segment(segment: str) -> list[tuple[str, bool]]:
     if _LOOP_OPEN_RE.match(segment) or _IF_OPEN_RE.match(segment):
         return out
 
-    # Zuweisungs-Präfixe abstreifen: `FOO=bar ls -la` → `ls -la`; `SP=/pfad` → nichts
-    while True:
-        stripped = _ASSIGN_PREFIX_RE.sub('', segment)  # `^`-verankert: höchstens ein Treffer
-        if stripped == segment:
-            break
-        segment = stripped.strip()
+    # Zuweisungs-Präfixe abstreifen: `FOO=bar ls -la` → `ls -la`; `SP=/pfad` → nichts.
+    # Ein Ausdruck für alle Präfixe statt einer Schleife: Deren Abbruchbedingung, von mutmut
+    # umgedreht, lief je nach Testreihenfolge endlos oder scheiterte – derselbe Mutant
+    # wechselte so von Lauf zu Lauf zwischen „getötet" und „timeout".
+    segment = _ASSIGN_PREFIX_RE.sub('', segment).strip()
     if not segment:
         return out
 

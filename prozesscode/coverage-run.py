@@ -21,6 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ._cli import Parser
 from ._wrapper_output import emit
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,7 +60,7 @@ def module_unter(ausgabe: str, grenze: int) -> list[tuple[str, int]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--verbose", action="store_true", help="Vollständige Tabelle")
     args = parser.parse_args(argv)

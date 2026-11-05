@@ -18,6 +18,7 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from ._cli import Parser
 from ._util import REPO_ROOT, run_dotnet
 
 _RELEVANT = re.compile(
@@ -108,6 +109,7 @@ def _parse_coverage(path: Path) -> tuple[dict[str, float], list[FileGap]]:
           - None + Beschreibung:         kein Zeilen-Detail (compiler-generierte Klasse, z.B. async state machine)
     """
     root = ET.parse(path).getroot()
+    # Fail-closed: fehlt eine Gesamt-Rate, zählt sie als 0 – das Gate fällt, statt abzustürzen.
     totals = {
         "Branch": float(root.get("branch-rate", "0")),
         "Line":   float(root.get("line-rate",   "0")),
@@ -116,13 +118,15 @@ def _parse_coverage(path: Path) -> tuple[dict[str, float], list[FileGap]]:
     # filename → (min_branch_rate, line_rate, details)
     by_file: dict[str, tuple[float, float, list[LineDetail]]] = {}
 
+    # Klassen-, Zeilen- und Condition-Attribute schreibt coverlet immer; der strikte Zugriff
+    # macht ein abweichendes Format laut, statt es mit erfundenen Vorgabewerten zu deuten.
     for cls in root.iter("class"):
-        br = float(cls.get("branch-rate", "0"))
-        lr = float(cls.get("line-rate", "0"))
+        br = float(cls.attrib["branch-rate"])
+        lr = float(cls.attrib["line-rate"])
         if br >= _THRESHOLD and lr >= _THRESHOLD:
             continue
 
-        filename = _shorten(cls.get("filename", cls.get("name", "?")))
+        filename = _shorten(cls.attrib["filename"])
 
         # Zeilen-Details sammeln
         details: list[LineDetail] = []
@@ -132,18 +136,20 @@ def _parse_coverage(path: Path) -> tuple[dict[str, float], list[FileGap]]:
                 has_lines = True
                 # Branch-Lücken: Conditions mit < 100% coverage
                 for cond in line.findall("conditions/condition"):
-                    cov = cond.get("coverage", "100%")
+                    cov = cond.attrib["coverage"]
                     if cov != "100%":
-                        line_num = int(line.get("number", "0"))
+                        line_num = int(line.attrib["number"])
                         details.append((line_num, f"branch condition {cov}"))
                 # Zeilen-Lücken: Zeilen mit 0 Hits und ohne Branch-Condition (sonst Doppelmeldung)
-                if line.get("hits", "0") == "0" and not line.findall("conditions/condition"):
-                    line_num = int(line.get("number", "0"))
+                if line.attrib["hits"] == "0" and not line.findall("conditions/condition"):
+                    line_num = int(line.attrib["number"])
                     details.append((line_num, "nicht ausgeführt (0 hits)"))
 
-        if not has_lines and br < _THRESHOLD:
+        # Ohne Zeilen kann nur die Branch-Rate die Lücke sein – eine Line-Rate < 100 % setzt
+        # Zeilen voraus. Die Bedingung braucht deshalb keinen eigenen Vergleich.
+        if not has_lines:
             # Compiler-generierte Klasse (z.B. async state machine): kein Zeilen-Detail
-            short_class = cls.get("name", "").split("/")[-1]
+            short_class = cls.attrib["name"].split("/")[-1]
             details.append((None, f"kein Zeilen-Detail (compiler-generiert: {short_class})"))
 
         if filename in by_file:
@@ -263,7 +269,7 @@ def _report_coverage(totals: dict[str, float], gaps: list[FileGap]) -> bool:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

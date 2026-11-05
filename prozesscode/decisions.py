@@ -3,10 +3,10 @@
 decisions.py – CLI-Tool zur Verwaltung von Architecture Decision Records in docs/history/adr.md
 """
 
-import argparse
 import re
 import sys
 from pathlib import Path
+from ._cli import Parser
 
 
 # ---------------------------------------------------------------------------
@@ -388,7 +388,7 @@ def cmd_refs(args):
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         prog="decisions.py",
         description="CLI-Tool zur Verwaltung von Architecture Decision Records (docs/history/adr.md)",
     )

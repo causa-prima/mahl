@@ -20,6 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ._cli import Parser
 from ._wrapper_output import emit
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -64,7 +65,7 @@ def _anzahl(ausgabe: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--verbose", action="store_true", help="Vollständiger Output")
     # Nur die als `safe` markierten Fixes: Ruffs `--unsafe-fixes` ändern Semantik (etwa

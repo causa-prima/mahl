@@ -67,3 +67,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Ich hatte den Durchgangsweg nur als ‚nicht bis ins Detail nachgelesen' markiert, statt ihn vor dem Vorschlag nachzuverfolgen. Für ein Guard-Design verlangt das Prinzip einen Beleg je Dimension, kein Argument – die Dimension ‚Pfade' (welchen Weg nimmt der zu fangende Fall?) blieb ungeprüft.
   Regel: Vor jedem Guard- oder Gate-Vorschlag den Weg des Falls, den er fangen soll, im Skill bzw. Code bis zur geplanten Prüfstelle nachverfolgen: Erreicht der Fall die Stelle in dem Zustand, den die Prüfung sieht? Eine Unsicherheit dazu wird vor dem Vorschlag aufgelöst, nicht nur markiert.
   CM-Bezug: CM-S095-2
+
+## Session 146 – 2026-11-05
+
+- **[MITTEL] [QUALITÄT] [Testing] LL-S146-1 – Ein Test schickte über einen Mutanten SIGHUP an mutmut**
+  Quelle: Orchestrator
+  Was: Der Sperrklinken-Volllauf brach zweimal an derselben Stelle (Mutant 4195 von 21513) mit Exit -1 ab, rund 10 Minuten je Versuch. Ursache: Ein in S146 von einem Subagenten geschriebener Test (test_dotnet_stryker, Lock-Test) trug os.getppid() als 'lebenden fremden Prozess' in den Lock ein. mutmut mutierte in _run_lock._pid_alive os.kill(pid, 0) zu os.kill(pid, 1) – SIGHUP an den Elternprozess, unter mutmut also an mutmut selbst. Behoben: PID 1 (init), wie der bestehende Lock-Test; als normaler User ist ein Signal an init wirkungslos (PermissionError, gilt als lebend).
+  Warum: Ein Test, der einen echten Prozess außerhalb seiner selbst als Ziel einer Signal-Funktion nutzt, ist harmlos, solange der Code das Signal 0 schickt. Mutation verwandelt die Signalnummer in ein echtes Signal; welcher Prozess es empfängt, entscheidet dann der Test. Beim Schreiben denkt niemand an den Mutanten, beim Review auch nicht.
+  Regel: Tests übergeben Signal-Funktionen (os.kill, killpg) nur PIDs, die ein echtes Signal nicht trifft oder nicht stört: PID 1 als 'lebt, gehört einem anderen', ein eigener Kindprozess als 'lebt, gehört mir'. Nie getppid() oder die PID eines Werkzeugs, unter dem der Test läuft.
+
+- **[HOCH] [PROZESS] [Doku] LL-S146-2 – LSP-Pilot maß über fünf Runden Nutzung, ohne die Ausführbarkeit der Anweisung zu prüfen**
+  Quelle: Orchestrator
+  Was: OBS-S085-4 (Language-Server für die Agenten) wurde seit 2026-06-20 fünfmal verlängert und stand in S146 vor dem Verwerfen nach Abbruchklausel. Gemessen wurde stets nur die Nutzung (tool-usage --lsp: null). Erst ein Harness-Test in S146 mit einem echten frontend-layer-implementer zeigte: LSP steht direkt in seiner Tool-Liste, ToolSearch hat er nicht – die Prompt-Anweisung 'deferred: erst per ToolSearch select:LSP laden' war zumindest heute falsch und ließ sich als 'nicht ladbar' lesen. Ob sie in früheren Runden stimmte, ist ungeklärt (Claude Code kann sein Verhalten geändert haben; beim Aktivierungstest war LSP in der Hauptsession vermutlich deferred). Die Log-Auswertung zeigte zudem null Ladeversuche in 52 Agentenläufen.
+  Warum: Eine Nullnutzung hat mehrere Ursachen – nicht gewollt, vergessen, nicht erreichbar –, und eine Nutzungszählung unterscheidet sie nicht. Die Pilot-Kriterien setzten die Erreichbarkeit voraus, statt sie je Runde zu prüfen; die Anweisung im Prompt galt als Teil des Aufbaus, nicht als Behauptung über Tool-Verhalten, die altern kann. Fast wäre auf dieser Basis verworfen worden.
+  Regel: Ein Pilot, der Nutzung misst, prüft zu Beginn jeder Runde im echten Zielagenten, dass die Anweisung ausführbar ist (Tool sichtbar, Ladeweg stimmt, ein Aufruf gelingt) – erst dann sagt eine Nullnutzung etwas über das Werkzeug.
+  CM-Bezug: CM-S116-1

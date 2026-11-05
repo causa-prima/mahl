@@ -1,99 +1,168 @@
 {
+  "prozesscode._cli": {
+    "beurteilbar": 7,
+    "getoetet": 5,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
   "prozesscode._feature": {
-    "beurteilbar": 155,
-    "getoetet": 149
+    "beurteilbar": 255,
+    "getoetet": 226,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode._run_lock": {
+    "beurteilbar": 67,
+    "getoetet": 44,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode._session_logs": {
+    "beurteilbar": 280,
+    "getoetet": 216,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode._stryker_report": {
+    "beurteilbar": 235,
+    "getoetet": 234,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode._stryker_target": {
+    "beurteilbar": 55,
+    "getoetet": 55,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._test_inventory": {
     "beurteilbar": 248,
-    "getoetet": 209,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "getoetet": 210,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode._util": {
+    "beurteilbar": 58,
+    "getoetet": 7,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode._wrapper_output": {
+    "beurteilbar": 32,
+    "getoetet": 31,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.anchors": {
-    "beurteilbar": 216,
-    "getoetet": 125
+    "beurteilbar": 380,
+    "getoetet": 205,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.check-atdd-gate": {
+    "beurteilbar": 160,
+    "getoetet": 156,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.commit_msg": {
     "beurteilbar": 228,
     "getoetet": 226,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.coverage-run": {
+    "beurteilbar": 115,
+    "getoetet": 61,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.decisions": {
+    "beurteilbar": 596,
+    "getoetet": 165,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.doc": {
+    "beurteilbar": 853,
+    "getoetet": 496,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.dotnet-stryker": {
-    "beurteilbar": 176,
-    "getoetet": 55,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 163,
+    "getoetet": 137,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.dotnet-test": {
-    "beurteilbar": 508,
-    "getoetet": 177,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 460,
+    "getoetet": 438,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.eintrag_felder": {
-    "beurteilbar": 21,
-    "getoetet": 20
+    "beurteilbar": 55,
+    "getoetet": 41,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.eslint-run": {
+    "beurteilbar": 58,
+    "getoetet": 50,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.guard-stats": {
     "beurteilbar": 99,
     "getoetet": 68,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks._hook_io": {
+    "beurteilbar": 100,
+    "getoetet": 82,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-adr-capture": {
     "beurteilbar": 83,
     "getoetet": 79,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-agent-start": {
-    "beurteilbar": 12,
-    "getoetet": 12
+    "beurteilbar": 63,
+    "getoetet": 49,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-anchors": {
     "beurteilbar": 71,
     "getoetet": 67,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-bash-permission": {
-    "beurteilbar": 1197,
-    "getoetet": 1175,
+    "beurteilbar": 1193,
+    "getoetet": 1171,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-code-quality-blocking": {
     "beurteilbar": 15,
     "getoetet": 15,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-code-quality-nonblocking": {
-    "beurteilbar": 40,
-    "getoetet": 19,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 31,
+    "getoetet": 31,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-dangling-refs": {
     "beurteilbar": 103,
     "getoetet": 98,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-dependency-allowlist": {
     "beurteilbar": 40,
     "getoetet": 38,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-e2e-scenario-ref": {
     "beurteilbar": 113,
     "getoetet": 110,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-feature-plan": {
     "beurteilbar": 49,
     "getoetet": 47,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-obs-capture": {
     "beurteilbar": 95,
     "getoetet": 95,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-oq-capture": {
     "beurteilbar": 80,
     "getoetet": 78,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-ordinale": {
     "beurteilbar": 39,
@@ -103,120 +172,281 @@
   "prozesscode.hooks.check-ref-direction": {
     "beurteilbar": 49,
     "getoetet": 49,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-td-capture": {
     "beurteilbar": 130,
     "getoetet": 130,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-test-spec-ref": {
     "beurteilbar": 175,
     "getoetet": 170,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.checks.common": {
-    "beurteilbar": 28,
-    "getoetet": 0
+    "beurteilbar": 88,
+    "getoetet": 61,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.constructors": {
+    "beurteilbar": 54,
+    "getoetet": 24,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.eslint_lint": {
+    "beurteilbar": 112,
+    "getoetet": 112,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.guard_log": {
+    "beurteilbar": 62,
+    "getoetet": 47,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.immutability": {
+    "beurteilbar": 30,
+    "getoetet": 10,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.immutability_strict": {
+    "beurteilbar": 48,
+    "getoetet": 18,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.checks.mengenangaben": {
-    "beurteilbar": 70,
-    "getoetet": 59
+    "beurteilbar": 129,
+    "getoetet": 107,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.primitives": {
+    "beurteilbar": 152,
+    "getoetet": 88,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.rop": {
+    "beurteilbar": 18,
+    "getoetet": 7,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.checks.ruff_lint": {
-    "beurteilbar": 31,
-    "getoetet": 17
+    "beurteilbar": 86,
+    "getoetet": 32,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.test_patterns": {
+    "beurteilbar": 69,
+    "getoetet": 37,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.throw_check": {
+    "beurteilbar": 24,
+    "getoetet": 7,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.checks.tooling_tests": {
-    "beurteilbar": 34,
-    "getoetet": 22
+    "beurteilbar": 90,
+    "getoetet": 45,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.dispatch-edit-write": {
-    "beurteilbar": 64,
-    "getoetet": 37,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 54,
+    "getoetet": 54,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.merke-rueckgaben": {
     "beurteilbar": 115,
     "getoetet": 115,
-    "messung": "mutmut 3.8.0, Wertung 2"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.jenga_score": {
     "beurteilbar": 236,
     "getoetet": 66,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.jscpd-run": {
+    "beurteilbar": 143,
+    "getoetet": 103,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.kontext_tags": {
+    "beurteilbar": 26,
+    "getoetet": 21,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.lessons": {
+    "beurteilbar": 253,
+    "getoetet": 125,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.lessons_entry": {
+    "beurteilbar": 185,
+    "getoetet": 130,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.mutmut-run": {
-    "beurteilbar": 652,
-    "getoetet": 457,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 666,
+    "getoetet": 609,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.next_run": {
+    "beurteilbar": 997,
+    "getoetet": 762,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.obs": {
+    "beurteilbar": 583,
+    "getoetet": 138,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.obs-archive": {
+    "beurteilbar": 157,
+    "getoetet": 88,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.obs-drain": {
     "beurteilbar": 436,
     "getoetet": 351,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.obs_entry": {
+    "beurteilbar": 507,
+    "getoetet": 425,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.obs_parse": {
+    "beurteilbar": 259,
+    "getoetet": 224,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.open_questions": {
+    "beurteilbar": 94,
+    "getoetet": 81,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.oq": {
     "beurteilbar": 436,
     "getoetet": 72,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.oq_entry": {
+    "beurteilbar": 135,
+    "getoetet": 73,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.ordinale": {
-    "beurteilbar": 105,
-    "getoetet": 97
+    "beurteilbar": 187,
+    "getoetet": 137,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.playwright-test": {
+    "beurteilbar": 250,
+    "getoetet": 206,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.qa-check": {
-    "beurteilbar": 1078,
-    "getoetet": 417,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 1047,
+    "getoetet": 943,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.read-breakdown": {
+    "beurteilbar": 478,
+    "getoetet": 43,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.repo_kontext": {
+    "beurteilbar": 71,
+    "getoetet": 65,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.retro_report": {
     "beurteilbar": 1511,
     "getoetet": 471,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.rueckgaben": {
-    "beurteilbar": 119,
-    "getoetet": 108
+    "beurteilbar": 340,
+    "getoetet": 271,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.ruff-run": {
+    "beurteilbar": 106,
+    "getoetet": 93,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.session-agenda": {
     "beurteilbar": 1033,
-    "getoetet": 528,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "getoetet": 527,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.stryker-frontend": {
-    "beurteilbar": 191,
-    "getoetet": 65,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "beurteilbar": 186,
+    "getoetet": 164,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.stryker-summary": {
+    "beurteilbar": 246,
+    "getoetet": 45,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.td": {
     "beurteilbar": 528,
-    "getoetet": 143,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "getoetet": 169,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.td_anchors": {
     "beurteilbar": 392,
     "getoetet": 319,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.td_due": {
+    "beurteilbar": 95,
+    "getoetet": 29,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.td_entry": {
     "beurteilbar": 239,
     "getoetet": 194,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.test-inventory": {
+    "beurteilbar": 101,
+    "getoetet": 43,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.tool-usage": {
+    "beurteilbar": 347,
+    "getoetet": 92,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.tracker": {
+    "beurteilbar": 108,
+    "getoetet": 22,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.tracker_diff": {
     "beurteilbar": 420,
     "getoetet": 344,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.tracker_entry": {
     "beurteilbar": 291,
     "getoetet": 220,
-    "messung": "mutmut 3.8.0, Wertung 3"
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.tracker_preview": {
+    "beurteilbar": 109,
+    "getoetet": 77,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.user-message": {
+    "beurteilbar": 42,
+    "getoetet": 19,
+    "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.vitest-run": {
     "beurteilbar": 254,
-    "getoetet": 189,
+    "getoetet": 227,
     "messung": "mutmut 3.8.1, Wertung 3"
   }
 }

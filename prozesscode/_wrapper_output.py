@@ -60,11 +60,13 @@ def error_lines(lines: list[str], *, verbose: bool = False, fallback_tail: int =
 def emit(*, verbose: bool, output: str, verdict: str, details: list[str] | None = None) -> None:
     """Gibt die Wrapper-Ausgabe nach der oben beschriebenen Politik aus.
 
-    verbose → der vollständige rohe Output. Sonst: `verdict`, danach optionale `details`
-    (im Fehlerfall die analyse-relevanten Zeilen).
+    verbose → der vollständige rohe Output, danach das Verdikt – es ist die Aussage des
+    Wrappers und darf auch mit `--verbose` nicht fehlen. Sonst: optionale `details` (im
+    Fehlerfall die analyse-relevanten Zeilen), danach `verdict`.
     """
     if verbose:
         print(output.rstrip())
+        print(verdict)
         return
     if details:
         print("\n".join(details))
