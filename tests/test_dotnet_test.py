@@ -330,6 +330,31 @@ def test_gruener_gefilterter_lauf_zeigt_nur_das_verdikt(monkeypatch, capsys):
     assert capsys.readouterr().out == "✓ 53 Backend-Tests grün, 9s 381ms\n"
 
 
+# Echte Ausgabe eines gefilterten Laufs ohne Treffer (S148, Filter „A|B" – MTP-Exit 8).
+_ZERO_TESTS = (Path(__file__).parent / "fixtures" / "dotnet_test_zero_tests.txt").read_text(encoding="utf-8")
+
+
+def test_zero_tests_report_nennt_den_filter_und_dass_er_ein_teilstring_ist():
+    bericht = dt.zero_tests_report(_ZERO_TESTS, "A|B")
+
+    assert bericht is not None
+    assert "„A|B“" in bericht
+    assert "Teilstring" in bericht
+
+
+def test_zero_tests_report_ist_none_wenn_tests_liefen():
+    assert dt.zero_tests_report(MTP_SUMMARY, "X") is None
+
+
+def test_gefilterter_lauf_ohne_treffer_zeigt_den_filterhinweis_statt_der_rohausgabe(monkeypatch, capsys):
+    monkeypatch.setattr(dt, "run_dotnet", lambda _argumente: (_ZERO_TESTS, 8))
+
+    code = cli_aufruf(monkeypatch, dt, "--filter", "A|B")
+
+    assert code == 8
+    assert capsys.readouterr().out == dt.zero_tests_report(_ZERO_TESTS, "A|B") + "\n"
+
+
 def test_roter_gefilterter_lauf_zeigt_den_bericht(monkeypatch, capsys):
     code = _gefiltert(monkeypatch, MTP_FAILED, 1)
 
@@ -451,6 +476,16 @@ def test_voller_lauf_misst_coverage_mit_den_stryker_ausschluessen(dotnet, monkey
     assert dotnet.aufrufe == [
         ["test", "--project", "Server.Tests/mahl.Server.Tests.csproj",
          *dt.coverage_args(STRYKER, dotnet.ergebnisse)]]
+
+
+def test_voller_lauf_ohne_tests_nennt_keinen_filter(dotnet, monkeypatch, capsys):
+    """Ohne --filter gibt es keinen Filter, der schuld sein könnte – der Hinweis darf keinen erfinden."""
+    dotnet.ausgabe, dotnet.exit_code = _ZERO_TESTS, 8
+
+    code = cli_aufruf(monkeypatch, dt)
+
+    assert code == 8
+    assert "Filter" not in capsys.readouterr().out
 
 
 def test_voller_gruener_lauf_mit_voller_coverage_ist_gruen(dotnet, monkeypatch, capsys):

@@ -37,6 +37,20 @@ _THRESHOLD = 1.0  # 100 %
 _SUMMARY_PASSED = re.compile(r"Test run summary: Passed!.*?total: (\d+).*?duration: ([^\n]+)", re.DOTALL)
 
 
+_ZERO_TESTS_RAN = "Test run summary: Zero tests ran"
+_ZERO_TESTS_HINT = (
+    "✗ Filter „{filter}“ traf keinen Test. --filter ist ein Teilstring des voll-qualifizierten Namens"
+    " (Namespace.Klasse.Methode), kein Muster – „|“ ist kein Oder.\n"
+    "   Ausweg: einen gemeinsamen Teilstring wählen (z. B. die Klasse) oder je Test einen Aufruf."
+)
+
+
+def zero_tests_report(output: str, filter_name: str) -> str | None:
+    """Hinweis für einen gefilterten Lauf ohne Treffer – sonst None. MTP sagt nur „Zero tests ran“
+    und nennt den Filter nicht; wer ein Muster erwartet hat, sieht so nicht, woran es lag."""
+    return _ZERO_TESTS_HINT.format(filter=filter_name) if _ZERO_TESTS_RAN in output else None
+
+
 def verdict(output: str) -> str | None:
     """Eine Zeile für einen grünen Lauf im MTP-Modus von `dotnet test` – sonst None (Details nötig)."""
     match = _SUMMARY_PASSED.search(output)
@@ -298,7 +312,8 @@ def main() -> None:
     drop_dangling_runtime_dir()
     output, exit_code = run_dotnet(dotnet_args)
 
-    summary = verdict(output) or failure_report(output) or host_error_report(output)
+    zero_tests = zero_tests_report(output, args.filter_name) if args.filter_name else None
+    summary = verdict(output) or zero_tests or failure_report(output) or host_error_report(output)
     if args.verbose or not output.strip():
         print(output)
     elif summary:

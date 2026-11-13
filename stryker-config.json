@@ -4,6 +4,7 @@
     "test-projects": ["Server.Tests/mahl.Server.Tests.csproj"],
     "test-runner": "mtp",
     "coverage-analysis": "perTest",
+    "mutation-level": "Complete",
     "additional-timeout": 15000,
     "reporters": ["html", "cleartext", "json"],
     "thresholds": { "high": 100, "low": 100, "break": 100 },

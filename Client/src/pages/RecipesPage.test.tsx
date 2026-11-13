@@ -237,6 +237,43 @@ describe('Rezepte erfassen', () => {
     expect(stepTexts[1]).toMatch(/^2\D+In der Pfanne ausbacken\.$/)
   })
 
+  // Szenario: Mengen an den Grenzen werden gespeichert und angezeigt
+  // Beispiel: alle
+  // Der Server liefert die Menge als JSON-Zahl; die Nullen am Ende aus Beispiel 3 und 4 normalisiert JSON.parse
+  // schon, am Client sind sie von Beispiel 1 und 2 nicht unterscheidbar – die Zeilen stehen der Zuordnung wegen da.
+  it.each([
+    { zeile: '0,001 g Mehl', menge: '0.001', anzeige: '0,001 g Mehl' },
+    { zeile: '9999,999 g Mehl', menge: '9999.999', anzeige: '9999,999 g Mehl' },
+    { zeile: '0,0010 g Mehl', menge: '0.0010', anzeige: '0,001 g Mehl' },
+    { zeile: '9999,9990 g Mehl', menge: '9999.9990', anzeige: '9999,999 g Mehl' },
+    { zeile: '1,5 g Mehl', menge: '1.5', anzeige: '1,5 g Mehl' },
+  ])('US602_EdgeCase_CreateRecipe_QuantityAtLimit_ShowsGermanNotation ($zeile)',
+    async ({ zeile, menge, anzeige }) => {
+      // Given: der Server legt das Rezept an und liefert die Menge als JSON-Zahl
+      const body = `{"id":"${createdPancakes.id}","title":"Pfannkuchen","steps":[{"instruction":"Teig rühren."}],`
+        + `"ingredients":[{"name":"Mehl","quantity":${menge},"unit":"g"}]}`
+      const json = { 'Content-Type': 'application/json' }
+      server.use(
+        http.get('/api/recipes', () => HttpResponse.json([])),
+        http.get(`/api/recipes/${createdPancakes.id}`, () => new HttpResponse(body, { headers: json })),
+        http.post('/api/recipes', () => new HttpResponse(body, { status: 201, headers: json })),
+      )
+      const user = userEvent.setup()
+      renderApp('/recipes')
+      fireEvent.click(await screen.findByRole('button', { name: 'Rezept anlegen' }))
+
+      // When: Titel, Zutatenzeile und Schritt eingeben, speichern
+      await user.type(await screen.findByLabelText(/^Titel/), 'Pfannkuchen')
+      await user.type(screen.getByLabelText(/^Zutaten/), zeile)
+      await user.type(screen.getByLabelText('Schritt 1'), 'Teig rühren.')
+      fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+      // Then: die Detailansicht zeigt die Zutat in deutscher Schreibweise
+      await screen.findByRole('heading', { name: 'Pfannkuchen' })
+      const ingredients = within(screen.getByRole('list', { name: 'Zutaten' })).getAllByRole('listitem')
+      expect(ingredients.map((item) => item.textContent)).toEqual([anzeige])
+    })
+
   // Szenario: Rezept aus der Rezept-Liste öffnen
   // Die Rolle `link` hat ein <a> nur mit href – der Klick sichert damit zugleich einen echten Link (Lesezeichen,
   // neuer Tab, ADR-S135-5); die Adresse prüft der Handler, der nur auf die Kennung des Rezepts antwortet.

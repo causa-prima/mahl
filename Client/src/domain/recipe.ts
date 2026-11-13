@@ -44,11 +44,15 @@ export type Recipe = RecipeSummary & {
   readonly steps: readonly RecipeStep[]
 }
 
+// Deutsche Schreibweise: Dezimalkomma, keine Tausendergruppierung, höchstens 3 Nachkommastellen (Server-Grenze),
+// keine Nullen am Ende.
+const quantityFormat = new Intl.NumberFormat('de-DE', { useGrouping: false, maximumFractionDigits: 3 })
+
 // "<Menge> <Einheit> <Name>" bzw. nur "<Name>" ohne Menge (ADR-S020-1).
 export function formatIngredient(ingredient: RecipeIngredient): string {
   return ingredient.quantity === null
     ? ingredient.name
-    : `${String(ingredient.quantity)} ${ingredient.unit} ${ingredient.name}`
+    : `${quantityFormat.format(ingredient.quantity)} ${ingredient.unit} ${ingredient.name}`
 }
 
 export type NewRecipe = {

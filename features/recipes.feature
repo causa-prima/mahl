@@ -409,6 +409,7 @@ Feature: Rezepte erfassen
       | Zeile                                    | Meldung                                      |
       | 0 g Mehl                                 | Menge muss größer als 0 sein.                |
       | 0,0005 g Mehl                            | Menge darf maximal 3 Nachkommastellen haben. |
+      | 10000,0005 g Mehl                        | Menge darf maximal 3 Nachkommastellen haben. |
       | 1,0000000000000000000000000000001 g Mehl | Menge darf maximal 3 Nachkommastellen haben. |
       | 0,0000000000000000000000000000001 g Mehl | Menge darf maximal 3 Nachkommastellen haben. |
       | 10000 g Mehl                             | Menge darf maximal 9999,999 sein.            |
@@ -655,13 +656,14 @@ Feature: Rezepte erfassen
     And ich auf "Speichern" klicke
     Then zeigt die Detailansicht die Zutat "<Anzeige>"
 
-    # Nullen am Ende zählen nicht als Nachkommastellen.
+    # Nullen am Ende zählen nicht als Nachkommastellen; weniger als 3 Nachkommastellen sind keine Tausendstel.
     Examples:
       | Zeile            | Anzeige         |
       | 0,001 g Mehl     | 0,001 g Mehl    |
       | 9999,999 g Mehl  | 9999,999 g Mehl |
       | 0,0010 g Mehl    | 0,001 g Mehl    |
       | 9999,9990 g Mehl | 9999,999 g Mehl |
+      | 1,5 g Mehl       | 1,5 g Mehl      |
 
   # Gutfall der Übergangsregel in den Schreibweisen, die in der Rezeptsammlung häufig sind:
   # Namen aus mehreren Wörtern, Einheit mit Punkt, Kleinschreibung, Name ohne Menge.

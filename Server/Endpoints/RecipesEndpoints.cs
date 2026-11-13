@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using mahl.Infrastructure;
 using mahl.Infrastructure.DatabaseTypes;
 using mahl.Server.Domain;
@@ -58,9 +57,9 @@ file static class RecipeMappings
 {
     // ADR-S030-1: hier – und nur hier – entsteht die Identität des Rezepts (RecipeId.New() unten), weil hier
     // die Zeile entsteht.
-    // Validiert sind bisher die Pflichtangaben (Titel, Zutatenfeld, Schritte); die Fehler-Szenarien der
-    // Zeilen (Zeile nicht gefunden, Einheit falsch …) kommen später. Bis dahin ist eine unbekannte Zeile
-    // unbestimmt.
+    // Validiert sind bisher die Pflichtangaben (Titel, Zutatenfeld, Schritte), Längen und die Menge jeder Zeile;
+    // die übrigen Fehler-Szenarien der Zeilen (Zutat nicht gefunden, Einheit falsch, leerer Name, doppelte
+    // Zutat) kommen später. Bis dahin ist eine solche Zeile unbestimmt.
     internal static async Task<IResult> CreateRecipe(CreateRecipeDto dto, MahlDbContext db, HttpContext httpContext) =>
         await dto.ToValues().Match(
             values => SaveRecipe(values, db, httpContext),
@@ -79,12 +78,14 @@ file static class RecipeMappings
             .MapError<RecipeTitle, RecipeTitleError, IReadOnlyList<FieldError>>(error => [DescribeTitle(error)]);
 
     // ADR-S135-2: leere Zeilen und Zeilen aus Leerraum werden übergangen; „mindestens eine Zutat" gilt nur,
-    // wenn keine nicht leere Zeile da ist. Null (explizit gesendet, ADR-S144-2) ist wie leer.
+    // wenn keine nicht leere Zeile da ist – fehlerhafte Zeilen erreichen die Prüfung nicht, Bind schließt nach
+    // CollectAll kurz. Null (explizit gesendet, ADR-S144-2) ist wie leer.
     private static OneOf<NonEmptyImmutableArray<ParsedIngredientLine>, IReadOnlyList<FieldError>> ToIngredientLines(string? text) =>
-        NonEmptyImmutableArray<ParsedIngredientLine>
-            .Create([.. NormalizedNonEmptyLines(text).Select(ParseLine)])
-            .MapError<NonEmptyImmutableArray<ParsedIngredientLine>, ListViolation, IReadOnlyList<FieldError>>(
-                _ => [IngredientsMissing]);
+        CollectAll(NormalizedNonEmptyLines(text).Select(ParseLine))
+            .Bind<ImmutableArray<ParsedIngredientLine>, NonEmptyImmutableArray<ParsedIngredientLine>, IReadOnlyList<FieldError>>(
+                lines => NonEmptyImmutableArray<ParsedIngredientLine>.Create(lines)
+                    .MapError<NonEmptyImmutableArray<ParsedIngredientLine>, ListViolation, IReadOnlyList<FieldError>>(
+                        _ => [IngredientsMissing]));
 
     private const char LineSeparator = '\n';
 
@@ -111,7 +112,10 @@ file static class RecipeMappings
     // der Grenze. ListViolation kennt nur „leer" und bildet damit auf genau diese eine Meldung je Liste ab.
     // Als Property statt static readonly Feld: Stryker schaltet Mutanten zur Laufzeit um, ein Feld-Initialisierer
     // liefe nur einmal je Prozess und sähe den aktiven Mutanten nicht.
-    private static FieldError IngredientsMissing => new("ingredients", "Rezept muss mindestens eine Zutat haben.");
+    private static FieldError IngredientsMissing => new(IngredientsField, "Rezept muss mindestens eine Zutat haben.");
+
+    // Request-JSON-Property des Zutatenfelds: Key der Listen- und der Zeilenmeldungen (ADR-S090-1, ADR-S135-2).
+    private const string IngredientsField = "ingredients";
     private static FieldError StepsMissing => new("steps", "Rezept muss mindestens einen Schritt haben.");
 
     // Der Domänentyp bleibt feldagnostisch (ADR-S120-1). Coverage-Ausschluss je ganze Methode wie bei
@@ -217,18 +221,32 @@ file static class RecipeMappings
     private static RecipeIngredient ToRecipeIngredient(ParsedIngredientLine line, Func<string, Guid> ingredientIdByName) =>
         RecipeIngredient.Create(IngredientId.Create(ingredientIdByName(line.Name)), line.Quantity);
 
-    // ADR-S135-2, Ausschnitt des Gutfalls: beginnt die Zeile mit einer Ziffer, ist sie „Menge Einheit
-    // Zutat"; sonst ist die ganze Zeile die Zutat, ohne Menge (ADR-S020-1). Die Einheit wird noch nicht
-    // gelesen – sie ist die Basiseinheit der Zutat; ihre Prüfung kommt mit dem Szenario „Einheit falsch".
-    private static ParsedIngredientLine ParseLine(string line) =>
-        char.IsAsciiDigit(line[0]) ? ParseLineWithQuantity(line.Split(WordSeparator)) : (line, Quantity.Unspecified);
+    // ADR-S135-2: beginnt die Zeile mit einer Ziffer, ist sie „Menge Einheit Zutat"; sonst ist die ganze Zeile
+    // die Zutat, ohne Menge (ADR-S020-1). Eine ungültige Menge wird zur Meldung, die die Zeile zitiert. Die
+    // Einheit wird noch nicht gelesen – sie ist die Basiseinheit der Zutat; ihre Prüfung kommt mit dem Szenario
+    // „Einheit falsch".
+    private static OneOf<ParsedIngredientLine, FieldError> ParseLine(string line) =>
+        char.IsAsciiDigit(line[0])
+            ? ParseLineWithQuantity(line, line.Split(WordSeparator))
+            : (line, Quantity.Unspecified);
 
-    private static ParsedIngredientLine ParseLineWithQuantity(string[] words)
+    private static OneOf<ParsedIngredientLine, FieldError> ParseLineWithQuantity(string line, string[] words) =>
+        QuantityAmount.Create(words[0])
+            .MapError<QuantityAmount, QuantityError, FieldError>(error => DescribeQuantity(error, line))
+            // Wort 2 ist die Einheit, noch ungelesen (s. ParseLine); der Rest ist der – möglicherweise mehrwortige – Name.
+            .Map<QuantityAmount, ParsedIngredientLine, FieldError>(
+                amount => (string.Join(WordSeparator, words.Skip(2)), Quantity.Specified(amount)));
+
+    // ADR-S051-2, Addendum S135: die Meldung zitiert die normalisierte Zeile in „…“ (U+201E, U+201C).
+    [ExcludeFromCoverageGate("structurally unreachable sum-type/enum default arm (ADR-S040-1)")]
+    private static FieldError DescribeQuantity(QuantityError error, string line) => new(IngredientsField, $"„{line}“: " + error switch
     {
-        // Wort 2 ist die Einheit, noch ungelesen (s. ParseLine); der Rest ist der – möglicherweise mehrwortige – Name.
-        var name = string.Join(WordSeparator, words.Skip(2));
-        return (name, Quantity.Specified(decimal.Parse(words[0], CultureInfo.InvariantCulture)));
-    }
+        QuantityError.NotANumber => "Menge muss eine Zahl sein (z. B. 1,5).",
+        QuantityError.NotPositive => "Menge muss größer als 0 sein.",
+        QuantityError.TooManyDecimals => "Menge darf maximal 3 Nachkommastellen haben.",
+        QuantityError.TooLarge => "Menge darf maximal 9999,999 sein.",
+        _ => SumType.Unreachable<string>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
+    });
 
     private static RecipeDbType ToDbType(this Recipe recipe) =>
         new() { Id = recipe.Id.Value, Title = recipe.Title.Value };

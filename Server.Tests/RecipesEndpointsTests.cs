@@ -583,6 +583,80 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         new("Prise", "schwarzer pfeffer", new RecipeIngredientResponse("schwarzer Pfeffer", null, null)) { TestDisplayName = "schwarzer pfeffer (ohne Menge und Einheit)" },
     ];
 
+    // Szenario: Ungültige Menge in einer Zutatenzeile
+    // Beispiel: alle
+    // Die Meldung zitiert die Zeile in „…“ (U+201E/U+201C, ADR-S051-2) und steht allein auf `ingredients`; bei
+    // mehreren verletzten Regeln gilt die erste: Zahlform, größer als 0, Nachkommastellen, Maximum (ADR-S135-2).
+    [Theory]
+    [MemberData(nameof(InvalidQuantityLines))]
+    public async Task US602_Error_CreateRecipe_InvalidQuantity_Returns422AtIngredients(string line, string expectedMessage)
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+        var request = ACreateRecipe(title: "Pfannkuchen", ingredients: line, steps: [AStepPayload("Teig rühren.")]);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: genau die eine Meldung bei den Zutaten, nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError("ingredients", $"„{line}“: {expectedMessage}"));
+    }
+
+    private const string NotANumber = "Menge muss eine Zahl sein (z. B. 1,5).";
+    private const string NotPositive = "Menge muss größer als 0 sein.";
+    private const string TooManyDecimals = "Menge darf maximal 3 Nachkommastellen haben.";
+    private const string TooLarge = "Menge darf maximal 9999,999 sein.";
+
+    // Parameter: Zeile, Meldung ohne Zitat der Zeile.
+    public static IEnumerable<TheoryDataRow<string, string>> InvalidQuantityLines =>
+    [
+        new("0 g Mehl", NotPositive) { TestDisplayName = "0 g Mehl" },
+        new("0,0005 g Mehl", TooManyDecimals) { TestDisplayName = "0,0005 g Mehl" },
+        new("10000,0005 g Mehl", TooManyDecimals) { TestDisplayName = "10000,0005 g Mehl" },
+        new("1,0000000000000000000000000000001 g Mehl", TooManyDecimals) { TestDisplayName = "1,(30 Nullen)1 g Mehl" },
+        new("0,0000000000000000000000000000001 g Mehl", TooManyDecimals) { TestDisplayName = "0,(30 Nullen)1 g Mehl" },
+        new("10000 g Mehl", TooLarge) { TestDisplayName = "10000 g Mehl" },
+        new("10000,000 g Mehl", TooLarge) { TestDisplayName = "10000,000 g Mehl" },
+        new("100000000000000000000000000000 g Mehl", TooLarge) { TestDisplayName = "10^29 g Mehl" },
+        new("1.5 g Mehl", NotANumber) { TestDisplayName = "1.5 g Mehl" },
+        new("1.000 g Mehl", NotANumber) { TestDisplayName = "1.000 g Mehl" },
+        new("5, g Mehl", NotANumber) { TestDisplayName = "5, g Mehl" },
+        new("1,5,5 g Mehl", NotANumber) { TestDisplayName = "1,5,5 g Mehl" },
+    ];
+
+    // Szenario: Mengen an den Grenzen werden gespeichert und angezeigt
+    // Beispiel: alle
+    // Nullen am Ende zählen nicht als Nachkommastellen; die Menge wird exakt gespeichert.
+    [Theory]
+    [MemberData(nameof(BoundaryQuantityLines))]
+    public async Task US602_EdgeCase_CreateRecipe_QuantityAtBoundary_Returns201AndShowsQuantity(
+        string line, decimal expectedQuantity)
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        var mehl = AnIngredient("Mehl", "g");
+        await SeedIngredientsAsync(mehl);
+        const string title = "Pfannkuchen";
+        const string instruction = "Teig rühren.";
+        var request = ACreateRecipe(title: title, ingredients: line, steps: [AStepPayload(instruction)]);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: 201, die Menge steht exakt im Body und in der DB
+        await AssertRecipeWithOneStepStoredAsync(
+            response, title, instruction, (mehl, new RecipeIngredientResponse("Mehl", expectedQuantity, "g")));
+    }
+
+    // Parameter: Zeile, erwartete Menge der Anzeige (Outline: Zeile | Anzeige).
+    public static IEnumerable<TheoryDataRow<string, decimal>> BoundaryQuantityLines =>
+    [
+        new("0,001 g Mehl", 0.001m) { TestDisplayName = "0,001 g Mehl" },
+        new("9999,999 g Mehl", 9999.999m) { TestDisplayName = "9999,999 g Mehl" },
+        new("0,0010 g Mehl", 0.001m) { TestDisplayName = "0,0010 g Mehl" },
+        new("9999,9990 g Mehl", 9999.999m) { TestDisplayName = "9999,9990 g Mehl" },
+        new("1,5 g Mehl", 1.5m) { TestDisplayName = "1,5 g Mehl" },
+    ];
+
     // Szenario: Leere Zeilen und Zeilen aus Leerzeichen im Zutatenfeld werden übergangen
     // „Leer" heißt nach der Normalisierung leer (ADR-S135-1): auch eine Zeile nur aus Leerzeichen ohne Breite
     // (U+200B) ergibt keine Zutat – string.IsNullOrWhiteSpace erkennt sie nicht.

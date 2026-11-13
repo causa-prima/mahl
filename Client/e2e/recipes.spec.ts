@@ -175,10 +175,12 @@ async function fillRecipeForm(
 
 // Then „bin ich weiterhin im Formular mit allen Eingaben": Formular, Titel, Zutaten und jedes Schrittfeld
 // mit seinem eingegebenen Wert (roh – auch Leerraum bleibt stehen).
-async function expectFormWithInputs(page: Readonly<Page>, title: string, steps: readonly string[]): Promise<void> {
+async function expectFormWithInputs(
+  page: Readonly<Page>, title: string, steps: readonly string[], ingredients: string = INGREDIENTS_MEHL,
+): Promise<void> {
   await expectForm(page)
   await expect(page.getByLabel('Titel')).toHaveValue(title)
-  await expect(page.getByLabel('Zutaten')).toHaveValue(INGREDIENTS_MEHL)
+  await expect(page.getByLabel('Zutaten')).toHaveValue(ingredients)
   await expectStepNumbers(page, steps.map((_, index) => index + 1))
   await Promise.all(steps.map(async (instruction, index) => {
     await expect(stepField(page, index + 1)).toHaveValue(instruction)
@@ -899,5 +901,83 @@ test.describe('US602_EdgeCase: Eingaben bereinigen und erkennen', () => {
     // Then: Schritt 1 "Teig rühren." als einziger Schritt
     await expect(page).toHaveURL(RECIPE_DETAIL_URL)
     await expectDetailSteps(page, [FIRST_STEP])
+  })
+})
+
+// Meldungen der Mengenprüfung (ADR-S051-2, Addendum S135) – ohne das Zitat der Zeile davor.
+const QUANTITY_NOT_A_NUMBER = 'Menge muss eine Zahl sein (z. B. 1,5).'
+const QUANTITY_NOT_POSITIVE = 'Menge muss größer als 0 sein.'
+const QUANTITY_TOO_MANY_DECIMALS = 'Menge darf maximal 3 Nachkommastellen haben.'
+const QUANTITY_TOO_LARGE = 'Menge darf maximal 9999,999 sein.'
+
+// @US-602-error
+test.describe('US602_Error: Ungültige Menge', () => {
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const invalidQuantities = [
+    { line: '0 g Mehl', message: QUANTITY_NOT_POSITIVE },
+    { line: '0,0005 g Mehl', message: QUANTITY_TOO_MANY_DECIMALS },
+    { line: '10000,0005 g Mehl', message: QUANTITY_TOO_MANY_DECIMALS },
+    { line: '1,0000000000000000000000000000001 g Mehl', message: QUANTITY_TOO_MANY_DECIMALS },
+    { line: '0,0000000000000000000000000000001 g Mehl', message: QUANTITY_TOO_MANY_DECIMALS },
+    { line: '10000 g Mehl', message: QUANTITY_TOO_LARGE },
+    { line: '10000,000 g Mehl', message: QUANTITY_TOO_LARGE },
+    { line: '100000000000000000000000000000 g Mehl', message: QUANTITY_TOO_LARGE },
+    { line: '1.5 g Mehl', message: QUANTITY_NOT_A_NUMBER },
+    { line: '1.000 g Mehl', message: QUANTITY_NOT_A_NUMBER },
+    { line: '5, g Mehl', message: QUANTITY_NOT_A_NUMBER },
+    { line: '1,5,5 g Mehl', message: QUANTITY_NOT_A_NUMBER },
+  ] as const
+  invalidQuantities.forEach(({ line, message }) => {
+    // Szenario: Ungültige Menge in einer Zutatenzeile
+    // Beispiel: alle
+    test(`US602_Error_CreateRecipe_InvalidQuantity_ShowsMessageQuotingLine (${line})`, async ({ page, request }) => {
+      // Given: die Zutat "Mehl" mit Einheit "g" existiert
+      await seedIngredientViaApi(request, 'Mehl', 'g')
+      const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+      // When: Formular öffnen, "Pfannkuchen", <Zeile> als Zutaten und den Schritt "Teig rühren." eingeben, speichern
+      await openCreateForm(page)
+      await fillRecipeForm(page, PANCAKES, [FIRST_STEP], line)
+      await saveForm(page)
+
+      // Then: bei den Zutaten genau die Meldung „<Zeile>“: <Meldung> – der Hinweis plus genau diese Meldung
+      //   bilden die ganze Beschreibung des Felds, eine weitere Meldung fiele auf
+      await expectMessageAtIngredients(page, `„${line}“: ${message}`)
+      // Then: der Fokus liegt auf dem Zutatenfeld
+      await expect(page.getByLabel('Zutaten')).toBeFocused()
+      // Then: weiterhin im Formular mit allen Eingaben
+      await expectFormWithInputs(page, PANCAKES, [FIRST_STEP], line)
+      // Then: die Rezept-Liste ist unverändert
+      expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
+    })
+  })
+})
+
+// @US-602-edge-case
+test.describe('US602_EdgeCase: Mengen an den Grenzen', () => {
+  // Eine Zeile je Beispiel der Scenario Outline. Nullen am Ende zählen nicht als Nachkommastellen.
+  const boundaryQuantities = [
+    { line: '0,001 g Mehl', display: '0,001 g Mehl' },
+    { line: '9999,999 g Mehl', display: '9999,999 g Mehl' },
+    { line: '0,0010 g Mehl', display: '0,001 g Mehl' },
+    { line: '9999,9990 g Mehl', display: '9999,999 g Mehl' },
+    { line: '1,5 g Mehl', display: '1,5 g Mehl' },
+  ] as const
+  boundaryQuantities.forEach(({ line, display }) => {
+    // Szenario: Mengen an den Grenzen werden gespeichert und angezeigt
+    // Beispiel: alle
+    test(`US602_EdgeCase_CreateRecipe_QuantityAtBoundary_ShowsAsStored (${line})`, async ({ page, request }) => {
+      // Given: die Zutat "Mehl" mit Einheit "g" existiert
+      await seedIngredientViaApi(request, 'Mehl', 'g')
+
+      // When: Formular öffnen, "Pfannkuchen", <Zeile> als Zutaten und den Schritt "Teig rühren." eingeben, speichern
+      await openCreateForm(page)
+      await fillRecipeForm(page, PANCAKES, [FIRST_STEP], line)
+      await saveForm(page)
+
+      // Then: die Detailansicht zeigt die Zutat <Anzeige> – die einzige Zutat des Rezepts
+      await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+      await expect(page.getByRole('list', { name: 'Zutaten' }).getByRole('listitem')).toHaveText([exactly(display)])
+    })
   })
 })

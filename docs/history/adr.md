@@ -1311,7 +1311,7 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 
 ### ADR-S092-1: Stryker Mutation-Level „Standard" beibehalten (nicht auf Advanced anheben)
 
-**Status:** Accepted
+**Status:** Superseded by ADR-S148-1 (der Revisit-Trigger trat ein: an `PadRight` hätte erst ein String-Method-Mutant eine echte Lücke gezeigt)
 **Tags:** scope:cross-cutting, testing:stryker, tooling:build
 
 **Entscheidung:** Das Stryker-Mutation-Level bleibt auf „Standard" (Default) – es wird nicht auf Advanced angehoben. Advanced ist das einzige höhere Level mit zusätzlichen Mutator-Kategorien: Regex, Math Methods, **String Methods**. „Complete" ist laut Stryker.NET-Doku **deckungsgleich mit Advanced** (verifiziert S092: die Level-Tabelle listet keine Complete-exklusiven Mutationen, nur die Beschreibung „all possible mutations") – die einzige relevante Schwelle ist also Standard → Advanced.
@@ -1324,6 +1324,26 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 **Revisit-Trigger:** Advanced neu bewerten, sobald regex-/string-method-schwerer Code entsteht – konkret die `sourceUrl`-Validierung (Regex) oder die Duplikat-Erkennung „abweichende Schreibweise" (falls via `.ToUpper()`/`.ToLower()` statt `StringComparer.OrdinalIgnoreCase`). Dann ist der Nutzen an einem konkreten Codepfad messbar.
 
 **Verworfen:** Jetzt auf Advanced anheben – Gate-Mehraufwand ohne aktuellen Nutzen; schließt den Trim-Blindspot nicht (s.o.). (Complete ist keine separate Option, da laut Doku ≡ Advanced.)
+
+---
+
+### ADR-S148-1: Stryker Backend: Mutation-Level „Complete"
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:stryker, tooling:build
+
+**Entscheidung:** `stryker-config.json` setzt `"mutation-level": "Complete"`. Damit laufen zusätzlich zu Standard die Mutatoren der Stufe Advanced (String-Methoden, Math, Regex) und alle, die Stryker.NET künftig nur unter Complete führt. Ersetzt ADR-S092-1.
+
+**Begründung:**
+1. **Eine echte Lücke, die nur ein String-Method-Mutant zeigt:** `QuantityAmount.Create` (US-602 run-10) füllt Nachkommastellen mit `PadRight` auf. Unter Standard entstand an `PadRight`, `TrimStart` und `TrimEnd` kein Mutant; der Score stand bei 100 %, obwohl „1,5 g Mehl" ungetestet war. Die Gegenprobe – `PadRight` durch `PadLeft` ersetzt – speicherte 1,005 und ließ alle 47 Tests von `RecipesEndpointsTests` grün. Gefunden hat das ein Reviewer, nicht Stryker. Das Gegenargument aus ADR-S092-1 (der einzige Advanced-Mutant an `Trim()` sei trivial tötbar) gilt für `PadRight ↔ PadLeft` und `TrimStart ↔ TrimEnd` nicht: Beide liefern auf vielen Eingaben dasselbe und fallen nur mit gezielten Beispielen auf.
+2. **Die Kosten sind gemessen klein:** Je ein voller Backend-Lauf auf demselben Stand (S148): Standard 198 Mutanten in 115 s, Advanced 215 in 122 s, Complete 215 in 123 s – alle getötet, kein äquivalenter Mutant. Hinzu kamen 6 String-Method- und 12 Collection-Expression-Mutanten.
+3. **Complete statt Advanced:** Auf dem heutigen Code sind beide Mutantenmengen identisch (Diff der Mutator-Listen beider Reports), also gleich teuer. Complete nimmt künftige Mutatoren ohne erneute Entscheidung mit; erzeugt einer davon äquivalente Mutanten, greift die bestehende Survivor-Regel (Suppression mit ADR oder Einzelfall-Freigabe, ADR-S041-8).
+
+**Geltungsbereich:** Nur Stryker.NET (Backend). StrykerJS kennt keine Mutationsstufen.
+
+**Verworfen:**
+- **Standard beibehalten** (ADR-S092-1) – lässt die gemessene Lücke stehen; der Mehraufwand, mit dem ADR-S092-1 begründet war, trat in der Messung nicht auf.
+- **Advanced** – heute gleichwertig, müsste aber bei jedem neuen Complete-Mutator neu entschieden werden.
 
 ---
 

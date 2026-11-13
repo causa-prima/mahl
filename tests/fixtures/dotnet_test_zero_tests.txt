@@ -1,0 +1,14 @@
+Running tests from /home/kieritz/repos/mahl/Server.Tests/bin/Debug/net10.0/mahl.Server.Tests.dll (net10.0|x64)
+/home/kieritz/repos/mahl/Server.Tests/bin/Debug/net10.0/mahl.Server.Tests.dll (net10.0|x64) Zero tests ran (627ms)
+Exit code: 8
+
+Test run summary: Zero tests ran
+  error: 1
+
+  total: 0
+  failed: 0
+  succeeded: 0
+  skipped: 0
+  duration: 798ms
+Test run completed with non-success exit code: 8 (see: https://aka.ms/testingplatform/exitcodes)
+

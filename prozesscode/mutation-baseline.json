@@ -80,8 +80,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.dotnet-test": {
-    "beurteilbar": 460,
-    "getoetet": 438,
+    "beurteilbar": 472,
+    "getoetet": 450,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.eintrag_felder": {
