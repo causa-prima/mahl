@@ -359,7 +359,9 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
 2. Findings im **Haupt-Thread** umsetzen – ❌ und ⚠️ gleichermaßen, nach der Scope-Prüfung in
    `review-code` (spätere Phase → Abschluss-Triage; trivial → selbst, danach `qa-check`; alles andere →
    Schicht-Subagent mit Coding-Guidelines + TDD-Pflicht, Tendenz zu einem neuen). Mehrere Findings
-   derselben Schicht gehen gebündelt an einen Subagenten. Nach Fixes → nächste Runde.
+   derselben Schicht gehen gebündelt an einen Subagenten. Laufen Subagenten beider Schichten parallel, fährt
+   keiner von ihnen E2E – das tut der Orchestrator danach: Zwei E2E-Läufe gleichzeitig kollidieren am Port,
+   der zweite bricht ohne Ergebnis ab. Nach Fixes → nächste Runde.
    - Suppression-Findings → nach [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung).
 
    **Vor jedem Fix-Auftrag – Szenario-Frage (gilt für ❌ und ⚠️ gleichermaßen):** Ändert der Fix

@@ -53,7 +53,6 @@ internal static class ETagMiddleware
         }
 
         buffer.Position = 0;
-        // Bewusst ohne RequestAborted: Das Backend reicht Abbruch nirgends durch (Sonar S8949 verlangt die explizite Wahl).
-        await buffer.CopyToAsync(context.Response.Body, CancellationToken.None);
+        await buffer.CopyToAsync(context.Response.Body, Cancellation.None);
     }
 }

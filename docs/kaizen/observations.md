@@ -204,7 +204,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: GERING    Häufigkeit: häufig
 - Kategorie: AGENT    Kontext: Bash/Permission
-- Beobachtung: In S141 meldeten drei Layer-Subagenten (Frontend run-2, Backend run-2, Frontend Review-Fixes) unabhängig, dass der Bash-Hook python3-Heredocs, sed -i, cat >> (Redirect) und einen Heredoc-Edit mit anschließendem Wrapper-Aufruf im selben Befehl blockt. Alle wichen ohne Folgen auf Edit aus, verloren dabei aber je einen oder mehrere Versuche und meldeten den Punkt als Prozess-Auffälligkeit im Return. Offen ist, ob die Agent-Definitionen den Weg (Dateien per Edit/Write ändern) so klar nennen, dass der erste Versuch schon richtig ist. Erneut in S143 (US-602 run-6): Drei der vier Layer-Subagenten meldeten in ihrem Prozessverbesserungs-Abschnitt Fehlversuche an Heredoc-Skripten mit Wrapper-Aufruf, sed -i und npx eslint bzw. npm run lint, bevor sie auf Edit und eslint-run wechselten. Erneut in S144 (US-602 run-8): Vier von sechs Layer-Subagenten meldeten Fehlversuche an python3-Heredocs, sed -i oder Redirects auf Repo-Dateien, bevor sie auf Edit/Write wechselten; auch der Orchestrator lief einmal in die Sperre (Heredoc-Anhängen an eine Spec-Datei).
+- Beobachtung: In S141 meldeten drei Layer-Subagenten (Frontend run-2, Backend run-2, Frontend Review-Fixes) unabhängig, dass der Bash-Hook python3-Heredocs, sed -i, cat >> (Redirect) und einen Heredoc-Edit mit anschließendem Wrapper-Aufruf im selben Befehl blockt. Alle wichen ohne Folgen auf Edit aus, verloren dabei aber je einen oder mehrere Versuche und meldeten den Punkt als Prozess-Auffälligkeit im Return. Offen ist, ob die Agent-Definitionen den Weg (Dateien per Edit/Write ändern) so klar nennen, dass der erste Versuch schon richtig ist. Erneut in S143 (US-602 run-6): Drei der vier Layer-Subagenten meldeten in ihrem Prozessverbesserungs-Abschnitt Fehlversuche an Heredoc-Skripten mit Wrapper-Aufruf, sed -i und npx eslint bzw. npm run lint, bevor sie auf Edit und eslint-run wechselten. Erneut in S144 (US-602 run-8): Vier von sechs Layer-Subagenten meldeten Fehlversuche an python3-Heredocs, sed -i oder Redirects auf Repo-Dateien, bevor sie auf Edit/Write wechselten; auch der Orchestrator lief einmal in die Sperre (Heredoc-Anhängen an eine Spec-Datei). Erneut in S148 (US-602 run-11): Fünf von sechs Layer-Subagenten meldeten Fehlversuche an python3-Heredocs bzw. sed -i (einer auch an einem Filter hinter dem Wrapper), bevor sie auf Edit wechselten; der Orchestrator lief einmal in die Sperre (Heredoc-Anhängen an die E2E-Spec).
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -254,7 +254,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: PROZESS    Kontext: Review
-- Beobachtung: US-602 run-6 (S143) brauchte vier Review-Runden; jede fand bei 0 ❌ zwischen 6 und 15 ⚠️. Ab Runde 3 widersprachen Funde direkt früheren Runden: Ein Test-Helfer wurde in Runde 3 verlangt und in Runde 4 als „verbirgt Arrange und Act“ wieder beanstandet; eine explizite Existenz-Assertion wurde in Runde 1 verlangt und in Runde 4 als redundant gemeldet; die Unterscheidung toHaveCount(0) gegenüber toBeHidden() wurde in Runde 2 als begründet gelobt und in Runde 4 als Streuung beanstandet. Die Regel „Auditoren ohne Iterations-Vorwissen“ verhindert gedämpfte Kritik, lässt aber jede Runde neue Politur finden; das Rundenlimit (max. 3) stoppte den Loop, die Fortsetzung entschied der User. Jede Runde kostete vier bis fünf Agentenläufe plus einen Fix-Subagenten und einen qa-check. Weiterer Fall S147 (US-602 run-9): Auch hier drei Runden ohne Konvergenz. Frische Auditoren kehrten in Runde 3 zwei Empfehlungen aus Runde 2 um (Titel-Konstante im E2E-Test, Default eines Test-Data-Builders), und jede Runde brachte neue kosmetische ⚠️. Der User beendete den Loop nach Runde 3 und hängte die inhaltlichen Punkte an einen TD für run-13.
+- Beobachtung: US-602 run-6 (S143) brauchte vier Review-Runden; jede fand bei 0 ❌ zwischen 6 und 15 ⚠️. Ab Runde 3 widersprachen Funde direkt früheren Runden: Ein Test-Helfer wurde in Runde 3 verlangt und in Runde 4 als „verbirgt Arrange und Act“ wieder beanstandet; eine explizite Existenz-Assertion wurde in Runde 1 verlangt und in Runde 4 als redundant gemeldet; die Unterscheidung toHaveCount(0) gegenüber toBeHidden() wurde in Runde 2 als begründet gelobt und in Runde 4 als Streuung beanstandet. Die Regel „Auditoren ohne Iterations-Vorwissen“ verhindert gedämpfte Kritik, lässt aber jede Runde neue Politur finden; das Rundenlimit (max. 3) stoppte den Loop, die Fortsetzung entschied der User. Jede Runde kostete vier bis fünf Agentenläufe plus einen Fix-Subagenten und einen qa-check. Weiterer Fall S147 (US-602 run-9): Auch hier drei Runden ohne Konvergenz. Frische Auditoren kehrten in Runde 3 zwei Empfehlungen aus Runde 2 um (Titel-Konstante im E2E-Test, Default eines Test-Data-Builders), und jede Runde brachte neue kosmetische ⚠️. Der User beendete den Loop nach Runde 3 und hängte die inhaltlichen Punkte an einen TD für run-13. Weiterer Fall S148 (US-602 run-11): Runde 1 verlangte, die Meldungsliste im Frontend-Test nicht seitenweit zu suchen; Runde 2 band sie über aria-describedby ans Feld; Runde 3 beanstandete genau diese Bindung als Kopplung und die seitenweite Gegenprobe als fragil. Dazu kam eine in Runde 1 vom User verworfene Szenario-Bindung in Runde 3 wieder. Wegen Fixes durch Schicht-Subagenten waren alle drei Runden nötig (R1 und R2 je fünf Auditoren, R3 zwei); erst Runde 3 endete mit nur trivialen Fixes.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-6 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -360,4 +360,64 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Vorprägung: Vermutung ohne Beleg: Typ-Immutabilität wird in eslint-plugin-functional/is-immutable-type über Dateien hinweg zwischengespeichert, das Ergebnis könnte von der Lint-Reihenfolge abhängen.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: Recherche – Ursache unklar, braucht Läufe mit gestashtem Arbeitsbaum und isolierter Regel
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S148-3 – Auditoren sollen Tests fahren, der Nur-Lese-Hook blockt die Test-Wrapper
+- Quelle: Subagent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: häufig
+- Kategorie: TOOLING    Kontext: Review
+- Beobachtung: review-code verlangt, dass Auditoren jedes Finding am Stand belegen, auch durch Testläufe, und der Orchestrator-Prompt nannte python3 -m prozesscode.dotnet-test bzw. vitest-run. In US-602 run-11 meldeten mehrere Auditoren (functional-correctness R1 und R2, test-quality R2, code-quality R1), der Hook habe dotnet-test geblockt, laut eigener Angabe auch ohne Pipe oder Redirect; vitest-run lief bei einem. Folge: Befunde kamen als „offene Prüfung" statt belegt, und die Gegenproben musste der Orchestrator bzw. ein Schicht-Subagent nachholen. Nicht nachgestellt: ob der Hook dotnet-test für Auditoren absichtlich sperrt (der Build schreibt bin/obj) oder ob nur der Aufruf mit Filter/Pipe scheiterte. Zu klären: Wrapper für Auditoren freigeben (ggf. im Nur-Lese-Modus ohne Build) oder den Auftrag im Prompt und in review-code auf das ändern, was erlaubt ist.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-11 als Beobachtung entschieden; Ursache erst beim Drain nachstellen
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S148-4 – Sonar-Regeln, auf die sich Code-Kommentare berufen, sind im Build nicht prüfbar
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Sonstiges
+- Beobachtung: Mehrere Backend-Stellen begründen eine Form mit einer Sonar-Regel („Sonar S8949 verlangt die explizite Wahl" des CancellationToken). In US-602 run-11 wurden alle Aufrufe auf eine zentrale Konstante Cancellation.None umgestellt; ob S8949 das als explizite Wahl akzeptiert, ließ sich nicht prüfen: Der Build (TreatWarningsAsErrors) bindet keinen Sonar-Analyzer ein, die Regel läuft nur in der IDE-Analyse des Users. Damit sind Kommentare, die sich auf Sonar berufen, und Umbauten, die sie berühren, für Agenten unprüfbar. Zu klären: SonarAnalyzer.CSharp in den Build aufnehmen (Kosten, Lärm), einen Wrapper für eine Sonar-Analyse anbieten, oder Sonar-Begründungen im Code als ungeprüft kennzeichnen.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-11 als Beobachtung entschieden (statt in der IDE zu prüfen oder zurückzudrehen)
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S148-5 – Line-Coverage zählte eine const-decimal-Zeile als nicht ausgeführt
+- Quelle: Subagent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Testing
+- Beobachtung: In US-602 run-11 brach die Line-Coverage (Gate 100 %) an einer unveränderten Zeile in Server/Domain/QuantityAmount.cs: private const decimal ThousandthsPerUnit = 1000m; meldete 0 Treffer (Line 99,80 %), zweimal reproduziert, obwohl der Wert in jedem Mengen-Test verwendet wird. Ein const decimal ist in C# kein IL-Literal, sondern ein Feld mit DecimalConstantAttribute; warum die Zeile vor dem Umbau gezählt wurde und danach nicht, ist ungeklärt (vermutet, nicht gemessen: Zeitpunkt der Typinitialisierung). Umgangen durch const int und Umrechnung an der Verwendungsstelle. Andere const decimal im Code könnten das Gate genauso flackern lassen; zu klären: Ursache nachstellen, ggf. Guideline-Hinweis oder Coverage-Ausschluss für solche Deklarationen.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: Recherche – die Ursache nachzustellen braucht mehrere Coverage-Läufe mit Varianten (Tiering, Typinitialisierung); im Lauf per int umgangen
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S148-6 – Das von EF erzeugte SQL ist über den dotnet-test-Wrapper nicht einsehbar
+- Quelle: Subagent
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Testing
+- Beobachtung: Um zu belegen, dass EF eine Abfrage mit lower() auf beiden Seiten nach SQL übersetzt (ADR-S135-2, Addendum S148 – kein Test trennt das), musste der Backend-Subagent in US-602 run-11 vorübergehend Code ändern: ein LogTo in die Datei im Scratchpad in TestWebApplicationFactory und einen Logging-Eintrag in appsettings.json, beides danach zurückgebaut; das kostete rund drei Zyklen. Der Wrapper zeigt keine Logs des Test-Hosts, auch nicht mit --verbose (MTP/xUnit schluckt die Konsolenausgabe), und Umgebungsvariablen als Präfix blockt der Bash-Hook. Vorschlag des Subagenten: ein Schalter am Wrapper (z. B. --sql-log), der das EF-Command-Logging per Umgebung in eine Scratchpad-Datei lenkt.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-11 als Beobachtung entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S148-7 – jscpd meldet ein Duplikat zwischen tests/test_qa_check.py und tests/test_qa_check_git.py
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: dauerhaft
+- Kategorie: QUALITÄT    Kontext: Hook/Script
+- Beobachtung: Beim REFACTOR von US-602 run-11 meldete python3 -m prozesscode.jscpd-run einen Fund, den dieser Lauf nicht erzeugt hat: tests/test_qa_check.py Zeilen 142–157 gleichen tests/test_qa_check_git.py Zeilen 19–34. Beide Dateien hat der Lauf nicht angefasst. Wahrscheinlich eine gemeinsame Fixture bzw. Hilfsfunktion, die beim Aufteilen der qa-check-Tests doppelt blieb; nicht geprüft, seit wann.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-11 als Beobachtung entschieden; außerhalb des Laufs
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S148-8 – td add vergibt die ID eines in derselben Session entfernten Eintrags erneut
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: HOCH    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: In S148 entfernte td remove den Eintrag TD-S148-1 („Zutatensuche faltet anders als der Unique-Index", behoben in US-602 run-11); das folgende td add vergab für einen neuen, anderen Eintrag wieder TD-S148-1. Die alte ID steht aber schon in der Historie (Commit 3e4d7b0, tech-debt.md von HEAD): git log --grep und jeder Verweis in einer Commit-Nachricht träfen danach zwei verschiedene Einträge. Ursache vermutet, nicht im Code gelesen: Die ID-Vergabe zählt nur die aktuell in der Datei stehenden IDs der laufenden Session. Behelf diesmal: ID per Edit auf TD-S148-2 geändert (User-Freigabe). Vermutlich gleiche Logik in oq.py und weiteren Trackern. Behebung: die nächste freie Nummer gegen die git-Historie (alle je vergebenen IDs der Session) bestimmen.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von US-602 run-11 entschieden: diesmal einmalig per Edit umbenannt, Werkzeug-Fix später
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

@@ -12,6 +12,16 @@ export type FieldMessage<Element extends HTMLElement> = {
 // eslint-disable-next-line functional/prefer-immutable-types -- Ref-Callback erhält das DOM-Element
 export type InputRefCallback = (element: HTMLTextAreaElement | null) => void
 
+// ADR-S135-4 (Addendum S148): Das Zutatenfeld zeigt alle Meldungen des Servers in dessen Reihenfolge.
+export type FieldMessageList<Element extends HTMLElement> = {
+  readonly messages: readonly string[]
+  readonly ref: RefObject<Element | null>
+}
+
+// Stabile Referenz für „keine Meldungen": `?? []` erzeugte je Rendern ein neues Array, und die useMemo-Abhängigkeiten
+// (Fokus-Reihenfolge, Rückgabe) liefen jedes Mal neu.
+const noMessages: readonly string[] = []
+
 type FocusCandidate = { readonly message: string | undefined; readonly element: () => HTMLElement | null | undefined }
 
 // ADR-S135-4: Nach einem Fehler erhält das erste Feld mit Meldung den Fokus. `candidates` steht in der
@@ -33,7 +43,7 @@ export function useRecipeFieldMessages(error: ApiError | undefined, sentFieldInd
   const stepInputs = useRef<(HTMLTextAreaElement | null)[]>([])
   const fields = error?.kind === 'FieldErrors' ? error.fields : undefined
   const titleMessage = fields?.title?.[0]
-  const ingredientsMessage = fields?.ingredients?.[0]
+  const ingredientsMessages = fields?.ingredients ?? noMessages
   const stepsMessage = fields?.steps?.[0]
   const instructionMessages = useMemo(
     () => messagesByFieldIndex(sentFieldIndexes, (sentIndex) => instructionMessageAtSentIndex(fields, sentIndex)),
@@ -43,17 +53,17 @@ export function useRecipeFieldMessages(error: ApiError | undefined, sentFieldInd
   const firstInstruction = useMemo(() => [...instructionMessages][0], [instructionMessages])
   const focusOrder = useMemo<readonly FocusCandidate[]>(() => [
     { message: titleMessage, element: () => titleRef.current },
-    { message: ingredientsMessage, element: () => ingredientsRef.current },
+    { message: ingredientsMessages[0], element: () => ingredientsRef.current },
     { message: stepsMessage, element: () => stepInputs.current[0] },
     // Nur die erste Anweisungs-Meldung zählt (Formularreihenfolge): sie erhält den Fokus.
     { message: firstInstruction?.[1], element: () => stepInputs.current[firstInstruction?.[0] ?? 0] },
-  ], [titleMessage, ingredientsMessage, stepsMessage, firstInstruction])
+  ], [titleMessage, ingredientsMessages, stepsMessage, firstInstruction])
   useFocusFirstMessage(error, focusOrder)
 
   // useMemo: Der React-Compiler-Lint (react-hooks/refs) akzeptiert Objekte mit Refs im Rückgabewert nur memoisiert.
   return useMemo(() => ({
     title: { message: titleMessage, ref: titleRef },
-    ingredients: { message: ingredientsMessage, ref: ingredientsRef },
+    ingredients: { messages: ingredientsMessages, ref: ingredientsRef },
     steps: {
       message: stepsMessage,
       instructionMessage: (fieldIndex: number) => instructionMessages.get(fieldIndex),
@@ -62,5 +72,5 @@ export function useRecipeFieldMessages(error: ApiError | undefined, sentFieldInd
         stepInputs.current[fieldIndex] = element
       },
     },
-  }), [titleMessage, ingredientsMessage, stepsMessage, instructionMessages])
+  }), [titleMessage, ingredientsMessages, stepsMessage, instructionMessages])
 }

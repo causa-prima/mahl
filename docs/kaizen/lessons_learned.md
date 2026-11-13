@@ -139,3 +139,23 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Der ADR-Scan ist im Architektur-Check verankert (CM-S107-2); Entscheidungen, die erst in der Triage entstehen – hier eine Build-/Test-Konfiguration –, durchlaufen keinen solchen Schritt. Die Recherche richtete sich auf die Stryker-Doku, nicht auf den eigenen Bestand.
   Regel: Bevor ich eine Änderung an Produkt-Konfiguration oder Querschnittsregeln empfehle – auch mitten in Triage oder Review –, zuerst decisions list --tag <dimension> zur betroffenen Dimension (hier testing:stryker); eine gefundene ADR gehört mit Kurztitel und Kernargument in die Vorlage an den User.
   CM-Bezug: CM-S107-2
+
+- **[MITTEL] [PROZESS] [Review] LL-S148-7 – Aussage eines Subagenten über Werkzeugverhalten im Test-Review ohne Gegenprobe übernommen**
+  Quelle: Orchestrator
+  Was: In der PLANUNG von US-602 run-11 schlug der Backend-Subagent WithStrictOrdering() im gemeinsamen 422-Helfer vor und schrieb, die Dictionary-Keys seien davon nicht betroffen; ich antwortete „einverstanden" und gab den Test-Batch frei, der Kommentar behauptete dasselbe. Erst in Review-Runde 2 zeigte ein Experiment (Keys vertauscht → rot), dass die Tests die Key-Reihenfolge pinnten – Überspezifikation gegen ADR-S090-1, die harmlose Umbauten rot gemacht hätte; ein Fix-Subagent musste den Helfer umbauen.
+  Warum: Die Behauptung betraf externes Werkzeugverhalten (FluentAssertions) und klang plausibel; im Test-Review prüfte ich die Assertions gegen die Szenarien, nicht die Werkzeug-Annahme hinter dem Helfer. Eine Gegenprobe (Keys im Erwartungswert vertauschen) hätte eine Minute gekostet.
+  Regel: Stützt sich ein Test-Batch auf eine Aussage über Werkzeugverhalten (Matcher-Optionen, Vergleichssemantik), wird sie vor der Freigabe per Gegenprobe belegt oder vom Subagenten belegt eingefordert – nicht als Planungsdetail durchgewunken.
+  CM-Bezug: CM-S064-1
+
+- **[MITTEL] [PROZESS] [Kommunikation] LL-S148-8 – ADR eine Aussage zugeschrieben, die nur in einem Code-Kommentar steht**
+  Quelle: Orchestrator
+  Was: In US-602 run-11 begründete ich gegenüber dem Backend-Subagenten die Entscheidung zur Key-Reihenfolge mit „ADR-S135-3: die Fehlerreihenfolge der Keys ist unerheblich". Der Satz steht in einem Code-Kommentar an ToValues, nicht in ADR-S135-3. Der Subagent übernahm den Verweis in den Kommentar des Test-Helfers; erst beim Freigabe-Review fiel es mir auf, die Korrektur kostete eine weitere Runde Nachricht und Änderung.
+  Warum: Ich zitierte aus dem Gedächtnis des Code-Kommentars, der selbst auf ADRs verweist, und schrieb die Aussage der nächstliegenden ADR zu, ohne den ADR-Text abzurufen. Ein falsches Zitat in einer Anweisung an einen Subagenten wird von ihm als Beleg weitergetragen.
+  Regel: Wer eine ADR als Beleg für eine Aussage nennt, ruft ihren Text vorher ab (decisions get) – besonders in Anweisungen an Subagenten, die das Zitat in Code oder Doku übernehmen.
+  CM-Bezug: CM-S064-1
+
+- **[MITTEL] [PROZESS] [Testing] LL-S148-9 – Zwei parallele Fix-Subagenten fuhren E2E gleichzeitig – der zweite brach am belegten Port ab**
+  Quelle: Orchestrator
+  Was: In Review-Runde 1 von US-602 run-11 startete ich Frontend- und Backend-Fix-Subagenten parallel und trug beiden einen Playwright-Lauf auf. Der Frontend-Subagent brach zweimal mit „http://localhost:5059 … is already used" ab, ohne Ergebnis; ich fuhr den Lauf danach selbst.
+  Warum: Parallelität spart Zeit, und ich habe beim Auftrag nicht bedacht, dass die E2E-Suite einen festen Port und eine gemeinsame DB belegt; implementing-scenario kannte bisher nur den sequentiellen Fall (Frontend, dann Backend).
+  Regel: Laufen Schicht-Subagenten parallel, fährt keiner E2E; das tut der Orchestrator danach (in implementing-scenario, Review-Loop, ergänzt).

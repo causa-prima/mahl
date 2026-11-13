@@ -18,7 +18,7 @@ import { useResultMutation } from '../hooks/useResultMutation'
 import { createRecipe } from '../services/recipesApi'
 import { useDiscardQuestion } from '../hooks/useDiscardQuestion'
 import { useRecipeFieldMessages } from '../hooks/useRecipeFieldMessages'
-import type { FieldMessage, InputRefCallback } from '../hooks/useRecipeFieldMessages'
+import type { FieldMessage, FieldMessageList, InputRefCallback } from '../hooks/useRecipeFieldMessages'
 import { useRecipeForm } from '../hooks/useRecipeForm'
 import { sentStepFieldIndexes, toNewRecipe } from '../domain/recipe'
 import type { Recipe } from '../domain/recipe'
@@ -130,7 +130,7 @@ type TitleAndIngredientsFieldsProps = {
   readonly onTitleChange: (title: string) => void
   readonly onIngredientsChange: (ingredients: string) => void
   readonly titleField: FieldMessage<HTMLInputElement>
-  readonly ingredientsField: FieldMessage<HTMLTextAreaElement>
+  readonly ingredientsField: FieldMessageList<HTMLTextAreaElement>
 }
 
 function TitleAndIngredientsFields(props: Readonly<TitleAndIngredientsFieldsProps>) {
@@ -157,7 +157,7 @@ function TitleAndIngredientsFields(props: Readonly<TitleAndIngredientsFieldsProp
 
 type IngredientsFieldProps = {
   readonly value: string
-  readonly field: FieldMessage<HTMLTextAreaElement>
+  readonly field: FieldMessageList<HTMLTextAreaElement>
   readonly onChange: (ingredients: string) => void
 }
 
@@ -168,13 +168,14 @@ function IngredientsField({ value, field, onChange }: Readonly<IngredientsFieldP
   const inputId = useId()
   const hintId = useId()
   const messageId = useId()
-  const { message } = field
+  const { messages } = field
+  const hasMessages = messages.length > 0
   // error={false}: Der Hinweis bleibt grau, auch wenn das Feld im Fehlerzustand ist.
   // Stryker disable next-line BooleanLiteral: reine Farbe des Hinweises ohne Semantik (ADR-S144-3)
   const hintElement = <FormHelperText id={hintId} error={false}>{ingredientsHint}</FormHelperText>
   return (
     // error trägt aria-invalid an das Eingabefeld weiter – Semantik, getestet (ADR-S144-3).
-    <FormControl fullWidth required margin="normal" error={message !== undefined}>
+    <FormControl fullWidth required margin="normal" error={hasMessages}>
       <InputLabel htmlFor={inputId}>Zutaten</InputLabel>
       <OutlinedInput
         id={inputId}
@@ -186,14 +187,24 @@ function IngredientsField({ value, field, onChange }: Readonly<IngredientsFieldP
         slotProps={{
           input: {
             // Stryker disable next-line ConditionalExpression: Verknüpfung nur bei vorhandener Meldung (ADR-S144-3)
-            'aria-describedby': message === undefined ? hintId : `${hintId} ${messageId}`,
+            'aria-describedby': hasMessages ? `${hintId} ${messageId}` : hintId,
           },
         }}
         onChange={(e) => { onChange(e.target.value) }}
       />
       {hintElement}
-      <FieldMessageText id={messageId} message={message} />
+      {hasMessages && <IngredientMessageList id={messageId} messages={messages} />}
     </FormControl>
+  )
+}
+
+// Aufzählung, auch bei einer einzelnen Meldung (ADR-S135-4, Addendum S148).
+function IngredientMessageList({ id, messages }: Readonly<{ id: string, messages: readonly string[] }>) {
+  return (
+    <FormHelperText id={id} component="ul">
+      {/* Text taugt nicht als Key, weil zwei gleiche Zeilen zwei gleiche Meldungen ergeben; der Index ist stabil, weil die Liste nur komplett ersetzt wird. */}
+      {messages.map((text, index) => <li key={index}>{text}</li>)}
+    </FormHelperText>
   )
 }
 

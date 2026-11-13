@@ -19,10 +19,14 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
 #pragma warning restore CA1812
 
+    // Alle geseedeten Zutaten – der erwartete Zutatenbestand nach jedem Anlegen (die Zutaten bleiben unverändert).
+    private readonly List<IngredientDbType> _seededIngredients = [];
+
     // Helper: legt Zutaten an und leert danach den Tracker – folgende Full-State-Abfragen lesen so die
     // DB, nicht die getrackten Seed-Instanzen.
     private async Task SeedIngredientsAsync(params IngredientDbType[] ingredients)
     {
+        _seededIngredients.AddRange(ingredients);
         Db.Ingredients.AddRange(ingredients);
         await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
         Db.ChangeTracker.Clear();
@@ -500,7 +504,8 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
     // Gemeinsamer Then-Teil von „Rezept mit einem Schritt gespeichert" (Full State): 201, genau ein Rezept in der DB
     // (Id vergibt der Server; sie wird über recipes[0].Id gegen den Body geprüft), Body in Zutatenreihenfolge,
     // Rezept-Zutaten in Zeilenreihenfolge (Position = Index + 1, Menge aus der erwarteten Anzeige), ein Schritt
-    // und unveränderte Zutaten. Je Zutat ein Paar aus geseedeter Zutat und erwarteter Anzeige, in Zeilenreihenfolge.
+    // und unveränderte Zutaten (alle geseedeten, auch die, die keine Zeile nennt). Je Zutat ein Paar aus geseedeter
+    // Zutat und erwarteter Anzeige, in Zeilenreihenfolge.
     private async Task AssertRecipeWithOneStepStoredAsync(
         HttpResponseMessage response, string title, string instruction,
         params (IngredientDbType Seed, RecipeIngredientResponse Expected)[] ingredients)
@@ -522,7 +527,7 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         (await Db.Steps.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
             [AStep(recipeId: recipes[0].Id, stepNumber: 1, instruction: instruction)], "genau ein Schritt ist gespeichert");
         (await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
-            ingredients.Select(i => i.Seed), "die Zutaten bleiben unverändert");
+            _seededIngredients, "die Zutaten bleiben unverändert");
     }
 
     // Szenario: Titel und Anweisung mit genau der zulässigen Länge werden gespeichert
@@ -593,14 +598,21 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
     {
         // Given: die Zutat "Mehl" mit Einheit "g" existiert
         await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
-        var request = ACreateRecipe(title: "Pfannkuchen", ingredients: line, steps: [AStepPayload("Teig rühren.")]);
 
         // When: das Rezept wird gespeichert
-        var response = await PostRecipeAsync(request);
+        var response = await PostPancakesAsync(line);
 
         // Then: genau die eine Meldung bei den Zutaten, nichts gespeichert
         await AssertRejectedWithAsync(response, SingleError("ingredients", $"„{line}“: {expectedMessage}"));
     }
+
+    // Das Rezept „Pfannkuchen“ mit einem Schritt und genau diesen Zutatenzeilen.
+    private Task<HttpResponseMessage> PostPancakesAsync(string ingredients) =>
+        PostRecipeAsync(ACreateRecipe(title: "Pfannkuchen", ingredients: ingredients, steps: [AStepPayload("Teig rühren.")]));
+
+    // Die Meldung ohne Zitat der Zeile, wenn die Zutat nicht (aktiv) im Bestand ist.
+    private static string NotFound(string name) =>
+        $"Zutat '{name}' nicht gefunden. Neue Zutaten werden auf der Zutaten-Seite angelegt.";
 
     private const string NotANumber = "Menge muss eine Zahl sein (z. B. 1,5).";
     private const string NotPositive = "Menge muss größer als 0 sein.";
@@ -623,6 +635,171 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         new("5, g Mehl", NotANumber) { TestDisplayName = "5, g Mehl" },
         new("1,5,5 g Mehl", NotANumber) { TestDisplayName = "1,5,5 g Mehl" },
     ];
+
+    // Szenario: Zutat nicht gefunden oder Einheit falsch
+    // Beispiel: alle
+    // „250 g Butter": eine gelöschte Zutat gilt als nicht gefunden (ADR-S135-2). „1": nach der Menge steht kein
+    // Wort mehr, die Zutat fehlt (ADR-S135-2, Addendum S148).
+    [Theory]
+    [MemberData(nameof(UnresolvableIngredientLines))]
+    public async Task US602_Error_CreateRecipe_IngredientNotFoundOrUnitWrong_Returns422AtIngredients(
+        string line, string expectedMessage)
+    {
+        // Given: "Mehl" (g) und "Zwiebel" (Stück) existieren, "Butter" (g) existiert und wurde gelöscht
+        await SeedIngredientsAsync(
+            AnIngredient("Mehl", "g"),
+            AnIngredient("Zwiebel", "Stück"),
+            AnIngredient("Butter", "g", deletedAt: DateTimeOffset.UtcNow));
+
+        // When: das Rezept wird gespeichert
+        var response = await PostPancakesAsync(line);
+
+        // Then: genau die eine Meldung bei den Zutaten, nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError("ingredients", $"„{line}“: {expectedMessage}"));
+    }
+
+    // Parameter: Zeile, Meldung ohne Zitat der Zeile.
+    public static IEnumerable<TheoryDataRow<string, string>> UnresolvableIngredientLines =>
+    [
+        new("250 g Mehk", NotFound("Mehk")) { TestDisplayName = "250 g Mehk" },
+        new("250 g Butter", NotFound("Butter")) { TestDisplayName = "250 g Butter (gelöscht)" },
+        new("2 EL Mehl", "Einheit 'EL' passt nicht zu 'Mehl' (möglich: 'g').") { TestDisplayName = "2 EL Mehl" },
+        new("1 Zwiebel", "Einheit fehlt (für 'Zwiebel': 'Stück').") { TestDisplayName = "1 Zwiebel" },
+        new("1", "Zutat fehlt.") { TestDisplayName = "1 (nur Menge)" },
+    ];
+
+    // Szenario: Alle fehlerhaften Zutatenzeilen werden gemeinsam und in Zeilenreihenfolge gemeldet
+    [Fact]
+    public async Task US602_Error_CreateRecipe_SeveralInvalidIngredientLines_Returns422InLineOrder()
+    {
+        // Given: die Zutaten "Mehl" (g) und "Milch" (ml) existieren
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"), AnIngredient("Milch", "ml"));
+
+        // When: das Rezept wird gespeichert
+        var response = await PostPancakesAsync("250 g Mehl\n2 Eier\n500 Milch");
+
+        // Then: beide Meldungen gemeinsam und in Zeilenreihenfolge bei den Zutaten, nichts gespeichert
+        await AssertRejectedWithAsync(response, new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            ["ingredients"] =
+            [
+                $"„2 Eier“: {NotFound("Eier")}",
+                "„500 Milch“: Einheit fehlt (für 'Milch': 'ml').",
+            ],
+        });
+    }
+
+    // Szenario: Eine Zutat, die schon in einer früheren Zeile steht, wird gemeldet
+    [Fact]
+    public async Task US602_Error_CreateRecipe_IngredientInEarlierLine_Returns422AtIngredients()
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+
+        // When: das Rezept wird gespeichert
+        var response = await PostPancakesAsync("250 g Mehl\n100 g Mehl");
+
+        // Then: genau die Meldung zur zweiten Zeile, nichts gespeichert
+        await AssertRejectedWithAsync(
+            response, SingleError("ingredients", "„100 g Mehl“: Zutat 'Mehl' steht bereits in einer früheren Zeile."));
+    }
+
+    // ADR-S135-2 (Addendum S148) (kein US-Tag, ADR-S106-3 „Stryker-blinde Invariante"): Prüfreihenfolge einer Zeile –
+    // die Menge kommt vor „Zutat fehlt". Eine Zeile nur aus ungültiger Menge nennt die Menge; ein Umtausch der
+    // Prüfungen ist kein Mutant.
+    [Fact]
+    public async Task CreateRecipe_LineOfInvalidQuantityOnly_ReportsQuantityBeforeMissingIngredient()
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+
+        // When: das Rezept wird gespeichert
+        var response = await PostPancakesAsync("0");
+
+        // Then: die Mengenmeldung, nicht „Zutat fehlt.", nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError("ingredients", "„0“: Menge muss größer als 0 sein."));
+    }
+
+    // ADR-S135-2 (Addendum S148) (kein US-Tag, ADR-S106-3 „Stryker-blinde Invariante"): doppelt ist eine Zeile nur
+    // gegenüber einer früheren FEHLERFREIEN Zeile – die fehlerhafte erste Zeile zählt nicht als Zutat. Die Zutat
+    // schon beim Auflösen zu merken (vor der Einheitenprüfung) ist kein Mutant.
+    [Fact]
+    public async Task CreateRecipe_EarlierLineWithWrongUnit_DoesNotMakeLaterLineDuplicate()
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+
+        // When: das Rezept wird gespeichert
+        var response = await PostPancakesAsync("2 EL Mehl\n100 g Mehl");
+
+        // Then: genau eine Meldung, zur ersten Zeile; keine Doppelt-Meldung zur zweiten
+        await AssertRejectedWithAsync(
+            response, SingleError("ingredients", "„2 EL Mehl“: Einheit 'EL' passt nicht zu 'Mehl' (möglich: 'g')."));
+    }
+
+    // ADR-S135-2 (Addendum S148) (kein US-Tag, ADR-S106-3 „Stryker-blinde Invariante"): doppelt ist die Zutat, nicht
+    // die Schreibweise – Groß-/Kleinschreibung und eine fehlende Menge in der früheren Zeile ändern daran nichts.
+    // Ein Vergleich über den Namen aus der Zeile statt über die Zutat ist kein Mutant.
+    [Theory]
+    [InlineData("250 g Mehl\n100 g mehl", "„100 g mehl“: Zutat 'mehl' steht bereits in einer früheren Zeile.")]
+    [InlineData("Mehl\n250 g Mehl", "„250 g Mehl“: Zutat 'Mehl' steht bereits in einer früheren Zeile.")]
+    public async Task CreateRecipe_SameIngredientInOtherSpellingOrWithoutQuantity_ReportsDuplicateAtLaterLine(
+        string ingredients, string expectedMessage)
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+
+        // When: das Rezept wird gespeichert
+        var response = await PostPancakesAsync(ingredients);
+
+        // Then: genau die Doppelt-Meldung zur späteren Zeile, nichts gespeichert
+        await AssertRejectedWithAsync(response, SingleError("ingredients", expectedMessage));
+    }
+
+    // ADR-S135-3 (kein US-Tag, ADR-S106-3 „Stryker-blinde Invariante"): alle Feldprüfungen laufen gesammelt – auch
+    // die Prüfung der Zeile, die den Zutatenbestand braucht, steht neben der Titelmeldung. Ein kurzschließender
+    // Umbau (Titel zuerst, dann Zeilen) ist kein Mutant.
+    [Fact]
+    public async Task CreateRecipe_EmptyTitleAndUnknownIngredient_Returns422WithBothMessages()
+    {
+        // Given: die Zutat "Mehl" mit Einheit "g" existiert; Titel leer, Zeile mit unbekannter Zutat
+        await SeedIngredientsAsync(AnIngredient("Mehl", "g"));
+        var request = ACreateRecipe(title: "", ingredients: "250 g Mehk");
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: beide Meldungen gleichzeitig, nichts gespeichert
+        await AssertRejectedWithAsync(response, new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            ["title"] = ["Titel darf nicht leer sein."],
+            ["ingredients"] = [$"„250 g Mehk“: {NotFound("Mehk")}"],
+        });
+    }
+
+    // ADR-S135-2, Addendum S148 (kein US-Tag, ADR-S106-3 „Stryker-blinde Invariante"): eine Zeile trifft die Zutat,
+    // die unter LOWER – der Funktion des Unique-Index (ADR-S105-2) – gleich heißt, also höchstens eine. „µg-Mix"
+    // (Mikro-Zeichen U+00B5) und „μg-Mix" (griechisches My U+03BC) lässt der Index beide zu; ein .NET-Vergleich mit
+    // OrdinalIgnoreCase hielte sie für gleich. Was der Test trennt: OrdinalIgnoreCase gegen LOWER. Was nicht: ob
+    // LOWER in der DB oder als ToLowerInvariant in .NET läuft – für dieses Paar fallen beide gleich aus.
+    [Fact]
+    public async Task CreateRecipe_IngredientNamesEqualOnlyUnderNetCaseFolding_ReferencesIngredientNamedInLine()
+    {
+        // Given: die Zutaten „µg-Mix" und „μg-Mix" existieren
+        var micro = AnIngredient(char.ConvertFromUtf32(0x00B5) + "g-Mix", "g");
+        var my = AnIngredient(char.ConvertFromUtf32(0x03BC) + "g-Mix", "g");
+        await SeedIngredientsAsync(micro, my);
+        const string title = "Testrezept";
+        const string instruction = "Alles mischen.";
+        var request = ACreateRecipe(title: title, ingredients: my.Name, steps: [AStepPayload(instruction)]);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: 201, die Rezept-Zutat verweist auf „μg-Mix", nicht auf „µg-Mix" (Full State)
+        await AssertRecipeWithOneStepStoredAsync(
+            response, title, instruction, (my, new RecipeIngredientResponse(Name: my.Name, Quantity: null, Unit: null)));
+    }
 
     // Szenario: Mengen an den Grenzen werden gespeichert und angezeigt
     // Beispiel: alle

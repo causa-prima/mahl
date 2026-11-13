@@ -1,19 +1,9 @@
 import type { Page, APIRequestContext } from '@playwright/test'
 import { test, expect, E2E_API_BASE } from './fixtures'
-import { createIngredientViaApi, seedIngredientViaApi } from './api/ingredientsApi'
+import { createIngredientViaApi, seedDeletedIngredientViaApi, seedIngredientViaApi } from './api/ingredientsApi'
 
 // Pending-Sperren und Undo-Toast der Zutaten-Seite laufen in der Querschnitts-Suite
 // (interaction.spec.ts, ADR-S112-5) – hier steht nur, was zutatenspezifisch ist.
-
-// Legt eine Zutat an und löscht sie direkt wieder (soft-delete) – Vorbedingung "die Zutat X
-// existiert und wurde gelöscht". Der ETag aus dem POST-Response geht als If-Match ins DELETE
-// (Plumbing: DELETE verlangt als mutierender Single-Resource-Endpoint einen If-Match, ADR-S058-1).
-async function seedDeletedIngredientViaApi(request: Readonly<APIRequestContext>, name: string, baseUnit: string): Promise<{ id: string }> {
-  const { id, etag } = await createIngredientViaApi(request, name, baseUnit)
-  const deleteResponse = await request.delete(`${E2E_API_BASE}/api/ingredients/${id}`, { headers: { 'If-Match': etag } })
-  expect(deleteResponse.status(), 'Seed-Löschen muss gelingen (204)').toBe(204)
-  return { id }
-}
 
 // Stellt eine soft-deleted Zutat direkt über die API wieder her – der "jemand anderes"-Zugriff der
 // beiden Parallelfall-Szenarien. Body ist Pflicht, Erfolgs-Status 200 (ADR-S111-1).

@@ -257,6 +257,7 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
   Button dem einer Liste entspricht.
 - **Formularfelder im Dialog:** `fullWidth` und `margin="dense"`.
 - **Formularfelder auf einer eigenen Seite** (z. B. „Rezept anlegen", ADR-S135-4): `fullWidth` und `margin="normal"` – eine Seite mit vielen, teils mehrzeiligen Feldern braucht am Handy mehr Abstand zwischen den Feldern als ein Dialog mit zweien. Eine Hilfsaktion („Schritt hinzufügen") steht direkt unter den Feldern, zu denen sie gehört; die Hauptaktion („Speichern") ist davon per `Stack spacing={2}` abgesetzt – derselbe Theme-Abstand wie im Seitenrumpf.
+- **Mehrere Meldungen an einem Feld** (Zutatenfeld, ADR-S135-4): Aufzählung als `FormHelperText component="ul"`; den Einzug (`1.25em` statt Browser-Default 40px) setzt das Theme für jedes `ul`-FormHelperText – die Aufzählungszeichen bleiben, damit die Listensemantik erhalten bleibt.
 - **Abschluss-Aktionen eines Formulars** („Abbrechen", „Speichern"): eine Zeile, rechtsbündig, die
   Hauptaktion rechts – im Dialog liefert das `DialogActions`, auf einer eigenen Seite eine
   `Stack direction="row"` mit `sx={{ justifyContent: 'flex-end' }}` (`justifyContent` nimmt der Stack

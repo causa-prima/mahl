@@ -123,8 +123,7 @@ file static class IngredientMappings
                 db.Ingredients.Add(dbType);
                 try
                 {
-                    // Bewusst ohne RequestAborted: Das Backend reicht Abbruch nirgends durch (Sonar S8949 verlangt die explizite Wahl).
-                    await db.SaveChangesAsync(CancellationToken.None);
+                    await db.SaveChangesAsync(Cancellation.None);
                 }
                 catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
                 {

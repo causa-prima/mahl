@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -1052,5 +1052,105 @@ describe('Rezept mit ungültiger Schritt-Anweisung', () => {
       title: recipeTitle, ingredients: recipeIngredients,
       steps: [{ instruction: validStep }, { instruction: tooLongInstruction }, { instruction: tooLongInstruction }],
     })
+  })
+})
+
+function ingredientsField() {
+  return screen.getByLabelText(/^Zutaten/)
+}
+
+// Die Elemente, auf die das Zutatenfeld per aria-describedby verweist (Hinweis, ggf. Meldungsliste).
+function describedByIds() {
+  return (ingredientsField().getAttribute('aria-describedby') ?? '').split(' ')
+}
+
+// Then: die Meldungen am Zutatenfeld stehen als Aufzählung in genau dieser Reihenfolge (ADR-S135-4, Addendum S148).
+function expectIngredientMessageList(messages: readonly string[]) {
+  const [, messageId] = describedByIds()
+  expect(messageId).toBeDefined()
+  const list = document.getElementById(messageId as string)
+  expect(list).not.toBeNull()
+  expect(screen.getAllByRole('list')).toContain(list)
+  expect(within(list as HTMLElement).getAllByRole('listitem').map((item) => item.textContent)).toEqual(messages)
+  expect(ingredientsField()).toHaveAccessibleDescription([ingredientsHint, ...messages].join(' '))
+  expect(ingredientsField()).toHaveAttribute('aria-invalid', 'true')
+}
+
+// @US-602-error
+describe('Rezept mit fehlerhaften Zutatenzeilen', () => {
+  const eierNotFound = "„2 Eier“: Zutat 'Eier' nicht gefunden. Neue Zutaten werden auf der Zutaten-Seite angelegt."
+  const milchUnitMissing = "„500 Milch“: Einheit fehlt (für 'Milch': 'ml')."
+
+  // Szenario: Alle fehlerhaften Zutatenzeilen werden gemeinsam und in Zeilenreihenfolge gemeldet
+  it('US602_Error_CreateRecipe_SeveralIngredientLinesInvalid_ShowsAllMessagesInServerOrderAndFocusOnField', async () => {
+    // Given: der Server meldet zwei Zeilen in Zeilenreihenfolge am Key `ingredients`
+    usePostRejectedWith({ ingredients: [eierNotFound, milchUnitMissing] })
+    const user = userEvent.setup()
+    await openCreateFormFromEmptyList()
+
+    // When: speichern
+    await clickSave(user)
+
+    // Then: beide Meldungen stehen als Aufzählung in Serverreihenfolge unter dem Hinweis, der Fokus liegt
+    // auf dem Zutatenfeld
+    await screen.findByText(eierNotFound)
+    expectIngredientMessageList([eierNotFound, milchUnitMissing])
+    expect(ingredientsField()).toHaveFocus()
+  })
+
+  // Szenario: Alle fehlerhaften Zutatenzeilen werden gemeinsam und in Zeilenreihenfolge gemeldet
+  // (jede fehlerhafte Zeile bekommt eine Meldung – auch zwei wörtlich gleiche Zeilen)
+  it('US602_Error_CreateRecipe_IdenticalIngredientLinesInvalid_ShowsOneMessagePerLineWithoutKeyWarning', async () => {
+    // Given: der Server meldet zwei wörtlich gleiche Meldungen (zwei gleiche fehlerhafte Zeilen)
+    usePostRejectedWith({ ingredients: [eierNotFound, eierNotFound] })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    onTestFinished(() => { consoleError.mockRestore() })
+    const user = userEvent.setup()
+    await openCreateFormFromEmptyList()
+
+    // When: speichern
+    await clickSave(user)
+
+    // Then: zwei Listeneinträge, React meldet keine doppelten Schlüssel
+    await screen.findAllByText(eierNotFound)
+    expectIngredientMessageList([eierNotFound, eierNotFound])
+    const keyWarnings = consoleError.mock.calls.map(([message]) => String(message)).filter((message) => message.includes('same key'))
+    expect(keyWarnings).toEqual([])
+  })
+
+  // Szenario: Eine Zutat, die schon in einer früheren Zeile steht, wird gemeldet
+  it('US602_Error_CreateRecipe_SingleIngredientMessage_ShowsItAsOneItemList', async () => {
+    // Given: der Server meldet genau eine Zeile
+    const duplicate = "„100 g Mehl“: Zutat 'Mehl' steht bereits in einer früheren Zeile."
+    usePostRejectedWith({ ingredients: [duplicate] })
+    const user = userEvent.setup()
+    await openCreateFormFromEmptyList()
+
+    // When: speichern
+    await clickSave(user)
+
+    // Then: auch eine einzelne Meldung steht als Aufzählung mit einem Eintrag
+    await screen.findByText(duplicate)
+    expectIngredientMessageList([duplicate])
+    expect(ingredientsField()).toHaveFocus()
+  })
+
+  // ADR-S135-4 (Addendum S148): Gegenprobe zur Aufzählung – ohne Meldung zum Zutatenfeld keine Liste.
+  it('CreateRecipe_NoIngredientMessage_ShowsNoMessageList', async () => {
+    // Given: der Server meldet nur den Titel
+    usePostRejectedWith({ title: [titleRequired] })
+    const user = userEvent.setup()
+    await openCreateFormFromEmptyList()
+
+    // When: speichern
+    await clickSave(user)
+
+    // Then: am Zutatenfeld steht keine Aufzählung, es beschreibt nur der Hinweis
+    await screen.findByText(titleRequired)
+    // Seitenweit, nicht am Feld: Ein leeres <ul> (Liste auch ohne Meldungen gerendert) würde vom Feld gar nicht
+    // referenziert – eine feldgebundene Prüfung übersähe es.
+    expect(screen.queryAllByRole('list')).toEqual([])
+    expect(ingredientsField()).toHaveAccessibleDescription(ingredientsHint)
+    expect(ingredientsField()).toHaveAttribute('aria-invalid', 'false')
   })
 })

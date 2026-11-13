@@ -14,6 +14,9 @@ const theme = createTheme({
   components: {
     // Seitenrumpf: MUIs Container polstert nur seitlich – ohne das klebt die Überschrift am oberen Rand.
     MuiContainer: { styleOverrides: { root: ({ theme }) => ({ paddingBlock: theme.spacing(2) }) } },
+    // Meldungsliste unter einem Feld (<ul>): kleiner Einzug statt Browser-Default 40px, sonst kosten die Umbrüche am Handy Platz.
+    // Listensemantik bleibt (kein list-style: none).
+    MuiFormHelperText: { styleOverrides: { root: { '&:is(ul)': { paddingInlineStart: '1.25em' } } } },
     MuiButton: { styleOverrides: { root: { minHeight: MIN_TOUCH_TARGET } } },
     MuiIconButton: { styleOverrides: { root: { minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET } } },
   },

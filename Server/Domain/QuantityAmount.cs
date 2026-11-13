@@ -22,7 +22,8 @@ internal readonly record struct QuantityAmount
     private const char Zero = '0';
     private const int MaxDecimals = 3;
     private const int MaxIntegerDigits = 4; // mit höchstens 3 Nachkommastellen gleichbedeutend mit „höchstens 9999,999"
-    private const decimal ThousandthsPerUnit = 1000m; // 10^MaxDecimals
+    // 10^MaxDecimals. Bewusst int statt decimal: Als decimal zählte die Line-Coverage diese Zeile nicht (Ursache ungeklärt).
+    private const int ThousandthsPerUnit = 1000;
 
     private readonly decimal _value;
 
@@ -59,7 +60,7 @@ internal readonly record struct QuantityAmount
 
         // Höchstens 4 + 3 Ziffern: exakt als ganze Tausendstel darstellbar.
         var thousandths = long.Parse(integerDigits + fractionDigits.PadRight(MaxDecimals, Zero), CultureInfo.InvariantCulture);
-        return new QuantityAmount(thousandths / ThousandthsPerUnit);
+        return new QuantityAmount((decimal)thousandths / ThousandthsPerUnit);
     }
 
     private static bool IsDigits(string text) => text.Length > 0 && text.All(char.IsAsciiDigit);

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { seedIngredientViaApi } from './api/ingredientsApi'
+import { seedDeletedIngredientViaApi, seedIngredientViaApi } from './api/ingredientsApi'
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import {
   createRecipeViaApi, fetchRecipeTitlesViaApi, postRecipeViaApi, seedRecipesWithSaltViaApi, UNKNOWN_RECIPE_ID,
@@ -128,12 +128,21 @@ async function expectMessageAt(page: Readonly<Page>, element: Readonly<Locator>,
   await expect(element).toHaveAccessibleDescription(message)
 }
 
-// Then „sehe ich bei den Zutaten die Fehlermeldung …": Am Zutatenfeld bleibt der Hinweis zur Eingabeform
-// stehen (ADR-S135-4); Hinweis und Meldung beschreiben das Feld gemeinsam, in der sichtbaren Reihenfolge.
-async function expectMessageAtIngredients(page: Readonly<Page>, message: string): Promise<void> {
-  await expect(page.getByText(message, { exact: true })).toBeVisible()
+// Then „sehe ich bei den Zutaten genau die Fehlermeldungen in dieser Reihenfolge …": Am Zutatenfeld bleibt
+// der Hinweis zur Eingabeform stehen; die Meldungen stehen als Aufzählung darunter, auch eine einzelne
+// (ADR-S135-4, Addendum S148). toHaveText mit Array pinnt Anzahl und Reihenfolge der Aufzählung; Hinweis
+// und Meldungen beschreiben das Feld gemeinsam, in der sichtbaren Reihenfolge.
+async function expectMessageListAtIngredients(page: Readonly<Page>, messages: readonly [string, ...string[]]): Promise<void> {
+  const [firstMessage] = messages
+  const messageList = page.getByRole('list').filter({ has: page.getByText(firstMessage, { exact: true }) })
+  await expect(messageList.getByRole('listitem')).toHaveText(messages.map(exactly))
   await expect(page.getByText(INGREDIENTS_HINT)).toBeVisible()
-  await expect(page.getByLabel('Zutaten')).toHaveAccessibleDescription(`${INGREDIENTS_HINT} ${message}`)
+  await expect(page.getByLabel('Zutaten')).toHaveAccessibleDescription([INGREDIENTS_HINT, ...messages].join(' '))
+}
+
+// Then „sehe ich bei den Zutaten (genau) die Fehlermeldung …": die Aufzählung mit genau dieser einen Meldung.
+async function expectMessageAtIngredients(page: Readonly<Page>, message: string): Promise<void> {
+  await expectMessageListAtIngredients(page, [message])
 }
 
 // Eingaben und Meldung der Szenarien von „Anlegen·Validierung Titel und Anweisung".
@@ -979,5 +988,92 @@ test.describe('US602_EdgeCase: Mengen an den Grenzen', () => {
       await expect(page).toHaveURL(RECIPE_DETAIL_URL)
       await expect(page.getByRole('list', { name: 'Zutaten' }).getByRole('listitem')).toHaveText([exactly(display)])
     })
+  })
+})
+
+// Meldungen der Namens- und Einheitenprüfung einer Zutatenzeile (ADR-S051-2, Addenda S135 und S148) – ohne
+// das Zitat der Zeile davor.
+const notFound = (name: string): string =>
+  `Zutat '${name}' nicht gefunden. Neue Zutaten werden auf der Zutaten-Seite angelegt.`
+const INGREDIENT_MISSING = 'Zutat fehlt.'
+
+// @US-602-error
+test.describe('US602_Error: Zutat nicht gefunden oder Einheit falsch', () => {
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const invalidLines = [
+    { line: '250 g Mehk', message: notFound('Mehk') },
+    { line: '250 g Butter', message: notFound('Butter') },
+    { line: '2 EL Mehl', message: "Einheit 'EL' passt nicht zu 'Mehl' (möglich: 'g')." },
+    { line: '1 Zwiebel', message: "Einheit fehlt (für 'Zwiebel': 'Stück')." },
+    { line: '1', message: INGREDIENT_MISSING },
+  ] as const
+  invalidLines.forEach(({ line, message }) => {
+    // Szenario: Zutat nicht gefunden oder Einheit falsch
+    // Beispiel: alle
+    test(`US602_Error_CreateRecipe_IngredientNotFoundOrWrongUnit_ShowsMessageQuotingLine (${line})`, async ({ page, request }) => {
+      // Given: die Zutaten "Mehl" (g) und "Zwiebel" (Stück) existieren, "Butter" (g) existiert und wurde gelöscht
+      await seedIngredientViaApi(request, 'Mehl', 'g')
+      await seedIngredientViaApi(request, 'Zwiebel', 'Stück')
+      await seedDeletedIngredientViaApi(request, 'Butter', 'g')
+      const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+      // When: Formular öffnen, "Pfannkuchen", <Zeile> als Zutaten und den Schritt "Teig rühren." eingeben, speichern
+      await openCreateForm(page)
+      await fillRecipeForm(page, PANCAKES, [FIRST_STEP], line)
+      await saveForm(page)
+
+      // Then: bei den Zutaten genau die Meldung „<Zeile>“: <Meldung>
+      await expectMessageAtIngredients(page, `„${line}“: ${message}`)
+      // Then: der Fokus liegt auf dem Zutatenfeld
+      await expect(page.getByLabel('Zutaten')).toBeFocused()
+      // Then: weiterhin im Formular mit allen Eingaben
+      await expectFormWithInputs(page, PANCAKES, [FIRST_STEP], line)
+      // Then: die Rezept-Liste ist unverändert
+      expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
+    })
+  })
+
+  // Szenario: Alle fehlerhaften Zutatenzeilen werden gemeinsam und in Zeilenreihenfolge gemeldet
+  test('US602_Error_CreateRecipe_SeveralInvalidLines_ShowsAllMessagesInLineOrder', async ({ page, request }) => {
+    // Given: die Zutaten "Mehl" (g) und "Milch" (ml) existieren
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    await seedIngredientViaApi(request, 'Milch', 'ml')
+
+    // When: Formular öffnen, "Pfannkuchen", die Zeilen „250 g Mehl“, „2 Eier“, „500 Milch“ und den Schritt
+    //   "Teig rühren." eingeben, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP], '250 g Mehl\n2 Eier\n500 Milch')
+    await saveForm(page)
+
+    // Then: bei den Zutaten genau diese Meldungen in dieser Reihenfolge
+    await expectMessageListAtIngredients(page, [
+      `„2 Eier“: ${notFound('Eier')}`,
+      "„500 Milch“: Einheit fehlt (für 'Milch': 'ml').",
+    ])
+    // Then: der Fokus liegt auf dem Zutatenfeld
+    await expect(page.getByLabel('Zutaten')).toBeFocused()
+  })
+
+  // Szenario: Eine Zutat, die schon in einer früheren Zeile steht, wird gemeldet
+  test('US602_Error_CreateRecipe_DuplicateIngredient_ShowsMessageAtLaterLine', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    const recipesBefore = await fetchRecipeTitlesViaApi(request)
+    const lines = '250 g Mehl\n100 g Mehl'
+
+    // When: Formular öffnen, "Pfannkuchen", die Zeilen „250 g Mehl“ und „100 g Mehl“ und den Schritt
+    //   "Teig rühren." eingeben, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP], lines)
+    await saveForm(page)
+
+    // Then: bei den Zutaten genau die Meldung zur späteren Zeile
+    await expectMessageAtIngredients(page, "„100 g Mehl“: Zutat 'Mehl' steht bereits in einer früheren Zeile.")
+    // Then: der Fokus liegt auf dem Zutatenfeld
+    await expect(page.getByLabel('Zutaten')).toBeFocused()
+    // Then: weiterhin im Formular mit allen Eingaben
+    await expectFormWithInputs(page, PANCAKES, [FIRST_STEP], lines)
+    // Then: die Rezept-Liste ist unverändert
+    expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
   })
 })

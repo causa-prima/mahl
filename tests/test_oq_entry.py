@@ -167,3 +167,15 @@ def test_remove_des_letzten_eintrags_haelt_den_header():
     leer = oq.remove(ohne_erste, "OQ-S119-3")
     assert leer.startswith("# Offene Fragen")
     assert "OQ-S" not in leer.split("-->")[-1]
+
+
+def test_verweis_pruefung_findet_fundstellen_im_echten_repo():
+    # Fällt die Prüfung aus (etwa weil das Hook-Modul nicht ladbar ist), meldet `oq remove` nur eine Warnung –
+    # still für den, der sie überliest. Geprüft am echten Repo, mit einer ID, die sicher anderswo steht.
+    # // Given eine ID, auf die Dokumente im Repo verweisen
+    cli = import_module("prozesscode.oq")
+    # // When die Verweise vor dem Löschen gesucht werden
+    treffer, warnung = cli._verweise("ADR-S135-2")
+    # // Then läuft die Prüfung und nennt Fundstellen
+    assert warnung is None
+    assert any(fund.startswith("docs/") for fund in treffer)

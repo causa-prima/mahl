@@ -21,7 +21,6 @@ Beispiele:
 Verwandt: `open_questions.py` (Fälligkeit für die Session-Agenda – nur lesend).
 """
 import argparse
-import os
 import sys
 
 
@@ -39,8 +38,6 @@ from . import td_anchors  # noqa: E402
 from .eintrag_felder import AUFSCHUB_HILFE, AUFSCHUB_HILFE_SET  # noqa: E402
 from .tracker_entry import kuerzungen
 
-_HOOKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".claude", "hooks")
-
 
 def _verweise(oid: str) -> tuple[list[str], str | None]:
     """Fundstellen, die auf `oid` zeigen – (Treffer, Warnung falls Prüfung ausfiel).
@@ -51,9 +48,8 @@ def _verweise(oid: str) -> tuple[list[str], str | None]:
     was hängt, räumt in einem Zug auf.
     """
     try:
-        sys.path.insert(0, _HOOKS)
         from importlib import import_module
-        refs = import_module("check-dangling-refs")
+        refs = import_module("prozesscode.hooks.check-dangling-refs")
         treffer = refs.find_references([oid], oq_path())
         return [f"{pfad}:{zeile}: {text.strip()[:90]}" for pfad, zeile, text in treffer], None
     except Exception as fehler:  # noqa: BLE001 – Prüfung ist Zusatznutzen, kein Muss

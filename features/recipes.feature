@@ -448,6 +448,7 @@ Feature: Rezepte erfassen
       | 250 g Butter | Zutat 'Butter' nicht gefunden. Neue Zutaten werden auf der Zutaten-Seite angelegt. |
       | 2 EL Mehl    | Einheit 'EL' passt nicht zu 'Mehl' (möglich: 'g').                                 |
       | 1 Zwiebel    | Einheit fehlt (für 'Zwiebel': 'Stück').                                            |
+      | 1            | Zutat fehlt.                                                                       |
 
   # @run-11 · Anlegen·Validierung Zutatenzeile · Full-Stack
   @US-602-error

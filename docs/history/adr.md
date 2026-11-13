@@ -291,6 +291,8 @@ Längengrenzen, Leer-Prüfung, Eindeutigkeit und die in Meldungen zitierten Wert
 
 Die Zeilen `unit` leer bei gesetzter `quantity` und `ingredientId` nicht gefunden gelten nicht für Rezepte aus Zutatenzeilen: Dort ersetzen sie „Einheit fehlt …" und „Zutat '…' nicht gefunden …", die die Zeile zitieren und den Ausweg nennen. Das Zitat steht vorn, weil ein Textfeld keine Zeilennummern zeigt. Grammatik der Zeile und Reihenfolge der Mengenprüfungen: ADR-S135-2.
 
+**Addendum (S148) – Zeile nur aus einer Menge:** `"„{zeile}“: Zutat fehlt."` – für eine Zeile, in der nach der Menge kein Wort mehr steht (ADR-S135-2, Addendum S148).
+
 ---
 
 ### ADR-S112-1: Fehlerantworten sind umgebungsunabhängig – `UseExceptionHandler` wird unbedingt registriert
@@ -712,6 +714,12 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 - **Zerlegen im Client** – zweite Implementierung der Grammatik, Drift zum Server (ADR-S090-1: Validierung server-only).
 - **Breite Erkennung der Menge (auch Vorzeichen, Komma, Punkt am Anfang)** – lieferte nur passendere Meldungen für Eingaben, die niemand absichtlich macht, bei deutlich komplexerer Regel (User-Entscheidung).
 
+**Addendum (S148) – Zeile nur aus Menge, Namensvergleich, Prüfreihenfolge der Zeile:**
+- Steht nach der Menge kein Wort mehr („1"), fehlt die Zutat; die Zeile wird mit „Zutat fehlt." gemeldet (ADR-S051-2, Addendum S148).
+- Namen (Punkt 4) vergleicht die DB mit `LOWER` auf beiden Seiten – dieselbe Funktion wie der Unique-Index auf `LOWER(name)` (ADR-S105-2). Damit trifft eine Zeile höchstens eine Zutat; ein Vergleich in .NET (`OrdinalIgnoreCase`) faltet anders und hielte etwa „µg" (Mikro-Zeichen) und „μg" (griechisches My) für gleich, die der Index als verschieden zulässt. Einheiten vergleicht der Server ohne Unterschied der Groß-/Kleinschreibung im Speicher: An ihnen hängt keine Eindeutigkeit.
+- Eine Zeile wird in dieser Reihenfolge geprüft, die erste verletzte Regel gilt: Menge (Punkt 1) → Zutat vorhanden → Zutat gefunden → Einheit fehlt oder passt nicht → Zutat doppelt. Doppelt ist eine Zeile nur gegenüber einer früheren fehlerfreien Zeile – eine fehlerhafte Zeile zählt nicht als Zutat.
+- Zwischen dem Nachschlagen der Zutaten und dem Speichern liegt keine Transaktion: Wird eine Zutat dazwischen soft-gelöscht, verweist das neue Rezept auf sie (der Fremdschlüssel bleibt gültig); wird sie umbenannt, nennt die Antwort den alten Namen. Bewusst hingenommen (User-Entscheidung): Einzelnutzer-Betrieb, kein Datenverlust; die Absicherung wäre Nachschlagen und Einfügen in einer Transaktion mit `FOR SHARE` auf die Zutatenzeilen.
+
 ---
 
 ### ADR-S135-3: Rezept-Feldregeln: Titel, Schritte, Prüfreihenfolge
@@ -751,6 +759,8 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 - **Dialog wie bei Zutaten** – zu klein für Titel, Zutatenfeld und mehrere Schritte.
 - **Meldung beim Bearbeiten des Feldes ausblenden** – s. Begründung.
 - **Escape = Verwerfen** – Datenverlust durch eine beiläufige Taste.
+
+**Addendum (S148) – Meldungen am Zutatenfeld als Aufzählung:** Das Zutatenfeld zeigt alle Meldungen des Servers in dessen Reihenfolge (Zeilenreihenfolge, ADR-S135-2) als Aufzählung unter dem Hinweis – auch eine einzelne. Hinweis und Meldungen beschreiben das Feld gemeinsam. Grund: Mehrere fehlerhafte Zeilen werden gemeinsam gemeldet; die Aufzählung gruppiert sie sichtbar als Liste einzelner Zeilenbefunde (User-Entscheidung), und eine Form unabhängig von der Anzahl erspart einen zweiten Darstellungsweg. Die übrigen Felder zeigen weiterhin je Feld die erste Meldung.
 
 ---
 
@@ -1344,6 +1354,24 @@ URL (inkl. Pfad- und Query-Parameter) wird geloggt. Request-Body wird **nicht** 
 **Verworfen:**
 - **Standard beibehalten** (ADR-S092-1) – lässt die gemessene Lücke stehen; der Mehraufwand, mit dem ADR-S092-1 begründet war, trat in der Messung nicht auf.
 - **Advanced** – heute gleichwertig, müsste aber bei jedem neuen Complete-Mutator neu entschieden werden.
+
+---
+
+### ADR-S148-2: Code einer Übergangsregel bekommt die volle Testtiefe
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:stryker, testing:e2e, arch:testing
+
+**Entscheidung:** Code, der eine Übergangsregel umsetzt – seine Ablösung ist fest eingeplant, etwa der Zerleger der Zutatenzeilen (ADR-S135-2, abgelöst durch US-607) –, unterliegt denselben Gates wie jeder Produktionscode: Coverage-Schwelle, Mutation 100 %, Tests je Schicht. Es gibt keine Markierung „Übergangscode" und keine reduzierte Tiefe.
+
+**Begründung (User-Entscheidung nach Erhebung):**
+1. **Gemessen:** Der Zerleger der Zutatenzeilen hat nach drei Läufen (US-602 run-7, run-10, run-11) 73 Testfälle – Backend 35, E2E 29, Frontend 9 (Theory-Zeilen und parametrisierte Fälle einzeln gezählt).
+2. **Was mit der Ablösung entfällt, ist nicht abgrenzbar:** US-607 zerlegt weiterhin Zeilen, nur beim Bestätigen jeder Zeile statt beim Speichern; Grammatik, Mengenregeln und Meldungen bleiben voraussichtlich zum Teil. Ein Teil der Tests trägt also über die Ablösung hinaus.
+3. **Eine Ausnahme kostet Verwaltung:** Markierung, Ablaufregel und die Prüfung, ob Code noch „Übergang" ist, bei unklarem Ertrag – und eine geringere Tiefe hätte genau die Fälle offen gelassen, die die Reviews dieser Läufe gefunden haben.
+
+**Verworfen:**
+- **Reduzierte Tiefe für Übergangscode** (z. B. nur E2E, kein Mutationstest) – s. Begründung 2 und 3.
+- **Erst mit US-607 entscheiden** – die Zahlen ändern sich bis dahin kaum; offen bliebe nur, was ohnehin nicht abgrenzbar ist.
 
 ---
 

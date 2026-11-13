@@ -127,16 +127,6 @@ Eintrag-Format:
 **Hintergrund:** Aus der Bestandsanalyse der Rezeptsammlung des Users: 62 von 114 Rezepten notieren die Zeit schon als „Arbeit + Warten“ (z. B. „15 + 60 + 10 Minuten“). 18 Rezepte haben parallele Schritte („In der Zwischenzeit …“) – deshalb misst US-517 nicht je Schritt, sondern je Kochvorgang. User: Wartezeiten am Ende werden nicht gemessen, weil niemand dafür die App öffnet; das Ende braucht einen gut sichtbaren „Kochen abschließen“-Knopf; starke Abweichung vom Median soll sofort eine Warnung mit Aktionen auslösen (in US-517 übernommen).
 **Aufschubgrund:** Umfang – betrifft fünf Stories über MVP bis PARKING; die Klärung gehört in den Workshop des ersten Zeitfelds (US-610), nicht in die Durchsicht von US-602.
 
----
-
-## OQ-S135-4 — Testtiefe für Code, der sicher ersetzt wird
-**Frage:** Braucht Code einer Übergangsregel (Ablösung fest eingeplant, gherkin-workshop „Tiefe je Regel"), der mit seiner Nachfolgelösung wieder entfällt, die volle Coverage-Schwelle und volle Mutationstests – oder gilt für ihn eine Ausnahme, und wenn ja, wie wird sie markiert und wann endet sie?
-**Fällig:** Szenario:„Zutat nicht gefunden oder Einheit falsch", Phase:MVP – Lauf 11 von US-602 ist der letzte Lauf zum Zerleger der Zutatenzeilen (Übergangsregel, abgelöst durch US-607); erst dann gibt es echte Zahlen zum Testaufwand.
-**Hintergrund:** Aus der Auswertung des neuen Workshop-Schritts „Tiefe je Regel" an US-602. Der User fragte, ob „temporärer Code keine Coverage braucht"; Gegenfrage war, wie sicher die typischsten Fälle dann korrekt umgesetzt werden. Zu erheben in den Läufen 7, 10 und 11 von US-602: Wie viele Tests (Unit, Integration, Mutanten) entstehen für den Zerleger, und wie viele davon entfallen mit US-607? Die Spezifikation selbst wurde bereits verschlankt (SKELETON 63 → 46 Szenarien).
-**Aufschubgrund:** User – im Workshop vereinbart, nach dem Ausprobieren mit echten Zahlen zu entscheiden
-
----
-
 ## OQ-S137-1 — Log-Ziel in Produktion: Wo landen Logs, sodass sie ein Redeploy überstehen?
 **Frage:** Wohin gehen die Backend-Logs in Produktion, damit sich Probleme im Nachhinein nachvollziehen lassen – auch über Neustarts und Redeploys hinweg? Optionen: (a) Docker-Log-Treiber, der außerhalb des Containers persistiert (z.B. journald), (b) Log-Sammler (z.B. Seq, Loki, Elasticsearch) – dann lohnt strukturiertes Logging (Serilog, JSON), (c) Datei durch die Anwendung – widerspräche der Observability-Anforderung in docs/process/nfr.md (stdout, Persistenz durch die Laufzeitumgebung). Hängt an der Hosting-Entscheidung.
 **Fällig:** Phase:V1 – erst mit dem Produktivbetrieb müssen Logs Redeploys überstehen; vorher reicht stdout in der Entwicklung

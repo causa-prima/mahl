@@ -39,7 +39,8 @@ internal readonly record struct Recipe
 
     // Kein OneOf: alle Teile kommen schon als geprüfte Domänentypen an; die Fehler der Teile sammelt die API-Grenze
     // (RecipesEndpoints.ToValues, ADR-S119-2) – ein OneOf hier käme erst danach zum Zug und schlösse kurz.
-    // „Jede Zutat höchstens einmal" kommt mit ihrem Szenario.
+    // „Jede Zutat höchstens einmal" (ADR-S135-2 Punkt 5) prüft die API-Grenze beim Auflösen der Zeilen: die Meldung
+    // zitiert die Zeile und wird mit den übrigen Zeilenmeldungen gesammelt.
     public static Recipe Create(
         RecipeId id,
         RecipeTitle title,

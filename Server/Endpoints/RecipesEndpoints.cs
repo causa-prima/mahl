@@ -10,20 +10,39 @@ using OneOf;
 using static mahl.Server.Endpoints.ValidationProblems;
 using static mahl.Server.OneOfExtensions;
 
-// Eine zerlegte Zutatenzeile (ADR-S135-2): der Name, unter dem die Zutat nachgeschlagen wird, und die
-// Menge. Tupel-Alias statt eigenem Typ aus demselben Grund wie IngredientValues in IngredientsEndpoints:
-// keine Invariante, nur Zwischenstand an der Grenze.
-using ParsedIngredientLine = (string Name, mahl.Server.Domain.Quantity Quantity);
+// Die zerlegten Zeilen in Zeilenreihenfolge, je Zeile die zerlegte Zeile oder ihre Meldung.
+using ParsedIngredientLines = System.Collections.Immutable.ImmutableArray<OneOf.OneOf<
+    mahl.Server.Endpoints.ParsedIngredientLine, mahl.Server.Endpoints.FieldError>>;
 
-// Die validierte Nutzlast des Anlegens – Titel, zerlegte Zutatenzeilen, Schritte; noch ohne Identität
-// und ohne Zutat-Ids (die kennt erst die DB). Tupel-Alias aus demselben Grund wie ParsedIngredientLine.
-// (Aliase können einander nicht referenzieren, daher ausgeschrieben.)
+// Die gefundenen aktiven Zutaten je Name aus den Zeilen – Schlüssel ist der Name genau so, wie die Zeile ihn
+// nennt (Ordinal): die Zuordnung Name -> Zutat trifft die Datenbank, .NET faltet nichts (ADR-S135-2, Addendum S148).
+using IngredientsByName = System.Collections.Generic.IReadOnlyDictionary<string, mahl.Server.Endpoints.StoredIngredient>;
+
+// Eine gefundene Zutat zusammen mit dem Namen, unter dem die Zeile sie nennt (für die Meldungen).
+using NamedIngredient = (string Name, mahl.Server.Endpoints.StoredIngredient Ingredient);
+
+// Die validierte Nutzlast des Anlegens – Titel, aufgelöste Zutatenzeilen, Schritte; noch ohne Identität.
 using RecipeValues = (
     mahl.Server.Domain.RecipeTitle Title,
-    mahl.Server.Types.NonEmptyImmutableArray<(string Name, mahl.Server.Domain.Quantity Quantity)> Lines,
+    mahl.Server.Types.NonEmptyImmutableArray<mahl.Server.Endpoints.ResolvedIngredientLine> Lines,
     mahl.Server.Types.NonEmptyImmutableArray<mahl.Server.Domain.StepInstruction> Steps);
 
 namespace mahl.Server.Endpoints;
+
+// Zwischenstände der Zeilenauflösung an der Grenze – ohne eigene Invarianten (die halten die Domänentypen). Als
+// file-Typen statt Tupel-Aliase, weil Aliase einander nicht referenzieren können und die Tupel sonst in jedem
+// Alias, der sie enthält, erneut ausgeschrieben stünden.
+
+// Eine zerlegte, noch nicht gegen den Zutatenbestand aufgelöste Zutatenzeile (ADR-S135-2): die normalisierte
+// Zeile (für das Zitat der Meldung), die Menge und der Text nach der Menge – ohne Menge die ganze Zeile.
+file readonly record struct ParsedIngredientLine(string Line, Quantity Quantity, string Remainder);
+
+// Eine aktive Zutat, wie die Datenbank sie zu einem Namen aus einer Zeile findet: Id, gespeicherter Name,
+// Basiseinheit.
+file readonly record struct StoredIngredient(Guid Id, string Name, string BaseUnit);
+
+// Eine fehlerfrei aufgelöste Zutatenzeile: die Zutat und die Menge.
+file readonly record struct ResolvedIngredientLine(StoredIngredient Ingredient, Quantity Quantity);
 
 internal static class RecipesEndpoints
 {
@@ -57,21 +76,27 @@ file static class RecipeMappings
 {
     // ADR-S030-1: hier – und nur hier – entsteht die Identität des Rezepts (RecipeId.New() unten), weil hier
     // die Zeile entsteht.
-    // Validiert sind bisher die Pflichtangaben (Titel, Zutatenfeld, Schritte), Längen und die Menge jeder Zeile;
-    // die übrigen Fehler-Szenarien der Zeilen (Zutat nicht gefunden, Einheit falsch, leerer Name, doppelte
-    // Zutat) kommen später. Bis dahin ist eine solche Zeile unbestimmt.
-    internal static async Task<IResult> CreateRecipe(CreateRecipeDto dto, MahlDbContext db, HttpContext httpContext) =>
-        await dto.ToValues().Match(
+    // Die Zeilen werden rein zerlegt, die Namen daraus in EINER Abfrage nachgeschlagen, dann rein aufgelöst und
+    // mit Titel und Schritten gesammelt (ADR-S135-2). Die Abfrage läuft auch bei ungültigem Titel – nur so stehen
+    // die Zeilenmeldungen neben der Titelmeldung (ADR-S135-3).
+    internal static async Task<IResult> CreateRecipe(CreateRecipeDto dto, MahlDbContext db, HttpContext httpContext)
+    {
+        ParsedIngredientLines lines = [.. NormalizedNonEmptyLines(dto.Ingredients).Select(ParseLine)];
+        var found = await FindActiveIngredientsAsync(NamesIn(lines), db);
+        return await dto.ToValues(lines, found).Match(
             values => SaveRecipe(values, db, httpContext),
             errors => Task.FromResult(ValidationProblemFor(errors)));
+    }
 
     // ADR-S135-3: alle Feldprüfungen laufen gesammelt (ADR-S119-2) – Titel und Zutatenfeld, dann die
-    // Schritte; die Fehlerreihenfolge im Body ist unerheblich (er ist feld-keyed, ADR-S090-1).
-    private static OneOf<RecipeValues, IReadOnlyList<FieldError>> ToValues(this CreateRecipeDto dto) =>
+    // Schritte. Die Reihenfolge der Keys im Body ist unerheblich (er ist feld-keyed, ADR-S090-1); die Meldungen
+    // eines Keys stehen in Zeilenreihenfolge (ADR-S135-2).
+    private static OneOf<RecipeValues, IReadOnlyList<FieldError>> ToValues(
+        this CreateRecipeDto dto, ParsedIngredientLines lines, IngredientsByName found) =>
         CollectMany(
-            CollectMany(ToTitle(dto.Title), ToIngredientLines(dto.Ingredients), (title, lines) => (title, lines)),
+            CollectMany(ToTitle(dto.Title), ToIngredientLines(lines, found), (title, resolved) => (title, resolved)),
             ToSteps(dto.Steps),
-            (head, steps) => (head.title, head.lines, steps));
+            (head, steps) => (head.title, head.resolved, steps));
 
     private static OneOf<RecipeTitle, IReadOnlyList<FieldError>> ToTitle(string? input) =>
         RecipeTitle.Create(input)
@@ -80,12 +105,109 @@ file static class RecipeMappings
     // ADR-S135-2: leere Zeilen und Zeilen aus Leerraum werden übergangen; „mindestens eine Zutat" gilt nur,
     // wenn keine nicht leere Zeile da ist – fehlerhafte Zeilen erreichen die Prüfung nicht, Bind schließt nach
     // CollectAll kurz. Null (explizit gesendet, ADR-S144-2) ist wie leer.
-    private static OneOf<NonEmptyImmutableArray<ParsedIngredientLine>, IReadOnlyList<FieldError>> ToIngredientLines(string? text) =>
-        CollectAll(NormalizedNonEmptyLines(text).Select(ParseLine))
-            .Bind<ImmutableArray<ParsedIngredientLine>, NonEmptyImmutableArray<ParsedIngredientLine>, IReadOnlyList<FieldError>>(
-                lines => NonEmptyImmutableArray<ParsedIngredientLine>.Create(lines)
-                    .MapError<NonEmptyImmutableArray<ParsedIngredientLine>, ListViolation, IReadOnlyList<FieldError>>(
+    private static OneOf<NonEmptyImmutableArray<ResolvedIngredientLine>, IReadOnlyList<FieldError>> ToIngredientLines(
+        ParsedIngredientLines lines, IngredientsByName found) =>
+        CollectAll(ResolveLines(lines, found))
+            .Bind<ImmutableArray<ResolvedIngredientLine>, NonEmptyImmutableArray<ResolvedIngredientLine>, IReadOnlyList<FieldError>>(
+                resolved => NonEmptyImmutableArray<ResolvedIngredientLine>.Create(resolved)
+                    .MapError<NonEmptyImmutableArray<ResolvedIngredientLine>, ListViolation, IReadOnlyList<FieldError>>(
                         _ => [IngredientsMissing]));
+
+    // ADR-S135-2 Punkt 5 / Addendum S148: Zutat doppelt ist die letzte Prüfung einer Zeile und gilt nur gegenüber
+    // einer früheren fehlerfreien Zeile – deshalb in Zeilenreihenfolge gefaltet, im Speicher über die Zeilen dieses
+    // einen Rezepts. Der Zustand der Faltung: die Zutaten der früheren fehlerfreien Zeilen und die bisherigen Ergebnisse.
+    private static ImmutableArray<OneOf<ResolvedIngredientLine, FieldError>> ResolveLines(
+        ParsedIngredientLines lines, IngredientsByName found) =>
+        lines.Aggregate(
+            (Earlier: ImmutableHashSet<Guid>.Empty, Results: ImmutableArray<OneOf<ResolvedIngredientLine, FieldError>>.Empty),
+            (state, line) => Advance(state, line, found)).Results;
+
+    // Ein Schritt der Faltung: die Zeile auflösen, ihr Ergebnis anhängen, eine fehlerfreie Zeile merkt ihre Zutat.
+    private static (ImmutableHashSet<Guid> Earlier, ImmutableArray<OneOf<ResolvedIngredientLine, FieldError>> Results) Advance(
+        (ImmutableHashSet<Guid> Earlier, ImmutableArray<OneOf<ResolvedIngredientLine, FieldError>> Results) state,
+        OneOf<ParsedIngredientLine, FieldError> line,
+        IngredientsByName found)
+    {
+        var result = line.Bind(parsed => ResolveIngredient(parsed, found)
+            .Bind<NamedIngredient, ResolvedIngredientLine, FieldError>(named => ResolveDuplicate(state.Earlier, parsed, named)));
+        return (result.Match(resolved => state.Earlier.Add(resolved.Ingredient.Id), _ => state.Earlier), state.Results.Add(result));
+    }
+
+    private static OneOf<ResolvedIngredientLine, FieldError> ResolveDuplicate(
+        ImmutableHashSet<Guid> earlierIngredients, ParsedIngredientLine parsed, NamedIngredient named) =>
+        earlierIngredients.Contains(named.Ingredient.Id)
+            ? LineError(parsed.Line, $"Zutat '{named.Name}' steht bereits in einer früheren Zeile.")
+            : new ResolvedIngredientLine(named.Ingredient, parsed.Quantity);
+
+    // ADR-S135-2 Punkt 2/3: mit Menge kann der Rest Einheit und Zutat sein, ohne Menge ist er die Zutat.
+    private static OneOf<NamedIngredient, FieldError> ResolveIngredient(ParsedIngredientLine line, IngredientsByName found) =>
+        line.Quantity.Match(
+            _ => ResolveWithQuantity(line, found),
+            () => ResolveName(line.Line, line.Remainder, found));
+
+    // ADR-S135-2 Punkt 2, Prüfreihenfolge Addendum S148: Ist der ganze Rest eine aktive Zutat, fehlt die Einheit.
+    // Sonst ist bei mehreren Wörtern das erste die Einheit, ein einzelnes Wort ist die (nicht gefundene) Zutat.
+    private static OneOf<NamedIngredient, FieldError> ResolveWithQuantity(ParsedIngredientLine line, IngredientsByName found) =>
+        found.TryGetValue(line.Remainder, out var withoutUnit)
+            ? LineError(line.Line, $"Einheit fehlt (für '{line.Remainder}': '{withoutUnit.BaseUnit}').")
+            : ResolveUnitAndName(line, found);
+
+    private static OneOf<NamedIngredient, FieldError> ResolveUnitAndName(ParsedIngredientLine line, IngredientsByName found) =>
+        SplitUnit(line.Remainder) is [var unit, var name]
+            ? ResolveName(line.Line, name, found).Bind(named => CheckUnit(line.Line, unit, named))
+            : NotFound(line.Line, line.Remainder);
+
+    private static OneOf<NamedIngredient, FieldError> ResolveName(string line, string name, IngredientsByName found) =>
+        found.TryGetValue(name, out var ingredient)
+            ? (name, ingredient)
+            : NotFound(line, name);
+
+    // ADR-S135-2, Addendum S148: Einheiten ohne Unterschied der Groß-/Kleinschreibung, im Speicher – an ihnen hängt
+    // keine Eindeutigkeit.
+    private static OneOf<NamedIngredient, FieldError> CheckUnit(string line, string unit, NamedIngredient named) =>
+        string.Equals(unit, named.Ingredient.BaseUnit, StringComparison.OrdinalIgnoreCase)
+            ? named
+            : LineError(line, $"Einheit '{unit}' passt nicht zu '{named.Name}' (möglich: '{named.Ingredient.BaseUnit}').");
+
+    private static FieldError NotFound(string line, string name) =>
+        LineError(line, $"Zutat '{name}' nicht gefunden. Neue Zutaten werden auf der Zutaten-Seite angelegt.");
+
+    // ADR-S051-2, Addendum S135: jede Zeilenmeldung zitiert die normalisierte Zeile in „…“ (U+201E, U+201C).
+    private static FieldError LineError(string line, string message) => new(IngredientsField, $"„{line}“: {message}");
+
+    // Erstes Wort (die Einheit) und Rest (die Zutat) – ein Wort allein bleibt ungeteilt.
+    private static string[] SplitUnit(string rest) => rest.Split(WordSeparator, 2);
+
+    // Die Namen, unter denen eine Zeile eine Zutat nennen kann: der ganze Rest und – bei mehreren Wörtern – der
+    // Rest ohne die Einheit; eine schon fehlerhafte Zeile nennt keine. Ordinal ohne Dubletten: jeder Name ist ein
+    // Schlüssel des Ergebnisses.
+    private static string[] NamesIn(ParsedIngredientLines lines) =>
+    [
+        .. lines.SelectMany(line => line.Match(NamesInLine, _ => Enumerable.Empty<string>())).Distinct(StringComparer.Ordinal),
+    ];
+
+    private static IEnumerable<string> NamesInLine(ParsedIngredientLine line) =>
+        SplitUnit(line.Remainder) is [_, var name] ? [line.Remainder, name] : [line.Remainder];
+
+    // ADR-S135-2, Addendum S148: Namen vergleicht die DB mit LOWER auf BEIDEN Seiten – dieselbe Funktion wie der
+    // Unique-Index auf LOWER("Name") (ADR-S105-2). Der Name aus der Zeile ist dabei ein Element der Parameter-
+    // Collection, kein freistehender Parameter. Am generierten SQL geprüft (kein Test trennt es): EF übersetzt
+    // c.ToLower() nach SQL lower() und wertet es nicht in .NET aus –
+    // `… FROM unnest(@names) AS n(value) WHERE lower(n.value) = lower(i."Name")`. Die DB liefert die Paare
+    // (Name, Zutat); der Unique-Index lässt je Name höchstens eine Zutat zu. Soft-gelöschte Zutaten gelten als
+    // nicht gefunden (ADR-S135-2 Punkt 4).
+    private static async Task<IngredientsByName> FindActiveIngredientsAsync(string[] names, MahlDbContext db)
+    {
+#pragma warning disable CA1304, CA1311, CA1862, MA0011 // ToLower() ist SQL-übersetzt (lower()), kein CLR-Aufruf – s. Kommentar oben
+        var rows = await db.Ingredients
+            .Where(i => i.DeletedAt == null)
+            .SelectMany(
+                i => names.Where(name => name.ToLower() == i.Name.ToLower()),
+                (i, name) => new { Name = name, i.Id, StoredName = i.Name, i.BaseUnit })
+            .ToListAsync(Cancellation.None);
+#pragma warning restore CA1304, CA1311, CA1862, MA0011
+        return rows.ToDictionary(row => row.Name, row => new StoredIngredient(row.Id, row.StoredName, row.BaseUnit), StringComparer.Ordinal);
+    }
 
     private const char LineSeparator = '\n';
 
@@ -138,25 +260,23 @@ file static class RecipeMappings
 
     private static async Task<IResult> SaveRecipe(RecipeValues values, MahlDbContext db, HttpContext httpContext)
     {
-        // Bewusst ohne RequestAborted: Das Backend reicht Abbruch nirgends durch (Sonar S8949 verlangt die explizite Wahl).
-        var ingredients = await db.Ingredients.ToListAsync(CancellationToken.None);
-        var ingredientsById = ingredients.ToDictionary(i => i.Id);
         var recipe = Recipe.Create(
             RecipeId.New(),
             values.Title,
-            values.Lines.Map(line => ToRecipeIngredient(line, name => IngredientIdByName(ingredients, name))),
+            values.Lines.Map(line => RecipeIngredient.Create(IngredientId.Create(line.Ingredient.Id), line.Quantity)),
             values.Steps);
 
         var recipeRow = recipe.ToDbType();
         db.Recipes.Add(recipeRow);
         db.RecipeIngredients.AddRange(recipe.ToRecipeIngredientDbTypes());
         db.Steps.AddRange(recipe.ToStepDbTypes());
-        await db.SaveChangesAsync(CancellationToken.None);
+        await db.SaveChangesAsync(Cancellation.None);
 
         // ADR-S106-1/ADR-S000-12: der xmin der neu angelegten Rezeptzeile geht als ETag mit dem 201 heraus.
         var xmin = db.ReadXmin(recipeRow);
         httpContext.Response.Headers.ETag = XminETag.Format(xmin);
-        return Results.Created($"/api/recipes/{recipe.Id.Value}", recipe.ToDto(id => ingredientsById[id.Value]));
+        // Der Body nennt je Zeile den gespeicherten Namen und die Basiseinheit der aufgelösten Zutat (ADR-S135-2).
+        return Results.Created($"/api/recipes/{recipe.Id.Value}", recipe.ToDto(values.Lines.Items));
     }
 
     // ADR-S142-2: dasselbe Rezept-DTO wie der 201 beim Anlegen, dazu der xmin der Rezeptzeile als ETag.
@@ -165,8 +285,7 @@ file static class RecipeMappings
     // Zutatendaten nicht ab, und die Abfragen laufen ohne gemeinsamen Snapshot (TD-S142-2).
     internal static async Task<IResult> GetRecipe(Guid id, MahlDbContext db, HttpContext httpContext)
     {
-        // Bewusst ohne RequestAborted: Das Backend reicht Abbruch nirgends durch (Sonar S8949 verlangt die explizite Wahl).
-        var recipe = await db.Recipes.SingleOrDefaultAsync(r => r.Id == id, CancellationToken.None);
+        var recipe = await db.Recipes.SingleOrDefaultAsync(r => r.Id == id, Cancellation.None);
         if (recipe is null)
             return NotFoundProblem();
 
@@ -184,7 +303,7 @@ file static class RecipeMappings
             .Where(ri => ri.RecipeId == recipeId)
             .OrderBy(ri => ri.Position)
             .Join(db.Ingredients, ri => ri.IngredientId, i => i.Id, (ri, i) => new { i.Name, ri.Quantity, i.BaseUnit })
-            .ToListAsync(CancellationToken.None);
+            .ToListAsync(Cancellation.None);
         return [.. rows.Select(row => ToIngredientDto(row.Name, row.Quantity, row.BaseUnit))];
     }
 
@@ -194,7 +313,7 @@ file static class RecipeMappings
             .Where(s => s.RecipeId == recipeId)
             .OrderBy(s => s.StepNumber)
             .Select(s => new StepDto(s.Instruction))
-            .ToListAsync(CancellationToken.None);
+            .ToListAsync(Cancellation.None);
 
     // Einzige Abbildung der Zutatenzeile auf das DTO (Lesen und Anlegen): mit Menge ist die Einheit die
     // Basiseinheit der Zutat; ohne Menge sind Menge und Einheit null (ADR-S135-2, ADR-S020-1).
@@ -208,45 +327,30 @@ file static class RecipeMappings
             statusCode: StatusCodes.Status404NotFound,
             extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["errorCode"] = "RECIPE_NOT_FOUND" });
 
-    // ADR-S135-2: Namen werden ohne Unterschied der Groß-/Kleinschreibung verglichen. Bewusst kein Dictionary
-    // nach Name: Die DB-Eindeutigkeit gilt unter LOWER(name), und OrdinalIgnoreCase faltet anders – „µg" (Mikro-
-    // Zeichen) und „μg" (griechisches My) oder „ς" und „σ" sind darunter gleich, unter LOWER verschieden. Ein
-    // Dictionary risse dann jedes Anlegen mit. Nicht abgesichert: Gibt es beide, nimmt First still eine davon
-    // (TD-S148-1). Ein unbekannter Name endet in 500 (TD-S144-1).
-    // Stryker disable once Linq : First vs. FirstOrDefault both end in 500 until unknown names get a message (Einzelfall, vom User freigegeben S148)
-    private static Guid IngredientIdByName(IReadOnlyList<IngredientDbType> ingredients, string name) =>
-        ingredients.First(i => string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase)).Id;
-
-    // Der Lookup Name -> Zutat-Id kommt als Funktion herein: die Zerlegung kennt keine DB.
-    private static RecipeIngredient ToRecipeIngredient(ParsedIngredientLine line, Func<string, Guid> ingredientIdByName) =>
-        RecipeIngredient.Create(IngredientId.Create(ingredientIdByName(line.Name)), line.Quantity);
-
-    // ADR-S135-2: beginnt die Zeile mit einer Ziffer, ist sie „Menge Einheit Zutat"; sonst ist die ganze Zeile
-    // die Zutat, ohne Menge (ADR-S020-1). Eine ungültige Menge wird zur Meldung, die die Zeile zitiert. Die
-    // Einheit wird noch nicht gelesen – sie ist die Basiseinheit der Zutat; ihre Prüfung kommt mit dem Szenario
-    // „Einheit falsch".
+    // ADR-S135-2: beginnt die Zeile mit einer Ziffer, ist das erste Wort die Menge; sonst ist die ganze Zeile
+    // die Zutat, ohne Menge (ADR-S020-1). Eine ungültige Menge wird zur Meldung, die die Zeile zitiert.
     private static OneOf<ParsedIngredientLine, FieldError> ParseLine(string line) =>
         char.IsAsciiDigit(line[0])
-            ? ParseLineWithQuantity(line, line.Split(WordSeparator))
-            : (line, Quantity.Unspecified);
+            ? ParseLineWithQuantity(line, line.Split(WordSeparator, 2))
+            : new ParsedIngredientLine(line, Quantity.Unspecified, line);
 
+    // ADR-S135-2, Addendum S148: steht nach der Menge kein Wort mehr, fehlt die Zutat – geprüft erst nach der Menge.
     private static OneOf<ParsedIngredientLine, FieldError> ParseLineWithQuantity(string line, string[] words) =>
         QuantityAmount.Create(words[0])
-            .MapError<QuantityAmount, QuantityError, FieldError>(error => DescribeQuantity(error, line))
-            // Wort 2 ist die Einheit, noch ungelesen (s. ParseLine); der Rest ist der – möglicherweise mehrwortige – Name.
-            .Map<QuantityAmount, ParsedIngredientLine, FieldError>(
-                amount => (string.Join(WordSeparator, words.Skip(2)), Quantity.Specified(amount)));
+            .MapError<QuantityAmount, QuantityError, FieldError>(error => LineError(line, DescribeQuantity(error)))
+            .Bind<QuantityAmount, ParsedIngredientLine, FieldError>(amount => words is [_, var rest]
+                ? new ParsedIngredientLine(line, Quantity.Specified(amount), rest)
+                : LineError(line, "Zutat fehlt."));
 
-    // ADR-S051-2, Addendum S135: die Meldung zitiert die normalisierte Zeile in „…“ (U+201E, U+201C).
     [ExcludeFromCoverageGate("structurally unreachable sum-type/enum default arm (ADR-S040-1)")]
-    private static FieldError DescribeQuantity(QuantityError error, string line) => new(IngredientsField, $"„{line}“: " + error switch
+    private static string DescribeQuantity(QuantityError error) => error switch
     {
         QuantityError.NotANumber => "Menge muss eine Zahl sein (z. B. 1,5).",
         QuantityError.NotPositive => "Menge muss größer als 0 sein.",
         QuantityError.TooManyDecimals => "Menge darf maximal 3 Nachkommastellen haben.",
         QuantityError.TooLarge => "Menge darf maximal 9999,999 sein.",
         _ => SumType.Unreachable<string>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
-    });
+    };
 
     private static RecipeDbType ToDbType(this Recipe recipe) =>
         new() { Id = recipe.Id.Value, Title = recipe.Title.Value };
@@ -268,13 +372,19 @@ file static class RecipeMappings
             RecipeId = recipe.Id.Value, StepNumber = index + 1, Instruction = step.Value,
         });
 
-    private static RecipeDto ToDto(this Recipe recipe, Func<IngredientId, IngredientDbType> ingredientRow) =>
-        new(
+    // Reihenfolge und Menge kommen aus dem Rezept, Name und Basiseinheit je IngredientId aus den aufgelösten Zeilen
+    // (Recipe.Ingredients entsteht aus genau diesen Zeilen, SaveRecipe).
+    private static RecipeDto ToDto(this Recipe recipe, ImmutableArray<ResolvedIngredientLine> lines)
+    {
+        var ingredientsById = lines.ToDictionary(line => line.Ingredient.Id, line => line.Ingredient);
+        return new(
             recipe.Id.Value,
             recipe.Title.Value,
-            [.. recipe.Ingredients.Items.Select(ingredient => ingredient.ToDto(ingredientRow(ingredient.Ingredient)))],
+            [.. recipe.Ingredients.Items.Select(ingredient =>
+            {
+                var stored = ingredientsById[ingredient.Ingredient.Value];
+                return ToIngredientDto(stored.Name, ingredient.Quantity.Match<decimal?>(amount => amount, () => null), stored.BaseUnit);
+            })],
             [.. recipe.Steps.Items.Select(step => new StepDto(step.Value))]);
-
-    private static RecipeIngredientDto ToDto(this RecipeIngredient ingredient, IngredientDbType row) =>
-        ToIngredientDto(row.Name, ingredient.Quantity.Match<decimal?>(amount => amount, () => null), row.BaseUnit);
+    }
 }

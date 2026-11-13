@@ -54,13 +54,19 @@ public class EndpointsTestsBase : IAsyncLifetime
         new(title, ingredients, steps ?? [AStepPayload()]);
 
     // Gemeinsamer Then-Teil der Ablehnungen: 422 (ADR-S090-1) mit genau diesen Feldmeldungen (Full State)
-    // und nichts gespeichert.
+    // und nichts gespeichert. Die Meldungen eines Keys in ihrer Reihenfolge – die Zeilenmeldungen kommen
+    // in Zeilenreihenfolge (ADR-S135-2); die Reihenfolge der Keys ist unerheblich (ADR-S090-1: feld-keyed)
+    // und wird deshalb nicht verglichen.
     protected async Task AssertRejectedWithAsync(HttpResponseMessage response, IReadOnlyDictionary<string, IReadOnlyList<string>> expectedErrors)
     {
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
-        body.Errors.Should().BeEquivalentTo(expectedErrors);
+        body.Errors.Keys.Should().BeEquivalentTo(expectedErrors.Keys);
+        foreach (var (key, expectedMessages) in expectedErrors)
+        {
+            body.Errors[key].Should().Equal(expectedMessages, $"the messages of '{key}' keep their order");
+        }
         await AssertNothingPersistedAsync();
     }
 
