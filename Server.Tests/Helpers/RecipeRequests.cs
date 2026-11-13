@@ -9,6 +9,10 @@ public sealed record StepPayload(string Instruction);
 // ADR-S135-2: die Zutaten gehen als roher Text des Zutatenfelds hinaus, eine Zutat je Zeile.
 public sealed record CreateRecipeRequest(string Title, string Ingredients, IReadOnlyList<StepPayload> Steps);
 
+// ADR-S020-1: Quantity und Unit sind beide null (ohne Menge) oder beide gesetzt.
+// public und hier, weil die Theory-Daten der Rezept-Tests den Typ in öffentlichen Signaturen tragen.
+public sealed record RecipeIngredientResponse(string Name, decimal? Quantity, string? Unit);
+
 // ADR-S090-1: 422-Body feld-keyed.
 public sealed record ValidationErrorResponse(IReadOnlyDictionary<string, IReadOnlyList<string>> Errors);
 #pragma warning restore MA0048, CA1812

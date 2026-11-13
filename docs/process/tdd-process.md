@@ -290,6 +290,9 @@ Beispiele:
 
 Gleichartige Testlogik mit variierenden Inputs/Outputs wird als ein parametrisierter Test geschrieben
 (xUnit `[Theory]`). `[InlineData]` für einfache Werte, `[MemberData]` mit `TheoryData<…>` für komplexe Objekte.
+Ein eigener Typ in solchen Testdaten steht in der öffentlichen Signatur der Theory und gehört deshalb nach
+`Server.Tests/Helpers/` (dort liegen die Request-/Response-Records): privat in der Testklasse scheitert er an
+CS0051, öffentlich verschachtelt an CA1034, als eigener Typ in der Testdatei an MA0048.
 
 ```csharp
 [Theory]

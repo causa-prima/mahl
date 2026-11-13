@@ -5,7 +5,7 @@ import {
   createRecipeViaApi, fetchRecipeTitlesViaApi, postRecipeViaApi, seedRecipesWithSaltViaApi, UNKNOWN_RECIPE_ID,
 } from './api/recipesApi'
 import { discardQuestion } from './pages/recipesPage'
-import { exactly } from './exactText'
+import { escapeRegExp, exactly } from './exactText'
 
 // Then „sehe ich die Detailansicht des neuen Rezepts": die eigene Adresse mit der Kennung (ADR-S135-5).
 const RECIPE_DETAIL_URL = /\/recipes\/[0-9a-f-]{36}$/
@@ -143,6 +143,11 @@ const FIRST_STEP = 'Teig rühren.'
 const INSTRUCTION_OF_1001_CHARS = 'a'.repeat(1001)
 const STEP_TOO_LONG = 'Schritt-Anweisung darf maximal 1000 Zeichen lang sein.'
 
+// Leerzeichen ohne Breite (U+200B) – als Codepunkt, nie als Literal oder Escape (CGG-naming).
+const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200B)
+// Eine Eingabe „nur aus Leerzeichen ohne Breite": mehrere davon, damit nicht ein einzelnes Zeichen den Fall trägt.
+const ONLY_ZERO_WIDTH_SPACES = ZERO_WIDTH_SPACE.repeat(2)
+
 // Je zwei Leerzeichen davor und dahinter, im Inneren jedes einfache Leerzeichen verdoppelt.
 const withExtraSpaces = (text: string): string => `  ${text.replaceAll(' ', '  ')}  `
 
@@ -151,13 +156,15 @@ function stepField(page: Readonly<Page>, number: number): Locator {
   return stepsSection(page).getByLabel(`Schritt ${String(number)}`)
 }
 
-// When „ich <Titel> als Titel eingebe", „ich "250 g Mehl" als Zutaten eingebe" und je Schritt „ich … als
-// Schritt eingebe", vor jedem weiteren Schritt „ich auf "Schritt hinzufügen" klicke". Nacheinander per
-// reduce: Die Reihenfolge ist Teil der Eingabe, und `functional/no-loop-statements` verbietet for…of.
-async function fillRecipeForm(page: Readonly<Page>, title: string, steps: readonly [string, ...string[]]): Promise<void> {
+// When „ich <Titel> als Titel eingebe", „ich <Zutaten> als Zutaten eingebe" (ohne Angabe "250 g Mehl") und je
+// Schritt „ich … als Schritt eingebe", vor jedem weiteren Schritt „ich auf "Schritt hinzufügen" klicke".
+// Nacheinander per reduce: Die Reihenfolge ist Teil der Eingabe, und `functional/no-loop-statements` verbietet for…of.
+async function fillRecipeForm(
+  page: Readonly<Page>, title: string, steps: readonly [string, ...string[]], ingredients: string = INGREDIENTS_MEHL,
+): Promise<void> {
   const [firstStep, ...furtherSteps] = steps
   await page.getByLabel('Titel').fill(title)
-  await page.getByLabel('Zutaten').fill(INGREDIENTS_MEHL)
+  await page.getByLabel('Zutaten').fill(ingredients)
   await stepField(page, 1).fill(firstStep)
   await furtherSteps.reduce(async (previous, instruction, index) => {
     await previous
@@ -198,6 +205,20 @@ async function expectStepsNotMarked(page: Readonly<Page>, numbers: readonly numb
     await expect(stepField(page, number)).not.toHaveAttribute('aria-invalid', 'true')
   }))
 }
+
+// Ein Eintrag der Schrittliste der Detailansicht, roh geprüft (exactText.ts): sichtbare Nummer „N.", höchstens ein
+// Leerzeichen, dann genau diese Anweisung – ein Zeilenumbruch irgendwo fiele auf.
+const numberedStep = (number: number, instruction: string): RegExp =>
+  new RegExp(`^${String(number)}\\. ?${escapeRegExp(instruction)}$`)
+
+// Then „zeigt die Detailansicht die Schritte als einzelne Einträge …": das Array pinnt Anzahl und Reihenfolge.
+async function expectDetailSteps(page: Readonly<Page>, instructions: readonly string[]): Promise<void> {
+  await expect(page.getByRole('list', { name: 'Zubereitung' }).getByRole('listitem'))
+    .toHaveText(instructions.map((instruction, index) => numberedStep(index + 1, instruction)))
+}
+
+// Titel aus „Titel und Anweisung werden mit zusammengefasstem Leerraum … gespeichert": so gespeichert und angezeigt.
+const LENTIL_SOUP = 'linsensuppe vom blech'
 
 // @US-602-happy-path
 test.describe('US602_HappyPath: Rezeptformular öffnen', () => {
@@ -410,11 +431,11 @@ test.describe('US602_EdgeCase: Rezeptformular abbrechen', () => {
   test('US602_EdgeCase_CancelCreateForm_OnlyWhitespace_ShowsListWithoutQuestion', async ({ page }) => {
     // When: ich das Formular öffne und in jedes Feld nur Leerraum eingebe
     await openCreateForm(page)
-    await page.getByLabel('Titel').fill(' \u{200B}  \u{200B} ')
-    await page.getByLabel('Zutaten').fill('\n  \n\u{200B}\n \u{200B} \n')
+    await page.getByLabel('Titel').fill(` ${ZERO_WIDTH_SPACE}  ${ZERO_WIDTH_SPACE} `)
+    await page.getByLabel('Zutaten').fill(`\n  \n${ZERO_WIDTH_SPACE}\n ${ZERO_WIDTH_SPACE} \n`)
     await page.getByLabel('Schritt 1').fill('   ')
     await page.getByRole('button', { name: 'Schritt hinzufügen' }).click()
-    await page.getByLabel('Schritt 2').fill('\u{200B}\u{200B}')
+    await page.getByLabel('Schritt 2').fill(ONLY_ZERO_WIDTH_SPACES)
     // When: ich auf "Abbrechen" klicke
     await cancelForm(page)
 
@@ -425,10 +446,10 @@ test.describe('US602_EdgeCase: Rezeptformular abbrechen', () => {
   // Eine Zeile je Beispiel der Scenario Outline: die Zeichen, die ADR-S135-1 außer Leerzeichen ohne Breite
   // entfernt, und U+0085 als Unicode-Leerraum, den JavaScripts trim() nicht kennt.
   const vanishingCharacters = [
-    { zeichen: 'ein weiches Trennzeichen (U+00AD)', text: '\u{00AD}' },
-    { zeichen: 'einen Wortverbinder (U+2060)', text: '\u{2060}' },
-    { zeichen: 'eine Byte-Order-Mark (U+FEFF)', text: '\u{FEFF}' },
-    { zeichen: 'einen Zeilenumbruch „Next Line“ (U+0085)', text: '\u{0085}' },
+    { zeichen: 'ein weiches Trennzeichen (U+00AD)', text: String.fromCodePoint(0x00AD) },
+    { zeichen: 'einen Wortverbinder (U+2060)', text: String.fromCodePoint(0x2060) },
+    { zeichen: 'eine Byte-Order-Mark (U+FEFF)', text: String.fromCodePoint(0xFEFF) },
+    { zeichen: 'einen Zeilenumbruch „Next Line“ (U+0085)', text: String.fromCodePoint(0x0085) },
   ] as const
   vanishingCharacters.forEach(({ zeichen, text }) => {
     // Szenario: Abbrechen fragt nicht nach, wenn der Titel nur Zeichen enthält, die beim Normalisieren wegfallen
@@ -781,5 +802,102 @@ test.describe('US602_EdgeCase: Titel und Anweisung an der Längengrenze', () => 
     const stepItems = page.getByRole('list', { name: 'Zubereitung' }).getByRole('listitem')
     await expect(stepItems).toHaveCount(1)
     await expect(stepItems.getByText(instruction, { exact: true })).toHaveText(exactly(instruction))
+  })
+})
+
+// @US-602-edge-case
+test.describe('US602_EdgeCase: Eingaben bereinigen und erkennen', () => {
+  // Szenario: Titel und Anweisung werden mit zusammengefasstem Leerraum und in eingegebener Schreibweise gespeichert
+  test('US602_EdgeCase_CreateRecipe_TitleAndInstructionWithExtraWhitespace_ShowsCollapsedInEnteredCase', async ({ page, request }) => {
+    // Given: die Zutat "Linsen" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Linsen', 'g')
+
+    // When: Titel mit Leerraum außen und innen, kleingeschrieben; als Schritt eine Anweisung mit Zeilenumbrüchen,
+    //   Tabulatoren und mehrfachen Leerzeichen zwischen "Linsen" und "kochen."
+    await openCreateForm(page)
+    await fillRecipeForm(page, '  linsensuppe   vom  blech  ', ['Linsen \n\t  \n\t kochen.'], '125 g Linsen')
+    await saveForm(page)
+
+    // Then: die Detailansicht des Rezepts "linsensuppe vom blech" – Schreibweise wie eingegeben (roher Text, exactText.ts)
+    await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(exactly(LENTIL_SOUP))
+    // Then: Schritt 1 "Linsen kochen." ohne Zeilenumbruch – roh geprüft, ein \n im Text fiele auf
+    await expectDetailSteps(page, ['Linsen kochen.'])
+    // Then: "linsensuppe vom blech" steht in der Rezept-Liste (die Liste hat genau diesen Eintrag)
+    await page.goto('/recipes')
+    await expect(page.getByRole('list', { name: 'Rezepte' }).getByRole('listitem')).toHaveText([exactly(LENTIL_SOUP)])
+  })
+
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const typicalLines = [
+    { name: 'rote Linsen', unit: 'g', line: '125 g rote Linsen', display: '125 g rote Linsen' },
+    { name: 'Vanillezucker', unit: 'Pck.', line: '1 Pck. Vanillezucker', display: '1 Pck. Vanillezucker' },
+    { name: 'Mehl', unit: 'g', line: '250 G mehl', display: '250 g Mehl' },
+    { name: 'schwarzer Pfeffer', unit: 'Prise', line: 'schwarzer pfeffer', display: 'schwarzer Pfeffer' },
+  ] as const
+  typicalLines.forEach(({ name, unit, line, display }) => {
+    // Szenario: Zutatenzeilen in typischer Schreibweise werden erkannt und wie gespeichert angezeigt
+    // Beispiel: alle
+    test(`US602_EdgeCase_CreateRecipe_IngredientLineInTypicalNotation_ShowsAsStored (${line})`, async ({ page, request }) => {
+      // Given: die Zutat <Name> mit Einheit <Einheit> existiert
+      await seedIngredientViaApi(request, name, unit)
+
+      // When: "Testrezept" als Titel, <Zeile> als Zutaten, "Alles mischen." als Schritt, dann speichern
+      await openCreateForm(page)
+      await fillRecipeForm(page, 'Testrezept', ['Alles mischen.'], line)
+      await saveForm(page)
+
+      // Then: die Detailansicht zeigt die Zutat <Anzeige> – die einzige Zutat des Rezepts
+      await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+      await expect(page.getByRole('list', { name: 'Zutaten' }).getByRole('listitem')).toHaveText([exactly(display)])
+    })
+  })
+
+  // Szenario: Leere Zeilen und Zeilen aus Leerzeichen im Zutatenfeld werden übergangen
+  test('US602_EdgeCase_CreateRecipe_BlankIngredientLines_AreSkipped', async ({ page, request }) => {
+    // Given: die Zutaten "Mehl" (g) und "Milch" (ml) existieren
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    await seedIngredientViaApi(request, 'Milch', 'ml')
+
+    // When: als Zutaten "250 g Mehl", eine leere Zeile, eine Zeile aus Leerzeichen, eine Zeile nur aus Leerzeichen
+    //   ohne Breite und "500 ml Milch"
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP], `250 g Mehl\n\n   \n${ONLY_ZERO_WIDTH_SPACES}\n500 ml Milch`)
+    await saveForm(page)
+
+    // Then: die Detailansicht zeigt die Zutaten in dieser Reihenfolge: "250 g Mehl", "500 ml Milch"
+    await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+    await expect(page.getByRole('list', { name: 'Zutaten' }).getByRole('listitem'))
+      .toHaveText([exactly('250 g Mehl'), exactly('500 ml Milch')])
+  })
+
+  // Szenario: Leere Schrittfelder werden beim Speichern übergangen
+  test('US602_EdgeCase_CreateRecipe_BlankStepBetweenSteps_IsSkipped', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+
+    // When: "Pfannkuchen", "250 g Mehl", Schritte "Eier trennen.", "   ", "Eiweiß steif schlagen."
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, ['Eier trennen.', '   ', 'Eiweiß steif schlagen.'])
+    await saveForm(page)
+
+    // Then: die Schritte als einzelne Einträge: 1 "Eier trennen.", 2 "Eiweiß steif schlagen."
+    await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+    await expectDetailSteps(page, ['Eier trennen.', 'Eiweiß steif schlagen.'])
+  })
+
+  // Szenario: Ein Schrittfeld nur aus Leerzeichen ohne Breite wird übergangen
+  test('US602_EdgeCase_CreateRecipe_StepOfZeroWidthSpacesOnly_IsSkipped', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+
+    // When: "Pfannkuchen", "250 g Mehl", Schritte "Teig rühren." und eines nur aus Leerzeichen ohne Breite (U+200B)
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP, ONLY_ZERO_WIDTH_SPACES])
+    await saveForm(page)
+
+    // Then: Schritt 1 "Teig rühren." als einziger Schritt
+    await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+    await expectDetailSteps(page, [FIRST_STEP])
   })
 })

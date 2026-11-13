@@ -13,8 +13,6 @@ namespace mahl.Server.Tests;
 public class RecipesEndpointsTests(PostgresContainerFixture postgres) : EndpointsTestsBase(postgres)
 {
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
-    // ADR-S020-1: Quantity und Unit sind beide null (ohne Menge) oder beide gesetzt.
-    private sealed record RecipeIngredientResponse(string Name, decimal? Quantity, string? Unit);
     private sealed record RecipeResponse(
         Guid Id, string Title, IReadOnlyList<RecipeIngredientResponse> Ingredients, IReadOnlyList<StepPayload> Steps);
     private sealed record RecipeSummaryResponse(Guid Id, string Title);
@@ -499,6 +497,34 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
     // Roh-Eingabe aus dem normalisierten Wert: je zwei Leerzeichen davor/dahinter, inneres Leerzeichen verdoppelt.
     private static string WithExtraSpaces(string text) => $"  {text.Replace(" ", "  ", StringComparison.Ordinal)}  ";
 
+    // Gemeinsamer Then-Teil von „Rezept mit einem Schritt gespeichert" (Full State): 201, genau ein Rezept in der DB
+    // (Id vergibt der Server; sie wird über recipes[0].Id gegen den Body geprüft), Body in Zutatenreihenfolge,
+    // Rezept-Zutaten in Zeilenreihenfolge (Position = Index + 1, Menge aus der erwarteten Anzeige), ein Schritt
+    // und unveränderte Zutaten. Je Zutat ein Paar aus geseedeter Zutat und erwarteter Anzeige, in Zeilenreihenfolge.
+    private async Task AssertRecipeWithOneStepStoredAsync(
+        HttpResponseMessage response, string title, string instruction,
+        params (IngredientDbType Seed, RecipeIngredientResponse Expected)[] ingredients)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.Created, "das Rezept wird angelegt");
+        var recipes = await Db.Recipes.ToListAsync(TestContext.Current.CancellationToken);
+        recipes.Should().BeEquivalentTo([ARecipe(title)], o => o.Excluding(r => r.Id), "genau ein Rezept ist gespeichert");
+        var body = await response.Content.ReadFromJsonAsync<RecipeResponse>(TestContext.Current.CancellationToken);
+        body.Should().BeEquivalentTo(
+            new RecipeResponse(
+                Id: recipes[0].Id, Title: title, Ingredients: ingredients.Select(i => i.Expected).ToList(),
+                Steps: [AStepPayload(instruction)]),
+            o => o.WithStrictOrdering(), "der Body trägt das gespeicherte Rezept in Zutatenreihenfolge");
+        (await Db.RecipeIngredients.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
+            ingredients.Select((ingredient, index) => ARecipeIngredient(
+                recipeId: recipes[0].Id, position: index + 1, ingredientId: ingredient.Seed.Id,
+                quantity: ingredient.Expected.Quantity)),
+            "die Rezept-Zutaten stehen in Zeilenreihenfolge mit der erwarteten Menge");
+        (await Db.Steps.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
+            [AStep(recipeId: recipes[0].Id, stepNumber: 1, instruction: instruction)], "genau ein Schritt ist gespeichert");
+        (await Db.Ingredients.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
+            ingredients.Select(i => i.Seed), "die Zutaten bleiben unverändert");
+    }
+
     // Szenario: Titel und Anweisung mit genau der zulässigen Länge werden gespeichert
     // Gemessen wird am normalisierten Wert (ADR-S135-1): roh 105 bzw. 1005 Zeichen, normalisiert 100 bzw. 1000.
     [Fact]
@@ -518,22 +544,71 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         // When: das Rezept wird gespeichert
         var response = await PostRecipeAsync(request);
 
-        // Then: 201, der Body trägt Titel und Anweisung normalisiert (Full State)
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var recipes = await Db.Recipes.ToListAsync(TestContext.Current.CancellationToken);
-        // Id vergibt der Server; geprüft wird sie über die Response-Assertion unten
-        recipes.Should().BeEquivalentTo([ARecipe(title)], o => o.Excluding(r => r.Id));
-        var body = await response.Content.ReadFromJsonAsync<RecipeResponse>(TestContext.Current.CancellationToken);
-        body.Should().BeEquivalentTo(new RecipeResponse(
-            Id: recipes[0].Id, Title: title,
-            Ingredients: [new RecipeIngredientResponse(Name: "Mehl", Quantity: 250m, Unit: "g")],
-            Steps: [AStepPayload(instruction)]));
+        // Then: 201, Body und gespeicherter Stand tragen Titel und Anweisung normalisiert (Full State)
+        await AssertRecipeWithOneStepStoredAsync(
+            response, title, instruction, (mehl, new RecipeIngredientResponse(Name: "Mehl", Quantity: 250m, Unit: "g")));
+    }
 
-        // Then: gespeichert ist der normalisierte Text
-        (await Db.Steps.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
-            [AStep(recipeId: recipes[0].Id, stepNumber: 1, instruction: instruction)]);
-        (await Db.RecipeIngredients.ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo(
-            [ARecipeIngredient(recipeId: recipes[0].Id, position: 1, ingredientId: mehl.Id, quantity: 250m)]);
+    // Szenario: Zutatenzeilen in typischer Schreibweise werden erkannt und wie gespeichert angezeigt
+    // Beispiel: alle
+    // Angezeigt wird der gespeicherte Name mit der Basiseinheit der Zutat (ADR-S135-2), nicht die Schreibweise der Zeile.
+    [Theory]
+    [MemberData(nameof(TypicalIngredientLines))]
+    public async Task US602_EdgeCase_CreateRecipe_IngredientLineInTypicalNotation_Returns201AndShowsStoredIngredient(
+        string baseUnit, string line, RecipeIngredientResponse expectedDisplay)
+    {
+        // Given: die Zutat (gespeicherter Name = Name der erwarteten Anzeige) existiert
+        var ingredient = AnIngredient(expectedDisplay.Name, baseUnit);
+        await SeedIngredientsAsync(ingredient);
+        const string title = "Testrezept";
+        const string instruction = "Alles mischen.";
+        var request = ACreateRecipe(title: title, ingredients: line, steps: [AStepPayload(instruction)]);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: 201, der Body zeigt die Zutat mit gespeichertem Namen und Basiseinheit
+        // Menge als Dezimalzahl (ADR-S020-1); die Rezept-Zutat verweist auf die gefundene Zutat
+        await AssertRecipeWithOneStepStoredAsync(response, title, instruction, (ingredient, expectedDisplay));
+    }
+
+    // Parameter: Basiseinheit der Zutat, Zeile im Zutatenfeld, erwartete Anzeige (Outline: Name | Einheit | Zeile | Anzeige).
+    // Die Spalte „Name" ist in jedem Beispiel gleich dem Namen der Anzeige; der Test seedet die Zutat deshalb unter
+    // expectedDisplay.Name. Ein künftiges Beispiel mit abweichendem Namen bräuchte eine eigene Spalte.
+    public static IEnumerable<TheoryDataRow<string, string, RecipeIngredientResponse>> TypicalIngredientLines =>
+    [
+        new("g", "125 g rote Linsen", new RecipeIngredientResponse("rote Linsen", 125m, "g")) { TestDisplayName = "125 g rote Linsen" },
+        new("Pck.", "1 Pck. Vanillezucker", new RecipeIngredientResponse("Vanillezucker", 1m, "Pck.")) { TestDisplayName = "1 Pck. Vanillezucker" },
+        new("g", "250 G mehl", new RecipeIngredientResponse("Mehl", 250m, "g")) { TestDisplayName = "250 G mehl" },
+        new("Prise", "schwarzer pfeffer", new RecipeIngredientResponse("schwarzer Pfeffer", null, null)) { TestDisplayName = "schwarzer pfeffer (ohne Menge und Einheit)" },
+    ];
+
+    // Szenario: Leere Zeilen und Zeilen aus Leerzeichen im Zutatenfeld werden übergangen
+    // „Leer" heißt nach der Normalisierung leer (ADR-S135-1): auch eine Zeile nur aus Leerzeichen ohne Breite
+    // (U+200B) ergibt keine Zutat – string.IsNullOrWhiteSpace erkennt sie nicht.
+    [Fact]
+    public async Task US602_EdgeCase_CreateRecipe_BlankIngredientLines_Returns201AndSkipsThem()
+    {
+        // Given: die Zutaten "Mehl" (g) und "Milch" (ml) existieren
+        var mehl = AnIngredient("Mehl", "g");
+        var milch = AnIngredient("Milch", "ml");
+        await SeedIngredientsAsync(mehl, milch);
+        const string title = "Pfannkuchen";
+        const string instruction = "Teig rühren.";
+        // Die Zeilen des Szenarios: "250 g Mehl", eine leere Zeile, eine Zeile aus Leerzeichen, eine Zeile nur
+        // aus Leerzeichen ohne Breite (U+200B), "500 ml Milch".
+        var lines = new[] { "250 g Mehl", "", "   ", char.ConvertFromUtf32(0x200B), "500 ml Milch" };
+        var request = ACreateRecipe(
+            title: title, ingredients: string.Join('\n', lines), steps: [AStepPayload(instruction)]);
+
+        // When: das Rezept wird gespeichert
+        var response = await PostRecipeAsync(request);
+
+        // Then: 201, nur die beiden Zutaten in dieser Reihenfolge
+        await AssertRecipeWithOneStepStoredAsync(
+            response, title, instruction,
+            (mehl, new RecipeIngredientResponse(Name: "Mehl", Quantity: 250m, Unit: "g")),
+            (milch, new RecipeIngredientResponse(Name: "Milch", Quantity: 500m, Unit: "ml")));
     }
 
     // ADR-S144-2 (kein US-Tag, ADR-S106-3 „Protokoll-/Infrastruktur-Mechanik"): explizites null zählt wie

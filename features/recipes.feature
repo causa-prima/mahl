@@ -692,7 +692,7 @@ Feature: Rezepte erfassen
     When ich zur Rezepte-Seite navigiere
     And ich auf "Rezept anlegen" klicke
     And ich "Pfannkuchen" als Titel eingebe
-    And ich als Zutaten "250 g Mehl", eine leere Zeile, eine Zeile aus Leerzeichen und "500 ml Milch" eingebe
+    And ich als Zutaten "250 g Mehl", eine leere Zeile, eine Zeile aus Leerzeichen, eine Zeile nur aus Leerzeichen ohne Breite und "500 ml Milch" eingebe
     And ich "Teig rühren." als Schritt eingebe
     And ich auf "Speichern" klicke
     Then zeigt die Detailansicht die Zutaten in dieser Reihenfolge: "250 g Mehl", "500 ml Milch"

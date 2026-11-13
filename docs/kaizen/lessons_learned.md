@@ -96,3 +96,39 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: S147, US-602 run-9: Im Auftrag an den Frontend-Subagenten gab ich vor, im Komponententest zu zwei zu langen Schritten den gesendeten Request-Body nicht zu prüfen. Die TS-Guideline (CGT-full-state-assertions) verlangt den vollständigen beobachtbaren Zustand, also auch den Body. Der Test-Auditor verlangte die Prüfung in Review-Runde 2 zu Recht; sie kam per Fix-Subagent nach, eine zusätzliche Runde. Vierter Fall derselben Klasse in dieser Session nach LL-S147-1.
   Warum: Die Vorgabe beruhte auf meiner Einschätzung, der Body sei an anderer Stelle schon geprüft; gegen die Regelquelle habe ich sie nicht gehalten. Die genaue Überlegung von damals ist nach zwei Kontext-Kompaktierungen nicht mehr rekonstruierbar.
   Regel: Wer im Auftrag eine Prüfung ausdrücklich ausschließt, hält das vorher gegen die Test-Regeln der Guideline (CGT-full-state-assertions, CGC-Pendant) – ein Ausschluss ist eine Vorgabe wie jede andere und braucht ihre Quelle.
+
+## Session 148 – 2026-11-13
+
+- **[HOCH] [AGENT] [Kommunikation] LL-S148-1 – Entscheidungsgrundlage aus ungemessener Kausalbehauptung**
+  Quelle: User
+  Was: In der Abschluss-Triage von US-602 run-7 legte ich dem User als Grundlage vor, zwei Vordergrund-qa-check-Läufe seien nur wegen timeout: 600000 nicht in den Hintergrund gewandert. Der User entschied darauf. Erst danach maß ich die Laufzeiten: 107 s und 102 s, also unter dem Standard-Limit – die Läufe belegten nichts, und die Agent-Definitionen widersprachen der Aussage sogar (Harness-Test: 180 s auch mit timeout). Die Entscheidung musste neu getroffen werden.
+  Warum: Ein plausibler Mechanismus (timeout gesetzt → kein Verschieben) fühlte sich wie ein Beleg an; die Gegenfrage, ob das Ergebnis ohne den Mechanismus anders ausgesehen hätte, blieb aus. Die Log-Daten zur Dauer lagen vor.
+  Regel: Bevor eine Kausalaussage ('X kam nur wegen Y durch') in eine User-Entscheidung geht: messen, ob der Fall ohne Y anders verlaufen wäre (hier: Laufzeit gegen Limit) – sonst als ungeprüft kennzeichnen.
+  CM-Bezug: CM-S064-1
+
+- **[HOCH] [QUALITÄT] [TDD] LL-S148-2 – Unsichtbares Zeichen als Escape geschrieben, obwohl die Guideline das Auflösen beschreibt**
+  Quelle: Orchestrator
+  Was: Im E2E-Test zu „Ein Schrittfeld nur aus Leerzeichen ohne Breite wird übergangen“ schrieb ich '\u200B\u200B'. Die Werkzeugkette löste es beim Edit zum unsichtbaren Literal auf. Drei Review-Agenten meldeten es; ein Editor, der unsichtbare Zeichen entfernt, hätte den Test still in einen Leer-String-Test verwandelt, der die Normalisierung nicht mehr prüft.
+  Warum: CGG-naming beschreibt genau diesen Fall (Codepunkt-Ausdruck, nie Literal oder \u-Escape, weil die Werkzeugkette den Escape auflöst). Die Regel war bekannt, wurde beim Schreiben des E2E-Tests aber nicht angewandt – kein Hook prüft Spec-Dateien auf unsichtbare Zeichen.
+  Regel: Unsichtbare oder Leerraum-Zeichen in Tests immer als String.fromCodePoint/char.ConvertFromUtf32 schreiben, nie als Escape; nach dem Edit mit grep -P auf den Codepunkt gegenprüfen.
+  CM-Bezug: CM-S047-1
+
+- **[HOCH] [QUALITÄT] [TDD] LL-S148-3 – Test-Review gab Eingaben jenseits des Szenarios frei und übersah eine fehlende**
+  Quelle: Orchestrator
+  Was: Im Test-Review von US-602 run-7 gab ich einen Backend-Test zu „Leere Zeilen und Zeilen aus Leerzeichen im Zutatenfeld werden übergangen“ frei, der eine Zeile aus Leerzeichen ohne Breite enthielt, die das Szenario nicht nannte – begründet mit ADR-S135-1 statt, wie TDD-spec-verweis verlangt, vorher ein Beispiel ins Feature-File zu bringen. Zugleich fehlte im Test die im Szenario genannte leere Zeile (führendes \n schloss nur die Vorzeile ab); erst ein Auditor in Review-Runde 2 bemerkte es, nachdem ich den Kommentar sogar auf „leere Zeile“ korrigiert hatte.
+  Warum: Beim Test-Review prüfte ich, ob die Assertions gedeckt sind, nicht Zeile für Zeile, ob die Testdaten genau die Szenario-Eingaben bilden. Eine zusätzliche fachliche Begründung (ADR) fühlte sich wie Deckung an.
+  Regel: Im Test-Review die Given-Daten gegen jede im Szenario genannte Eingabe abzählen (fehlt eine? kommt eine dazu?); eine Eingabe ohne Szenario-Zeile wird nicht per ADR, sondern per Feature-File-Beispiel mit User-Freigabe gedeckt.
+  CM-Bezug: CM-S116-1
+
+- **[MITTEL] [AGENT] [Kommunikation] LL-S148-4 – Ungeprüfte Behauptung als Begründung an einen Subagenten weitergegeben**
+  Quelle: User
+  Was: Gegen den Dictionary-Lookup des Backend-Subagenten argumentierte ich mit „ſalz“ und „salz“ seien unter OrdinalIgnoreCase gleich. Dem User nannte ich das als ungeprüft, dem Subagenten als Tatsache; er schrieb es in einen Code-Kommentar. Ein Wegwerf-Test widerlegte das Beispiel (ſ/s verschieden, µ/μ und ς/σ gleich) – der Einwand hielt in der Sache, das Beispiel war falsch.
+  Warum: Die Kennzeichnung als ungeprüft galt nur in der Antwort an den User, nicht in der Nachricht an den Subagenten; dort wurde das Beispiel zur Begründung, die er übernahm.
+  Regel: Eine ungeprüfte Behauptung behält ihre Kennzeichnung in jeder Weitergabe (Subagent, Code, Tracker) – oder wird vorher mit einem Wegwerf-Test geprüft, wenn das billiger ist.
+  CM-Bezug: CM-S064-1
+
+- **[MITTEL] [PROZESS] [Agent-Prompt] LL-S148-5 – Übergangsregel eines OBS im Spawn-Prompt vergessen**
+  Quelle: User
+  Was: OBS-S144-4 („Hintergrund-Lauf weckt den Layer-Subagenten nach seinem Ende nicht“) legte in S147 als Übergang fest: bis zu einer mechanischen Lösung steht die Vordergrund-Vorgabe im Spawn-Prompt. Im ersten Spawn von US-602 run-7 fehlte sie. Der Subagent startete qa-check mit run_in_background, wurde nicht geweckt, und der Lauf stand rund 30 Minuten still, bis der User fragte, wie lange ich noch warten würde. Zudem versprach ich, bei Ausbleiben selbst zu prüfen, ohne einen Mechanismus, der mich weckt.
+  Warum: Die Übergangsregel lebte nur im OBS-Text; nichts legte sie beim Spawn vor – weder Skill noch Agent-Definition noch Hook. Erinnerung war der einzige Träger.
+  Regel: Eine Übergangsregel, die bei einer wiederkehrenden Handlung gelten soll, gehört an die Stelle, die bei dieser Handlung gelesen wird (Skill-Schritt, Agent-Definition), nicht nur in den Tracker-Eintrag.

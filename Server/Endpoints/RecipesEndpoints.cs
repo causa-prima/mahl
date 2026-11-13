@@ -82,15 +82,20 @@ file static class RecipeMappings
     // wenn keine nicht leere Zeile da ist. Null (explizit gesendet, ADR-S144-2) ist wie leer.
     private static OneOf<NonEmptyImmutableArray<ParsedIngredientLine>, IReadOnlyList<FieldError>> ToIngredientLines(string? text) =>
         NonEmptyImmutableArray<ParsedIngredientLine>
-            .Create([.. NonBlankLines(text).Select(ParseLine)])
+            .Create([.. NormalizedNonEmptyLines(text).Select(ParseLine)])
             .MapError<NonEmptyImmutableArray<ParsedIngredientLine>, ListViolation, IReadOnlyList<FieldError>>(
                 _ => [IngredientsMissing]);
 
     private const char LineSeparator = '\n';
 
-    // ADR-S135-2: Null und Leerraum-Zeilen ergeben keine Zeile.
-    private static IEnumerable<string> NonBlankLines(string? text) =>
-        (text ?? string.Empty).Split(LineSeparator).Where(line => !string.IsNullOrWhiteSpace(line));
+    // Trennt die Wörter einer normalisierten Zeile – nach ADR-S135-1 steht dort nur noch je ein ASCII-Leerzeichen.
+    private const char WordSeparator = ' ';
+
+    // ADR-S135-2 / ADR-S135-1: jede Zeile wird normalisiert; Null und normalisiert leere Zeilen ergeben keine Zeile.
+    private static IEnumerable<string> NormalizedNonEmptyLines(string? text) =>
+        (text ?? string.Empty).Split(LineSeparator)
+            .SelectMany(line => NonEmptyNormalizedString.Create(line)
+                .Match<IEnumerable<string>>(normalized => [normalized.Value], _ => []));
 
     // ADR-S144-1: die Meldung zu einer Anweisung keyt auf den Index in der gesendeten Liste, die zur
     // Liste als Ganzes auf `steps`.
@@ -130,12 +135,12 @@ file static class RecipeMappings
     private static async Task<IResult> SaveRecipe(RecipeValues values, MahlDbContext db, HttpContext httpContext)
     {
         // Bewusst ohne RequestAborted: Das Backend reicht Abbruch nirgends durch (Sonar S8949 verlangt die explizite Wahl).
-        var ingredientsByName = await db.Ingredients.ToDictionaryAsync(i => i.Name, StringComparer.Ordinal, CancellationToken.None);
-        var ingredientsById = ingredientsByName.Values.ToDictionary(i => i.Id);
+        var ingredients = await db.Ingredients.ToListAsync(CancellationToken.None);
+        var ingredientsById = ingredients.ToDictionary(i => i.Id);
         var recipe = Recipe.Create(
             RecipeId.New(),
             values.Title,
-            values.Lines.Map(line => ToRecipeIngredient(line, name => ingredientsByName[name].Id)),
+            values.Lines.Map(line => ToRecipeIngredient(line, name => IngredientIdByName(ingredients, name))),
             values.Steps);
 
         var recipeRow = recipe.ToDbType();
@@ -199,6 +204,15 @@ file static class RecipeMappings
             statusCode: StatusCodes.Status404NotFound,
             extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["errorCode"] = "RECIPE_NOT_FOUND" });
 
+    // ADR-S135-2: Namen werden ohne Unterschied der Groß-/Kleinschreibung verglichen. Bewusst kein Dictionary
+    // nach Name: Die DB-Eindeutigkeit gilt unter LOWER(name), und OrdinalIgnoreCase faltet anders – „µg" (Mikro-
+    // Zeichen) und „μg" (griechisches My) oder „ς" und „σ" sind darunter gleich, unter LOWER verschieden. Ein
+    // Dictionary risse dann jedes Anlegen mit. Nicht abgesichert: Gibt es beide, nimmt First still eine davon
+    // (TD-S148-1). Ein unbekannter Name endet in 500 (TD-S144-1).
+    // Stryker disable once Linq : First vs. FirstOrDefault both end in 500 until unknown names get a message (Einzelfall, vom User freigegeben S148)
+    private static Guid IngredientIdByName(IReadOnlyList<IngredientDbType> ingredients, string name) =>
+        ingredients.First(i => string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase)).Id;
+
     // Der Lookup Name -> Zutat-Id kommt als Funktion herein: die Zerlegung kennt keine DB.
     private static RecipeIngredient ToRecipeIngredient(ParsedIngredientLine line, Func<string, Guid> ingredientIdByName) =>
         RecipeIngredient.Create(IngredientId.Create(ingredientIdByName(line.Name)), line.Quantity);
@@ -207,14 +221,13 @@ file static class RecipeMappings
     // Zutat"; sonst ist die ganze Zeile die Zutat, ohne Menge (ADR-S020-1). Die Einheit wird noch nicht
     // gelesen – sie ist die Basiseinheit der Zutat; ihre Prüfung kommt mit dem Szenario „Einheit falsch".
     private static ParsedIngredientLine ParseLine(string line) =>
-        char.IsAsciiDigit(line[0]) ? ParseLineWithQuantity(line.Split(' ')) : (line, Quantity.Unspecified);
+        char.IsAsciiDigit(line[0]) ? ParseLineWithQuantity(line.Split(WordSeparator)) : (line, Quantity.Unspecified);
 
     private static ParsedIngredientLine ParseLineWithQuantity(string[] words)
     {
-        // Wort 1 ist die Einheit, noch ungelesen (s. ParseLine). Kein List-Pattern: `is [var amount, _, var name]`
-        // bräuchte einen Zweig für andere Wortzahlen, den noch kein Szenario fordert.
-        var (amount, name) = (words[0], words[2]);
-        return (name, Quantity.Specified(decimal.Parse(amount, CultureInfo.InvariantCulture)));
+        // Wort 2 ist die Einheit, noch ungelesen (s. ParseLine); der Rest ist der – möglicherweise mehrwortige – Name.
+        var name = string.Join(WordSeparator, words.Skip(2));
+        return (name, Quantity.Specified(decimal.Parse(words[0], CultureInfo.InvariantCulture)));
     }
 
     private static RecipeDbType ToDbType(this Recipe recipe) =>
