@@ -18,6 +18,15 @@ def test_definierte_guards_kommen_aus_beiden_dispatchern():
     assert "ruff_lint" in namen
 
 
+def test_teilchecks_des_blockierenden_qualitaets_hooks_gelten_als_definiert():
+    """Sie protokollieren unter eigenem Namen; ohne Definition stünden sie als „nicht mehr
+    definiert" da und könnten nie als stumm auffallen."""
+    qs = import_module("prozesscode.hooks.check-code-quality-blocking")
+    namen = stats.definierte_guards()
+    for fn in qs.CHECKS:
+        assert namen[qs.teilcheck_name(fn)] == stats.GRUPPE_QS_BLOCKIEREND
+
+
 def test_direkt_protokollierende_hooks_gelten_als_definiert():
     """Nicht jeder Guard läuft über einen Dispatcher – manche Hooks rufen guard_log selbst.
     Ohne sie stünden lebende Guards als „nicht mehr definiert" im Report und könnten nie als

@@ -52,6 +52,13 @@ Verbleibende Stryker-Survivors behandelst du nach [Welcher Survivor bekommt welc
 
 TDD-Abweichung (Test nach Code) ist ein Prozess-Fehler → sofort STOP und melden.
 
+**Aussagen mit Beleg:** Begründungen des Orchestrators tragen „(geprüft: <Quelle>)" oder
+„(ungeprüft)". In Code, Testkommentare und Return übernimmst du nur Geprüftes als Tatsache; eine
+ungeprüfte Aussage, auf die du baust, belegst du vorher selbst (Wegwerf-Test, `decisions get`,
+Doku) oder meldest sie als offen. Umgekehrt gilt dasselbe: Stützt sich deine PLANUNG auf
+Werkzeugverhalten (Matcher-Optionen wie `WithStrictOrdering()`, Vergleichssemantik, Defaults),
+nennst du den Beleg – ohne ihn ist es eine Vermutung und so zu kennzeichnen.
+
 **Ausgabe** – in dieser Reihenfolge: Ein zu langer Bericht kommt beim Orchestrator am Ende
 abgeschnitten an, das Unverzichtbare steht deshalb vorn. Dasselbe gilt für jede Zwischenmeldung
 (PLANUNG, `TEST-REVIEW:`): zuerst das Signal und die Rückfragen, dann knapp die Begründung; Details,

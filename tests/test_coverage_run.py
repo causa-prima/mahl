@@ -79,6 +79,73 @@ def test_fehlendes_venv_nennt_den_herstellenden_befehl(monkeypatch, capsys):
     assert "requirements-dev.txt" in capsys.readouterr().out
 
 
+# --- --fehlend: welche Zeilen eines Moduls ungedeckt sind -----------------------------------
+# Die Retro soll eine dünne Fassade von einer Lücke in der Logik unterscheiden; eine Prozentzahl
+# sagt das nicht, die fehlenden Zeilen schon.
+# Zeilen aus einem echten Lauf (S149, `coverage-run --fehlend jenga_score --verbose`), nicht
+# nachgebaut: Spaltenbreite, leere Missing-Spalte bei 100 % und Bereichsschreibweise stammen von
+# pytest-cov selbst.
+_AUSGABE_FEHLEND = """\
+Name                                                  Stmts   Miss  Cover   Missing
+-----------------------------------------------------------------------------------
+prozesscode/doc.py                                      275     41    85%   183, 225, 330, 442, 465-468, 472-487, 494-495, 510-532, 563
+prozesscode/hooks/check-anchors.py                       44      0   100%
+prozesscode/jenga_score.py                               84     36    57%   72-116, 137-141, 147
+-----------------------------------------------------------------------------------
+TOTAL                                                  8515   1048    88%
+
+2361 passed in 75.02s
+"""
+
+
+def _mit_aufruf(monkeypatch, stdout=_AUSGABE_FEHLEND) -> list[tuple]:
+    aufrufe: list[tuple] = []
+    monkeypatch.setattr(cov, "_venv_vorhanden", lambda: True)
+    monkeypatch.setattr(cov, "_laufe", lambda *a: aufrufe.append(a) or _Lauf(stdout))
+    return aufrufe
+
+
+def test_fehlend_nennt_die_ungedeckten_zeilen_des_moduls(monkeypatch, capsys):
+    # Given
+    aufrufe = _mit_aufruf(monkeypatch)
+    # When
+    code = cov.main(["--fehlend", "jenga_score"])
+    # Then
+    assert code == 0
+    assert "--cov-report=term-missing" in aufrufe[0]
+    assert cov.FEHLEND_ZEILE.format(pfad="prozesscode/jenga_score.py", prozent=57,
+                                    fehlend="72-116, 137-141, 147") in capsys.readouterr().out
+
+
+def test_fehlend_nimmt_auch_den_pfad_wie_in_der_tabelle(monkeypatch, capsys):
+    _mit_aufruf(monkeypatch)
+    cov.main(["--fehlend", "prozesscode/doc.py"])
+    assert cov.FEHLEND_ZEILE.format(
+        pfad="prozesscode/doc.py", prozent=85,
+        fehlend="183, 225, 330, 442, 465-468, 472-487, 494-495, 510-532, 563",
+    ) in capsys.readouterr().out
+
+
+def test_fehlend_in_unterordner_bei_voller_abdeckung_sagt_keine(monkeypatch, capsys):
+    _mit_aufruf(monkeypatch)
+    cov.main(["--fehlend", "hooks/check-anchors"])
+    assert cov.FEHLEND_ZEILE.format(pfad="prozesscode/hooks/check-anchors.py", prozent=100,
+                                    fehlend=cov.KEINE) in capsys.readouterr().out
+
+
+def test_fehlend_mit_unbekanntem_modul_sagt_das_statt_still_nichts(monkeypatch, capsys):
+    """Ein Tippfehler darf nicht wie „keine Lücke" aussehen."""
+    _mit_aufruf(monkeypatch)
+    assert cov.main(["--fehlend", "jenga"]) == 2
+    assert cov.UNBEKANNT.format(modul="jenga") in capsys.readouterr().out
+
+
+def test_ohne_fehlend_bleibt_die_kurze_tabelle(monkeypatch):
+    aufrufe = _mit_aufruf(monkeypatch, _AUSGABE)
+    cov.main([])
+    assert "--cov-report=term" in aufrufe[0]
+
+
 def test_verbose_gibt_die_volle_tabelle(monkeypatch, capsys):
     monkeypatch.setattr(cov, "_venv_vorhanden", lambda: True)
     monkeypatch.setattr(cov, "_laufe", lambda *_a: _Lauf())

@@ -162,6 +162,14 @@ python3 -m prozesscode.obs set OBS-SNNN-N --status "UMGESETZT (S<NNN>)" --entsch
   Reaktivierung zusätzlich eine **Re-Trigger-Notiz** („wieder aktiv wenn …"); kein Script wertet sie aus, der
   Termin ist der verlässliche Backstop. Ein **blockiertes** Item (wartet auf X) ist genau dieser Fall: Grund =
   der Blocker, Termin = Spätestens-Wiedervorlage, Re-Trigger = dessen Auflösung.
+- <a id="DRN-pilot-ausfuehrbarkeit"></a>**Pilot, der Nutzung misst** (ein Werkzeug, eine Anweisung, ein Ablauf wird
+  „beobachtet, ob er genutzt wird"): Vor jedem Verlängern **und** vor jedem Verwerfen wegen Nichtnutzung
+  wird im echten Zielagenten geprüft, dass die Anweisung ausführbar ist – Werkzeug sichtbar, Ladeweg stimmt,
+  ein Aufruf gelingt. Das Ergebnis steht im Feld `Entscheidung/Maßnahme:` als „Ausführbarkeit geprüft:
+  <wie, wo, Datum>". Ohne diese Zeile kein Verlängern und kein Verwerfen. Grund: Eine Nullnutzung hat
+  mehrere Ursachen – nicht gewollt, vergessen, nicht erreichbar –, und eine Nutzungszählung unterscheidet
+  sie nicht. Ein Language-Server-Pilot wurde fünfmal verlängert und stand vor dem Verwerfen, während die
+  Ladeanweisung im Prompt für den Zielagenten falsch war.
 - **entschieden, aber später gebaut** („machen wir, nicht jetzt") → kein Aufschieben: Offen ist keine
   Entscheidung mehr, sondern eine Aufgabe, und eine Wiedervorlage legte sie mit der falschen Frage
   („entscheiden") wieder vor. Stattdessen ein Eintrag in `docs/AGENT_MEMORY.md` unter „Nächste

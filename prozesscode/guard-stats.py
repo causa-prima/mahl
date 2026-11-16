@@ -38,6 +38,9 @@ HINWEIS_DUENN = ("Noch zu wenige Auslösungen: 'nie gefeuert' ist hier eine Auss
                  "Alter des Protokolls, nicht über den Guard.")
 
 GRUPPE_EIGENSTAENDIG = "eigenständig (Hook protokolliert selbst)"
+# Seit S149 je Teilcheck protokolliert; die Summe steht weiter unter check-code-quality-blocking.
+# „nie gefeuert" ist hier bis auf Weiteres eine Aussage über das Alter dieser Zählung.
+GRUPPE_QS_BLOCKIEREND = "Teilcheck (check-code-quality-blocking, gezählt seit S149)"
 
 # Hooks außerhalb der Dispatcher rufen guard_log mit ihrem Namen als Literal. Die Dispatcher
 # übergeben eine Variable und fallen damit nicht unter das Muster – sie werden oben gelesen.
@@ -56,6 +59,10 @@ def definierte_guards() -> dict[str, str]:
     nichtblockierend = import_module("prozesscode.hooks.check-code-quality-nonblocking")
     for fn in nichtblockierend.CHECKS:
         namen[fn.__module__.rsplit(".", 1)[-1]] = "Hinweis (check-code-quality-nonblocking)"
+
+    qs_blockierend = import_module("prozesscode.hooks.check-code-quality-blocking")
+    for fn in qs_blockierend.CHECKS:
+        namen[qs_blockierend.teilcheck_name(fn)] = GRUPPE_QS_BLOCKIEREND
 
     for hook in sorted(_HOOKS.glob("*.py")):
         for name in _EIGENER_AUFRUF.findall(hook.read_text(encoding="utf-8")):

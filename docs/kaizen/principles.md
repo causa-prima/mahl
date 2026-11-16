@@ -115,6 +115,9 @@ Größe berichtet („Die berichtete Größe ist die gemessene").
   Datensatz, am frischen Agenten), erst verifizieren. Gesichert ist eine Aussage über externes
   Tool-Verhalten nur durch einen konkreten Tool-Call dieser Session – alles andere proaktiv als
   ungeprüft kennzeichnen und Verifizierung anbieten, nicht warten, bis der User nachfragt.
+  **Die Kennzeichnung reist mit:** Wer eine Aussage weitergibt (Subagent, User-Vorlage, Code,
+  Tracker), schreibt „(geprüft: <Quelle>)" oder „(ungeprüft)" dazu – beim Empfänger wird eine
+  Begründung sonst zur Tatsache, die er weiterträgt.
   Drei Tarnungen, die den Selbst-Check aushebeln:
   **Rechnen ist keine Messung.** Wer zitierte Zahlen addiert, teilt oder ins Verhältnis setzt, hat
   gerechnet, nicht erhoben: Das Ergebnis ist abgeleitet, erbt jeden Fehler der Quelle und muss so

@@ -5,6 +5,10 @@ Testabdeckung des Prozess-Codes unter `.claude/**` – als Metrik, nicht als Gat
 Verwendung:
   python3 -m prozesscode.coverage-run            # Gesamtwert + die schwächsten Module
   python3 -m prozesscode.coverage-run --verbose  # vollständige Tabelle
+  python3 -m prozesscode.coverage-run --fehlend jenga_score   # ungedeckte Zeilen eines Moduls
+
+`--fehlend` trennt in der Retro eine dünne Fassade von einer Lücke in der Logik: Eine
+Prozentzahl sagt nicht, *welche* Zeilen fehlen – ob die Ausgabe oder die Entscheidung.
 
 **Warum kein Gate:** siehe `coding-guideline-python.md`, „Was nicht gilt".
 
@@ -34,7 +38,13 @@ MESSPFADE = ("prozesscode",)
 ZEIGEN_UNTER = 60
 
 _ZEILE = re.compile(r"^(\S+\.py)\s+(\d+)\s+(\d+)\s+(\d+)%")
+_ZEILE_FEHLEND = re.compile(r"^(\S+\.py)\s+\d+\s+\d+\s+(\d+)%\s*(.*)$")
 _TOTAL = re.compile(r"^TOTAL\s+\d+\s+\d+\s+(\d+)%", re.M)
+
+FEHLEND_ZEILE = "  {pfad}: {prozent} % – fehlende Zeilen: {fehlend}"
+KEINE = "keine"
+UNBEKANNT = ("✗ Modul „{modul}“ steht nicht in der Messung. Name relativ zu prozesscode/ und "
+             "ohne .py (jenga_score, hooks/check-anchors) oder als Pfad wie in --verbose.")
 
 _FEHLT = (
     "✗ Werkzeug-Umgebung fehlt ({pfad}).\n"
@@ -59,18 +69,31 @@ def module_unter(ausgabe: str, grenze: int) -> list[tuple[str, int]]:
     return sorted([t for t in treffer if t[1] < grenze], key=lambda t: t[1])
 
 
+def fehlende_zeilen(ausgabe: str, modul: str) -> str | None:
+    """Meldezeile mit den ungedeckten Zeilen des Moduls; None, wenn es nicht gemessen wurde."""
+    gesucht = {modul, f"{MESSPFADE[0]}/{modul}.py"}
+    for m in (_ZEILE_FEHLEND.match(z) for z in ausgabe.splitlines()):
+        if m and m.group(1) in gesucht:
+            return FEHLEND_ZEILE.format(pfad=m.group(1), prozent=int(m.group(2)),
+                                        fehlend=m.group(3) or KEINE)
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = Parser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--verbose", action="store_true", help="Vollständige Tabelle")
+    parser.add_argument("--fehlend", metavar="MODUL",
+                        help="Ungedeckte Zeilen eines Moduls, z. B. jenga_score oder hooks/check-anchors")
     args = parser.parse_args(argv)
 
     if not _venv_vorhanden():
         print(_FEHLT.format(pfad=VENV_PY))
         return 2
 
+    bericht = "--cov-report=term-missing" if args.fehlend else "--cov-report=term"
     ergebnis = _laufe(str(VENV_PY), "-m", "pytest", TESTS, "-q",
-                      *[f"--cov={p}" for p in MESSPFADE], "--cov-report=term")
+                      *[f"--cov={p}" for p in MESSPFADE], bericht)
     ausgabe = ergebnis.stdout + ergebnis.stderr
 
     # Bei roten Tests ist die Zahl bedeutungslos: Nicht gelaufene Tests decken nichts ab, und
@@ -81,6 +104,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     gesamt = _TOTAL.search(ausgabe)
+    if args.fehlend:
+        zeile = fehlende_zeilen(ausgabe, args.fehlend)
+        if zeile is None:
+            print(UNBEKANNT.format(modul=args.fehlend))
+            return 2
+        emit(verbose=args.verbose, output=ausgabe,
+             verdict=f"✓ Coverage Prozess-Code: {gesamt.group(1) if gesamt else '?'} %",
+             details=[zeile])
+        return 0
+
     schwach = module_unter(ausgabe, ZEIGEN_UNTER)
     ungetestet = [m for m, p in schwach if p == 0]
 

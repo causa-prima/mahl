@@ -88,7 +88,8 @@ Wähle immer die einfachste Lösung, die den Anforderungen genügt.
   `char.ConvertFromUtf32(0x00A0)` oder ein `int`-Codepunkt), nie als Literal und nie als `\u`-Escape.
   Ein Literal ist unsichtbar und übersteht kein Editor-Normalisieren; einen `\u`-Escape löst die
   Werkzeugkette des Agenten schon beim Schreiben der Datei zum Literal auf (an Write und Edit
-  nachgewiesen, Ursache nicht geprüft). Sichtbare
+  nachgewiesen; schon der PreToolUse-Hook sieht das Literal, aufgelöst wird also beim Verarbeiten
+  des Tool-Aufrufs – wo genau, ist nicht geprüft). Sichtbare
   Buchstaben wie ein vorkomponiertes „ä" bleiben Literal: Geht es verloren, wird der Test laut rot.
 
 ---

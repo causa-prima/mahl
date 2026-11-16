@@ -37,6 +37,7 @@ from pathlib import Path
 
 from ._cli import Parser
 from ._run_lock import LOCK_BUSY_EXIT_CODE
+from ._test_struktur import fehlende_gwt
 from ._wrapper_output import VERBOSE_HINT
 from ._stryker_report import (
     NO_MUTANTS_HINT,
@@ -344,8 +345,7 @@ def check_test_structure(layer: str) -> list[tuple[str, str]]:
             current_block.append(line[1:])
 
     for filepath, trigger, added_lines in blocks:
-        block_text = "\n".join(added_lines)
-        missing = [m for m in ("// Given", "// When", "// Then") if m not in block_text]
+        missing = fehlende_gwt(added_lines)
         if missing:
             findings.append((filepath, f"{trigger}  →  fehlt: {', '.join(missing)}"))
 

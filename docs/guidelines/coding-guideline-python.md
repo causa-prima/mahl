@@ -122,6 +122,14 @@ Die Sperrklinke verhindert nur Rückschritte. Geschlossen wird eine Lücke erst,
 
 Gesichtet ist ein Modul, wenn kein Mutant mit Folge mehr überlebt – das Ziel ist nicht 100 %.
 
+**Ein Mutant wirkt auch außerhalb des Tests.** Übergibt ein Test einer Signal-Funktion
+(`os.kill`, `os.killpg`) eine echte PID, macht mutmut aus `os.kill(pid, 0)` ein
+`os.kill(pid, 1)` – ein echtes Signal an diesen Prozess. Deshalb nur PIDs, die ein Signal nicht
+trifft oder nicht stört: `1` (init) für „lebt, gehört einem anderen" (als normaler User endet das
+Signal in `PermissionError`), ein eigener Kindprozess für „lebt, gehört mir". Nie `os.getppid()`
+oder die PID eines Werkzeugs, unter dem der Test läuft – unter mutmut ist das mutmut selbst, und
+der Volllauf bricht mit SIGHUP ab.
+
 <a id="CGP-echtes-artefakt"></a>
 ### Tests laufen gegen das echte Artefakt, nicht gegen einen Ersatz
 
@@ -154,8 +162,10 @@ könnte der Fehler in dieser Form überhaupt auftreten?*
 ### Guards protokollieren ihre Auslösungen
 
 Jeder Guard meldet beim Anschlagen seine Identität (`checks/guard_log.py`); die Dispatcher tun
-das zentral, ein neuer Guard erbt es also. Gesichtet wird der Bestand in der Retro
-(`python3 -m prozesscode.guard-stats`). Ein Guard ohne jede Auslösung ist **entweder kaputt
+das zentral, ein neuer Guard erbt es also. **Bündelt ein Guard mehrere Prüfungen** (Teilchecks
+eines Dispatchers, zwei Prüfungen in einem Hook), protokolliert er jede unter eigenem Namen –
+sonst verschwindet der Ausfall der einen hinter den Auslösungen der anderen. Gesichtet wird der
+Bestand in der Retro (`python3 -m prozesscode.guard-stats`). Ein Guard ohne jede Auslösung ist **entweder kaputt
 oder überflüssig** – von außen nicht unterscheidbar, also prüfen statt annehmen.
 
 Zwei Regeln dazu:

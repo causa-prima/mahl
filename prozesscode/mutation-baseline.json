@@ -34,6 +34,11 @@
     "getoetet": 210,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
+  "prozesscode._test_struktur": {
+    "beurteilbar": 3,
+    "getoetet": 3,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
   "prozesscode._util": {
     "beurteilbar": 58,
     "getoetet": 7,
@@ -60,8 +65,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.coverage-run": {
-    "beurteilbar": 115,
-    "getoetet": 61,
+    "beurteilbar": 177,
+    "getoetet": 112,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.decisions": {
@@ -95,8 +100,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.guard-stats": {
-    "beurteilbar": 99,
-    "getoetet": 68,
+    "beurteilbar": 105,
+    "getoetet": 74,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks._hook_io": {
@@ -180,8 +185,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-test-spec-ref": {
-    "beurteilbar": 175,
-    "getoetet": 170,
+    "beurteilbar": 221,
+    "getoetet": 216,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.checks.common": {
@@ -247,6 +252,11 @@
   "prozesscode.hooks.checks.tooling_tests": {
     "beurteilbar": 90,
     "getoetet": 45,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
+  "prozesscode.hooks.checks.unsichtbare_zeichen": {
+    "beurteilbar": 40,
+    "getoetet": 40,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.dispatch-edit-write": {
@@ -345,8 +355,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.qa-check": {
-    "beurteilbar": 1116,
-    "getoetet": 1013,
+    "beurteilbar": 1104,
+    "getoetet": 1002,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.read-breakdown": {

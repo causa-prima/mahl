@@ -234,7 +234,9 @@ Spawn-Regeln:
 - **PLANUNG-Phase beachten:** Der Subagent beginnt mit einem PLANUNG-Schritt, stellt Rückfragen und berichtet seine eigenständig gefundenen ADRs. Auf diese Ausgabe antworten:
   - **Rückfragen:** Alle Rückfragen in einer Antwort beantworten. Für jede Frage prüfen, ob sie bereits im [Architektur-Check](#IMP-architektur-check) geklärt wurde – bekannte Antworten direkt einschließen (kurz vermerken: „aus dem Architektur-Check bekannt: [Antwort]"), offene Fragen gebündelt an den User weitergeben. Max. 2 Runden; danach dem Nutzer die Situation erklären (offene Fragen auflisten) und fragen wie weiter verfahren werden soll.
   - **ADR-Abgleich:** Findet der Subagent ADRs, die du nicht als relevant eingestuft hast (oder umgekehrt), kritisch prüfen ob sie tatsächlich anwendbar sind. Im Zweifelsfall mit dem Subagenten klären – dessen Begründungen aber ebenfalls kritisch hinterfragen, nicht blind übernehmen. Kein Konflikt: kein weiterer Austausch nötig.
+  - **Werkzeug-Aussagen des Subagenten:** Stützt sich sein Plan auf Werkzeugverhalten (Matcher-Optionen, Vergleichssemantik, Framework-Defaults), verlangst du den Beleg („geprüft: <Experiment/Doku>"), bevor du zustimmst – ein „einverstanden" macht die Aussage zur Grundlage des Test-Batches. (Vorfall: „`WithStrictOrdering()` lässt Dictionary-Keys unberührt" – sie pinnte doch die Key-Reihenfolge, aufgefallen erst in Review-Runde 2.)
   Erst nach dieser Antwort beginnt der Batch-RED-Zyklus.
+- <a id="IMP-beleg-pflicht"></a>**Belegpflicht in jeder Nachricht an einen Subagenten** (Spawn, PLANUNG-Antwort, Fix-Auftrag): Jede Begründung, die eine Sachaussage trägt – Werkzeugverhalten, Inhalt einer ADR oder Guideline, Semantik von Code –, steht mit „(geprüft: <Quelle>)" oder „(ungeprüft)". Eine ADR wird nur nach `decisions get` zitiert. Grund: Der Subagent übernimmt eine Begründung als Tatsache in Code und Kommentare; die Kennzeichnung muss mitreisen, sonst geht sie an der Grenze verloren (Vorfälle: ein falsches Zeichen-Beispiel und ein falsches ADR-Zitat landeten so in Code-Kommentaren; Prinzip [„Unterstützt ≠ beweist"](../../../docs/kaizen/principles.md#KPI-kommunikation)). **Schließt die Nachricht eine Prüfung ausdrücklich aus** („Body hier nicht prüfen"), nennt sie die Regelquelle, die das erlaubt – ein Ausschluss ist eine Vorgabe wie jede andere, und die Full-State-Regeln ([CGT-full-state-assertions](../../../docs/guidelines/coding-guideline-typescript.md#CGT-full-state-assertions), C#-Pendant) verlangen den vollständigen Zustand.
 - Haupt-Thread reviewt Diff und die Verdiktzeilen der Test-Runs nach jedem Subagent-Return.
 - **Suppressions-Politik korrekt formulieren:** Dem Subagenten nie „Ziel: NULL neue Suppressions" vorgeben – eine „null"-Vorgabe drängt ihn, korrekten/guideline-vorgeschriebenen Code zu entfernen. Es gilt [Welcher Survivor bekommt welche Reaktion?](../../../docs/process/tdd-process.md#TDD-survivor-entscheidung): Suppressionen mit Verweis auf eine erlaubende ADR (oder eine Einzelfall-Freigabe des Users) sind zulässig und werden in [Orchestrator-Check](#IMP-orchestrator-check) validiert.
 - Weicht der Subagent von TDD ab → an denselben Subagenten korrigieren (er wartet noch auf Test-Review). Max. 2 Iterationen; nach jeder Korrektur fordert der Subagent erneut Review an, bevor er zu GREEN übergeht. Nach 2 Iterationen ohne Verbesserung: Abbruch + Meldung an User.
@@ -259,7 +261,9 @@ Gegen diesen Anker prüft [Orchestrator-Check](#IMP-orchestrator-check), dass na
 
 - **Full-State-Assertions:** Bei `BeEquivalentTo` / `toEqual` (C#) bzw. `toEqual` / `toMatchObject` (TypeScript): Sind alle Properties durch ein Gherkin-Kriterium gedeckt? Gibt es `Excluding(...)` oder Partial-Matches? → müssen mit Kommentar begründet sein; unchecked oder excluded Properties sind Gold-Plating-Signal für den Produktionscode.
 
-- **Given/When-Struktur:** Neue Tests sollen durch `// Given`, `// When`, `// Then`-Kommentare gegliedert sein. Fehlen diese → Finding melden (im Test-Review nicht blockierend; der Übergabelauf von `qa-check` bricht dann vor Stryker ab, die Lücke muss also bis zur Übergabe geschlossen sein).
+- **Testdaten = Szenario-Eingaben:** Die Given-Daten jedes Tests Zeile für Zeile gegen die Eingaben abzählen, die sein Szenario bzw. seine Beispielzeile nennt: Fehlt eine (eine genannte leere Zeile, die im Test nur eine Vorzeile abschließt)? Kommt eine dazu, die nirgends steht? Eine zusätzliche Eingabe wird **nicht** per ADR gedeckt, sondern als Beispiel ins Feature-File gebracht (User-Freigabe), bevor der Test sie verwendet ([Spec-Verweis](../../../docs/process/tdd-process.md#TDD-spec-verweis)). Grund: Wer nur prüft, ob die Assertions gedeckt sind, übersieht eine fehlende Szenario-Eingabe – einmal fiel sie erst einem Auditor in Review-Runde 2 auf.
+
+- **Given/When-Struktur:** Neue Tests sind durch `// Given`, `// When`, `// Then`-Kommentare gegliedert. Bei Komponenten- und Integrationstests erzwingt das `check-test-spec-ref.py` schon beim Schreiben (ein neuer Test ohne die drei Kommentare wird nicht geschrieben); für E2E-Specs bleibt es ein Finding, das der Übergabelauf von `qa-check` vor Stryker nachprüft.
 
 **Spec-Quelle für sichtbare UI-Details:** Wurde im Lauf ein UI-Entwurf freigegeben, gilt er
 **zusammen mit den Szenarien** als Spec. Eine Assertion, die der Entwurf trägt (ein Feld ist
@@ -268,10 +272,11 @@ das Detail nennt. Grund: Eine Markierung, die der Entwurf zeigte, wurde als Gold
 gestrichen – der Mutant überlebte, der Test musste zurück.
 
 **Ergebnis je Punkt nennen:** Die Freigabe (oder Korrektur-Anforderung) nennt zu **jedem** der
-vier Punkte oben ein Ergebnis – auch „Given/When/Then: vorhanden" oder „keine Anpassungen an
-bestehenden Tests". Ein Punkt ohne genanntes Ergebnis gilt als nicht geprüft, und ohne alle vier
-gibt es keinen Freigabe-Anker. Grund: Ein Review, das sich auf zwei Punkte konzentriert, lässt die
-anderen still fallen; aufgefallen ist das bisher nur, wo ein mechanisches Gate nachfing.
+Punkte oben ein Ergebnis – auch „Given/When/Then: vorhanden", „Testdaten: je Szenario
+abgezählt, vollständig" oder „keine Anpassungen an bestehenden Tests". Das Ergebnis entsteht am
+Diff, nicht aus der Erinnerung an den Batch. Ein Punkt ohne genanntes Ergebnis gilt als nicht
+geprüft, und ohne ein Ergebnis zu jedem gibt es keinen Freigabe-Anker. Grund: Ein Review, das
+sich auf zwei Punkte konzentriert, lässt die anderen still fallen; aufgefallen ist das bisher nur, wo ein mechanisches Gate nachfing.
 
 <a id="IMP-orchestrator-check"></a>
 ## Orchestrator-Check
@@ -404,6 +409,16 @@ Review-Runden mit frischen Agenten pro Runde. Max. 3 Runden.
    (Verstehen braucht viele Schritte). Grund: Stimmt der User einem „vermerken" zu, entsteht der
    Aufschubgrund „User" von selbst – die Pflichtprüfung beim Erfassen würde so umgangen; von
    sieben zum Vermerken empfohlenen Punkten waren einmal sechs danach in Minuten behoben.
+   **Bestehende Entscheidung zuerst:** Ändert eine Empfehlung Produkt-Konfiguration (Build-/Test-
+   Kette wie `stryker-config.json`, `playwright.config.ts`, `Directory.Build.props`) oder eine
+   Querschnittsregel, vorher `python3 -m prozesscode.decisions list --tag <dimension>` zur
+   betroffenen Dimension; eine gefundene ADR steht mit Kurztitel und Kernargument (nach
+   `decisions get`) in der Vorlage. Grund: Der ADR-Scan des [Architektur-Checks](#IMP-adr-check)
+   erreicht Entscheidungen, die erst hier entstehen, nicht – eine Anhebung der Stryker-Stufe wurde
+   einmal empfohlen und entschieden, ohne dass die ADR zur selben Frage samt Revisit-Trigger vorlag.
+   Die Grundlagen der Vorlage tragen „(geprüft: <Quelle>)" oder „(ungeprüft)" wie in der
+   [Belegpflicht](#IMP-beleg-pflicht) – eine Kausalaussage („X kam nur wegen Y durch") gilt erst als
+   geprüft, wenn gemessen ist, dass der Fall ohne Y anders verlaufen wäre.
    Der User entscheidet pro Punkt:
    1. **Direkt umsetzen** → jetzt erledigen (ggf. eigener TDD-Zyklus / Schicht-Subagent).
    2. **Vermerken** → in das passende Dokument bzw. die passenden Dokumente eintragen. Welches Dokument wofür zuständig ist, steht in der `AGENTS.md`-Navigationstabelle (single source of truth – hier bewusst NICHT dupliziert, damit nichts driftet).

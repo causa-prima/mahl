@@ -21,6 +21,14 @@ sie den Fall inhaltlich deckt. Ein einfaches Szenario, das den Fall nicht erwäh
 Er ersetzt das Urteil des Test-Reviews nicht, er gibt ihm einen Anker: Ob dieser Test zu genau
 dieser Zeile passt, ist nachprüfbar; welche Spec ein Test ohne Verweis meint, war es nicht.
 
+**Zweite Prüfung, dieselbe Stelle: Gliederung.** Jeder neue Testfall trägt im Rumpf
+`// Given`, `// When`, `// Then` (Regel in `prozesscode/_test_struktur.py`, gemeinsam mit
+qa-check). Warum hier und nicht nur im Übergabelauf von qa-check: Dort fiel eine fehlende
+Gliederung erst nach der Test-Freigabe auf – die freigegebene Datei musste noch einmal geändert
+werden, und das Test-Review hatte „vorhanden" bestätigt, ohne am Diff zu zählen. Die
+Gliederungsprüfung protokolliert unter eigenem Namen (`gwt-gliederung`), damit ihr Ausfall
+nicht hinter den Auslösungen der Spec-Prüfung verschwindet.
+
 Bestandstests bleiben ungeprüft – nur neue Namen zählen; ein umbenannter Test gilt als neu.
 Umbenennen eines Szenarios in `features/` prüft dieser Hook nicht (anders als
 `check-e2e-scenario-ref` für E2E-Specs). Fail-open liegt beim Dispatcher.
@@ -29,8 +37,10 @@ import re
 from pathlib import Path
 
 from .._feature import parse_feature
-from .._test_inventory import parse_csharp, parse_typescript
+from .._test_inventory import Eintrag, parse_csharp, parse_typescript
+from .._test_struktur import fehlende_gwt
 from ._hook_io import edit_zustand
+from .checks import guard_log
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _FEATURES_DIR = _REPO_ROOT / "features"
@@ -51,11 +61,17 @@ def betrifft(file_path: str) -> bool:
     return bool(_TS_TEST_RE.search(file_path) or _CS_TEST_RE.search(file_path))
 
 
-def _testfaelle(file_path: str, text: str) -> dict[str, int]:
-    """Testname → Startzeile (0-basiert); Suiten zählen nicht."""
+def _testfaelle(file_path: str, text: str) -> dict[str, Eintrag]:
+    """Testname → Eintrag mit Zeilenbereich (1-basiert); Suiten zählen nicht."""
     lines = text.splitlines()
     parser = parse_csharp if _CS_TEST_RE.search(file_path) else parse_typescript
-    return {e.name: e.start - 1 for e in parser(lines) if not e.ist_suite}
+    return {e.name: e for e in parser(lines) if not e.ist_suite}
+
+
+def _neue_testfaelle(file_path: str, pre: str, post: str) -> dict[str, Eintrag]:
+    """Testfälle, deren Name im Nachzustand vorkommt, im Vorzustand nicht."""
+    alt = _testfaelle(file_path, pre)
+    return {n: e for n, e in _testfaelle(file_path, post).items() if n not in alt}
 
 
 def _kommentarblock(lines: list[str], start: int) -> list[str]:
@@ -116,14 +132,24 @@ def _pruefe_testfall(name: str, block: list[str], szenarien: dict, adrs: set[str
 
 def verstoesse(file_path: str, pre: str, post: str, features: list[str], adrs: set[str]) -> list[str]:
     """Meldungen für jeden neuen Testfall im Nachzustand ohne gültigen Spec-Verweis."""
-    alt = _testfaelle(file_path, pre)
-    neu = {n: i for n, i in _testfaelle(file_path, post).items() if n not in alt}
+    neu = _neue_testfaelle(file_path, pre, post)
     if not neu:
         return []
     lines = post.splitlines()
     szenarien = _szenarien(features)
-    return [m for name, start in neu.items()
-            for m in _pruefe_testfall(name, _kommentarblock(lines, start), szenarien, adrs)]
+    return [m for name, e in neu.items()
+            for m in _pruefe_testfall(name, _kommentarblock(lines, e.start - 1), szenarien, adrs)]
+
+
+def struktur_verstoesse(file_path: str, pre: str, post: str) -> list[str]:
+    """Meldungen für jeden neuen Testfall, in dessen Rumpf ein Gliederungs-Marker fehlt."""
+    lines = post.splitlines()
+    meldungen = []
+    for name, e in _neue_testfaelle(file_path, pre, post).items():
+        fehlt = fehlende_gwt(lines[e.start - 1:e.end])
+        if fehlt:
+            meldungen.append(GLIEDERUNG_FEHLT.format(test=name, fehlt=", ".join(fehlt)))
+    return meldungen
 
 
 def _features() -> list[str]:
@@ -140,10 +166,18 @@ def check(data: dict) -> str | None:
     if zustand is None:
         return None
     file_path, pre, post = zustand
+    teile = []
     meldungen = verstoesse(file_path, pre, post, _features(), _adrs())
-    if not meldungen:
-        return None
-    return KOPF + "\n".join(f"  - {m}" for m in meldungen) + "\n" + AUSWEG
+    if meldungen:
+        teile.append(KOPF + "\n".join(f"  - {m}" for m in meldungen) + "\n" + AUSWEG)
+    gliederung = struktur_verstoesse(file_path, pre, post)
+    if gliederung:
+        # Eigener Name im Protokoll: Der Dispatcher zählt nur „check-test-spec-ref" – fiele die
+        # Gliederungsprüfung aus, verschwände das hinter den Auslösungen der Spec-Prüfung.
+        guard_log.protokolliere("gwt-gliederung")
+        teile.append(KOPF_GLIEDERUNG + "\n".join(f"  - {m}" for m in gliederung) + "\n"
+                     + AUSWEG_GLIEDERUNG)
+    return "\n".join(teile) or None
 
 
 OHNE_VERWEIS = ("Test „{test}“ nennt keine Spec – darüber fehlt `// Szenario: <Titel>` "
@@ -162,4 +196,15 @@ AUSWEG = (
     "User-Freigabe (gherkin-workshop, Freigabestufe); ist das zu groß für diesen Lauf, den Test "
     "zurückstellen. Querschnitts-/Invarianten-Tests ohne Szenario: ohne US-Tag, mit "
     "`// ADR-SNNN-N` (ADR-S106-3). Format: docs/process/tdd-process.md#TDD-spec-verweis."
+)
+# Steht im Aufruf von guard_log als Literal: guard-stats findet direkt protokollierende Guards
+# nur so. Ein Test vergleicht das Protokoll mit dieser Konstante – driften beide, wird er rot.
+GUARD_GLIEDERUNG = "gwt-gliederung"
+GLIEDERUNG_FEHLT = "Test „{test}“: im Rumpf fehlt {fehlt}."
+KOPF_GLIEDERUNG = "❌ Neuer Test ohne Given/When/Then-Gliederung (CM-S070-1):\n"
+AUSWEG_GLIEDERUNG = (
+    "  Je Abschnitt eine eigene Kommentarzeile `// Given`, `// When`, `// Then` (Erklärung "
+    "dahinter erlaubt, `// When / Then` zählt nicht als `// Then`). Jetzt beim Schreiben, nicht "
+    "erst nach der Test-Freigabe – dort bricht sonst qa-check vor Stryker ab und die freigegebene "
+    "Datei muss noch einmal geändert werden. Regel: CGC-/CGT-given-when-then."
 )

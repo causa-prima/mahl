@@ -12,6 +12,8 @@ from importlib import import_module
 
 import pytest
 
+from prozesscode.hooks.checks import guard_log
+
 hook = import_module("prozesscode.hooks.check-test-spec-ref")
 
 FEATURE = textwrap.dedent("""\
@@ -60,11 +62,14 @@ BESTAND_TS = textwrap.dedent("""\
     """)
 
 
-def _neu_ts(kommentar: str, name: str = "US602_HappyPath_Neu") -> str:
+GEGLIEDERT = "    // Given\n    // When\n    // Then\n"
+
+
+def _neu_ts(kommentar: str, name: str = "US602_HappyPath_Neu", rumpf: str = GEGLIEDERT) -> str:
     """Bestand plus ein neuer Testfall mit dem gegebenen Kommentarblock darüber."""
     block = textwrap.indent(textwrap.dedent(kommentar), "  ")
     ohne_schluss = BESTAND_TS.removesuffix("})\n")  # schließendes describe abnehmen …
-    return ohne_schluss + f"\n{block}  it('{name}', async () => {{\n  }})\n}})\n"  # … und wieder dran
+    return ohne_schluss + f"\n{block}  it('{name}', async () => {{\n{rumpf}  }})\n}})\n"  # … und wieder dran
 
 
 def _verstoesse(post: str, pre: str = BESTAND_TS, pfad: str = TS) -> list[str]:
@@ -282,6 +287,78 @@ def test_dispatcher_weist_neuen_test_ohne_verweis_ab(tmp_path, monkeypatch):
                      + "\n" + hook.AUSWEG)
 
 
+# --- Gliederung: // Given, // When, // Then in jedem neuen Testfall ------------------------
+# CM-S070-1: Fehlende Given-Kommentare fielen erst im Übergabelauf von qa-check auf – nach der
+# Test-Freigabe, sodass die freigegebene Datei noch einmal geändert werden musste. Hier wird
+# dieselbe Regel (prozesscode/_test_struktur.py) beim Schreiben des Tests geprüft.
+SZENARIO = "// Szenario: Abbrechen ohne Eingaben führt ohne Nachfrage zur Rezept-Liste\n"
+
+
+def test_neuer_test_ohne_gliederung_nennt_alle_fehlenden_marker():
+    # Given
+    post = _neu_ts(SZENARIO, rumpf="    expect(1).toBe(1)\n")
+    # When
+    meldungen = hook.struktur_verstoesse(TS, BESTAND_TS, post)
+    # Then
+    assert meldungen == [hook.GLIEDERUNG_FEHLT.format(
+        test="US602_HappyPath_Neu", fehlt="// Given, // When, // Then")]
+
+
+def test_neuer_test_ohne_given_nennt_nur_given():
+    # Given
+    post = _neu_ts(SZENARIO, rumpf="    // When\n    // Then\n")
+    # When
+    meldungen = hook.struktur_verstoesse(TS, BESTAND_TS, post)
+    # Then
+    assert meldungen == [hook.GLIEDERUNG_FEHLT.format(test="US602_HappyPath_Neu", fehlt="// Given")]
+
+
+def test_gegliederter_neuer_test_ist_ok_auch_mit_erklaerung_hinter_dem_marker():
+    post = _neu_ts(SZENARIO, rumpf="    // Given: die Zutat Salz\n    // When: ich speichere\n"
+                                   "    // Then: sehe ich die Liste\n")
+    assert hook.struktur_verstoesse(TS, BESTAND_TS, post) == []
+
+
+def test_kombinierter_marker_zaehlt_nicht_als_then():
+    """Dieselbe Regel wie qa-check: `// When / Then` enthält kein `// Then`."""
+    post = _neu_ts(SZENARIO, rumpf="    // Given\n    // When / Then\n")
+    assert hook.struktur_verstoesse(TS, BESTAND_TS, post) == [
+        hook.GLIEDERUNG_FEHLT.format(test="US602_HappyPath_Neu", fehlt="// Then")]
+
+
+def test_marker_eines_nachbartests_gilt_nicht_fuer_den_neuen():
+    """Geprüft wird der Rumpf des neuen Tests, nicht die Datei: Der Bestandstest trägt
+    `// Given`, der neue nicht."""
+    post = _neu_ts(SZENARIO, rumpf="    // When\n    // Then\n")
+    assert len(hook.struktur_verstoesse(TS, BESTAND_TS, post)) == 1
+
+
+def test_marker_im_kommentar_ueber_dem_test_zaehlt_nicht():
+    """Der Kommentarblock über dem Test trägt die Spec, nicht die Gliederung – ein `// Given`
+    direkt über `it(` deckt den Rumpf nicht."""
+    post = _neu_ts(SZENARIO + "// Given steht hier, nicht im Rumpf\n",
+                   rumpf="    // When\n    // Then\n")
+    assert hook.struktur_verstoesse(TS, BESTAND_TS, post) == [
+        hook.GLIEDERUNG_FEHLT.format(test="US602_HappyPath_Neu", fehlt="// Given")]
+
+
+def test_bestandstest_ohne_gliederung_bleibt_ungeprueft():
+    """Nur neue Testfälle – der Bestandstest trägt nur `// Given` und blockiert keinen Edit."""
+    post = BESTAND_TS.replace("// Given", "// Given – nur umformuliert")
+    assert hook.struktur_verstoesse(TS, BESTAND_TS, post) == []
+
+
+def test_csharp_neuer_test_ohne_gliederung_wird_abgewiesen_mit_gliederung_nicht():
+    # Given
+    kopf = "\n    " + SZENARIO + "    [Fact]\n    public void US602_HappyPath_Neu()\n    {\n"
+    ohne = BESTAND_CS[:-2] + kopf + "    }\n}\n"
+    mit = BESTAND_CS[:-2] + kopf + "        // Given\n        // When\n        // Then\n    }\n}\n"
+    # When / Then
+    assert hook.struktur_verstoesse(CS, BESTAND_CS, ohne) == [hook.GLIEDERUNG_FEHLT.format(
+        test="US602_HappyPath_Neu", fehlt="// Given, // When, // Then")]
+    assert hook.struktur_verstoesse(CS, BESTAND_CS, mit) == []
+
+
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
     """tmp-Repo in echter Verzeichnisform: features/, ADR-Datei, Client/src/."""
@@ -306,12 +383,46 @@ def _write(pfad, inhalt) -> dict:
 def test_einstieg_meldet_mehrere_verstoesse_je_zeile(repo):
     datei = repo / "Client" / "src" / "Y.test.tsx"
     inhalt = (_neu_ts("// kein Verweis\n").removesuffix("})\n")
-              + "  it('US602_Error_Zweiter', async () => {\n  })\n})\n")
+              + "  it('US602_Error_Zweiter', async () => {\n" + GEGLIEDERT + "  })\n})\n")
     grund = hook.check(_write(datei, inhalt))
     assert grund == (hook.KOPF
                      + "  - " + hook.OHNE_VERWEIS.format(test="US602_HappyPath_Neu") + "\n"
                      + "  - " + hook.OHNE_VERWEIS.format(test="US602_Error_Zweiter") + "\n"
                      + hook.AUSWEG)
+
+
+def test_einstieg_meldet_spec_und_gliederung_getrennt_und_protokolliert_die_gliederung(repo):
+    """Beide Befunde in einer Meldung (sonst sähe man den zweiten erst nach dem Beheben des
+    ersten); die Gliederung zählt im Guard-Protokoll unter eigenem Namen, damit ihr Ausfall
+    nicht hinter den Auslösungen der Spec-Prüfung verschwindet."""
+    # Given
+    datei = repo / "Client" / "src" / "G.test.tsx"
+    inhalt = _neu_ts("// kein Verweis\n", rumpf="    // Given\n")
+    # When
+    grund = hook.check(_write(datei, inhalt))
+    # Then
+    assert grund == (hook.KOPF + "  - " + hook.OHNE_VERWEIS.format(test="US602_HappyPath_Neu")
+                     + "\n" + hook.AUSWEG + "\n"
+                     + hook.KOPF_GLIEDERUNG + "  - " + hook.GLIEDERUNG_FEHLT.format(
+                         test="US602_HappyPath_Neu", fehlt="// When, // Then")
+                     + "\n" + hook.AUSWEG_GLIEDERUNG)
+    assert guard_log.zaehlstand() == {hook.GUARD_GLIEDERUNG: 1}
+
+
+def test_einstieg_nur_gliederung_ohne_spec_kopf_je_test_eine_zeile(repo):
+    # Given – zwei neue Tests mit Spec, beide ungegliedert
+    datei = repo / "Client" / "src" / "H.test.tsx"
+    inhalt = (_neu_ts(SZENARIO, rumpf="").removesuffix("})\n")
+              + "  " + SZENARIO + "  it('US602_HappyPath_Zweiter', async () => {\n    // Given\n  })\n})\n")
+    # When
+    grund = hook.check(_write(datei, inhalt))
+    # Then
+    assert grund == (hook.KOPF_GLIEDERUNG
+                     + "  - " + hook.GLIEDERUNG_FEHLT.format(
+                         test="US602_HappyPath_Neu", fehlt="// Given, // When, // Then") + "\n"
+                     + "  - " + hook.GLIEDERUNG_FEHLT.format(
+                         test="US602_HappyPath_Zweiter", fehlt="// When, // Then") + "\n"
+                     + hook.AUSWEG_GLIEDERUNG)
 
 
 def test_einstieg_prueft_den_adr_verweis_gegen_die_adr_datei(repo):

@@ -152,6 +152,10 @@ Gesucht wird **kein Zielwert**, sondern die Stelle, an der offensichtlich Tests 
 - **Logik und Guards mit Lücken** – das ist der Befund. In S128 etwa `qa-check.py` (36 %),
   `check-anchors.py` (40 %), `check-code-quality-nonblocking.py` (32 %).
 
+**Welche Gruppe, entscheidet die Zeile, nicht die Prozentzahl:** `python3 -m prozesscode.coverage-run
+--fehlend <modul>` (etwa `jenga_score`, `hooks/check-anchors`) nennt die ungedeckten Zeilen. Fehlen
+nur Ausgabe und Argument-Parsing, ist es Fassade; fehlt eine Entscheidung, ist es der Befund.
+
 Ein Guard mit Lücken gehört zusammen mit [Guard-Auslösungen](#KZN-guard-stats) gelesen: Wenig
 Abdeckung *und* keine Auslösung ist ein deutlich stärkeres Signal als jedes für sich.
 
@@ -234,6 +238,15 @@ Ergebnis intern festhalten für [Findings präsentieren](#KZN-findings-praesenti
 Präsentiere dem User folgende strukturierte Übersicht und **warte auf Freigabe** bevor Änderungen umgesetzt werden. Freigabe kann teilweise erteilt oder abgelehnt werden – nur explizit freigegebene Punkte umsetzen.
 
 **Pro Finding vier Facetten explizit machen** (in Tabellen als Spalten/Unterzeilen, in Fließtext als benannte Punkte): **Problem** (was ist nicht ideal), **Warum jetzt** (wodurch ausgelöst / warum jetzt Thema), **Vorschlag** (empfohlener Kandidat), **Alternativen** (verworfene Kandidaten + warum verworfen). Ohne diese vier ist für den User nicht erkennbar, was zur Wahl steht.
+
+**Guard-/Gate-Vorschläge tragen zusätzlich den Durchgangsweg** (Hook, Prüfung in einem Wrapper,
+Pflichtfeld in einem Werkzeug): die **Prüfstelle** (Datei, Funktion, Zeitpunkt – vor dem Schreiben,
+beim Verify, …) und der **nachverfolgte Weg** des Falls, den sie fangen soll, bis dorthin – belegt
+im Code oder Skill, nicht angenommen. Erreicht der Fall die Stelle in dem Zustand, den die Prüfung
+sieht? Bleibt das offen, wird es vor der Vorlage geklärt, nicht nur markiert. Grund: Zweimal in
+Folge gab der User in einer Retro einen Guard frei, dessen Prüfstelle der gemeinte Fall nie
+erreicht hätte – einmal bei einer Prüfung gegen einen Freigabe-Anker, den ein Review-Fix gar
+nicht durchläuft.
 
 ```
 ## Neue/aktualisierte Maßnahmen (aus dem Retro-Report)
