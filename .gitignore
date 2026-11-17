@@ -411,6 +411,12 @@ StrykerOutput/
 # Stryker-Sandbox (bei Crash liegen geblieben; regenerierbar) – nicht committen/linten
 .stryker-tmp/
 
+# Wegwerf-Proben (`*.probe.test.ts(x)`, `*.probe.spec.ts`): kein Test des Laufs, die Spec-Hooks nehmen
+# sie aus, qa-check bricht ab, solange eine liegt. Muster: prozesscode/_test_struktur.py (PROBE_RE).
+Client/src/**/*.probe.test.ts
+Client/src/**/*.probe.test.tsx
+Client/e2e/**/*.probe.spec.ts
+
 # Lokale Secrets. NICHT committen. Geteilte NICHT-geheime DB-Config liegt in config/postgres.env (CM-S105-1).
 .env
 .env.local

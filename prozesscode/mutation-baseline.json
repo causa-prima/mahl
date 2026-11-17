@@ -30,8 +30,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._test_inventory": {
-    "beurteilbar": 248,
-    "getoetet": 210,
+    "beurteilbar": 259,
+    "getoetet": 224,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._test_struktur": {
@@ -150,8 +150,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-e2e-scenario-ref": {
-    "beurteilbar": 113,
-    "getoetet": 110,
+    "beurteilbar": 116,
+    "getoetet": 113,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-feature-plan": {
@@ -185,8 +185,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-test-spec-ref": {
-    "beurteilbar": 221,
-    "getoetet": 216,
+    "beurteilbar": 223,
+    "getoetet": 218,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.checks.common": {
@@ -300,8 +300,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.next_run": {
-    "beurteilbar": 997,
-    "getoetet": 762,
+    "beurteilbar": 1034,
+    "getoetet": 860,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.obs": {
@@ -355,8 +355,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.qa-check": {
-    "beurteilbar": 1104,
-    "getoetet": 1002,
+    "beurteilbar": 1118,
+    "getoetet": 1016,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.read-breakdown": {

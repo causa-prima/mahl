@@ -75,22 +75,6 @@ Eintrag-Format:
 **Fällig:** Phase:MVP – User-Entscheid S122 auf die zweite Hälfte der Frage („ab wann"): Beim Phasenwechsel SKELETON→MVP läuft ein `gherkin-workshop`, der die Mobile-Szenarien für die dann bestehenden Seiten systematisch entdeckt. Bis dahin trägt die UX-Guideline (Formular-/Dialog-Baseline, Reorder-Schutz) die Mobile-Anforderung allein.
 **Hintergrund:** Mobile-First ist NFR (`ux-ui-auditor`, MUI v7), aber `features/` enthält bisher **keine** Mobile-Szenarien. Laut Stories MVP/V1-Scope. Der responsive Reorder-Schutz für Formulare („Felder nicht per CSS umsortieren", weil das die Autofokus-/Fokus-Reihenfolge bricht) ist bereits in UX-Guideline der Formular-/Dialog-Baseline verankert. Systematisch beim MVP/V1 angehen – nicht vergessen.
 
----
-
-## OQ-S119-3 — Native C#-Union-Types statt `SumType.cs`, sobald .NET 11 verfügbar ist?
-**Frage:** Werden die handgerollten Sum-Types (`Server/Types/SumType.cs`, ADR-S040-1) auf native `union`-Typen umgestellt, sobald das Projekt auf .NET 11 / C# 15 steht?
-**Fällig:** S150 – verschoben in S130. Die Richtung steht (User-Tendenz deutlich zu den nativen Union-Types); offen ist allein die Verfügbarkeit. Tragender Trigger bleibt der Wechsel auf .NET 11 (GA November 2026 angekündigt), S150 ist nur der Backstop dahinter (~3,3 Tage/Session zum Zeitpunkt der Schätzung). Bei Wiedervorlage sind die beiden Haken unten zu prüfen – Boxing der Struct-Unions und der tatsächliche Spec-Umfang zum GA-Zeitpunkt.
-
-**Hintergrund:** Recherchiert in S119. C# 15 führt `union` als nominale Deklaration ein (`public union Pet(Cat, Dog, Bird);`) mit compiler-erzwungener Exhaustivität in `switch`, dazu den `closed`-Modifier für geschlossene Hierarchien. Verfügbar ab .NET 11 Preview 2, GA für November 2026 angekündigt.
-
-**Warum relevant:** `IngredientId` ist als Union `Known`/`Unknown` über `SumType.cs` gebaut (in S118 entschieden, in S120 umgesetzt – verworfen wurde die Alternative „zwei Entitätstypen `IngredientValues`/`Ingredient`", weil US-306 Schreiben ohne erreichbares Backend verlangt (ADR-S000-13, ADR-S112-4), die ID aber serverseitig vergeben wird (ADR-S030-1): eine Phase ohne Server-ID ist dokumentiert absehbar); nativ entfielen die `SumType.Unreachable<T>()`-Arme samt Stryker-Suppression (ADR-S018-2) – genau das Bedenken, das bei der ID-Modellierung diskutiert wurde.
-
-**Zwei Haken, die 2026 gegen ein Warten auf .NET 11 sprachen** – sie sind weiterhin die Prüfpunkte, an denen die Umstellung zu messen ist:
-1. Unions sind Structs mit einem `object? Value` – **Value Types boxen bei jeder Zuweisung.** Die Domänentypen des Projekts sind `readonly record struct` ausdrücklich, um Heap-Allokation zu vermeiden (Typen-Tabelle in [Immutability](guidelines/coding-guideline-csharp.md#CGC-immutability)).
-2. Das Projekt steht auf `net10.0`; `LangVersion=latest` liefert auf dem .NET-10-SDK C# 14, nicht 15. In Preview 5 fehlen laut Doku noch Teile der Spec (`ClosedAttribute` shippt die Runtime noch nicht).
-
----
-
 ## OQ-S119-4 — Gilt „Regeln in den Typ, Meldungen an die Grenze" auch im Frontend?
 **Frage:** Wird der Frontend-Fehlertyp `ValidationError = { readonly message: string }` auf Fehler**fälle** statt Meldungstexte umgestellt – oder gilt die Regel bewusst nur backend-seitig?
 **Fällig:** Phase:V1 – User-Entscheid S122: gekoppelt an **OQ-S094-1** (client-seitige Validierung) und darum auf dessen Anker gesetzt, damit beide zusammen entschieden werden. Begründung: Solange das Frontend keine Regeln prüft (ADR-S112-4), entstehen dort keine Fehler**fälle** – die Frage nach deren Typform hat bis dahin keinen Gegenstand.
@@ -156,3 +140,19 @@ Eintrag-Format:
 **Fällig:** Phase:MVP – im SKELETON vom User bewusst nicht entschieden („wenn überhaupt, dann später“)
 **Hintergrund:** S147, Review von CROSS-text/run-1: Heute gelten diese Zeichen als Inhalt; dadurch lassen sich optisch leere oder optisch gleiche Namen anlegen (security-auditor SEC-4, functional-correctness-auditor F-10). Außerdem prüft kein Test die Bereichsgrenzen der Zeichenmenge nach außen; Stryker mutiert Zahlenliterale nach Einschätzung des Reviewers nicht, ein aufgeweiteter Bereich fiele also nicht auf (test-quality-auditor R3, TQ-1). Betroffen: Server/Types/NonEmptyNormalizedString.cs, Client/src/domain/text.ts, features/text-input.feature. U+0000 und einzelne Surrogate enden heute vermutlich in 500 (vermerkt bei TD-S106-1).
 **Aufschubgrund:** User – S147 entschieden: im SKELETON nicht, wenn überhaupt dann später
+
+---
+
+## OQ-S150-1 — Eindeutigkeit von Titeln und Namen: sollen ß/SS und andere Mehrzeichen-Faltungen als gleich gelten?
+**Frage:** Sollen Rezepttitel (und Zutatennamen) auch dann als gleich gelten, wenn sie sich nur in einer Schreibweise unterscheiden, die Postgres-LOWER nicht angleicht – etwa „Straße“ gegen „STRASSE“?
+**Fällig:** Phase:MVP – im Workshop der MVP-Stufe von US-602 entscheiden; im SKELETON decken die Beispiele des Szenarios „Titel existiert bereits – unabhängig von Schreibweise und Leerraum“ den Bedarf
+**Hintergrund:** US-602 run-12 setzt die Titel-Eindeutigkeit per Unique-Index auf LOWER("Title") durch (ADR-S135-3, ADR-S105-2), wie den Zutaten-Index auf LOWER("Name"). LOWER schreibt Zeichen für Zeichen klein und faltet nicht voll: „Straße“/„STRASSE“ und das griechische Schluss-Sigma gelten danach als verschieden (abgeleitet aus der LOWER-Semantik, nicht an der DB gemessen). Ä/ä und zerlegte Umlaute (über NFC) werden angeglichen (geprüft: Tests run-12 grün). Eine volle Faltung bräuchte eine andere Index-Form (etwa ICU-basiert) für beide Indizes und ein neues Szenario. Quelle: functional-correctness-auditor, Review run-12.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-12 als offene Frage statt ADR-Grenzvermerk entschieden
+
+---
+
+## OQ-S150-2 — Navigationsleiste: welcher Eintrag ist auf Unterseiten markiert?
+**Frage:** Soll auf „Rezept anlegen" (/recipes/new) und der Detailansicht (/recipes/:id) der Eintrag „Rezepte" als aktiv markiert sein – und soll das ein Szenario festhalten?
+**Fällig:** Szenario:„Von der Detailansicht eines Rezepts zur Rezept-Liste navigieren" – der Lauf spezifiziert die Leiste auf der Detailansicht ohnehin
+**Hintergrund:** Client/src/components/AppLayout.tsx nutzt NavLink ohne `end`; React Router markiert damit „Rezepte" auch auf Unterpfaden (geprüft: react-router lib.js, Default end=false). Kein Szenario, kein Test und kein Mutant legen das fest – eine Änderung an Routen oder NavLink-Props könnte es still ändern. Quelle: functional-correctness-auditor, Review von CROSS-navigation run-1.
+**Aufschubgrund:** User – in der Abschluss-Triage von CROSS-navigation run-1 entschieden: gehört zum Lauf, der die Leiste auf der Detailansicht spezifiziert

@@ -192,26 +192,26 @@ def test_next_run_returns_whole_run_if_any_scenario_open():
 # --- open_runs / done_runs -----------------------------------------------------
 def test_open_runs_in_order():
     scenarios = nr.parse_scenarios(FEATURE)
-    opened = nr.open_runs(scenarios, implemented={"Erstes Szenario"})
+    opened = nr.open_runs(nr.group_runs(scenarios), implemented={"Erstes Szenario"})
     assert [g["scenarios"][0]["title"] for g in opened] == ["Zweites Szenario", "Drittes Szenario"]
 
 
 def test_open_runs_respects_exclude_tags():
     scenarios = nr.parse_scenarios(FEATURE)
-    opened = nr.open_runs(scenarios, implemented=set(), exclude_tags={"@US-904-error"})
+    opened = nr.open_runs(nr.group_runs(scenarios), implemented=set(), exclude_tags={"@US-904-error"})
     assert "Drittes Szenario" not in [g["scenarios"][0]["title"] for g in opened]
 
 
 def test_done_runs_requires_all_scenarios_done():
     scenarios = nr.parse_scenarios(FEATURE_WITH_RUNS)
     done = {"Zutat anlegen", "Leerer Name"}  # run-2 nur teilweise
-    done_groups = nr.done_runs(scenarios, implemented=done)
+    done_groups = nr.done_runs(nr.group_runs(scenarios), implemented=done)
     assert [g["number"] for g in done_groups] == [1]
 
 
 def test_done_runs_in_order():
     scenarios = nr.parse_scenarios(FEATURE)
-    done = nr.done_runs(scenarios, implemented={"Erstes Szenario", "Drittes Szenario"})
+    done = nr.done_runs(nr.group_runs(scenarios), implemented={"Erstes Szenario", "Drittes Szenario"})
     assert [g["scenarios"][0]["title"] for g in done] == ["Erstes Szenario", "Drittes Szenario"]
 
 
@@ -787,6 +787,114 @@ def test_cli_phase_status_prints_nothing_while_a_run_is_due(tmp_path, monkeypatc
     monkeypatch.setattr(nr, "_gather_implemented", set)
     assert nr.main(["--phase-status", memory]) == 0
     assert capsys.readouterr().out == ""
+
+
+def _open_line(out: str, title: str) -> str:
+    return next(line for line in out.splitlines() if title in line)
+
+
+def test_cli_open_marks_a_run_whose_predecessor_is_open(tmp_path, monkeypatch, capsys):
+    # Wer aus --open den nächsten Lauf wählt, muss einen zurückgehaltenen Lauf erkennen, ohne die
+    # `braucht:`-Kanten im Feature-File nachzulesen.
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen"})
+    assert nr.main(["--open"]) == 0
+    line = _open_line(capsys.readouterr().out, "Der Undo-Toast lässt sich manuell schließen")
+    assert line.endswith(" · wartet auf `braucht:US-904/run-8`")
+
+
+def test_cli_open_does_not_mark_a_run_whose_predecessor_is_done(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen", "Zutat löschen"})
+    assert nr.main(["--open"]) == 0
+    line = _open_line(capsys.readouterr().out, "Der Undo-Toast lässt sich manuell schließen")
+    assert line == '  `@CROSS-interaction-happy-path` „Der Undo-Toast lässt sich manuell schließen"'
+
+
+def test_cli_open_resolves_an_intra_file_edge(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    (tmp_path / "features" / "f0.feature").write_text(STORY_FEATURE.replace(
+        "# @run-8 · Löschen · Full-Stack", "# @run-8 · Löschen · Full-Stack · braucht:run-1"), encoding="utf-8")
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen"})
+    assert nr.main(["--open", "--story", "US-904"]) == 0
+    assert _open_line(capsys.readouterr().out, "Zutat löschen") == '  `run-8` „Löschen" (Full-Stack): „Zutat löschen"'
+
+
+def test_cli_open_names_every_unmet_edge(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    (tmp_path / "features" / "f1.feature").write_text(
+        CROSS_FEATURE.replace("# @braucht: US-904/run-8", "# @braucht: US-904/run-1,US-904/run-8"),
+        encoding="utf-8")
+    monkeypatch.setattr(nr, "_gather_implemented", set)
+    assert nr.main(["--open"]) == 0
+    line = _open_line(capsys.readouterr().out, "Der Undo-Toast lässt sich manuell schließen")
+    assert line.endswith(" · wartet auf `braucht:US-904/run-1,US-904/run-8`")
+
+
+def test_cli_done_lists_finished_runs_per_file(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen"})
+    assert nr.main(["--done"]) == 0
+    assert capsys.readouterr().out == (
+        "=== f0.feature (@US-904) ===\n"
+        '  `run-1` „Anlegen" (Full-Stack): „Zutat anlegen"\n')
+
+
+def test_cli_done_skips_a_file_without_finished_runs_and_goes_on(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Der Undo-Toast lässt sich manuell schließen"})
+    assert nr.main(["--done"]) == 0
+    assert capsys.readouterr().out == (
+        "=== f1.feature (@CROSS-interaction) ===\n"
+        '  `@CROSS-interaction-happy-path` „Der Undo-Toast lässt sich manuell schließen"\n')
+
+
+def test_cli_done_says_when_nothing_is_done(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", set)
+    assert nr.main(["--done"]) == 0
+    assert capsys.readouterr().out == "(keine erledigten Läufe)\n"
+
+
+def test_cli_open_says_when_nothing_is_open(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented",
+                        lambda: SKELETON_DONE | {"Zutat bearbeiten"})
+    assert nr.main(["--open"]) == 0
+    assert capsys.readouterr().out == "(keine offenen Läufe)\n"
+
+
+def test_cli_open_with_story_sees_a_predecessor_in_another_file(tmp_path, monkeypatch, capsys):
+    # Der Story-Filter grenzt nur die Ausgabe ein, nicht die Kantenprüfung: Der Vorgänger liegt in
+    # der Datei, die der Filter ausblendet.
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen"})
+    assert nr.main(["--open", "--story", "CROSS-interaction"]) == 0
+    out = capsys.readouterr().out
+    assert "Zutat löschen" not in out
+    assert _open_line(out, "Der Undo-Toast").endswith(" · wartet auf `braucht:US-904/run-8`")
+
+
+def test_cli_open_marks_a_dead_reference_as_waiting(tmp_path, monkeypatch, capsys):
+    # Wie next_run_global: Ein Verweis ohne Ziel hält den Lauf sichtbar zurück, statt still durchzulassen.
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    (tmp_path / "features" / "f1.feature").write_text(
+        CROSS_FEATURE.replace("US-904/run-8", "US-904/run-99"), encoding="utf-8")
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen", "Zutat löschen"})
+    assert nr.main(["--open"]) == 0
+    line = _open_line(capsys.readouterr().out, "Der Undo-Toast lässt sich manuell schließen")
+    assert line.endswith(" · wartet auf `braucht:US-904/run-99`")
+
+
+def test_cli_open_names_only_the_unmet_edges(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    (tmp_path / "features" / "f1.feature").write_text(
+        CROSS_FEATURE.replace("# @braucht: US-904/run-8", "# @braucht: US-904/run-1,US-904/run-8"),
+        encoding="utf-8")
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen"})
+    assert nr.main(["--open"]) == 0
+    line = _open_line(capsys.readouterr().out, "Der Undo-Toast lässt sich manuell schließen")
+    assert line.endswith(" · wartet auf `braucht:US-904/run-8`")
 
 
 def test_cli_check_reports_wrong_stufen(tmp_path, monkeypatch, capsys):

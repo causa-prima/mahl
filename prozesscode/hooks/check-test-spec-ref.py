@@ -30,6 +30,9 @@ Gliederungsprüfung protokolliert unter eigenem Namen (`gwt-gliederung`), damit 
 nicht hinter den Auslösungen der Spec-Prüfung verschwindet.
 
 Bestandstests bleiben ungeprüft – nur neue Namen zählen; ein umbenannter Test gilt als neu.
+Ausgenommen ist eine Wegwerf-Probe `*.probe.test.ts(x)` (`_test_struktur.PROBE_RE`): Sie prüft
+Werkzeugverhalten, keinen Fall des Laufs. In den Commit gelangt sie nicht – `.gitignore` nimmt sie aus –,
+und qa-check bricht vor Stryker ab, solange eine im Dateisystem liegt.
 Umbenennen eines Szenarios in `features/` prüft dieser Hook nicht (anders als
 `check-e2e-scenario-ref` für E2E-Specs). Fail-open liegt beim Dispatcher.
 """
@@ -38,7 +41,7 @@ from pathlib import Path
 
 from .._feature import parse_feature
 from .._test_inventory import Eintrag, parse_csharp, parse_typescript
-from .._test_struktur import fehlende_gwt
+from .._test_struktur import PROBE_RE, fehlende_gwt
 from ._hook_io import edit_zustand
 from .checks import guard_log
 
@@ -58,6 +61,8 @@ ALLE = "alle"
 
 
 def betrifft(file_path: str) -> bool:
+    if PROBE_RE.search(file_path):
+        return False
     return bool(_TS_TEST_RE.search(file_path) or _CS_TEST_RE.search(file_path))
 
 

@@ -28,6 +28,13 @@ async function visibleControls(page: Readonly<Page>): Promise<Locator[]> {
   return [...byRole.flat(), ...fieldFrames]
 }
 
+// Die Navigationsleiste (AppLayout) steht in jedem Zustand. Ihre Einträge werden gemessen, zählen für den
+// Leerlauf-Schutz aber nicht mit – sonst fände er in jedem Zustand etwas und könnte nicht mehr anschlagen.
+// Bei offenem Dialog sieht die Rollen-Query die Leiste nicht (aria-hidden), ebenso wenig wie visibleControls.
+async function navigationControlCount(page: Readonly<Page>): Promise<number> {
+  return page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link').filter({ visible: true }).count()
+}
+
 // Verstoß-Beschreibung "<Beschriftung>: <Breite>×<Höhe>" oder undefined, wenn das Element groß genug ist.
 // Timeout, damit ein zwischen Auflisten und Messen verschwundenes Element den Versuch abbricht statt ihn
 // über das toPass-Fenster hinaus aufzuhalten.
@@ -46,10 +53,11 @@ async function expectEveryControlMeetsTouchTarget(page: Readonly<Page>, state: R
     const controls = await visibleControls(page)
     const violations = await Promise.all(controls.map(touchTargetViolation))
     expect(violations.filter((violation) => violation !== undefined), `Zustand ${state.name}`).toEqual([])
-    // Ein Zustand hat Bedienelemente genau dann, wenn er nicht als ohne deklariert ist – auch umgekehrt,
+    // Ein Zustand hat eigene Bedienelemente genau dann, wenn er nicht als ohne deklariert ist – auch umgekehrt,
     // damit eine überholte Deklaration auffällt, statt still stehen zu bleiben.
-    expect(controls.length > 0, state.withoutControls
-      ? `Zustand ${state.name} hat jetzt ${String(controls.length)} Bedienelement(e) – withoutControls entfernen`
+    const ownControls = controls.length - await navigationControlCount(page)
+    expect(ownControls > 0, state.withoutControls
+      ? `Zustand ${state.name} hat jetzt ${String(ownControls)} eigene(s) Bedienelement(e) – withoutControls entfernen`
       : `Zustand ${state.name}: keine Bedienelemente gefunden`).toBe(!state.withoutControls)
   }).toPass({ timeout: 2_000 })
 }

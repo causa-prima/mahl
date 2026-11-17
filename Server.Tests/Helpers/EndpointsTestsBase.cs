@@ -59,6 +59,13 @@ public class EndpointsTestsBase : IAsyncLifetime
     // und wird deshalb nicht verglichen.
     protected async Task AssertRejectedWithAsync(HttpResponseMessage response, IReadOnlyDictionary<string, IReadOnlyList<string>> expectedErrors)
     {
+        await AssertValidationErrorsAsync(response, expectedErrors);
+        await AssertNothingPersistedAsync();
+    }
+
+    // 422 (ADR-S090-1) mit genau diesen Feldmeldungen, ohne Aussage zum gespeicherten Stand.
+    protected static async Task AssertValidationErrorsAsync(HttpResponseMessage response, IReadOnlyDictionary<string, IReadOnlyList<string>> expectedErrors)
+    {
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<ValidationErrorResponse>(TestContext.Current.CancellationToken);
         body.Should().NotBeNull();
@@ -67,7 +74,6 @@ public class EndpointsTestsBase : IAsyncLifetime
         {
             body.Errors[key].Should().Equal(expectedMessages, $"the messages of '{key}' keep their order");
         }
-        await AssertNothingPersistedAsync();
     }
 
     protected static IReadOnlyDictionary<string, IReadOnlyList<string>> SingleError(string key, string message) =>

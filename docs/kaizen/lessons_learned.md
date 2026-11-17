@@ -60,3 +60,18 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Ich entwarf die Ausnahme aus einem vorgestellten Fall, nicht aus dem Bestand – obwohl ich den Bestand im selben Schritt durchsucht hatte und er keinen Treffer in C#/TS lieferte. YAGNI war bekannt, wurde beim Guard-Bau aber nicht angelegt.
   Regel: Eine Ausnahme in einem Guard braucht einen Fall im Bestand; ohne ihn keine Ausnahme. Mit ihm wird jedes Element, für das dieselbe Begründung gilt, gleich behandelt – und ein Test schreibt die Entscheidung fest.
   CM-Bezug: CM-S047-1
+
+## Session 150 – 2026-11-17
+
+- **[HOCH] [QUALITÄT] [Testing] LL-S150-1 – Review-Fix machte eine C#-Assertion per ?. wirkungslos**
+  Quelle: Orchestrator
+  Was: Runde 1 des Reviews zur SPA-Auslieferung verlangte, ContentType!.MediaType null-sicher zu prüfen. Der Fix ContentType?.MediaType.Should().Be("text/html") prüfte bei fehlendem Header gar nichts mehr: ?. bricht die ganze Kette samt Assertion ab. Weder Orchestrator noch die Auditoren von Runde 2 bemerkten es; erst der Testqualitäts-Auditor in Runde 3.
+  Warum: Null-Sicherheit wurde als Lesbarkeitsfrage behandelt, nicht als Frage, ob die Assertion noch anschlagen kann. Die Gegenprobe (Header weglassen → rot?) lief für diesen Satz nie, weil die Änderung als reines Aufräumen nach der Freigabe galt.
+  Regel: In C#-Tests kein ?. vor .Should(): den Wert klammern ((x?.Y).Should()…), damit null in die Assertion läuft. Jede Änderung an einer Assertion – auch eine kosmetische – mit der Frage prüfen, ob sie im Fehlerfall noch rot würde (coding-guideline-csharp.md#CGC-null-conditional-assertion).
+  CM-Bezug: CM-S101-1
+
+- **[MITTEL] [QUALITÄT] [C#-Code] LL-S150-2 – SPA-Fallback unter /api verwandelte 405 in 404**
+  Quelle: Orchestrator
+  Was: Für die SPA-Auslieferung (ADR-S150-2) gab ich dem Backend-Subagenten in der PLANUNG MapFallback("/api/{**rest}", NotFound) vor. Der Fallback nimmt jede Methode an und gewann dadurch auch bei bekanntem Pfad mit falscher Methode: PUT /api/ingredients lieferte 404 statt 405. Erst der Korrektheits-Auditor meldete es, der RED-Test im Fix-Auftrag belegte es.
+  Warum: Beim Entwurf zählte nur der gewünschte Fall (unbekannter API-Pfad → 404), nicht, welche bestehenden Antworten des Routings ein Catch-all-Endpoint überdeckt. Kein Test hielt 405 fest, deshalb blieb die Suite grün.
+  Regel: Wer einen Catch-all- oder Fallback-Endpoint einführt, listet vorher die Negativ-Antworten, die das Routing bisher selbst gab (404, 405), und hält sie per Test fest, bevor der Fallback entsteht.

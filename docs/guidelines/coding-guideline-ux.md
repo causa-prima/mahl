@@ -239,6 +239,12 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
 - **Seitenrumpf:** `Container component="main" maxWidth="sm"`. Den seitlichen Rand gibt der
   Container, den oberen und unteren das Theme (`theme.spacing(2)`). Listenzeilen tragen
   `disableGutters`, damit ihr Text bündig mit Überschrift und Buttons steht.
+- **Navigationsleiste** ([Erreichbarkeit / Navigation](#CGU-navigation), eine geteilte Komponente
+  `AppLayout` um alle Routen): MUI-`AppBar` oben, darin ein `nav` „Hauptnavigation" mit Text-Einträgen
+  (`Button component={NavLink}`), ohne App-Name und Icons. Unten liegen Undo-Toast und Formular-Aktionen, deshalb
+  nicht als `BottomNavigation`. Der Eintrag der geöffneten Seite trägt `aria-current="page"`
+  und ist daran sichtbar markiert, fett und unterstrichen, also nicht nur über die Farbe. Die Markierung hängt
+  am Attribut, damit beide nicht auseinanderlaufen.
 - **Hierarchie:** Genau ein Seitentitel je Seite, `Typography variant="h5" component="h1"
   gutterBottom` – `h5` für die Größe auf dem Handy, `h1` für die Dokumentstruktur.
 - **Abschnittsüberschriften** innerhalb einer Seite (z. B. „Zutaten", „Zubereitung" der Rezept-Detailansicht):

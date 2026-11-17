@@ -93,13 +93,19 @@ namespace mahl.Infrastructure.Migrations
             // Check-then-Insert (TOCTOU-Race). Funktionaler Index auf LOWER(name) – nicht per EF-Model-
             // Config ausdrückbar, daher Raw-SQL. Vom Mutation-Testing ausgenommen (generierte Migration).
             migrationBuilder.Sql(
-                "CREATE UNIQUE INDEX \"IX_Ingredients_Name_Lower\" ON \"Ingredients\" (LOWER(\"Name\"));");
+                $"CREATE UNIQUE INDEX \"{UniqueIndexNames.IngredientName}\" ON \"Ingredients\" (LOWER(\"Name\"));");
+
+            // ADR-S105-2 / ADR-S135-3: Rezepttitel eindeutig ohne Unterschied der Groß-/Kleinschreibung,
+            // gleiche Begründung und Form wie der Zutaten-Index.
+            migrationBuilder.Sql(
+                $"CREATE UNIQUE INDEX \"{UniqueIndexNames.RecipeTitle}\" ON \"Recipes\" (LOWER(\"Title\"));");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DROP INDEX IF EXISTS \"IX_Ingredients_Name_Lower\";");
+            migrationBuilder.Sql($"DROP INDEX IF EXISTS \"{UniqueIndexNames.RecipeTitle}\";");
+            migrationBuilder.Sql($"DROP INDEX IF EXISTS \"{UniqueIndexNames.IngredientName}\";");
 
             migrationBuilder.DropTable(
                 name: "RecipeIngredients");

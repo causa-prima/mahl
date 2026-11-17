@@ -19,3 +19,4 @@
         *   Einstellung "Standard-Startseite" in den Nutzereinstellungen pro Gerät speicherbar.
         *   Beim App-Start wird die konfigurierte Ansicht geladen.
     *   **Parking-Hinweis:** Als einfacherer erster Schritt kann der Default-Wert hardcodiert werden (Smartphone → Einkaufsliste, Tablet → Pool), bevor die konfigurierbare Variante implementiert wird.
+    *   **Hinweis des Users (2026-11-17, offen für den Workshop dieser Story):** „In den meisten Fällen will ich direkt anfangen zu kochen, sodass das Rezept für den heutigen Tag der ideale Einstieg wäre. Wenn es keines gibt, dann der Pool / Wochenplan." Das weicht von der geräteabhängigen Regel oben ab und ist beim Workshop von US-001 zu klären. Bis dahin öffnet die Anwendung ohne Adresse die Rezept-Liste (Übergangsregel in `features/navigation.feature`).

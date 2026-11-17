@@ -25,6 +25,13 @@ def test_is_e2e_spec_ignores_unit_tests_and_other_files():
     assert not hook.is_e2e_spec("Server/Domain/Ingredient.cs")
 
 
+def test_is_e2e_spec_ignores_a_throwaway_probe():
+    # Wegwerf-Probe, etwa eine einmalige Messung im Browser: kein Szenario-Test. Gegenstück: qa-check
+    # bricht ab, solange eine liegt, und .gitignore hält sie aus Commits heraus.
+    assert not hook.is_e2e_spec("Client/e2e/zz-messung.probe.spec.ts")
+    assert hook.is_e2e_spec("Client/e2e/aufrufpfad-probe.spec.ts")  # nur die Endung `.probe.spec.ts` zählt
+
+
 def test_is_feature_matches_feature_files():
     assert hook.is_feature("features/ingredients.feature")
     assert not hook.is_feature("Client/e2e/ingredients.spec.ts")
@@ -123,6 +130,13 @@ def test_check_blockt_verweis_auf_ein_szenario_das_es_nicht_gibt():
     grund = hook.check(_spec_write("// Szenario: Dieses Szenario gibt es in keinem Feature\n"
                                    "test('x', () => {})\n"))
     assert grund and "Dieses Szenario gibt es in keinem Feature" in grund
+
+
+def test_check_laesst_eine_wegwerf_probe_ohne_szenario_durch():
+    daten = {"tool_name": "Write",
+             "tool_input": {"file_path": "Client/e2e/zz-messung.probe.spec.ts",
+                            "content": "test('messung', () => {})\n"}}
+    assert hook.check(daten) is None
 
 
 def test_check_ignoriert_dateien_ausserhalb_von_specs_und_features():

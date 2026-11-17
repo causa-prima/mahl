@@ -1077,3 +1077,93 @@ test.describe('US602_Error: Zutat nicht gefunden oder Einheit falsch', () => {
     expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
   })
 })
+
+// Kombinierendes Trema (U+0308) – als Codepunkt, nie als Literal oder Escape (CGG-naming). „a“ davor ergibt
+// zerlegt dasselbe sichtbare „ä“ wie das zusammengesetzte Zeichen.
+const COMBINING_DIAERESIS = String.fromCodePoint(0x0308)
+
+// Then „sehe ich am Titel die Fehlermeldung „Ein Rezept mit dem Titel '…' existiert bereits.““.
+const titleExists = (title: string): string => `Ein Rezept mit dem Titel '${title}' existiert bereits.`
+
+// Given „das Rezept <Titel> existiert" (samt der dafür nötigen Zutat „Mehl“ mit Einheit „g“, die jedes
+// Szenario dieses Abschnitts ohnehin voraussetzt).
+async function seedRecipeWithFlour(request: Readonly<APIRequestContext>, title: string): Promise<void> {
+  await seedIngredientViaApi(request, 'Mehl', 'g')
+  await createRecipeViaApi(request, { title, ingredients: INGREDIENTS_MEHL, instruction: FIRST_STEP })
+}
+
+// @US-602-error
+test.describe('US602_Error: Titel existiert bereits', () => {
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const duplicateTitles = [
+    { vorhanden: 'Pfannkuchen', eingabe: '"Pfannkuchen"', title: 'Pfannkuchen', normalisiert: 'Pfannkuchen' },
+    { vorhanden: 'Pfannkuchen', eingabe: '"PFANNKUCHEN"', title: 'PFANNKUCHEN', normalisiert: 'PFANNKUCHEN' },
+    { vorhanden: 'Pfannkuchen', eingabe: '"  pfannkuchen  "', title: '  pfannkuchen  ', normalisiert: 'pfannkuchen' },
+    { vorhanden: 'Käsekuchen', eingabe: '"KÄSEKUCHEN"', title: 'KÄSEKUCHEN', normalisiert: 'KÄSEKUCHEN' },
+    {
+      vorhanden: 'Käsekuchen',
+      eingabe: '"Käsekuchen" mit einem „ä“ aus „a“ und kombinierendem Trema',
+      title: `Ka${COMBINING_DIAERESIS}sekuchen`,
+      normalisiert: 'Käsekuchen',
+    },
+    { vorhanden: 'Apfel Strudel', eingabe: '"apfel   strudel"', title: 'apfel   strudel', normalisiert: 'apfel strudel' },
+  ] as const
+  duplicateTitles.forEach(({ vorhanden, eingabe, title, normalisiert }) => {
+    // Szenario: Titel existiert bereits – unabhängig von Schreibweise und Leerraum
+    // Beispiel: alle
+    test(`US602_Error_CreateRecipe_TitleAlreadyExists_ShowsMessageAtTitleAndKeepsInput (${vorhanden} ← ${eingabe})`, async ({ page, request }) => {
+      // Given: das Rezept <Vorhanden> existiert, die Zutat "Mehl" mit Einheit "g" existiert
+      await seedRecipeWithFlour(request, vorhanden)
+
+      // When: Formular öffnen, <Eingabe> als Titel, "250 g Mehl" und den Schritt "Teig rühren." eingeben, speichern
+      await openCreateForm(page)
+      await fillRecipeForm(page, title, [FIRST_STEP])
+      await saveForm(page)
+
+      // Then: am Titel die Meldung mit dem normalisierten Titel, der Fokus auf dem Titel-Feld
+      await expectMessageAt(page, page.getByLabel('Titel'), titleExists(normalisiert))
+      await expect(page.getByLabel('Titel')).toBeFocused()
+      // Then: weiterhin im Formular mit allen Eingaben
+      await expectFormWithInputs(page, title, [FIRST_STEP])
+      // Then: <Vorhanden> steht genau einmal in der Rezept-Liste (die Liste enthält nur dieses Rezept)
+      expect(await fetchRecipeTitlesViaApi(request)).toEqual([vorhanden])
+    })
+  })
+
+  // Szenario: Titel-Eindeutigkeit wird erst geprüft, wenn alle übrigen Prüfungen bestanden sind
+  test('US602_Error_CreateRecipe_DuplicateTitleWithInvalidLine_ReportsTitleOnlyAfterLineIsFixed', async ({ page, request }) => {
+    // Given: das Rezept "Pfannkuchen" existiert, die Zutat "Mehl" mit Einheit "g" existiert
+    await seedRecipeWithFlour(request, PANCAKES)
+
+    // When: Formular öffnen, "Pfannkuchen", "250 g Mehk" als Zutaten und den Schritt "Teig rühren." eingeben, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP], '250 g Mehk')
+    await saveForm(page)
+
+    // Then: bei den Zutaten genau die Meldung zur Zeile
+    await expectMessageAtIngredients(page, `„250 g Mehk“: ${notFound('Mehk')}`)
+    // Then: am Titel keine Fehlermeldung – ohne Beschreibung und nicht als fehlerhaft ausgezeichnet
+    await expect(page.getByLabel('Titel')).toHaveAccessibleDescription('')
+    await expect(page.getByLabel('Titel')).not.toHaveAttribute('aria-invalid', 'true')
+    // Then (Endzustand nach Fehler, Step-Code laut Feature-Kommentar): weiterhin im Formular mit allen Eingaben,
+    //   die Rezept-Liste unverändert
+    await expectFormWithInputs(page, PANCAKES, [FIRST_STEP], '250 g Mehk')
+    expect(await fetchRecipeTitlesViaApi(request)).toEqual([PANCAKES])
+
+    // When: die Zutaten durch "250 g Mehl" ersetzen, speichern
+    await page.getByLabel('Zutaten').fill(INGREDIENTS_MEHL)
+    await saveForm(page)
+
+    // Then: am Titel die Meldung
+    await expectMessageAt(page, page.getByLabel('Titel'), titleExists(PANCAKES))
+    // Then: bei den Zutaten keine Fehlermeldung mehr – nur noch der Hinweis beschreibt das Feld, es ist nicht als
+    //   fehlerhaft ausgezeichnet, und die Meldung steht nirgends mehr
+    await expect(page.getByLabel('Zutaten')).toHaveAccessibleDescription(INGREDIENTS_HINT)
+    await expect(page.getByLabel('Zutaten')).not.toHaveAttribute('aria-invalid', 'true')
+    await expect(page.getByText(`„250 g Mehk“: ${notFound('Mehk')}`, { exact: true })).toHaveCount(0)
+    // Then (Endzustand nach Fehler, Step-Code laut Feature-Kommentar): weiterhin im Formular mit allen Eingaben,
+    //   die Rezept-Liste unverändert
+    await expectFormWithInputs(page, PANCAKES, [FIRST_STEP])
+    expect(await fetchRecipeTitlesViaApi(request)).toEqual([PANCAKES])
+  })
+})

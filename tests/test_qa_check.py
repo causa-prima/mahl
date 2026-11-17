@@ -680,6 +680,67 @@ def test_lint_fast_fail_is_silent_for_clean_or_skipped_lint():
     assert qa.lint_fast_fail("n/a (backend)", -1) is None
 
 
+def _dateien(root, *pfade: str) -> None:
+    for pfad in pfade:
+        (root / pfad).parent.mkdir(parents=True, exist_ok=True)
+        (root / pfad).write_text("", encoding="utf-8")
+
+
+def test_probe_fast_fail_reports_a_leftover_probe(tmp_path, monkeypatch):
+    # // Given Wegwerf-Proben liegen im Dateisystem – Komponenten-Probe und E2E-Probe. Spec-Verweis und
+    #    Gliederung prüft für sie kein Hook, und git status sieht sie nicht (.gitignore). Reguläre Tests
+    #    und eine Datei außerhalb von Client/src und Client/e2e zählen nicht.
+    monkeypatch.setattr(qa, "_REPO_ROOT", tmp_path)
+    _dateien(tmp_path, "Client/src/App.test.tsx", "Client/src/a.probe.test.tsx",
+             "Client/src/pages/b.probe.test.ts", "Client/e2e/c.probe.spec.ts",
+             "Client/e2e/recipes.spec.ts", "tests/d.probe.test.ts")
+    # // When der Fast-Fail vor Stryker prüft
+    message = qa.probe_fast_fail()
+    # // Then nennt die Meldung genau die Proben, je Zeile eine
+    assert message == (qa.PROBE_KOPF
+                       + "  Client/e2e/c.probe.spec.ts\n  Client/src/a.probe.test.tsx\n"
+                       + "  Client/src/pages/b.probe.test.ts\n"
+                       + qa.PROBE_AUSWEG)
+
+
+def test_probe_fast_fail_is_silent_without_probe(tmp_path, monkeypatch):
+    # // Given / When / Then: nur reguläre Tests – auch einer, der „probe" im Namen trägt – kein Abbruch
+    monkeypatch.setattr(qa, "_REPO_ROOT", tmp_path)
+    _dateien(tmp_path, "Client/src/App.test.tsx", "Client/src/probe.test.tsx", "Client/e2e/a-probe.spec.ts")
+    assert qa.probe_fast_fail() is None
+
+
+def test_main_stops_a_backend_run_too_when_a_probe_is_left(tmp_path, monkeypatch, capsys):
+    # // Given ein Backend-Übergabelauf, im Frontend liegt eine E2E-Probe – sie liefe in jedem vollen
+    #    Playwright-Lauf mit, unabhängig davon, welche Schicht gerade übergibt
+    stryker_calls, _ = _main_mit_lint_fehler(monkeypatch)
+    monkeypatch.setattr(qa.sys, "argv", ["qa-check", "--layer", "backend"])
+    monkeypatch.setattr(qa, "_REPO_ROOT", tmp_path)
+    _dateien(tmp_path, "Client/e2e/zz.probe.spec.ts")
+    # // When qa-check über seinen Einstieg läuft
+    with pytest.raises(SystemExit) as stop:
+        qa.main()
+    # // Then bricht es ohne Stryker ab und nennt die Probe
+    assert stop.value.code == 1
+    assert stryker_calls == []
+    assert "Client/e2e/zz.probe.spec.ts" in capsys.readouterr().err
+
+
+def test_main_stops_before_stryker_when_a_probe_is_left(tmp_path, monkeypatch, capsys):
+    # // Given ein Frontend-Übergabelauf, in dem eine Wegwerf-Probe liegt
+    stryker_calls, _ = _main_mit_lint_fehler(monkeypatch)
+    monkeypatch.setattr(qa, "check_eslint", lambda _layer: ("OK", 0))
+    monkeypatch.setattr(qa, "_REPO_ROOT", tmp_path)
+    _dateien(tmp_path, "Client/src/zz.probe.test.tsx")
+    # // When qa-check über seinen Einstieg läuft
+    with pytest.raises(SystemExit) as stop:
+        qa.main()
+    # // Then bricht es ohne Stryker ab und nennt die Probe
+    assert stop.value.code == 1
+    assert stryker_calls == []
+    assert "Client/src/zz.probe.test.tsx" in capsys.readouterr().err
+
+
 def _main_mit_lint_fehler(monkeypatch, *argv: str) -> tuple[list, list]:
     """Startet qa-check über seinen Einstieg; ESLint meldet einen Fehler. Liefert die Aufrufe von
     Stryker und von Check 4 – und den Exit-Code als SystemExit."""

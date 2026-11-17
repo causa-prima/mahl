@@ -43,3 +43,19 @@ Feature: Navigation zwischen Seiten
     And ich habe den Direktlink des Rezepts "Pfannkuchen" in einem neuen Browserfenster geöffnet
     When ich in der Navigationsleiste auf "Rezepte" klicke
     Then sehe ich die Rezept-Liste mit "Pfannkuchen"
+
+  # Übergangsregel: Ziel ist laut User die Startseite nach US-001 „Geräte-Kontext“ – das Rezept für
+  # heute, sonst der Pool/Wochenplan. Beide Seiten gibt es noch nicht; bis dahin die Rezept-Liste.
+  # @run-3 · Einstieg · Frontend-only
+  @CROSS-navigation-start-page
+  Scenario: Ohne Adresse öffnet die Anwendung die Rezepte-Seite
+    When ich die Anwendung ohne Pfad öffne
+    Then sehe ich die Rezepte-Seite
+
+  # @run-3 · Einstieg · Frontend-only
+  @CROSS-navigation-unknown-address
+  Scenario: Eine unbekannte Adresse zeigt „Seite nicht gefunden.“ mit Navigationsleiste
+    When ich die Adresse "/zutatn" öffne
+    Then sehe ich die Meldung "Seite nicht gefunden."
+    When ich in der Navigationsleiste auf "Rezepte" klicke
+    Then sehe ich die Rezepte-Seite

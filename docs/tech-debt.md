@@ -175,7 +175,7 @@ Alle drei Punkte sind im Erfolgsfall bei schnellem Netz unbeobachtbar – deshal
 ---
 
 ## TD-S108-2 — Frontend: kein Fokus-Management nach Löschen und nach Undo
-**Fällig:** Szenario:„Von der Zutaten-Seite zur Rezepte-Seite navigieren", Phase:V1 – erster Navigations-/Mehrseiten-Schritt; dann liegt ein realistischer Tab-Kontext zur Bewertung vor.
+**Fällig:** Szenario:„Während eine Löschung läuft, erscheint noch kein Toast", Phase:V1 – der Lauf baut den Lösch-/Toast-Pfad der Zutaten-Seite ohnehin um (TD-S108-1 hängt dort); die Navigationsleiste liefert den Tab-Kontext zur Bewertung
 **Problem:** Nach dem Löschen einer Zutat unmountet das fokussierte Element (der Löschen-`IconButton` bzw. bei der letzten Zutat die ganze Liste), ohne dass der Fokus gezielt weitergeführt wird – der Browser setzt ihn auf `<body>` zurück. Dasselbe passiert nach einem Undo-Klick, wenn die Snackbar unmountet. Tastatur- und Screenreader-Nutzer müssen den „Rückgängig"-Weg danach per Tab suchen. Entschärfend: `SnackbarContent` setzt `role="alert"` (MUI-Default), die Meldung samt Undo-Möglichkeit wird also **angesagt**; MUI pausiert zudem den Auto-Hide-Timer, sobald der Button Fokus erhält – wer ihn erreicht, verliert die Zeit nicht. Heute sind es 1–2 Tab-Stopps, das wächst aber mit jeder weiteren Seite. Quelle: ux-ui-auditor (Review run-8, Runde 2).
 **Früher noch als beim Unmount:** Weil der Löschen-Button während des laufenden DELETE `disabled` wird (`IngredientsPage.tsx`), verliert er den Fokus bereits **beim Disable** – also unmittelbar nach dem Tastendruck und **vor** jedem Ergebnis, nicht erst beim Unmount nach Abschluss. Ein `disabled`-Element kann den Fokus per HTML-Semantik nicht halten; der Browser setzt ihn auf `<body>`. Anders als im Anlege-Dialog fängt hier keine MUI-Fokusfalle den Rücksprung ab, weil die Liste kein Modal ist. Ein Tastatur-/Screenreader-Nutzer verliert damit die DOM-Orientierung, während die Aktion noch läuft. Quelle: ux-ui-auditor (Review run-9).
 **Behebung:** Als bewusste Fokus-Strategie entscheiden, nicht als Schnellfix – die naheliegende Lösung (Autofokus auf „Rückgängig") hat echte Nebenwirkungen: Fokus-Stealing in ein selbstschließendes Element reißt den Nutzer aus dem Arbeitsfluss, und weil MUI bei Fokus den Timer pausiert, bliebe der Toast für Tastaturnutzer stehen, bis er aktiv weggedrückt wird. Strukturelle Nav-Vorgabe: UX-Guideline „Erreichbarkeit / Navigation".
@@ -296,7 +296,7 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Aufschubgrund:** User – beim Architektur-Check von US-602 run-2 ist der Lesepfad ohne Prüfung als Zwischenschritt gewählt; ein validierender Zweig wäre ohne Szenario ungetestet
 
 ## TD-S141-8 — E2E: Rezept-Liste nach dem Anlegen nur nach Neuladen geprüft
-**Fällig:** Szenario:„Von der Rezepte-Seite zur Zutaten-Seite navigieren" – mit der Navigationsleiste gibt es den Weg zur Liste innerhalb der App
+**Fällig:** Szenario:„Nach erfolgreichem Speichern ist das Formular beim erneuten Öffnen leer" – das Szenario geht nach dem Speichern über die Navigationsleiste zur Rezept-Liste; sein E2E ist die Behebung
 **Problem:** Client/e2e/recipes.spec.ts prüft „steht genau einmal in der Rezept-Liste“ per page.goto('/recipes'), also nach einem vollständigen Neuladen. Ein veralteter React-Query-Cache der Liste nach dem Anlegen bliebe so unsichtbar; CreateRecipePage invalidiert ['recipes'] nicht, es hilft nur staleTime 0. Mit Collection-ETag und Caching ab dem Sortier-Lauf ist das die wahrscheinlichste Stelle für eine stille Regression.
 **Behebung:** Im E2E nach dem Speichern über die Navigationsleiste zur Rezept-Liste wechseln statt neu zu laden; ggf. ['recipes'] nach dem Anlegen invalidieren, falls der Test es verlangt.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden; heute fehlt ein Weg zur Liste innerhalb der App
@@ -306,16 +306,6 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** POST /api/recipes begrenzt weder die Länge des Zutatentexts noch die Zahl der Zutatenzeilen oder Schritte; die Spalten sind text ohne Constraint, die einzige Schranke ist Kestrels Default-Body-Grenze (30 MB). features/recipes.feature begrenzt nur Titel (100) und Schritt-Anweisung (1000). Versehentlich unsinnige Eingaben (z.B. eingefügter Großtext) werden so ungeprüft gespeichert. Die 422-Antwort wächst zudem mit der Schrittzahl: Jeder leere (seit US-602 run-8) und jeder zu lange Schritt (seit run-9) ergibt einen eigenen Eintrag steps[i].instruction – 10 000 Schritte mit je 1001 Zeichen liefern 10 000 Meldungen. Eine Schrittobergrenze begrenzt damit auch die Fehlerantwort (Security-Review run-8). Seit US-602 run-11 schlägt jedes Anlegen die Zutatennamen aller Zeilen in einer DB-Abfrage nach (bis zu zwei Namen je Zeile als Parameter-Array), auch bei sonst ungültigem Request; ohne Zeilenobergrenze wächst diese Abfrage mit der Eingabe (Security-Review run-11).
 **Behebung:** Fachliche Obergrenzen als Szenario festlegen – Zweck wie bei den Zutaten-Namen: versehentliche unsinnige Eingaben abfangen, nicht Lastschutz (der liegt bei TD-S102-1) – und mit Meldung am Feld umsetzen.
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden: für den SKELETON egal, frühestens MVP
-
----
-
-## TD-S142-1 — Rezept-Liste: kein Tie-Breaker bei byte-identischen Titeln
-**Fällig:** Szenario:„Titel existiert bereits – unabhängig von Schreibweise und Leerraum" – mit der Titel-Eindeutigkeit gibt es keine byte-identischen Titel mehr; dort prüfen und schließen
-**Problem:** GET /api/recipes sortiert per Collate(title, de-x-icu) ohne Tie-Breaker (ADR-S142-1). de-x-icu ist deterministisch und ordnet verschiedene Titel immer fest; nur byte-identische Titel – heute noch anlegbar – stehen in unbestimmter Reihenfolge. Folge: Der Collection-Content-Hash-ETag (ADR-S084-1) kann zwischen Abfragen wechseln, 304 feuert dann nicht (Caching-Effekt, kein falsches Ergebnis). Zutaten sind nicht betroffen: der LOWER(name)-Unique-Index schließt identische Namen aus.
-**Behebung:** Mit der Titel-Eindeutigkeit (Unique-Index auf den normalisierten Titel) verschwindet der Fall: bestätigen, dass der Index byte-identische Titel ausschließt, dann Eintrag entfernen. Ein ThenBy(Id) wäre danach toter Code.
-**Aufschubgrund:** User – in der Abschluss-Triage von run-3/run-12 entschieden: TD mit Szenario-Anker statt ThenBy(Id), weil dessen Test nach der Titel-Eindeutigkeit kein Szenario mehr hätte
-
----
 
 ## TD-S142-2 — Rezept-Detail: ETag und Abfragen decken Rezeptzeilen, Schritte und Zutatendaten nicht ab
 **Fällig:** Phase:MVP – Backstop; eigentlicher Auslöser ist das erste Szenario, das Rezeptzeilen, Schritte oder Name/Einheit einer verwendeten Zutat ändert (bisher keins spezifiziert)
@@ -386,7 +376,47 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 ---
 
 ## TD-S148-2 — Backend: Zeilenauflösung des Rezept-Anlegens steckt in RecipesEndpoints und arbeitet auf Strings
-**Fällig:** Szenario:„Titel existiert bereits – unabhängig von Schreibweise und Leerraum" – run-12 fasst RecipesEndpoints.cs ohnehin an; dann ist bekannt, was die Titelprüfung dort ergänzt
+**Fällig:** Phase:MVP – mit US-607, das das Freitext-Zutatenfeld durch Zutaten je Schritt ablöst (ADR-S135-2): Die Zeilenauflösung wird dort ersetzt, ein Umbau vorher polierte Code, der wegfällt
 **Problem:** RecipeMappings in Server/Endpoints/RecipesEndpoints.cs ist mit US-602 run-11 auf rund 400 Zeilen gewachsen und mischt Zerlegen der Zutatenzeilen, DB-Nachschlagen, Auflösen (Einheit passt, Zutat doppelt), Speichern, Lesen und DTO-Mapping. Die Regeln „Einheit passt zur Zutat" und „Zutat höchstens einmal" prüfen rohe Strings bzw. Guids an der API-Grenze (Einheitenvergleich OrdinalIgnoreCase), obwohl es den Domänentyp Unit gibt; Recipe.Create kennt die Doppelt-Regel nicht. Bewusst so gebaut, weil die Meldung die Zeile zitiert und der Zutatenbestand erst an der Grenze bekannt ist (ADR-S135-2, Addendum S148). Quelle: code-quality-auditor, Review run-11.
 **Behebung:** Die Zeilenauflösung (ParsedIngredientLine bis ResolvedIngredientLine, FindActiveIngredientsAsync) in eine eigene Datei bzw. einen eigenen Resolver ziehen; prüfen, ob der Einheitenvergleich über Unit laufen kann und ob die Doppelt-Regel als Domänenregel ausdrückbar ist, ohne die gesammelte Meldung mit Zeilenzitat zu verlieren. Verhalten unverändert, Beleg: qa-check.
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-11 entschieden: Schnitt erst, wenn run-12 zeigt, was die Datei zusätzlich aufnimmt
+**Aufschubgrund:** User – in der Architektur-Prüfung von US-602 run-12 entschieden: run-12 ergänzt die Datei nur um das Abfangen der Titel-Eindeutigkeit (rund zehn Zeilen); der Schnitt lohnt erst mit US-607
+
+---
+
+## TD-S150-1 — Backend: Upgrade auf .NET 11 und Umstellung der Sum-Types auf C#-15-Unions (ADR-S150-1)
+**Fällig:** S155 – Spätestens-Termin; der Umbau ist entschieden (ADR-S150-1), offen ist allein, ob die Werkzeugkette ihn trägt
+**Problem:** Das Projekt steht auf net10.0; LangVersion=latest liefert dort C# 14, also keine Union-Typen. Die Sum-Types laufen deshalb weiter über Server/Types/SumType.cs mit SumType.Unreachable-Armen, Stryker-Suppression und Coverage-Ausschluss (ADR-S040-1), obwohl ADR-S150-1 die Ablösung entschieden hat. Ungeprüft ist, ob Stryker.NET, EF Core/Npgsql und coverlet mit .NET 11 und der Union-Syntax schon funktionieren.
+**Behebung:** Zuerst prüfen, ob Stryker.NET, EF Core/Npgsql, coverlet und die Analyzer .NET 11 und C# 15 tragen (Release Notes, dann ein Probe-Lauf auf einem Branch). Trägt die Kette: TargetFramework auf net11.0, jeden Sum-Type nach ADR-S150-1 umstellen (native union bei Referenztyp-Fällen, eigener Typ mit HasValue/TryGetValue bei Werttyp-Fällen), Unreachable-Arme samt Suppressionen entfernen, ADR-S040-1 auf Superseded. Trägt sie nicht: diesen Eintrag mit dem blockierenden Werkzeug als Auslöser neu terminieren. Beleg: dotnet-test und dotnet-stryker grün, 100 %.
+**Aufschubgrund:** User – in S150 entschieden (offene Frage „native C#-Union-Types statt SumType.cs“, damit geschlossen): Richtung als ADR, Upgrade als eigener Schritt nach der Werkzeug-Prüfung, nicht im laufenden Szenario-Lauf
+
+---
+
+## TD-S150-2 — Navigationsleiste nicht bündig mit dem Seitenrumpf
+**Fällig:** Phase:MVP – visuelle Politur, wenn das Layout der Seiten ohnehin überarbeitet wird
+**Problem:** Client/src/components/AppLayout.tsx: Die Leiste ist vollbreit und linksbündig, der Seitenrumpf dagegen auf maxWidth="sm" zentriert. Gemessen (Wegwerf-Probe, Playwright-Desktop-Viewport, Breite nicht abgefragt): linke Kante von „Zutaten" x = 24 px, Seitentitel x = 364 px. Am Handy kommen laut UX-Review ca. 8 px Innenabstand des Text-Buttons hinzu (aus MUI-Defaults abgeleitet, nicht gemessen). Die Visuelle Baseline (CGU-visuelle-baseline) nennt gegeneinander versetzte Kanten ausdrücklich als Mangel.
+**Behebung:** Leiste in denselben Container wie der Seitenrumpf (Toolbar disableGutters, Container maxWidth="sm" ohne vertikalen Theme-Abstand), Innenabstand des ersten Buttons ausgleichen; Bündigkeit in der Visuellen Baseline festhalten. Messen lässt sie sich nur im Browser – ein E2E-Messtest braucht ein Szenario (E2E-Szenario-Mapping-Hook), also vorher klären, ob Layout-Bündigkeit per Szenario oder nur per Augenschein geprüft wird.
+**Aufschubgrund:** User – im Review-Loop von CROSS-navigation run-1 entschieden: Messung nur im Browser möglich, ein Szenario für ein Layout-Detail lohnt jetzt nicht
+
+---
+
+## TD-S150-3 — Kein automatischer Kontrast- und Fokus-Check für das Accessibility-NFR
+**Fällig:** Phase:MVP – eigener fokussierter Schritt: neue Dev-Abhängigkeit und eine Suite über alle Seitenzustände
+**Problem:** docs/process/nfr.md (Accessibility) verlangt ausreichende Kontraste; geprüft wird das nirgends – Client/e2e/accessibility.spec.ts misst nur Touch-Targets, eine axe-Prüfung gibt es nicht (geprüft: grep nach axe in Client/e2e und package.json, kein Treffer). Anlass: Die Navigationsleiste setzt weißen Text auf MUI-Primärblau, laut UX-Review rechnerisch ca. 4,6:1 (knapp über AA 4,5:1, nicht gemessen); ob der Tastatur-Fokus auf dem blauen Grund sichtbar ist, ist ungeprüft.
+**Behebung:** axe-Prüfung (z. B. @axe-core/playwright) in die Accessibility-Suite aufnehmen, parametrisiert über die vorhandenen Seitenzustände (touchTargetPages); Fokus-Sichtbarkeit der Leiste gezielt prüfen. Vorher Dependency-ADRs prüfen (decisions list --tag tooling:dependencies).
+**Aufschubgrund:** User – in der Abschluss-Triage von CROSS-navigation run-1 entschieden: neue Abhängigkeit plus Suite ist ein eigener Schritt
+
+---
+
+## TD-S150-4 — Fehlerseiten: Rückweg aus dem Kontext der Adresse
+**Fällig:** Phase:MVP – im SKELETON genügt die Navigationsleiste als Rückweg
+**Problem:** Regel des Users (Abschluss-Triage CROSS-navigation run-3): Eine Fehlerseite bietet einen Rückweg an, der sich aus der Adresse ableitet – ein Direktlink auf ein Rezept führt „Zur Rezept-Liste", ebenso für jede andere Seite, soweit möglich; ohne solchen Kontext ein Button zur Startseite. „Rezept nicht gefunden." (ADR-S135-5) tut das bereits; Client/src/pages/NotFoundPage.tsx („Seite nicht gefunden.") zeigt nur die Meldung, auch bei Pfaden mit Kontext wie /recipes/abc/x.
+**Behebung:** Szenarien für die Fehlerseiten im MVP-Workshop (features/navigation.feature): Rückweg je Adress-Kontext und Button zur Startseite ohne Kontext; danach umsetzen, ggf. eine gemeinsame Fehlerseiten-Komponente mit „Rezept nicht gefunden.".
+**Aufschubgrund:** User – in der Abschluss-Triage von CROSS-navigation run-3 als MVP eingestuft
+
+---
+
+## TD-S150-5 — Host-Header-Prüfung offen (AllowedHosts *)
+**Fällig:** Phase:MVP – sobald die Anwendung über das Heimnetz hinaus oder dauerhaft im Netz betrieben wird
+**Problem:** Server/appsettings.json setzt AllowedHosts auf "*": Der Server nimmt jeden Host-Header an. Seit das Backend auch die Oberfläche ausliefert (ADR-S150-2), ist der ganze Server unter jedem Namen erreichbar, unter dem er im Netz auftaucht (Befund des Sicherheits-Reviews zur SPA-Auslieferung).
+**Behebung:** AllowedHosts auf die tatsächlichen Hostnamen des Deployments einschränken (je Umgebung in appsettings.<Umgebung>.json) und zusammen mit HTTPS und CSP aus nfr.md#NFR-security einführen.
+**Aufschubgrund:** User – in der Abschluss-Triage als MVP-Thema vermerkt, in SKELETON läuft die Anwendung nur lokal im Heimnetz

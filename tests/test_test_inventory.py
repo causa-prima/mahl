@@ -53,8 +53,21 @@ it('foo', () => {
     assert block_ende(lines, 0) == 3
 
 
-def test_declaration_without_a_block_stays_single_line():
+def test_declaration_without_a_block_runs_to_the_end_of_the_file():
     assert block_ende(_lines("nur text\nweiter"), 0) == 1
+
+
+def test_default_counts_parentheses_so_a_typescript_test_without_braces_ends_at_its_paren():
+    """Der Default zählt `()` mit: Ein TS-Test ohne Rumpf in `{}` endet an seiner schließenden `)`,
+    nicht am Dateiende – `parse_typescript` verlässt sich darauf."""
+    lines = _lines("""
+test(
+  'ohne Rumpf',
+  async () => expect(1).toBe(1),
+)
+danach
+""")
+    assert block_ende(lines, 0) == 3
 
 
 # --- C# ----------------------------------------------------------------------
@@ -101,6 +114,68 @@ def test_csharp_skips_attributes_between_marker_and_signature():
 
 def test_csharp_ignores_methods_without_a_test_attribute():
     assert "KeinTest" not in [e.name for e in parse_csharp(_lines(CS))]
+
+
+def test_csharp_range_of_a_multiline_signature_includes_the_body():
+    """Die Parameterliste schließt vor dem Rumpf – das Ende ist trotzdem die schließende `}` des
+    Rumpfs, nicht die `)` der Signatur (sonst fehlte der Rumpf, und die Gliederung galt als
+    fehlend)."""
+    lines = _lines("""
+    [Theory]
+    public async Task Mehrzeilig(
+        string a, string b)
+    {
+        Assert.Equal(a, b);
+    }
+    danach
+""")
+    eintrag = parse_csharp(lines)[0]
+    assert (eintrag.start, eintrag.end) == (1, 6)
+
+
+def test_csharp_multiline_expression_bodied_test_ends_at_its_semicolon():
+    """Ohne Rumpf in `{}` endet die Methode am `;` des Ausdrucks – nicht im Rumpf des Nachbartests,
+    dessen Gliederung sonst dem ungegliederten Test zugerechnet würde."""
+    lines = _lines("""
+    [Fact]
+    public Task Ausdruck() => Pruefe(
+        1,
+        2);
+
+    [Fact]
+    public void Nachbar()
+    {
+        // Given
+    }
+""")
+    erster, zweiter = parse_csharp(lines)
+    assert (erster.start, erster.end) == (1, 4)
+    assert (zweiter.start, zweiter.end) == (6, 10)
+
+
+def test_csharp_body_brace_on_the_line_that_closes_the_parameters_counts_only_braces():
+    """`string b) {` schließt die Parameterliste und öffnet den Rumpf in einer Zeile – gezählt wird
+    ab dort nur `{}`, sonst glichen sich `)` und `{` aus und der Block liefe weiter."""
+    lines = _lines("""
+    [Fact]
+    public void Mehrzeilig(
+        string a, string b) {
+        Assert.Equal(a, b);
+    }
+    danach
+""")
+    assert (parse_csharp(lines)[0].start, parse_csharp(lines)[0].end) == (1, 5)
+
+
+def test_csharp_truncated_method_runs_to_the_end_of_the_file():
+    """Weder Rumpf noch `;` bis zum Dateiende (Datei mitten im Schreiben): der Bereich endet an der
+    letzten Zeile, nicht dahinter."""
+    lines = _lines("""
+    [Fact]
+    public void Abgeschnitten(
+        string a,
+""")
+    assert (parse_csharp(lines)[0].start, parse_csharp(lines)[0].end) == (1, len(lines))
 
 
 # --- TypeScript --------------------------------------------------------------

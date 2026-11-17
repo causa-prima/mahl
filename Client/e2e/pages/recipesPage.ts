@@ -13,10 +13,11 @@ export function discardQuestion(page: Readonly<Page>) {
 // „Eingaben verwerfen?" und Detailansicht (recipes.feature, Querschnitts-Deklaration „Bedienbarkeit per
 // Finger"). Die Reihenfolge ist Vorbedingung: Jeder Zustand startet dort, wo der vorige endet („Formular"
 // auf der Liste, „Nachfrage" im offenen Formular).
-// Die Detailansicht eines gefundenen Rezepts hat noch kein Bedienelement, ihr Zustand findet also nichts
-// zu messen. Er steht trotzdem hier, weil die Deklaration sie einschließt: Ein künftiges Bedienelement
-// wird ohne weiteren Eingriff gemessen, und die Suite meldet dann, dass `withoutControls` zu entfernen
-// ist. Der einzige Button der Detailansicht steht im Zustand „Rezept nicht gefunden".
+// Die Detailansicht eines gefundenen Rezepts hat noch kein eigenes Bedienelement – gemessen werden dort nur
+// die Einträge der Navigationsleiste, die für den Leerlauf-Schutz nicht zählen. Der Zustand steht trotzdem
+// hier, weil die Deklaration sie einschließt: Ein künftiges Bedienelement wird ohne weiteren Eingriff
+// gemessen, und die Suite meldet dann, dass `withoutControls` zu entfernen ist. Der einzige Button der
+// Detailansicht steht im Zustand „Rezept nicht gefunden".
 export const recipesTouchTargets: TouchTargetPageDefinition = {
   name: 'Rezepte',
   states: (page, request) => [

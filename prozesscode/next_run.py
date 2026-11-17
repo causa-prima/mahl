@@ -46,10 +46,11 @@ Modi:
                          Exit 1 bei Verstoß. Manuelle Bestandsprüfung – im Moment der
                          Entstehung greift der Hook `check-feature-plan.py`.
   --open / --done         Offene bzw. erledigte Läufe je Feature-Datei listen (ein Lauf gilt als
-                         "erledigt", wenn alle seine Szenarien implementiert sind).
+                         "erledigt", wenn alle seine Szenarien implementiert sind). Ein offener
+                         Lauf mit offenem Vorgänger trägt den Zusatz „wartet auf `braucht:…`".
   --story US-NNN          Nur mit --open/--done: auf die Feature-Datei(en) dieser Story
                          eingrenzen (z.B. Sibling-Läufe-Überblick ohne Rauschen aus anderen
-                         Storys/NFR-Features).
+                         Storys/NFR-Features). Die Kanten prüft es weiter über alle Dateien.
 
 Story-Bestimmung: `Aktuelle Story: US-NNN` aus AGENT_MEMORY → Feature-Datei mit Top-Level-Tag
 `@US-NNN`. „Nächster offener Lauf" = der Lauf mit der **niedrigsten Run-Nummer** (= vorgesehene
@@ -222,18 +223,32 @@ def _is_done(group: dict, implemented: set[str]) -> bool:
     return all(s["title"] in implemented for s in group["scenarios"])
 
 
-def _needs_satisfied(group: dict, groups: list[dict], implemented: set[str]) -> bool:
-    """Sind alle Vorgänger dieses Laufs erledigt?
+def unmet_needs(group: dict, groups: list[dict], implemented: set[str]) -> list[str]:
+    """Die `braucht:`-Verweise dieses Laufs, deren Vorgänger noch offen sind.
 
     Ein Verweis ohne Ziel gilt als **nicht** erfüllt: Ein Vertipper soll den Lauf sichtbar
     zurückhalten (check_dependencies nennt ihn), statt still durchzulassen – ein durchgelassener
     toter Verweis wäre genau der stumme Ausfall, den niemand bemerkt.
     """
-    for ref in group["needs"]:
+    def erfuellt(ref: str) -> bool:
         targets = [g for g in groups if matches_ref(g, ref, group["file_index"])]
-        if not targets or not all(_is_done(t, implemented) for t in targets):
-            return False
-    return True
+        return bool(targets) and all(_is_done(t, implemented) for t in targets)
+    return [ref for ref in group["needs"] if not erfuellt(ref)]
+
+
+def _needs_satisfied(group: dict, groups: list[dict], implemented: set[str]) -> bool:
+    """Sind alle Vorgänger dieses Laufs erledigt?"""
+    return not unmet_needs(group, groups, implemented)
+
+
+def waiting_note(group: dict, groups: list[dict], implemented: set[str]) -> str:
+    """Zusatz für die Lauf-Liste, solange ein Vorgänger offen ist – sonst leer.
+
+    Wer aus `--open` den nächsten Lauf wählt, soll einen zurückgehaltenen Lauf erkennen, ohne die
+    Kanten im Feature-File nachzulesen.
+    """
+    offen = unmet_needs(group, groups, implemented)
+    return f" · wartet auf `braucht:{','.join(offen)}`" if offen else ""
 
 
 def next_run_global(
@@ -375,18 +390,15 @@ def check_stufen(feature_texts: list[str], story_texts: list[str]) -> list[str]:
 
 
 def open_runs(
-    scenarios: list[dict], implemented: set[str], exclude_tags: frozenset[str] = frozenset()
+    groups: list[dict], implemented: set[str], exclude_tags: frozenset[str] = frozenset()
 ) -> list[dict]:
-    """Alle Läufe mit mindestens einem offenen Szenario, in Reihenfolge."""
-    return [g for g in group_runs(scenarios) if _group_is_open(g, implemented, exclude_tags)]
+    """Die Läufe mit mindestens einem offenen Szenario, in Reihenfolge."""
+    return [g for g in groups if _group_is_open(g, implemented, exclude_tags)]
 
 
-def done_runs(scenarios: list[dict], implemented: set[str]) -> list[dict]:
-    """Alle Läufe, deren Szenarien vollständig implementiert sind, in Reihenfolge."""
-    return [
-        g for g in group_runs(scenarios)
-        if all(s["title"] in implemented for s in g["scenarios"])
-    ]
+def done_runs(groups: list[dict], implemented: set[str]) -> list[dict]:
+    """Die Läufe, deren Szenarien vollständig implementiert sind, in Reihenfolge."""
+    return [g for g in groups if _is_done(g, implemented)]
 
 
 def format_run(group: dict) -> str:
@@ -750,13 +762,17 @@ def _cmd_list(only_open: bool, story: str | None = None) -> int:
     Rauschen und unnötige Tokenkosten)."""
     implemented = _gather_implemented()
     label = "offene" if only_open else "erledigte"
+    paths = _feature_files()
+    texts = [_read(p) for p in paths]
+    # Kanten über alle Dateien auflösen, auch wenn --story die Ausgabe eingrenzt: Ein Vorgänger
+    # darf in einer ausgeblendeten Datei liegen.
+    all_groups = collect_runs(texts)
     any_output = False
-    for path in _feature_files():
-        text = _read(path)
+    for file_index, (path, text) in enumerate(zip(paths, texts, strict=True)):
         if story is not None and not matches_story(text, story):
             continue
-        groups = open_runs(parse_scenarios(text), implemented) if only_open \
-            else done_runs(parse_scenarios(text), implemented)
+        file_groups = [g for g in all_groups if g["file_index"] == file_index]
+        groups = open_runs(file_groups, implemented) if only_open else done_runs(file_groups, implemented)
         if not groups:
             continue
         any_output = True
@@ -764,7 +780,8 @@ def _cmd_list(only_open: bool, story: str | None = None) -> int:
         header = f"=== {path.name}" + (f" ({ftags})" if ftags else "") + " ==="
         print(header)
         for g in groups:
-            print(f"  {format_run(g)}")
+            note = waiting_note(g, all_groups, implemented) if only_open else ""
+            print(f"  {format_run(g)}{note}")
     if not any_output:
         print(f"(keine {label}n Läufe)")
     return 0

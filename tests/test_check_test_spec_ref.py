@@ -256,6 +256,9 @@ def test_csharp_neuer_test_ohne_verweis_wird_abgewiesen():
     ("/home/x/repo/Client/src/services/recipes.test.ts", True),
     ("Server.Tests/Endpoints/RecipeEndpointsTests.cs", True),
     ("Client/e2e/recipes.spec.ts", False),          # E2E: check-e2e-scenario-ref
+    ("Client/src/zz.probe.test.tsx", False),        # Wegwerf-Probe: qa-check bricht ab, solange sie existiert
+    ("Client/src/services/x.probe.test.ts", False),
+    ("Client/src/probe.test.tsx", True),            # nur die Endung `.probe.test.*` zählt, nicht der Name
     ("Client/src/pages/RecipesPage.tsx", False),
     ("Server/Domain/Recipe.cs", False),
     ("tests/test_retro_report.py", False),
@@ -359,6 +362,16 @@ def test_csharp_neuer_test_ohne_gliederung_wird_abgewiesen_mit_gliederung_nicht(
     assert hook.struktur_verstoesse(CS, BESTAND_CS, mit) == []
 
 
+def test_csharp_gegliederter_test_mit_mehrzeiliger_signatur_ist_ok():
+    """Eine Parameterliste über zwei Zeilen ließ den Rumpf aus dem Testfall fallen –
+    die Gliederungs-Marker galten als fehlend, obwohl sie dastanden."""
+    # Given
+    neu = ("\n    " + SZENARIO + "    [Theory]\n    public async Task US602_HappyPath_Neu(\n"
+           "        string a, string b)\n    {\n        // Given\n        // When\n        // Then\n    }\n}\n")
+    # When / Then
+    assert hook.struktur_verstoesse(CS, BESTAND_CS, BESTAND_CS[:-2] + neu) == []
+
+
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
     """tmp-Repo in echter Verzeichnisform: features/, ADR-Datei, Client/src/."""
@@ -389,6 +402,13 @@ def test_einstieg_meldet_mehrere_verstoesse_je_zeile(repo):
                      + "  - " + hook.OHNE_VERWEIS.format(test="US602_HappyPath_Neu") + "\n"
                      + "  - " + hook.OHNE_VERWEIS.format(test="US602_Error_Zweiter") + "\n"
                      + hook.AUSWEG)
+
+
+def test_einstieg_laesst_eine_wegwerf_probe_ohne_verweis_und_gliederung_durch(repo):
+    # Eine Probe prüft Werkzeugverhalten (etwa jsdom), keinen Fall des Laufs – Spec-Verweis und Gliederung
+    # wären Zeremonie. Gegenstück zur Lücke: qa-check bricht ab, solange die Probe existiert.
+    datei = repo / "Client" / "src" / "zz.probe.test.tsx"
+    assert hook.check(_write(datei, _neu_ts("// kein Verweis\n", rumpf=""))) is None
 
 
 def test_einstieg_meldet_spec_und_gliederung_getrennt_und_protokolliert_die_gliederung(repo):

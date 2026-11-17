@@ -22,7 +22,7 @@ internal static class IngredientsEndpoints
 {
     internal static void MapIngredientsEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/ingredients");
+        var group = app.MapGroup($"{ApiRoutes.Prefix}/ingredients");
         // Stryker disable once Statement,String : Tag name has no routing or behavioral impact (ADR-S136-1)
         group.WithTags("Ingredients");
 
@@ -125,7 +125,7 @@ file static class IngredientMappings
                 {
                     await db.SaveChangesAsync(Cancellation.None);
                 }
-                catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
+                catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: UniqueIndexNames.IngredientName })
                 {
                     return await SoftDeletedOrDuplicateConflict(dbType, ingredient, db);
                 }
@@ -138,7 +138,7 @@ file static class IngredientMappings
                 return ingredient.ToDto(xmin);
             })
             .MatchAsync(
-                created => Results.Created($"/api/ingredients/{created.Id}", created),
+                created => Results.Created($"{ApiRoutes.Prefix}/ingredients/{created.Id}", created),
                 error => error);
 
     // ADR-S051-2 / ADR-S090-1: ein Fehlerfall des Konzepts -> ein (Request-JSON-Property, fester
@@ -282,7 +282,7 @@ file static class IngredientMappings
         {
             return await SaveOrResolveConcurrentRestore(row, requested, db);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Ingredients_Name_Lower" })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: UniqueIndexNames.IngredientName })
         {
             // Restore ist seit run-11 ein allgemeiner Schreib-Endpoint auf der eindeutigkeitsbeschränkten
             // Name-Spalte (ADR-S105-2/ADR-S111-2) – ein Request-Name, der mit einer ANDEREN Zeile

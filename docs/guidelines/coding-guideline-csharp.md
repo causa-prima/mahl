@@ -468,3 +468,21 @@ result.Should().BeEquivalentTo(expected, options => options
 result.Should().BeEquivalentTo(expected, options => options
     .Excluding(x => x.DeletedAt));
 ```
+
+<a id="CGC-null-conditional-assertion"></a>
+### Kein `?.` vor `.Should()`
+
+Ein `?.` in der Kette vor `.Should()` bricht bei `null` den **ganzen** Ausdruck ab, also auch die
+Assertion: Sie läuft nicht und meldet nichts, der Test bleibt grün. Den Wert klammern, damit
+`null` in die Assertion läuft und dort als Fehler erscheint.
+
+```csharp
+// ✗ Prüft nichts, wenn der Header fehlt
+response.Content.Headers.ContentType?.MediaType.Should().Be("text/html");
+
+// ✓ null landet in der Assertion: „Expected … to be "text/html", but found <null>"
+(response.Content.Headers.ContentType?.MediaType).Should().Be("text/html");
+```
+
+Grund: Ein Review-Fix machte eine Content-Type-Prüfung so null-sicher, dass sie bei fehlendem
+Header still entfiel – gefunden erst zwei Review-Runden später.

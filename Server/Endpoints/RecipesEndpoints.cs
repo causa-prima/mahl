@@ -6,6 +6,7 @@ using mahl.Server.Dtos;
 using mahl.Server.Middleware;
 using mahl.Server.Types;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using OneOf;
 using static mahl.Server.Endpoints.ValidationProblems;
 using static mahl.Server.OneOfExtensions;
@@ -48,7 +49,7 @@ internal static class RecipesEndpoints
 {
     internal static void MapRecipesEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/recipes");
+        var group = app.MapGroup($"{ApiRoutes.Prefix}/recipes");
         // Stryker disable once Statement,String : Tag name has no routing or behavioral impact (ADR-S136-1)
         group.WithTags("Recipes");
 
@@ -238,6 +239,10 @@ file static class RecipeMappings
 
     // Request-JSON-Property des Zutatenfelds: Key der Listen- und der Zeilenmeldungen (ADR-S090-1, ADR-S135-2).
     private const string IngredientsField = "ingredients";
+
+    // Request-JSON-Property des Titels: Key der Feld- und der Eindeutigkeitsmeldung (ADR-S135-3).
+    private const string TitleField = "title";
+
     private static FieldError StepsMissing => new("steps", "Rezept muss mindestens einen Schritt haben.");
 
     // Der Domänentyp bleibt feldagnostisch (ADR-S120-1). Coverage-Ausschluss je ganze Methode wie bei
@@ -245,8 +250,8 @@ file static class RecipeMappings
     [ExcludeFromCoverageGate("structurally unreachable sum-type/enum default arm (ADR-S040-1)")]
     private static FieldError DescribeTitle(RecipeTitleError error) => error switch
     {
-        RecipeTitleError.Empty => new FieldError("title", "Titel darf nicht leer sein."),
-        RecipeTitleError.TooLong => new FieldError("title", "Titel darf maximal 100 Zeichen lang sein."),
+        RecipeTitleError.Empty => new FieldError(TitleField, "Titel darf nicht leer sein."),
+        RecipeTitleError.TooLong => new FieldError(TitleField, "Titel darf maximal 100 Zeichen lang sein."),
         _ => SumType.Unreachable<FieldError>(), // ADR-S040-1: enum-Default-Arm, strukturell unerreichbar
     };
 
@@ -266,17 +271,34 @@ file static class RecipeMappings
             values.Lines.Map(line => RecipeIngredient.Create(IngredientId.Create(line.Ingredient.Id), line.Quantity)),
             values.Steps);
 
+        return (await InsertAsync(recipe, db)).Match<IResult>(
+            recipeRow =>
+            {
+                // ADR-S106-1/ADR-S000-12: der xmin der neu angelegten Rezeptzeile geht als ETag mit dem 201 heraus.
+                httpContext.Response.Headers.ETag = XminETag.Format(db.ReadXmin(recipeRow));
+                // Der Body nennt je Zeile den gespeicherten Namen und die Basiseinheit der aufgelösten Zutat (ADR-S135-2).
+                return Results.Created($"{ApiRoutes.Prefix}/recipes/{recipe.Id.Value}", recipe.ToDto(values.Lines.Items));
+            },
+            titleTaken => ValidationProblemFor([titleTaken]));
+    }
+
+    // ADR-S105-2 / ADR-S135-3: die Titel-Eindeutigkeit prüft allein der Unique-Index (LOWER(title)) beim
+    // Insert – also erst, wenn alle übrigen Prüfungen bestanden sind. Zitiert wird der normalisierte Titel.
+    private static async Task<OneOf<RecipeDbType, FieldError>> InsertAsync(Recipe recipe, MahlDbContext db)
+    {
         var recipeRow = recipe.ToDbType();
         db.Recipes.Add(recipeRow);
         db.RecipeIngredients.AddRange(recipe.ToRecipeIngredientDbTypes());
         db.Steps.AddRange(recipe.ToStepDbTypes());
-        await db.SaveChangesAsync(Cancellation.None);
-
-        // ADR-S106-1/ADR-S000-12: der xmin der neu angelegten Rezeptzeile geht als ETag mit dem 201 heraus.
-        var xmin = db.ReadXmin(recipeRow);
-        httpContext.Response.Headers.ETag = XminETag.Format(xmin);
-        // Der Body nennt je Zeile den gespeicherten Namen und die Basiseinheit der aufgelösten Zutat (ADR-S135-2).
-        return Results.Created($"/api/recipes/{recipe.Id.Value}", recipe.ToDto(values.Lines.Items));
+        try
+        {
+            await db.SaveChangesAsync(Cancellation.None);
+            return recipeRow;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: UniqueIndexNames.RecipeTitle })
+        {
+            return new FieldError(TitleField, $"Ein Rezept mit dem Titel '{recipe.Title.Value}' existiert bereits.");
+        }
     }
 
     // ADR-S142-2: dasselbe Rezept-DTO wie der 201 beim Anlegen, dazu der xmin der Rezeptzeile als ETag.

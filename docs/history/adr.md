@@ -159,6 +159,26 @@ Zusätzlich strukturelle Vorgabe (Interaction Design, kein Szenario nötig dafü
 
 **Verworfen:** Globale, dateiübergreifende Run-Nummern – jede neue Story erzwänge Einschübe (`run-11.5`) oder eine Neunummerierung, die alle `// Szenario:`-Verweise und AGENT_MEMORY-Einträge bräche; zudem erzwingt eine totale Ordnung Reihenfolge auch dort, wo keine besteht. Ebenfalls verworfen: Phase nur an den beiden querschnittlichen Dateien statt an allen Läufen – die Scope-Angabe lag dort bereits als Prosa-Kommentar vor (`# Implementierungs-Scope: MVP`) und war zum Zeitpunkt dieser Entscheidung schon inkonsistent zu `architecture.md`, was genau der Drift ist, den ein maschinell gelesener Anker verhindert.
 
+### ADR-S150-2: Backend liefert die SPA aus – Fallback auf `index.html` außer unter `/api/`
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, tooling:build, http:404
+
+**Entscheidung:** Das Backend liefert den Client-Build aus `Server/wwwroot/` (Vite-`outDir`) als statische Dateien aus. Jeder Pfad, für den es weder einen Endpoint noch eine Datei gibt, bekommt `index.html` – die Adresse wertet dann das Client-Routing aus (Startseite, Direktlinks auf Rezepte, „Seite nicht gefunden."). Ausgenommen sind Pfade unter `/api/`: Ein unbekannter API-Pfad bleibt eine 404 ohne HTML-Body.
+
+Genauer:
+- **Nur Pfade ohne Dateiendung** im letzten Segment bekommen `index.html`. Eine fehlende Datei (`/assets/fehlt.js`, `/favicon.ico`) bleibt 404 – sonst bekäme ein Browser mit veraltetem Asset-Verweis HTML statt Skript.
+- **Nur Lese-Anfragen** (GET, HEAD) bekommen `index.html`; ein `POST` auf einen Client-Pfad bekommt 405 ohne Body – der Pfad ist eine Leseadresse, kein HTML.
+- **Unter `/api/` antwortet das Routing selbst:** Unbekannter Pfad 404, bekannter Pfad mit falscher Methode 405 – der Fallback darf die 405 nicht überdecken. Groß-/Kleinschreibung spielt dabei keine Rolle (`/API/…` wie `/api/…`).
+- **Das API-Präfix hat im Server eine einzige Quelle.** Die Ausnahme ist nur korrekt, solange jeder Endpoint darunter liegt.
+- **Die Auslieferung setzt einen Client-Build in `Server/wwwroot/` voraus.** In der Entwicklung und im E2E-Lauf liefert stattdessen der Vite-Dev-Server den Client und leitet `/api` weiter (`Client/playwright.config.ts`: `baseURL` auf den Vite-Port); die Auslieferung durch das Backend sichern die Integrationstests in `Server.Tests/SpaHostingTests.cs`.
+
+**Begründung:** `docs/reference/architecture.md` (Deployment) sieht genau diese Auslieferung vor, `Server/Program.cs` setzte sie nicht um – ohne Vite-Dev-Server lud damit weder `/` noch ein Direktlink die Anwendung (Befund im Review von CROSS-navigation run-3). Direktlinks auf Rezepte sind entschieden (ADR-S135-5) und brauchen den Fallback, weil der Server die Client-Routen nicht kennt. Die Ausnahme für `/api/` verhindert, dass ein Aufrufer der API auf einem Tippfehler 200 mit einer HTML-Seite statt 404 bekommt – der Frontend-Service-Client läse sie als kaputtes JSON statt als „nicht gefunden".
+
+**Verworfen:**
+- **Eigener Static-Server (z.B. nginx-Container) vor dem Backend** – zweiter Dienst im Deployment, widerspricht der Festlegung in `architecture.md`, ohne dass ein Bedarf (Lastverteilung, CDN) besteht.
+- **Hash-Routing (`/#/recipes/…`)** – bräuchte keinen Fallback, macht aber Direktlinks und Lesezeichen unlesbar und widerspricht den Adressen der Szenarien.
+
 ---
 
 ## API-Validierung & Fehlerbehandlung (alle Endpoints)
@@ -1092,6 +1112,23 @@ Ein geteilter Domänentyp (`Unit`, §2 Regel 2) bekommt **je Verwendungsstelle**
 **Verworfen:**
 - **Prüfung nur an der Grenze** (Stand vor dieser ADR) – einfacher, aber die Invariante steht nicht im Typ.
 - **`OneOf<Recipe, RecipeError>` aus `Recipe.Create`** – s. Begründung: kein Sammeln mit den Feldfehlern.
+
+### ADR-S150-1: Sum-Types werden C#-15-Unions statt handgerollter Typen über `SumType.cs`
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:sum-type
+
+**Entscheidung:** Die handgerollten Sum-Types (`Server/Types/SumType.cs`, Dispatch nach ADR-S040-1) werden durch Union-Typen aus C# 15 (.NET 11) abgelöst. Zwei Formen, nach den Fall-Typen gewählt:
+- **Fälle aus Referenztypen:** native Deklaration `union X(A, B);`.
+- **Ein Fall ist ein Werttyp** (die Domänentypen sind `readonly record struct`, siehe [Immutability](../guidelines/coding-guideline-csharp.md#CGC-immutability)): eigener Typ mit Union-Attribut und dem nicht-boxenden Zugriffsmuster (`HasValue`, `TryGetValue`), nicht die native Deklaration.
+
+ADR-S040-1 gilt, solange ein Typ noch über `SumType.cs` läuft; ist der letzte umgestellt, wird sie `Superseded`.
+
+**Begründung:** Der Compiler prüft bei Unions die Vollständigkeit eines `switch` selbst; die `_ => SumType.Unreachable<T>()`-Arme samt Stryker-Suppression und Coverage-Ausschluss (ADR-S040-1, ADR-S018-2) entfallen damit. .NET 11 ist seit 10.11.2026 allgemein verfügbar, C# 15 ist dort Standard-Sprachversion, Union-Typen gehören zum Lieferumfang (geprüft: devblogs.microsoft.com/dotnet/announcing-dotnet-11). Eine native Union speichert ihren Wert als `object?` und boxt Werttypen; Bibliotheken können das mit `HasValue`/`TryGetValue` umgehen, der Compiler matcht dann ohne Boxing (geprüft: devblogs.microsoft.com/dotnet/csharp-15-union-types, Stand Preview 2 – ob unverändert zur GA, ungeprüft). Daher die zweite Form für Werttyp-Fälle.
+
+**Verworfen:**
+- **Bei `SumType.cs` bleiben** – hält die Unreachable-Arme und ihre Suppressionen dauerhaft im Code, die der Compiler jetzt selbst überflüssig macht.
+- **Native `union` auch für Werttyp-Fälle** – boxt bei jeder Zuweisung; die Domänentypen sind ausdrücklich Structs, um Heap-Allokation zu vermeiden.
 
 ---
 

@@ -22,9 +22,16 @@ var app = builder.Build();
 // UseExceptionHandler, der unbehandelte Exceptions generisch auf RFC-7807-ProblemDetails mappt
 // und den Stack-Trace serverseitig LOGGT statt ihn auszuliefern. Damit verschwindet der
 // Umgebungs-Zweig oben – und E2E übt denselben Fehlerpfad aus wie Produktion.
+
+// ADR-S150-2: Der Client-Build (Server/wwwroot) wird als statische Dateien ausgeliefert. UseStaticFiles steht
+// VOR UseCollectionETag und beendet die Pipeline bei einem Treffer: Die ETag-Middleware puffert jede
+// GET-200-Antwort und hasht sie – für Assets unnötig und doppelt zum Datei-ETag der StaticFileMiddleware.
+// Eine Optimierung, keine Invariante: Auch hinter der Middleware bliebe der Datei-ETag stehen (ADR-S142-2).
+app.UseStaticFiles();
 app.UseCollectionETag();
 app.MapIngredientsEndpoints();
 app.MapRecipesEndpoints();
+app.MapSpaFallback();
 
 // E2E-Test-Isolation (ADR-S084-4 Addendum): NUR in der E2E-Umgebung. Die E2E läuft gegen eine eigene DB
 // (appsettings.E2E.json -> mahl_e2e), nie gegen dev/prod. Provisioniert das Schema pro Lauf und mappt

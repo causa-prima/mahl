@@ -460,6 +460,92 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
         new(new string('a', 101), "Titel darf maximal 100 Zeichen lang sein.") { TestDisplayName = "Titel mit 101 Zeichen" },
     ];
 
+    // Kombinierendes Trema als Codepunkt (CGG-naming: nie Literal, nie \u-Escape).
+    private static readonly string CombiningDiaeresis = char.ConvertFromUtf32(0x0308);
+
+    // Szenario: Titel existiert bereits – unabhängig von Schreibweise und Leerraum
+    // Beispiel: alle
+    [Theory]
+    [MemberData(nameof(ExistingTitles))]
+    public async Task US602_Error_CreateRecipe_TitleExists_Returns422AtTitleAndKeepsExistingRecipe(string existingTitle, string requestTitle, string titleInMessage)
+    {
+        // Given: das Rezept existiert, die Zutat "Mehl" mit Einheit "g" existiert
+        var existing = await SeedExistingRecipeAsync(existingTitle);
+
+        // When: ein Rezept mit demselben Titel in abweichender Schreibweise wird gespeichert
+        var response = await PostRecipeAsync(ACreateRecipe(title: requestTitle));
+
+        // Then: 422, die Meldung nennt den normalisierten eingegebenen Titel; nur das vorhandene Rezept bleibt
+        await AssertRejectedKeepingExistingAsync(
+            response, SingleError("title", TitleExists(titleInMessage)), existing);
+    }
+
+    // Parameter: vorhandener Titel, eingegebener Titel, Titel in der Meldung (normalisiert, ADR-S135-1).
+    public static IEnumerable<TheoryDataRow<string, string, string>> ExistingTitles =>
+    [
+        new("Pfannkuchen", "Pfannkuchen", "Pfannkuchen") { TestDisplayName = "gleich" },
+        new("Pfannkuchen", "PFANNKUCHEN", "PFANNKUCHEN") { TestDisplayName = "Großschreibung" },
+        new("Pfannkuchen", "  pfannkuchen  ", "pfannkuchen") { TestDisplayName = "Leerraum außen" },
+        new("Käsekuchen", "KÄSEKUCHEN", "KÄSEKUCHEN") { TestDisplayName = "Umlaut groß" },
+        new("Käsekuchen", $"Ka{CombiningDiaeresis}sekuchen", "Käsekuchen") { TestDisplayName = "kombinierendes Trema" },
+        new("Apfel Strudel", "apfel   strudel", "apfel strudel") { TestDisplayName = "Leerraum innen" },
+    ];
+
+    // Szenario: Titel-Eindeutigkeit wird erst geprüft, wenn alle übrigen Prüfungen bestanden sind
+    [Fact]
+    public async Task US602_Error_CreateRecipe_TitleExistsAndIngredientInvalid_ReportsTitleOnlyAfterIngredientIsFixed()
+    {
+        // Given: das Rezept "Pfannkuchen" existiert, die Zutat "Mehl" mit Einheit "g" existiert
+        var existing = await SeedExistingRecipeAsync("Pfannkuchen");
+
+        // When: mit unbekannter Zutat gespeichert
+        var first = await PostPancakesAsync("250 g Mehk");
+
+        // Then: genau die Zutatenmeldung, keine am Titel
+        await AssertRejectedKeepingExistingAsync(
+            first, SingleError("ingredients", $"„250 g Mehk“: {NotFound("Mehk")}"), existing);
+
+        // When: mit gültiger Zutat erneut gespeichert
+        var second = await PostPancakesAsync("250 g Mehl");
+
+        // Then: nur noch die Meldung am Titel
+        await AssertRejectedKeepingExistingAsync(
+            second, SingleError("title", TitleExists("Pfannkuchen")), existing);
+    }
+
+    // Die Meldung, wenn ein Rezept mit dem (normalisierten) Titel bereits existiert.
+    private static string TitleExists(string title) => $"Ein Rezept mit dem Titel '{title}' existiert bereits.";
+
+    // Seedet "Mehl" und ein Rezept mit einer Zutatenzeile und einem Schritt; leert danach den Tracker.
+    private async Task<ExistingRecipe> SeedExistingRecipeAsync(string title)
+    {
+        var mehl = AnIngredient("Mehl", "g");
+        await SeedIngredientsAsync(mehl);
+        var recipe = ARecipe(title);
+        var line = ARecipeIngredient(recipe.Id, 1, mehl.Id, 100m);
+        var step = AStep(recipe.Id, 1, "Vorhandener Schritt.");
+        Db.Recipes.Add(recipe);
+        Db.RecipeIngredients.Add(line);
+        Db.Steps.Add(step);
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Db.ChangeTracker.Clear();
+        return new ExistingRecipe(recipe, line, step);
+    }
+
+    private sealed record ExistingRecipe(RecipeDbType Recipe, RecipeIngredientDbType Line, StepDbType Step);
+
+    // Then-Teil: 422 mit genau diesen Meldungen; gespeichert ist weiterhin nur das vorhandene Rezept (Full State).
+    private async Task AssertRejectedKeepingExistingAsync(
+        HttpResponseMessage response, IReadOnlyDictionary<string, IReadOnlyList<string>> expectedErrors, ExistingRecipe existing)
+    {
+        await AssertValidationErrorsAsync(response, expectedErrors);
+        // AsNoTracking: der Helfer läuft im selben Test mehrfach auf demselben Kontext; getrackt bekäme der zweite
+        // Aufruf die Instanzen des ersten zurück (Identity Resolution) und sähe eine veränderte Zeile nicht.
+        (await Db.Recipes.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo([existing.Recipe]);
+        (await Db.RecipeIngredients.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo([existing.Line]);
+        (await Db.Steps.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken)).Should().BeEquivalentTo([existing.Step]);
+    }
+
     // Szenario: Schritt-Anweisung mit mehr als 1000 Zeichen
     [Fact]
     public async Task US602_Error_CreateRecipe_InstructionTooLong_Returns422AtStep()

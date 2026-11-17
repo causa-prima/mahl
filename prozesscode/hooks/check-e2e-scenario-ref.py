@@ -15,6 +15,7 @@ prüft diesen. Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 import re
 from pathlib import Path
 
+from .._test_struktur import PROBE_RE
 from ._hook_io import edit_zustand
 from ..next_run import scenario_comment_titles, parse_scenarios
 
@@ -31,7 +32,8 @@ _SZENARIO_LINE_RE = re.compile(r"//\s*Szenario:")
 
 
 def is_e2e_spec(file_path: str) -> bool:
-    return bool(_E2E_SPEC_RE.search(file_path))
+    """E2E-Spec, die Szenarien abbildet – eine Wegwerf-Probe (`*.probe.spec.ts`, PROBE_RE) zählt nicht."""
+    return bool(_E2E_SPEC_RE.search(file_path)) and not PROBE_RE.search(file_path)
 
 
 def is_feature(file_path: str) -> bool:

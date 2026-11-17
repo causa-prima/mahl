@@ -10,7 +10,8 @@ Gegenüber LSP `documentSymbol`: Das liefert nur Startzeilen und listet zusätzl
 Property/Konstante mit auf – für eine große Testdatei ein Vielfaches dieser Ausgabe. Für
 C# steht ohnehin kein Language-Server bereit.
 
-Blockende per Klammerzählung (C#/TypeScript). Zeichenketten und Zeilenkommentare werden vorher
+Blockende per Klammerzählung: TypeScript zählt `{}` und `()`, eine C#-Methode nur ihren Rumpf in
+`{}` – oder sie endet am `;` eines Ausdrucks ohne Rumpf. Zeichenketten und Zeilenkommentare werden vorher
 ausgeblendet, damit eine Klammer in einem Text-Literal die Zählung nicht verschiebt. Python hat
 keine Blockklammern – dort ergibt sich das Ende aus der Einrückung.
 """
@@ -61,21 +62,43 @@ def _ohne_literale(line: str) -> str:
     return _LINE_COMMENT.sub("", _LITERAL.sub("''", line))
 
 
-def block_ende(lines: list[str], start_idx: int) -> int:
-    """Letzte Zeile (0-basiert) des bei `start_idx` beginnenden Blocks, per Klammerzählung.
+# Klammerpaare, die die Blockzählung berücksichtigt. TypeScript braucht beide: `it('…', () => {…})`
+# öffnet mit `(`. Ein C#-Methodenrumpf dagegen ist allein durch `{}` begrenzt – mit `()` endete der
+# Block bei einer mehrzeiligen Parameterliste schon an deren `)`, vor dem Rumpf.
+ALLE_KLAMMERN = ("{}", "()")
+NUR_GESCHWEIFTE = ("{}",)
+# Was in einer C#-Methode ab der Signatur zuerst kommt: `{` öffnet den Rumpf, `;` beendet einen Ausdruck.
+_RUMPF_ODER_ENDE = re.compile(r"[{;]")
 
-    Öffnet der Block nie eine Klammer (etwa eine abstrakte Deklaration), ist er einzeilig.
+
+def block_ende(lines: list[str], start_idx: int, paare: tuple[str, ...] = ALLE_KLAMMERN) -> int:
+    """Letzte Zeile (0-basiert) des bei `start_idx` beginnenden Blocks, per Klammerzählung über `paare`.
+
+    Öffnet der Block nie eine Klammer, reicht er bis zum Dateiende – wer das nicht will, grenzt
+    vorher selbst ab (wie `_cs_methoden_ende` für Methoden ohne Rumpf).
     """
     tiefe = 0
     geoeffnet = False
     for idx in range(start_idx, len(lines)):
         sauber = _ohne_literale(lines[idx])
-        tiefe += sauber.count("{") + sauber.count("(")
-        tiefe -= sauber.count("}") + sauber.count(")")
+        tiefe += sum(sauber.count(auf) - sauber.count(zu) for auf, zu in paare)
         if tiefe > 0:
             geoeffnet = True
         elif geoeffnet:
             return idx
+    return len(lines) - 1
+
+
+def _cs_methoden_ende(lines: list[str], signatur_idx: int) -> int:
+    """Letzte Zeile (0-basiert) einer C#-Methode ab ihrer Signatur.
+
+    Steht vor der ersten `{` ein `;`, ist es ein Ausdruck ohne Rumpf (`=> …;`), der dort endet –
+    auch über mehrere Zeilen. Sonst begrenzt der Rumpf in `{}` die Methode.
+    """
+    for idx in range(signatur_idx, len(lines)):
+        erstes = _RUMPF_ODER_ENDE.search(_ohne_literale(lines[idx]))
+        if erstes:
+            return idx if erstes.group() == ";" else block_ende(lines, idx, NUR_GESCHWEIFTE)
     return len(lines) - 1
 
 
@@ -89,7 +112,7 @@ def parse_csharp(lines: list[str]) -> list[Eintrag]:
             treffer = CS_METHOD.match(lines[folge])
             if treffer:
                 eintraege.append(Eintrag(treffer.group(1), idx + 1,
-                                         block_ende(lines, folge) + 1, 0, False))
+                                         _cs_methoden_ende(lines, folge) + 1, 0, False))
                 break
     return eintraege
 

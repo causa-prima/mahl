@@ -31,7 +31,7 @@ internal static class E2ETestSupport
         // Leert vor jedem Test ALLE Tabellen (Playwright beforeEach) -> leere DB je Test. Begründung
         // TRUNCATE statt DROP / RESTART IDENTITY / CASCADE: ADR-S084-4 Addendum. Reset-Logik geteilt mit
         // Server.Tests (ADR-S105-1): Infrastructure.DatabaseResetExtensions.
-        app.MapPost("/api/test/reset", async (MahlDbContext db) =>
+        app.MapPost($"{ApiRoutes.Prefix}/test/reset", async (MahlDbContext db) =>
         {
             await db.TruncateAllTablesAsync();
             return Results.NoContent();

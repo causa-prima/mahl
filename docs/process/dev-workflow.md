@@ -400,8 +400,9 @@ docker rm -f -v $(docker ps -aq --filter label=reuse-id=mahl-server-tests)
 > E2E (`E2ETestSupport`) provisionieren das Schema beide via `MigrateAsync()`, nicht via
 > `EnsureCreated()`. `migrations add` erzeugt die Datei aber **ausschließlich aus dem EF-Modell**:
 > Von Hand ergänzte `migrationBuilder.Sql(...)`-Blöcke kennt EF nicht und schreibt sie nicht zurück.
-> Betroffen ist heute der funktionale Unique-Index `IX_Ingredients_Name_Lower`
-> (`LOWER("Name")`, ADR-S105-2).
+> Betroffen sind heute die funktionalen Unique-Indizes (ADR-S105-2), deren Namen
+> `Infrastructure/UniqueIndexNames.cs` führt – die Liste dort ist vollständig, diese Stelle zählt sie
+> bewusst nicht auf.
 >
 > Also: `grep -n "migrationBuilder.Sql" Infrastructure/Migrations/*.cs` **vor** dem Remove, und die
 > Blöcke danach in `Up` **und** `Down` der neuen Datei zurückschreiben.

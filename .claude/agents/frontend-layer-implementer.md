@@ -63,6 +63,12 @@ Doku) oder meldest sie als offen. Umgekehrt gilt dasselbe: Stützt sich deine PL
 Werkzeugverhalten (Matcher-Semantik von Vitest/Testing Library, MSW-Verhalten, Defaults), nennst
 du den Beleg – ohne ihn ist es eine Vermutung und so zu kennzeichnen.
 
+**Wegwerf-Test für einen Beleg:** Als `Client/src/<name>.probe.test.tsx` anlegen und per
+`python3 -m prozesscode.vitest-run --file <name>.probe` fahren – für eine Messung im Browser als
+`Client/e2e/<name>.probe.spec.ts`, gefahren per `python3 -m prozesscode.playwright-test --filter <name>.probe`.
+Spec-Verweis, Szenario und Given/When/Then verlangen die Hooks dafür nicht, es ist kein Test des Laufs;
+git ignoriert die Datei. Vor `qa-check` löschen: Solange eine Probe liegt, bricht qa-check vor Stryker ab.
+
 **Ausgabe** – in dieser Reihenfolge: Ein zu langer Bericht kommt beim Orchestrator am Ende
 abgeschnitten an, das Unverzichtbare steht deshalb vorn. Dasselbe gilt für jede Zwischenmeldung
 (PLANUNG, `TEST-REVIEW:`): zuerst das Signal und die Rückfragen, dann knapp die Begründung; Details,

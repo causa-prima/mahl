@@ -8,8 +8,9 @@ import type { APIRequestContext, Page } from '@playwright/test'
 export interface TouchTargetState {
   // Zustandsname für die Fehlermeldung der Suite.
   readonly name: string
-  // Nur für einen Zustand ohne jedes Bedienelement: Sonst verlangt die Suite mindestens eines, damit
-  // ein Zustand, in dem die Messung nichts findet, auffällt statt still grün zu bleiben. Mit der Angabe
+  // Nur für einen Zustand ohne jedes eigene Bedienelement (die Navigationsleiste zählt nicht): Sonst verlangt
+  // die Suite mindestens eines, damit ein Zustand, in dem die Messung nichts findet, auffällt statt still grün
+  // zu bleiben. Mit der Angabe
   // verlangt sie genau keines – bekommt der Zustand eines, wird es gemessen und die Angabe als überholt gemeldet.
   readonly withoutControls?: true
   // Führt vom vorigen Zustand in diesen und wartet, bis er sichtbar ist: Gemessen wird sofort danach,

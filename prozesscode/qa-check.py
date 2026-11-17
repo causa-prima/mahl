@@ -37,7 +37,7 @@ from pathlib import Path
 
 from ._cli import Parser
 from ._run_lock import LOCK_BUSY_EXIT_CODE
-from ._test_struktur import fehlende_gwt
+from ._test_struktur import PROBE_RE, fehlende_gwt
 from ._wrapper_output import VERBOSE_HINT
 from ._stryker_report import (
     NO_MUTANTS_HINT,
@@ -367,6 +367,36 @@ def structure_fast_fail(layer: str) -> str | None:
             f"kein Übergabe-Hash:\n{details}\n   Kommentare ergänzen, dann qa-check neu starten.")
 
 
+PROBE_KOPF = "[qa-check] ❌ Wegwerf-Probe im Dateisystem – Abbruch vor Stryker, kein Übergabe-Hash:\n"
+PROBE_AUSWEG = ("   Probe löschen – sie ist kein Test des Laufs. Soll sie bleiben: in einen echten Test umbenennen "
+                "(ohne `.probe`), mit Spec-Verweis und Given/When/Then. Dann qa-check neu starten.")
+
+
+# Wo Wegwerf-Proben entstehen (PROBE_RE): Komponenten-Proben unter Client/src, E2E-Proben unter Client/e2e.
+_PROBE_ROOTS = ("Client/src/", "Client/e2e/")
+
+
+def probe_fast_fail() -> str | None:
+    """Meldung, wenn eine Wegwerf-Probe (`*.probe.test.ts(x)`, `*.probe.spec.ts`) liegt – sonst None.
+
+    Die Probe ist der Ausnahmefall der Spec-Hooks (check-test-spec-ref, check-e2e-scenario-ref): kein
+    Test des Laufs, deshalb weder Spec-Verweis noch Gliederung. Ihr Gegenstück ist dieser Abbruch –
+    liefe sie mit, zählte Stryker bzw. jeder volle Playwright-Lauf sie als Test. Deshalb unabhängig von
+    der Schicht, die gerade übergibt. Gesucht wird im Dateisystem, nicht über git status: `.gitignore`
+    nimmt Proben aus (damit sie nicht in einen Commit gelangen), und git status zeigt ignorierte Dateien
+    nicht.
+    """
+    probes = sorted(
+        p.relative_to(_REPO_ROOT).as_posix()
+        for root in _PROBE_ROOTS
+        for p in (_REPO_ROOT / root).rglob("*.probe.*")
+        if PROBE_RE.search(p.name)
+    )
+    if not probes:
+        return None
+    return PROBE_KOPF + "".join(f"  {p}\n" for p in probes) + PROBE_AUSWEG
+
+
 # ── Test-Freigabe-Audit ──────────────────────────────────────────────────────
 
 def audit_approved_tests(layer: str, approved: dict[str, str]) -> tuple[int, list[str]]:
@@ -597,7 +627,7 @@ def main() -> None:
 
     # ── Test-Struktur (Fast-Fail vor Stryker) ─────────────────────────────────
     if run_stryker_now:
-        message = structure_fast_fail(args.layer)
+        message = probe_fast_fail() or structure_fast_fail(args.layer)
         if message:
             print(message, file=sys.stderr)
             sys.exit(1)
