@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import { http, HttpResponse } from 'msw'
 import { server } from './mocks/server'
-import { AppRoutes } from './App'
+import { appRoutes } from './App'
 
 type PageName = 'Zutaten' | 'Rezepte'
 
@@ -16,9 +16,7 @@ function renderAppAt(initialPath: string) {
   )
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <AppRoutes />
-      </MemoryRouter>
+      <RouterProvider router={createMemoryRouter(appRoutes, { initialEntries: [initialPath] })} />
     </QueryClientProvider>,
   )
 }

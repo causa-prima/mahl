@@ -75,3 +75,33 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: Für die SPA-Auslieferung (ADR-S150-2) gab ich dem Backend-Subagenten in der PLANUNG MapFallback("/api/{**rest}", NotFound) vor. Der Fallback nimmt jede Methode an und gewann dadurch auch bei bekanntem Pfad mit falscher Methode: PUT /api/ingredients lieferte 404 statt 405. Erst der Korrektheits-Auditor meldete es, der RED-Test im Fix-Auftrag belegte es.
   Warum: Beim Entwurf zählte nur der gewünschte Fall (unbekannter API-Pfad → 404), nicht, welche bestehenden Antworten des Routings ein Catch-all-Endpoint überdeckt. Kein Test hielt 405 fest, deshalb blieb die Suite grün.
   Regel: Wer einen Catch-all- oder Fallback-Endpoint einführt, listet vorher die Negativ-Antworten, die das Routing bisher selbst gab (404, 405), und hält sie per Test fest, bevor der Fallback entsteht.
+
+## Session 151 – 2026-11-18
+
+- **[HOCH] [QUALITÄT] [Mutation-Testing] LL-S151-1 – Survivor in einer Schutzbedingung als YAGNI gestrichen – sie schützte ein Verhalten ohne Szenario**
+  Quelle: Orchestrator
+  Was: US-602 run-15: Ein Mutant überlebte im Effect von useDiscardQuestion, der einen während des Speicherns abgefangenen Navigationsversuch still zurücknimmt. Der Orchestrator las die Bedingung als überflüssig und ließ den Effect entfernen; Stryker stand danach bei 100 %. Drei Auditoren fanden den Fehlerpfad: Scheitert das Speichern, öffnet sich die Nachfrage „Eingaben verwerfen?“ nachträglich. Behoben mit einem neuen Szenario und dem zurückgeholten Effect.
+  Warum: Geprüft wurden nur die Pfade, die schon ein Szenario hatten. Der Pfad „Speichern scheitert nach abgefangenem Versuch“ hatte keins – deshalb hielt kein Test die Bedingung, und der Survivor sah wie toter Code aus.
+  Regel: Überlebt ein Mutant in einer Schutzbedingung, zuerst fragen, welches Verhalten sie schützt und ob dafür ein Szenario fehlt; erst streichen, wenn kein Pfad sie braucht. Ein Survivor heißt „kein Test hält das“, nicht „das braucht niemand“.
+  CM-Bezug: CM-S095-2
+
+- **[HOCH] [TOOLING] [Mutation-Testing] LL-S151-2 – Schwerer Lauf ohne Parallelitäts- und Speichergrenze brachte die WSL-VM zum Absturz**
+  Quelle: User
+  Was: S151: mutmut-run startete mutmut mit der Standard-Parallelität (ein Prozess je Kern, 20) – rund 30 GB, OOM in init.scope. Die Distro wurde dreimal beendet, die Agent-Sitzung ging jeweils verloren; die Ursache fand erst eine Analyse der Claude-Desktop-App unter Windows. Der Orchestrator verfolgte nach dem ersten Absturz zunächst eine falsche Spur (Freigabe-Dialog/Notification-Hook, als ungeprüft gekennzeichnet). Behoben: OOMPolicy=continue für init.scope (Windows-Seite) und mutmut-run mit 2–4 Workern in einer systemd-run-Speichergruppe (gemessen rund 1,9 GB).
+  Warum: Der Wrapper hatte keine Grenze. Auf den gleichartigen Vorfall vom 29.07.2026 (node-Prozesse) wurde mit mehr RAM und Swap reagiert, nicht mit einer Ursachenprüfung – das Problem galt als Eigenschaft der Umgebung.
+  Regel: Ein Absturz wird an der Ursache behoben, nicht mit mehr Ressourcen überdeckt. Werkzeuge, die Prozesse parallel starten, laufen mit fester Parallelität und Speichergrenze; nach jedem schweren Lauf Exit-Code (137) und OOM-Ereignisse prüfen.
+  CM-Bezug: CM-S140-3
+
+- **[HOCH] [PROZESS] [Hook/Script] LL-S151-3 – Bash-Hook gegen ein angenommenes Bedrohungsmodell gehärtet statt nach der Intention gefragt**
+  Quelle: User
+  Was: S151: Der Orchestrator verschärfte die Auditor-Sperre des Bash-Hooks (sed-Positivliste) und plante eine Absicherung gegen Umgehung per Kommando-Substitution – also gegen Absicht. Die Positivliste blockierte eine im Log 26-mal belegte harmlose Form (sed -n N,Mp $f) und wurde zurückgebaut; dabei entstanden zwei selbst eingebaute Lücken (unquotiertes \$, \\.), die erst ein Auditor fand, und ein NameError, der jedes Bash blockierte. Erst die Klarstellung des Users (Ziel: Versehen verhindern und aufs richtige Werkzeug lenken, keine Sicherheitsgrenze) korrigierte die Richtung; daraus entstand der Abschnitt DEV-schutzziel.
+  Warum: Die Intention des Hooks stand nirgends. Der Orchestrator leitete sie aus sicherheitslastigen Auditor-Befunden ab, statt sie zu klären, und baute auf dieser Annahme weiter.
+  Regel: Nur Änderungen vornehmen, die der Intention des Artefakts entsprechen. Steht sie nicht fest, nachfragen – nicht bei jeder Kleinigkeit, sondern wenn die Änderung Blast Radius hat (Guards, Gates, Architektur, schwer Umkehrbares).
+  CM-Bezug: neu
+
+- **[HOCH] [PROZESS] [Kommunikation] LL-S151-4 – Triage-Empfehlung in sich widersprüchlich, bestehende Regel nicht vorher gesucht**
+  Quelle: User
+  Was: US-602 run-14: Zur langen Testdatei empfahl der Orchestrator „ignorieren, Aufteilung vor run-15/16“ – mitten in run-14, „vor run-15“ hieß also jetzt. Die ESLint-Regel, die eine Aufteilung allein wegen der Länge verwirft (Client/eslint.config.js), fand er erst nach der Rückfrage des Users.
+  Warum: Die Empfehlung wurde aus der Lage formuliert, ohne die Zeitangabe gegen den aktuellen Stand zu lesen und ohne nach einer bestehenden Regelung im Projekt zu suchen (Dimension Quellen).
+  Regel: Vor einer Empfehlung zu einer Strukturfrage zuerst die bestehende Regelung im Projekt suchen; eine Empfehlung mit Zeitangabe gegen den aktuellen Stand gegenlesen, bevor sie dem User vorliegt.
+  CM-Bezug: CM-S095-2

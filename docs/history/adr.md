@@ -179,6 +179,19 @@ Genauer:
 - **Eigener Static-Server (z.B. nginx-Container) vor dem Backend** – zweiter Dienst im Deployment, widerspricht der Festlegung in `architecture.md`, ohne dass ein Bedarf (Lastverteilung, CDN) besteht.
 - **Hash-Routing (`/#/recipes/…`)** – bräuchte keinen Fallback, macht aber Direktlinks und Lesezeichen unlesbar und widerspricht den Adressen der Szenarien.
 
+### ADR-S151-1: Data-Router von React Router, Daten weiter über TanStack Query
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, frontend:react
+
+**Entscheidung:** Der Client nutzt React Router im Data-Modus: Die Routentabelle wird mit `createBrowserRouter` gebaut und über `<RouterProvider>` gerendert; Tests bauen dieselbe Tabelle mit `createMemoryRouter`. Von den Funktionen des Data-Modus wird genutzt, was ein Szenario braucht – zuerst `useBlocker` für die Nachfrage beim Verlassen des Rezeptformulars (ADR-S135-6). Laden und Speichern laufen weiter über TanStack Query und die Service-Schicht (ADR-S056-1), nicht über `loader`/`action` des Routers.
+
+**Begründung:** Navigation abfangen – Navigationsleiste wie Browser-Zurück, mit Rückkehr ins Formular unter derselben Adresse – bietet React Router nur über `useBlocker`, und den gibt es im deklarativen Modus (`<BrowserRouter>`) nicht (React-Router-Doku „Picking a Mode"; im Code: `useBlocker` verlangt den Data-Router-Kontext). Der deklarative Modus war mit der ersten Route ohne dokumentierte Abwägung gekommen. Die Datenfunktionen des Routers bleiben ungenutzt, weil die Datenschicht samt Fehlerkategorien und Conditional Requests (ADR-S054-1, ADR-S084-3) schon über TanStack Query steht; zwei Ladewege wären ein Bruch ohne Nutzen.
+
+**Verworfen:**
+- **Deklarativer Router mit eigenem Abfangen** – Klicks über einen eigenen Wächter, Browser-Zurück über einen Platzhalter-Eintrag im Verlauf: baut einen Teil des Routers nach und verfälscht den Verlauf, den ADR-S135-6 festlegt.
+- **Framework-Modus** – Vite-Plugin und dateibasierte Routen; ein Umbau ohne Bedarf (kein Server-Rendering, kein Code-Splitting gefordert).
+
 ---
 
 ## API-Validierung & Fehlerbehandlung (alle Endpoints)
@@ -810,6 +823,8 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 **Begründung:** Eingaben eines Rezepts sind teuer – die Nachfrage muss jeden Weg aus dem Formular abdecken, nicht nur „Abbrechen". Ein Formular im Verlauf hinter einem gespeicherten Rezept lädt zum Doppelt-Anlegen ein. Während des Speicherns wäre eine Nachfrage mit „Verwerfen" irreführend, weil das Rezept trotzdem entsteht.
 
 **Verworfen:** `beforeunload`-Dialog des Browsers allein – greift nicht bei Navigation innerhalb der Anwendung und lässt keinen eigenen Text zu.
+
+**Addendum (S151) – Sperre während des Speicherns nur mit Eingaben; ein abgefangener Versuch verfällt:** Gesperrt wird nur ein Formular mit Eingaben (ADR-S135-1). Ein leeres Formular lässt sich auch während des Speicherns sofort verlassen: Der Server lehnt es immer ab, es entsteht nichts, und die Begründung oben greift nicht (User-Entscheidung: ein leeres Formular verlässt man ohne Hindernisse). Ein Versuch, der während des Speicherns abgefangen wird, verfällt still; scheitert das Speichern, bleibt das Formular mit der Meldung stehen, ohne nachträgliche Nachfrage (Szenario „Ein während des Speicherns abgefangener Versuch fragt nach fehlgeschlagenem Speichern nicht nach").
 
 ---
 

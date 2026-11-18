@@ -44,6 +44,8 @@ Alle so gefundenen ADRs (außer denen bereits in der Message) im **PLANUNG**-Sch
 
 Implementiert eine Zeile eine Entscheidung aus `docs/history/adr.md` (z.B. Service-Layer-Pattern, ResultAsync-Pflicht, MSW-Teststrategie), direkt darüber `// ADR-SXXX-N` schreiben.
 
+**Dateien ändern nur mit Edit/Write:** Code und Tests änderst du mit Edit/Write, nie per `sed -i`, Heredoc (`cat > datei <<'EOF'`) oder Python-Skript im Bash-Aufruf – der Permission-Hook lehnt das ab. Wrapper (`vitest-run`, `stryker-frontend`, `eslint-run`, `qa-check`) rufst du ohne nachgestellten Filter auf; mehr Tiefe gibt `--verbose`.
+
 **Test-Einschränkung (Ausnahmen nur nach explizitem Orchestrator-Auftrag):**
 Erlaubt: ausschließlich MSW-basierte Tests über die öffentliche Komponenten-API; ein Test auf die HTTP-Schnittstelle des API-Clients nur in der oben genannten Ausnahme.
 Verbleibende Stryker-Survivors behandelst du nach [Welcher Survivor bekommt welche Reaktion?](../../docs/process/tdd-process.md#TDD-survivor-entscheidung): Suppression nur, wenn eine bestehende ADR genau diese Klasse erlaubt (die Begründung nennt sie); jeden anderen nicht über die Komponenten-API tötbaren Survivor meldest du im Return an den Orchestrator, statt ihn zu suppressen. Das QA-Script listet alle Suppressionen im Check „Neue Suppressionen"; der Orchestrator prüft die Begründungen.

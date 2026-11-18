@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useId, useRef } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Container from '@mui/material/Container'
@@ -14,14 +14,9 @@ import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useNavigate } from 'react-router'
-import { useResultMutation } from '../hooks/useResultMutation'
-import { createRecipe } from '../services/recipesApi'
-import { useDiscardQuestion } from '../hooks/useDiscardQuestion'
-import { useRecipeFieldMessages } from '../hooks/useRecipeFieldMessages'
+import { useRecipeCreation } from '../hooks/useRecipeCreation'
 import type { FieldMessage, FieldMessageList, InputRefCallback } from '../hooks/useRecipeFieldMessages'
 import { useRecipeForm } from '../hooks/useRecipeForm'
-import { sentStepFieldIndexes, toNewRecipe } from '../domain/recipe'
-import type { Recipe } from '../domain/recipe'
 
 const ingredientsHint = 'Eine Zutat je Zeile: Menge, Einheit, Zutat – z. B. „250 g Mehl“ oder „Salz“.'
 
@@ -29,16 +24,10 @@ const ingredientsHint = 'Eine Zutat je Zeile: Menge, Einheit, Zutat – z. B. �
 export default function CreateRecipePage() {
   const navigate = useNavigate()
   const { values, hasInput, setTitle, setIngredients, changeStep, addStep } = useRecipeForm()
-  // Die Detailansicht lädt das Rezept selbst über die Adresse (ADR-S142-2).
-  const [save, error] = useResultMutation(createRecipe, (created: Recipe) => {
-    void navigate(`/recipes/${created.id}`)
-  })
-  // Stand beim Speichern: welches Formularfeld welchen gesendeten Schritt trug (ADR-S144-1).
-  const [sentFieldIndexes, setSentFieldIndexes] = useState<readonly number[]>([])
-  const field = useRecipeFieldMessages(error, sentFieldIndexes)
+  const { save, discardQuestion, field } = useRecipeCreation(hasInput)
 
+  // Abbrechen ist eine Navigation wie jede andere: mit Eingaben hält der Blocker sie für die Nachfrage an.
   const leaveToList = () => { void navigate('/recipes') }
-  const discardQuestion = useDiscardQuestion(hasInput, leaveToList)
 
   return (
     <Container component="main" maxWidth="sm">
@@ -46,8 +35,7 @@ export default function CreateRecipePage() {
         component="form"
         onSubmit={(e: Readonly<React.SyntheticEvent>) => {
           e.preventDefault()
-          setSentFieldIndexes(sentStepFieldIndexes(values.steps))
-          save(toNewRecipe(values))
+          save(values)
         }}
       >
         <Typography variant="h5" component="h1" gutterBottom>Rezept anlegen</Typography>
@@ -68,13 +56,13 @@ export default function CreateRecipePage() {
             onChange={changeStep}
             onAdd={addStep}
           />
-          <FormActions onCancel={discardQuestion.cancel} />
+          <FormActions onCancel={leaveToList} />
         </Stack>
       </Box>
       <DiscardDialog
         open={discardQuestion.open}
         onKeepEditing={discardQuestion.keepEditing}
-        onDiscard={leaveToList}
+        onDiscard={discardQuestion.discard}
       />
     </Container>
   )
@@ -244,10 +232,11 @@ function StepsSection(props: Readonly<StepsSectionProps>) {
           // (ADR-S135-4); das erste würde sonst mit dem Titel konkurrieren.
           autoFocus={index > 0}
           inputRef={inputRef(index)}
-          message={instructionMessage(index)}
           // Nur das erste Feld ist Fokusziel der Listen-Meldung (ADR-S135-4); `describedBy` ist nur bei
           // vorhandener Meldung gesetzt.
-          listMessageId={index === 0 ? describedBy : undefined}
+          feedback={index === 0 && describedBy !== undefined
+            ? { kind: 'list', messageId: describedBy }
+            : { kind: 'instruction', message: instructionMessage(index) }}
           onChange={(text) => { onChange(index, text) }}
         />
       ))}
@@ -264,21 +253,27 @@ function FieldMessageText({ id, message }: Readonly<{ id: string, message: strin
   return message !== undefined && <FormHelperText id={id}>{message}</FormHelperText>
 }
 
+// Ein Schrittfeld trägt höchstens eine Meldung: entweder die Listen-Meldung oder die eigene Anweisungs-Meldung.
+type StepFieldMessage =
+  // Id der Listen-Meldung an der Legende, nur am Fokusziel dieser Meldung: Das Feld trägt sie selbst
+  // (aria-invalid, aria-describedby), ohne roten Rahmen (UI-Entwurf).
+  | { readonly kind: 'list', readonly messageId: string }
+  // Meldung zur Anweisung dieses Schritts (Hilfetext unter dem Feld)
+  | { readonly kind: 'instruction', readonly message: string | undefined }
+
 type StepFieldProps = {
   readonly label: string
   readonly value: string
   readonly autoFocus: boolean
   readonly inputRef: InputRefCallback
-  // Meldung zur Anweisung dieses Schritts (Hilfetext unter dem Feld)
-  readonly message: string | undefined
-  // Id der Listen-Meldung an der Legende, nur gesetzt am Fokusziel dieser Meldung: Das Feld trägt sie selbst
-  // (aria-invalid, aria-describedby), ohne roten Rahmen (UI-Entwurf).
-  readonly listMessageId: string | undefined
+  readonly feedback: StepFieldMessage
   readonly onChange: (instruction: string) => void
 }
 
 function StepField(props: Readonly<StepFieldProps>) {
-  const { label, value, autoFocus, inputRef, message, listMessageId, onChange } = props
+  const { label, value, autoFocus, inputRef, feedback, onChange } = props
+  const message = feedback.kind === 'instruction' ? feedback.message : undefined
+  const listMessageId = feedback.kind === 'list' ? feedback.messageId : undefined
   return (
     <TextField
       label={label}
@@ -290,8 +285,6 @@ function StepField(props: Readonly<StepFieldProps>) {
       value={value}
       inputRef={inputRef}
       // error trägt aria-invalid und die Verknüpfung des Hilfetextes an das Eingabefeld (Semantik, getestet).
-      // Annahme: Das Feld mit Listen-Meldung hat keine Anweisungs-Meldung (bei der Listen-Meldung wurde
-      // kein Schritt gesendet) – die beiden aria-Quellen kollidieren nie.
       error={message !== undefined}
       helperText={message}
       slotProps={{

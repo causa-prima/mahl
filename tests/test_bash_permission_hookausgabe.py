@@ -67,6 +67,18 @@ def test_allow_meldet_die_entscheidung_im_erwarteten_format(monkeypatch, capsys,
     }}
 
 
+def test_umgeschriebener_befehl_behaelt_die_uebrigen_eingabefelder(monkeypatch, capsys, logs):
+    # Claude Code ersetzt die Eingabe durch `updatedInput` als Ganzes: Fehlten `timeout` oder
+    # `run_in_background`, liefe ein langer Wrapper nach dem Umschreiben mit dem Standard-Timeout
+    # im Vordergrund (S151 beobachtet: `| tail` gekürzt, Lauf nach zwei Minuten abgebrochen).
+    eingabe = {"command": "python3 -m prozesscode.vitest-run | tail -5", "timeout": 600000,
+               "run_in_background": True, "description": "Frontend-Tests"}
+    code, out = _hook(monkeypatch, capsys, {"tool_name": "Bash", "tool_input": eingabe})
+    assert code == 0
+    assert json.loads(out)["hookSpecificOutput"]["updatedInput"] == {
+        **eingabe, "command": "python3 -m prozesscode.vitest-run"}
+
+
 def test_unnoetiger_marker_erlaubt_und_sagt_es_dem_agenten(monkeypatch, capsys, logs):
     code, out = _hook(monkeypatch, capsys, _bash("ls -la # --allow-once"))
     assert code == 0
@@ -215,8 +227,6 @@ def test_ohne_ziel_schreibt_das_protokoll_ins_deny_log(logs):
     ("rm -rf x # --allow-once", "ask", "ONE_TIME"),
     ("cat <<EOF\nx\nEOF", "deny", "UNSUPPORTED_QUOTING"),
     ("echo $'a'", "deny", "UNSUPPORTED_QUOTING"),
-    ("python3 -m prozesscode.vitest-run <<'EOF' | tail -3\nx\nEOF", "deny", "INDIRECT_WRAPPER_FILTER"),
-    ("python3 -m prozesscode.vitest-run | wc -l", "deny", "INDIRECT_WRAPPER_FILTER"),
     ("dotnet test", "deny", "WRONG_APPROACH"),
     ("cd Client && npm ci", "deny", "WRONG_APPROACH"),
     ("python3 -m prozesscode.td set TD-S080-1 --titel X", "ask", "WRITE_ACCESS"),
@@ -244,6 +254,48 @@ def test_ohne_passenden_hinweis_bleibt_der_grund_leer():
 
 def test_deny_nachricht_ohne_auditor_angabe_ist_die_regulaere():
     assert hook._build_deny_message("Grund") == "Grund" + hook._ALLOW_ONCE_WITH_HINT_FOOTER
+
+
+# --- Abgelehnte Kette nennt das Glied (OBS-S151-2) --------------------------------
+# Ohne die Angabe hielt ein Auditor ein erlaubtes Glied für gesperrt und ließ dessen Prüfung aus.
+def test_abgelehnte_kette_nennt_das_glied():
+    _, grund, _ = hook.check_command("git status; frobnicate --x")
+    meldung = hook._build_deny_message(grund)
+    assert "frobnicate --x" in meldung
+    assert meldung.endswith(hook._NO_HINT_MESSAGE)   # ohne Hinweis bleibt der allgemeine Text
+
+
+def test_abgelehnte_kette_nennt_das_glied_auch_dem_auditor():
+    _, grund, _ = hook.check_command("python3 -m prozesscode.decisions list; touch x", nur_lesend=True)
+    meldung = hook._build_deny_message(grund, nur_lesend=True)
+    assert "touch x" in meldung
+    assert meldung.endswith(hook._NUR_LESEND_DENY_REASON + hook._NUR_LESEND_FOOTER)
+
+
+def test_redirect_in_eine_datei_verweist_auf_write_und_edit():
+    """OBS-S141-1: Layer-Subagenten versuchten wiederholt `cat > datei <<'EOF'` – der Rat muss
+    der Weg zum Ziel sein (Datei schreiben), nicht der zum Auffangen einer Befehlsausgabe."""
+    _, grund, _ = hook.check_command("cat > Client/src/x.ts <<'EOF'\nexport {}\nEOF")
+    assert grund.splitlines()[1].startswith("Datei anlegen, ändern oder anhängen")
+    assert "Write" in grund and "Edit" in grund
+
+
+def test_glied_kopf_trennt_auch_einen_hinweis_mit_leerzeile():
+    """Der Hinweis zu `python3 -c` enthält selbst Leerzeilen – getrennt wird an der ersten."""
+    _, grund, _ = hook.check_command("git status; python3 -c 1")
+    hinweis = hook._get_smart_hint("python3 -c 1")
+    assert "\n\n" in hinweis
+    assert hook._build_deny_message(grund) == (
+        hook._GLIED_KOPF.format(glied="python3 -c 1") + hinweis + hook._ALLOW_ONCE_WITH_HINT_FOOTER)
+
+
+@pytest.mark.parametrize("befehl", ["frobnicate", "timeout 5 frobnicate"])
+def test_einzelbefehl_bekommt_keine_gliedangabe(befehl):
+    assert hook.check_command(befehl)[1] == ""
+
+
+def test_glied_in_einer_substitution_wird_genannt():
+    assert "frobnicate" in hook.check_command("out=$(ls | frobnicate)")[1]
 
 
 # --- Segmentprüfung ------------------------------------------------------------

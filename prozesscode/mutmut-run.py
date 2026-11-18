@@ -70,6 +70,16 @@ WERTUNG_STAND = 3
 # Ein Volllauf kann Stunden dauern; der Deckel ist eine Reißleine, keine Erwartung.
 TIMEOUT_S = 4 * 60 * 60
 
+# Speicher eines Laufs. Ohne Vorgabe startet mutmut je CPU-Kern einen Worker – hier 20,
+# jeder mit 1–3 GB RAM und Swap. Am 18.11.2026 lief so der Speicher der WSL-VM voll; der OOM-Kill
+# traf die cgroup, in der auch claude läuft, und systemd beendete daraufhin die ganze Distro.
+# Deshalb wenige Worker und eine eigene Gruppe mit fester Grenze: Ein OOM beendet dann nur den
+# Lauf (OOMPolicy=stop der Gruppe), nicht die Sitzung. Die Werte stammen aus der Analyse des
+# Vorfalls; die .wslconfig (22 GB RAM, 16 GB Swap) weiter zu erhöhen half schon im Juli nicht.
+WORKER = 4
+SPEICHERGRENZE = ("systemd-run", "--user", "--scope", "--quiet",
+                  "-p", "MemoryHigh=10G", "-p", "MemoryMax=12G", "-p", "MemorySwapMax=4G")
+
 MAX_ZEILEN = 15
 
 # Exit-Code eines Mutantenlaufs → Status. Nachbau von `mutmut.stats.status_by_exit_code`,
@@ -110,6 +120,11 @@ _ABBRUCH = (
     "  Kein Ergebnis dieses Laufs – die Ursache steht davor: --verbose.\n"
     "  Häufig ein Fehler im Testcode, der nur im Mutantenbaum auftritt (Import, Pfad).\n"
     "  Nennt sie eine Datei, die es im Repo nicht mehr gibt: --frisch (s. raeume_baum)."
+)
+_SPEICHER_VOLL = (
+    "\n  SIGKILL: vermutlich die Speichergrenze der Gruppe (SPEICHERGRENZE, MemoryMax=12G).\n"
+    "  Prüfen: dmesg | grep -E 'Out of memory|oom-kill'. Nicht die Grenze anheben, sondern\n"
+    "  WORKER senken oder klären, warum ein Worker so viel Speicher braucht."
 )
 _FEHLT = (
     "✗ Werkzeug-Umgebung fehlt ({pfad}).\n"
@@ -485,8 +500,15 @@ def _ohne_core_dump() -> None:
     resource.setrlimit(resource.RLIMIT_CORE, (1, hart))
 
 
+def _befehl(argv: tuple[str, ...]) -> list[str]:
+    """Der Mutationslauf in eigener Speichergruppe (SPEICHERGRENZE); `show` und die übrigen
+    Abfragen brauchen keine."""
+    praefix = SPEICHERGRENZE if argv[:1] == ("run",) else ()
+    return [*praefix, str(MUTMUT), *argv]
+
+
 def _laufe(*argv: str) -> subprocess.CompletedProcess:
-    return subprocess.run([str(MUTMUT), *argv], cwd=ROOT, capture_output=True,
+    return subprocess.run(_befehl(argv), cwd=ROOT, capture_output=True,
                           text=True, timeout=TIMEOUT_S, preexec_fn=_ohne_core_dump)
 
 
@@ -527,7 +549,7 @@ def main(argv: list[str] | None = None) -> int:
     filter_ = []
     if args.mutate:
         filter_ = [args.mutate if _ist_mutantenname(args.mutate) else f"{args.mutate}.*"]
-    lauf = _laufe("run", *filter_)
+    lauf = _laufe("run", "--max-children", str(WORKER), *filter_)
     lauf_ausgabe = lauf.stdout + lauf.stderr
 
     # Bricht der Lauf ab (kaputte Suite, fehlende Stats, Absturz), sagt jede Zahl danach
@@ -535,9 +557,11 @@ def main(argv: list[str] | None = None) -> int:
     # mutmut endet nur in seinen Abbruchpfaden mit ≠ 0, ihre Texte wechseln je Version.
     if lauf.returncode != 0:
         zeilen = lauf_ausgabe.strip().splitlines()
-        emit(verbose=args.verbose, output=lauf_ausgabe,
-             verdict=_ABBRUCH.format(code=lauf.returncode,
-                                     zeile=zeilen[-1] if zeilen else "keine Ausgabe"))
+        verdikt = _ABBRUCH.format(code=lauf.returncode,
+                                  zeile=zeilen[-1] if zeilen else "keine Ausgabe")
+        if lauf.returncode in (-9, 137):  # SIGKILL – direkt oder über eine Shell
+            verdikt += _SPEICHER_VOLL
+        emit(verbose=args.verbose, output=lauf_ausgabe, verdict=verdikt)
         return 1
 
     # `--all true`: ohne die getöteten Mutanten ließe sich der Nenner nicht bilden.

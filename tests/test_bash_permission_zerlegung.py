@@ -143,6 +143,11 @@ def test_woertliche_bereiche(text, bereiche):
     ("grep '$(ls)' x", [("grep '$(ls)' x", False)]),
     # Direkt hinter einem wörtlichen Bereich wird wieder ausgeführt.
     ("echo 'a'$(rm -rf x)", [("rm -rf x", False), ("echo 'a'WERT", False)]),
+    # Arithmetik führt nichts aus; ihr Wert steht wie jeder andere als WERT da.
+    ("total=$((total+1))", []),
+    # Endet der Inhalt auf `)`, ist es noch keine Arithmetik: Die innere Substitution läuft.
+    ("out=$(echo $(rm -rf x))", [("rm -rf x", False), ("echo WERT", False)]),
+    ("echo $((1+2))", [("echo WERT", False)]),
 ])
 def test_expansion_findet_was_ausgefuehrt_wird(segment, kommandos):
     assert hook.expand_segment(segment) == kommandos
@@ -175,49 +180,18 @@ def test_cd_vor_npm(segmente, konflikt):
 
 
 # --- Wrapper-Analyse ------------------------------------------------------------------------
-@pytest.mark.parametrize("davor, umschliessung", [
-    ("echo `", "`"),
-    ("x $(", "("),
-    ("{ ", "{"),
-    ("head <(echo ", "<("),
-    ("tee >(", ">("),
-    ("( X ", "("),
-    ("for f in a; do ", "block"),
-    ("if true; then ", "block"),
-    ("case x in a) ", "block"),
-    ("if true; then x; fi; ", None),
-    ("case x in a) y;; esac; ", None),
-    ("echo X; ", None),
-    ("", None),
+@pytest.mark.parametrize("stufen, nur_filter", [
+    ([], False),
+    ([" grep x "], True),
+    ([" grep x ", " tail -3"], True),
+    (["tee x"], False),
+    (["wc -l"], False),
+    (["grep -q x"], False),
+    ([" grep -q x"], False),                 # wie sie aus dem Split kommt: mit Leerzeichen davor
+    (["tail -5 > x"], False),
 ])
-def test_umschliessung(davor, umschliessung):
-    assert hook._umschliessung(davor) == umschliessung
-
-
-@pytest.mark.parametrize("stufen, urteil", [
-    ([], "tee"),
-    (["tee x"], "tee"),
-    ([" grep x "], "filter"),
-    (["wc -l"], "andere"),
-    (["tee >(x)"], "andere"),
-])
-def test_stufen_urteil(stufen, urteil):
-    assert hook._stufen_urteil(stufen) == urteil
-
-
-@pytest.mark.parametrize("befehl, grund", [
-    (f"echo x | tee >({_WRAPPER})", "_GRUND_PROZESS_SUBSTITUTION"),
-    (f"{_WRAPPER} | wc -l", "_GRUND_STUFE"),
-    (f"out=$({_WRAPPER}) | head", "_GRUND_WEITERGABE"),
-])
-def test_wrapper_ablehnung_nennt_den_grund(befehl, grund):
-    assert hook.wrapper_filter_ablehnung(befehl) == hook._INDIRECT_FILTER_REASON.format(
-        erkannt=getattr(hook, grund))
-
-
-def test_wrapper_mit_filter_und_heredoc_nennt_den_heredoc():
-    grund = hook.check_command(f"{_WRAPPER} <<'EOF' | tail -3\nx\nEOF")[1]
-    assert grund == hook._INDIRECT_FILTER_REASON.format(erkannt=hook._GRUND_HEREDOC)
+def test_nur_filter(stufen, nur_filter):
+    assert hook._nur_filter(stufen) is nur_filter
 
 
 def test_filter_vor_dem_wrapper_bleibt_stehen():

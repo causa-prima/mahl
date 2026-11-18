@@ -22,6 +22,7 @@ import zipfile
 from pathlib import Path
 
 from ._cli import Parser
+from ._run_lock import RunLock
 from ._util import REPO_ROOT, run_npm
 from ._wrapper_output import emit, strip_noise
 
@@ -36,6 +37,9 @@ KEIN_TEST_GEFUNDEN = "✗ --filter traf keinen E2E-Test – Pattern prüfen"
 # Playwrights Ausgabeordner (leert Playwright bei jedem Lauf); `Client/playwright.config.ts`
 # liest die Breite aus MAHL_HANDYBREITE und schaltet dann den Trace ein.
 TEST_RESULTS = REPO_ROOT / "Client" / "test-results"
+# Ein Lauf zur Zeit: Ein zweiter baute dasselbe Backend (gemeinsame Build-Ausgabe), scheiterte
+# an dessen Port und läge zudem parallel im Speicher. Parallel starten Auditoren im Review-Loop.
+_LAUF_LOCK = REPO_ROOT / ".claude" / "tmp" / "playwright_run"
 
 
 def _ereignisse(archiv: zipfile.ZipFile, name: str) -> list[dict]:
@@ -94,7 +98,8 @@ def main() -> None:
     if args.handybreite:
         os.environ["MAHL_HANDYBREITE"] = str(args.handybreite)
 
-    output, exit_code = run_npm(npm_args)
+    with RunLock(_LAUF_LOCK, "E2E-Lauf"):
+        output, exit_code = run_npm(npm_args)
     bilder = _bilder_ablegen(args.handybreite) if args.handybreite else ""
 
     passed = _PASSED.search(output)

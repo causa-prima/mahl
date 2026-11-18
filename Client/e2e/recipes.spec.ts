@@ -1,10 +1,11 @@
 import { test, expect } from './fixtures'
 import { seedDeletedIngredientViaApi, seedIngredientViaApi } from './api/ingredientsApi'
-import type { APIRequestContext, Locator, Page } from '@playwright/test'
+import type { APIRequestContext, Locator, Page, Route } from '@playwright/test'
 import {
   createRecipeViaApi, fetchRecipeTitlesViaApi, postRecipeViaApi, seedRecipesWithSaltViaApi, UNKNOWN_RECIPE_ID,
 } from './api/recipesApi'
 import { discardQuestion } from './pages/recipesPage'
+import { navEntry } from './pages/navigation'
 import { escapeRegExp, exactly } from './exactText'
 
 // Then „sehe ich die Detailansicht des neuen Rezepts": die eigene Adresse mit der Kennung (ADR-S135-5).
@@ -37,8 +38,7 @@ test.describe('US602_HappyPath: Rezepte erfassen', () => {
     await seedIngredientViaApi(request, 'Salz', 'g')
 
     // When: ich zur Rezepte-Seite navigiere und auf "Rezept anlegen" klicke
-    await page.goto('/recipes')
-    await page.getByRole('button', { name: 'Rezept anlegen' }).click()
+    await openCreateForm(page)
     // When: Titel, Zutaten (eine je Zeile) und zwei Schritte eingeben, dann speichern
     await page.getByLabel('Titel').fill('Pfannkuchen')
     await page.getByLabel('Zutaten').fill('Salz\n250 g Mehl\n500 ml Milch')
@@ -84,10 +84,25 @@ test.describe('US602_HappyPath: Rezepte erfassen', () => {
 
 const INGREDIENTS_HINT = 'Eine Zutat je Zeile: Menge, Einheit, Zutat – z. B. „250 g Mehl“ oder „Salz“.'
 
+// Pflichtmeldungen des Formulars (ADR-S051-2).
+const TITLE_EMPTY = 'Titel darf nicht leer sein.'
+const INGREDIENTS_REQUIRED = 'Rezept muss mindestens eine Zutat haben.'
+const STEPS_REQUIRED = 'Rezept muss mindestens einen Schritt haben.'
+
+// When „ich auf "Rezept anlegen" klicke" – auf der Rezept-Liste.
+async function clickCreateRecipe(page: Readonly<Page>): Promise<void> {
+  await page.getByRole('button', { name: 'Rezept anlegen' }).click()
+}
+
 // When der Formular-Szenarien: zur Rezepte-Seite navigieren und auf "Rezept anlegen" klicken.
 async function openCreateForm(page: Readonly<Page>): Promise<void> {
   await page.goto('/recipes')
-  await page.getByRole('button', { name: 'Rezept anlegen' }).click()
+  await clickCreateRecipe(page)
+}
+
+// When „die Fehlermeldung … erscheint": abwarten, bis die Antwort des Servers angezeigt wird.
+async function expectMessageShown(page: Readonly<Page>, message: string): Promise<void> {
+  await expect(page.getByText(message, { exact: true })).toBeVisible()
 }
 
 // Der Abschnitt "Schritte" als Gruppe. Name per Regex: Der Pflicht-Asterisk der Legende steht daneben.
@@ -124,7 +139,7 @@ async function expectForm(page: Readonly<Page>): Promise<void> {
 // Then „sehe ich <am Element> die Fehlermeldung …": sichtbar und als Beschreibung mit dem Element
 // verknüpft – „am Feld" wie beim Hinweis des Zutatenfelds.
 async function expectMessageAt(page: Readonly<Page>, element: Readonly<Locator>, message: string): Promise<void> {
-  await expect(page.getByText(message, { exact: true })).toBeVisible()
+  await expectMessageShown(page, message)
   await expect(element).toHaveAccessibleDescription(message)
 }
 
@@ -336,12 +351,25 @@ async function cancelForm(page: Readonly<Page>): Promise<void> {
   await page.getByRole('button', { name: 'Abbrechen' }).click()
 }
 
-// When der Nachfrage-Szenarien: Formular öffnen, "Pfannkuchen" als Titel eingeben, auf "Abbrechen" klicken.
-async function openDiscardQuestionWithTitle(page: Readonly<Page>): Promise<void> {
+// When der Nachfrage- und Verlassen-Szenarien: zur Rezepte-Seite navigieren, auf "Rezept anlegen" klicken und
+// "Pfannkuchen" als Titel eingeben.
+async function openCreateFormWithTitle(page: Readonly<Page>): Promise<void> {
   await openCreateForm(page)
   await page.getByLabel('Titel').fill('Pfannkuchen')
+}
+
+// When der Nachfrage-Szenarien: Formular öffnen, "Pfannkuchen" als Titel eingeben, auf "Abbrechen" klicken.
+async function openDiscardQuestionWithTitle(page: Readonly<Page>): Promise<void> {
+  await openCreateFormWithTitle(page)
   await cancelForm(page)
 }
+
+// When „ich <Schließen>" – die Beispielzeilen beider Escape-/Klick-daneben-Szenarien. Der Klick daneben trifft
+// die linke obere Ecke: Dort liegt bei jeder Fenstergröße der Hintergrund, nicht die mittig stehende Nachfrage.
+const closingsAside = [
+  { schliessen: 'Escape drücke', close: async (page: Readonly<Page>) => { await page.keyboard.press('Escape') } },
+  { schliessen: 'neben die Nachfrage klicke', close: async (page: Readonly<Page>) => { await page.mouse.click(5, 5) } },
+] as const
 
 // Then „sehe ich die Rezept-Liste" und „wurde ich nicht gefragt, ob ich Eingaben verwerfen möchte" – eine
 // Nachfrage hätte den Weg zur Liste angehalten.
@@ -475,13 +503,8 @@ test.describe('US602_EdgeCase: Rezeptformular abbrechen', () => {
     })
   })
 
-  // Eine Zeile je Beispiel der Scenario Outline. Der Klick daneben trifft die linke obere Ecke: Dort liegt
-  // bei jeder Fenstergröße der Hintergrund, nicht die mittig stehende Nachfrage.
-  const closings = [
-    { schliessen: 'Escape drücke', close: async (page: Readonly<Page>) => { await page.keyboard.press('Escape') } },
-    { schliessen: 'neben die Nachfrage klicke', close: async (page: Readonly<Page>) => { await page.mouse.click(5, 5) } },
-  ] as const
-  closings.forEach(({ schliessen, close }) => {
+  // Eine Zeile je Beispiel der Scenario Outline.
+  closingsAside.forEach(({ schliessen, close }) => {
     // Szenario: Escape oder Klick neben die Nachfrage behält die Eingaben
     test(`US602_EdgeCase_CancelCreateForm_CloseQuestionAside_KeepsInput (${schliessen})`, async ({ page }) => {
       // When: ich das Formular öffne, "Pfannkuchen" als Titel eingebe und auf "Abbrechen" klicke
@@ -510,10 +533,137 @@ test.describe('US602_EdgeCase: Rezeptformular abbrechen', () => {
     await cancelForm(page)
     await discardQuestion(page).getByRole('button', { name: 'Verwerfen' }).click()
     // When: ich auf "Rezept anlegen" klicke
-    await page.getByRole('button', { name: 'Rezept anlegen' }).click()
+    await clickCreateRecipe(page)
 
     // Then: Titel und Zutatenfeld leer, genau ein leeres Schrittfeld mit der Nummer 1
     await expectEmptyForm(page)
+  })
+})
+
+// Then „sehe ich die Zutaten-Seite": ihre Adresse und ihr Seitentitel.
+async function expectIngredientsPage(page: Readonly<Page>): Promise<void> {
+  await expect(page).toHaveURL(/\/ingredients$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Zutaten' })).toBeVisible()
+}
+
+// Die Wege aus dem Formular (Beispielspalten <Weg> und <Seite> der Verlassen-Szenarien, ADR-S135-6). Das
+// Formular wird stets über die Rezept-Liste geöffnet – Browser-Zurück führt deshalb zur Rezept-Liste.
+type LeavingWay = {
+  readonly weg: string
+  readonly leave: (page: Readonly<Page>) => Promise<void>
+  readonly seite: string
+  readonly expectTarget: (page: Readonly<Page>) => Promise<void>
+}
+const viaIngredientsEntry: LeavingWay = {
+  weg: 'in der Navigationsleiste auf "Zutaten" klicke',
+  leave: async (page) => { await navEntry(page, 'Zutaten').click() },
+  seite: 'die Zutaten-Seite',
+  expectTarget: expectIngredientsPage,
+}
+const viaRecipesEntry: LeavingWay = {
+  weg: 'in der Navigationsleiste auf "Rezepte" klicke',
+  leave: async (page) => { await navEntry(page, 'Rezepte').click() },
+  seite: 'die Rezept-Liste',
+  expectTarget: expectRecipeList,
+}
+const viaBrowserBack: LeavingWay = {
+  weg: 'im Browser zurückgehe',
+  leave: async (page) => { await page.goBack() },
+  seite: 'die Rezept-Liste',
+  expectTarget: expectRecipeList,
+}
+
+// @US-602-happy-path
+test.describe('US602_HappyPath: Rezeptformular verlassen', () => {
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const discardWays = [viaIngredientsEntry, viaRecipesEntry, viaBrowserBack] as const
+  discardWays.forEach(({ weg, leave, seite, expectTarget }) => {
+    // Szenario: Verlassen mit Eingaben fragt nach – Verwerfen führt zum gewählten Ziel
+    test(`US602_HappyPath_LeaveCreateForm_WithInput_DiscardShowsTarget (${weg} → ${seite})`, async ({ page }) => {
+      // When: ich zur Rezepte-Seite navigiere, auf "Rezept anlegen" klicke und "Pfannkuchen" als Titel eingebe
+      await openCreateFormWithTitle(page)
+      // When: ich <Weg>
+      await leave(page)
+
+      // Then: sehe ich die Nachfrage "Eingaben verwerfen?"
+      await expect(discardQuestion(page)).toBeVisible()
+
+      // When: ich auf "Verwerfen" klicke
+      await discardQuestion(page).getByRole('button', { name: 'Verwerfen' }).click()
+
+      // Then: sehe ich <Seite>
+      await expectTarget(page)
+    })
+  })
+
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const continueWays = [viaIngredientsEntry, viaBrowserBack] as const
+  continueWays.forEach(({ weg, leave, seite, expectTarget }) => {
+    // Szenario: Verlassen mit Eingaben fragt nach – Weiter bearbeiten bleibt im Formular, auch beim zweiten Versuch
+    test(`US602_HappyPath_LeaveCreateForm_WithInput_ContinueEditingStaysAndAsksAgain (${weg} → ${seite})`, async ({ page }) => {
+      // When: ich zur Rezepte-Seite navigiere, auf "Rezept anlegen" klicke und "Pfannkuchen" als Titel eingebe
+      await openCreateFormWithTitle(page)
+      // When: ich <Weg> und auf "Weiter bearbeiten" klicke
+      await leave(page)
+      await discardQuestion(page).getByRole('button', { name: 'Weiter bearbeiten' }).click()
+
+      // Then: sehe ich das Formular mit dem Titel "Pfannkuchen", weiterhin unter seiner eigenen Adresse
+      // (die Adresse prüft expectFormWithTitle mit)
+      await expectFormWithTitle(page, 'Pfannkuchen')
+
+      // When: ich <Weg>
+      await leave(page)
+
+      // Then: sehe ich die Nachfrage "Eingaben verwerfen?"
+      await expect(discardQuestion(page)).toBeVisible()
+
+      // When: ich auf "Verwerfen" klicke
+      await discardQuestion(page).getByRole('button', { name: 'Verwerfen' }).click()
+
+      // Then: sehe ich <Seite>
+      await expectTarget(page)
+    })
+  })
+})
+
+// @US-602-edge-case
+test.describe('US602_EdgeCase: Rezeptformular verlassen', () => {
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const waysWithoutInput = [viaIngredientsEntry, viaBrowserBack] as const
+  waysWithoutInput.forEach(({ weg, leave, seite, expectTarget }) => {
+    // Szenario: Ohne Eingaben verlässt man das Formular ohne Nachfrage
+    test(`US602_EdgeCase_LeaveCreateForm_WithoutInput_ShowsTargetWithoutQuestion (${weg} → ${seite})`, async ({ page }) => {
+      // When: ich zur Rezepte-Seite navigiere und auf "Rezept anlegen" klicke
+      await openCreateForm(page)
+      // When: ich <Weg>
+      await leave(page)
+
+      // Then: sehe ich <Seite> und wurde nicht gefragt, ob ich Eingaben verwerfen möchte – eine Nachfrage
+      // hätte den Weg angehalten
+      await expectTarget(page)
+      await expect(discardQuestion(page)).toHaveCount(0)
+    })
+  })
+
+  // Eine Zeile je Beispiel der Scenario Outline.
+  closingsAside.forEach(({ schliessen, close }) => {
+    // Szenario: Escape oder Klick neben die Nachfrage nach Browser-Zurück bleibt im Formular
+    test(`US602_EdgeCase_LeaveCreateFormViaBack_CloseQuestionAside_StaysInForm (${schliessen})`, async ({ page }) => {
+      // When: ich zur Rezepte-Seite navigiere, auf "Rezept anlegen" klicke und "Pfannkuchen" als Titel eingebe
+      await openCreateFormWithTitle(page)
+      // When: ich im Browser zurückgehe
+      await viaBrowserBack.leave(page)
+      // Erst wenn der Fokus in der Nachfrage liegt, erreicht Escape ihren Handler (wie beim Abbrechen).
+      await expect(discardQuestion(page).getByRole('button', { name: 'Weiter bearbeiten' })).toBeFocused()
+      // When: ich <Schließen>
+      await close(page)
+
+      // Then: sehe ich das Formular mit dem Titel "Pfannkuchen", weiterhin unter seiner eigenen Adresse
+      // (die Adresse prüft expectFormWithTitle mit)
+      await expectFormWithTitle(page, 'Pfannkuchen')
+      // Then: sehe ich keine Nachfrage mehr
+      await expect(discardQuestion(page)).toBeHidden()
+    })
   })
 })
 
@@ -568,6 +718,166 @@ test.describe('US602_HappyPath: Rezept-Detailansicht', () => {
   })
 })
 
+const RECIPES_API_PATH = '/api/recipes'
+
+// Ein zurückgehaltenes Speichern: `arrived` erfüllt sich, sobald die Anfrage den Browser verlassen hat (sie läuft
+// also wirklich); `complete` ist der Schritt „das Speichern abgeschlossen ist".
+type HeldSave = {
+  readonly arrived: Promise<void>
+  readonly complete: () => Promise<void>
+}
+
+// Given „das Speichern eines Rezepts dauert spürbar": hält die nächste Speicher-Anfrage (POST) zurück, bis der
+// Test sie freigibt. „Während das Speichern noch läuft" ist so kein Wettlauf gegen eine feste Verzögerung – die
+// Antwort käme sonst womöglich vor der Prüfung an. `complete` reicht die Anfrage an den Server weiter, wartet seine
+// Antwort ab und entfernt erst dann den Handler: page.unroute reicht noch offene Anfragen seines Handlers sofort
+// weiter. Ein weiteres Speichern braucht deshalb einen eigenen Aufruf.
+async function holdNextRecipeSave(page: Readonly<Page>): Promise<HeldSave> {
+  const held = Promise.withResolvers<Route>()
+  const holdSave = async (route: Readonly<Route>): Promise<void> => {
+    if (route.request().method() !== 'POST') { await route.fallback(); return }
+    held.resolve(route)
+  }
+  await page.route(`**${RECIPES_API_PATH}`, holdSave)
+  return {
+    arrived: held.promise.then(() => undefined),
+    complete: async () => {
+      const route = await held.promise
+      const response = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === RECIPES_API_PATH)
+      await route.continue()
+      await response
+      await page.unroute(`**${RECIPES_API_PATH}`, holdSave)
+    },
+  }
+}
+
+// Settle-Fenster vor „ohne Nachfrage": Eine fälschlich geöffnete Nachfrage hängt sich wenige Millisekunden nach
+// dem Navigationsversuch in die Seite; ohne das Fenster bestünde toHaveCount(0) schon davor.
+const QUESTION_SETTLE_MS = 400
+
+// Then „sehe ich die Detailansicht des Rezepts "Pfannkuchen"" nach dem Speichern: die Adresse des neuen
+// Rezepts (ADR-S135-5) und seine Detailansicht.
+async function expectNewPancakesDetail(page: Readonly<Page>): Promise<void> {
+  await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+  await expectPancakesDetail(page)
+}
+
+// @US-602-edge-case
+test.describe('US602_EdgeCase: Rezeptformular speichern und verlassen', () => {
+  // Szenario: Speichern führt ohne Nachfrage zur Detailansicht
+  test('US602_EdgeCase_SaveCreateForm_ShowsDetailWithoutQuestion', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+
+    // When: Formular öffnen, "Pfannkuchen", "250 g Mehl" und "Teig rühren." eingeben, auf "Speichern" klicken
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP])
+    await saveForm(page)
+
+    // Then: die Detailansicht des Rezepts "Pfannkuchen"
+    // Then: wurde ich nicht gefragt, ob ich Eingaben verwerfen möchte – belegt durch die Detailansicht: Eine
+    // Nachfrage hätte die Weiterleitung angehalten. Eine eigene Prüfung auf der Detailansicht könnte nicht
+    // scheitern, die Nachfrage gehört zum Formular.
+    await expectNewPancakesDetail(page)
+  })
+
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const waysWhileSaving = [viaBrowserBack, viaIngredientsEntry] as const
+  waysWhileSaving.forEach(({ weg, leave }) => {
+    // Szenario: Während des Speicherns lässt sich das Formular nicht verlassen
+    test(`US602_EdgeCase_LeaveCreateFormWhileSaving_StaysInFormThenShowsDetail (${weg})`, async ({ page, request }) => {
+      // Given: die Zutat "Mehl" mit Einheit "g" existiert
+      await seedIngredientViaApi(request, 'Mehl', 'g')
+      // Given: das Speichern eines Rezepts dauert spürbar
+      const save = await holdNextRecipeSave(page)
+
+      // When: Formular öffnen, "Pfannkuchen", "250 g Mehl" und "Teig rühren." eingeben, auf "Speichern" klicken
+      await openCreateForm(page)
+      await fillRecipeForm(page, PANCAKES, [FIRST_STEP])
+      await saveForm(page)
+      await save.arrived
+      // When: ich, während das Speichern noch läuft, <Weg>
+      await leave(page)
+      await page.waitForTimeout(QUESTION_SETTLE_MS)
+
+      // Then: sehe ich weiterhin das Formular, ohne Nachfrage, unter seiner eigenen Adresse
+      // (die Adresse prüft expectFormWithTitle mit)
+      await expectFormWithTitle(page, PANCAKES)
+      await expect(discardQuestion(page)).toHaveCount(0)
+
+      // When: das Speichern abgeschlossen ist
+      await save.complete()
+
+      // Then: sehe ich die Detailansicht des Rezepts "Pfannkuchen" – nicht das Ziel des Wegs
+      await expectNewPancakesDetail(page)
+    })
+  })
+
+  // Szenario: Während eines erneuten Speicherns bleibt die Meldung an ihrem Schritt
+  // Das leere zweite Feld fehlt in der ersten gesendeten Liste, in der zweiten ist es dabei (ADR-S144-1).
+  test('US602_EdgeCase_ResaveAfterStepMessage_WhileSaving_MessageStaysAtItsStep', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    // Given: das Speichern eines Rezepts dauert spürbar (gilt für beide Speichervorgänge)
+    const firstSave = await holdNextRecipeSave(page)
+
+    // When: Schritt 1 "Teig rühren.", Schritt 2 "   ", Schritt 3 aus 1001 Zeichen, auf "Speichern" klicken
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP, '   ', INSTRUCTION_OF_1001_CHARS])
+    await saveForm(page)
+    // When: das Speichern abgeschlossen ist – die Meldung des Servers ist angekommen
+    await firstSave.complete()
+    await expectMessageShown(page, STEP_TOO_LONG)
+    // When: ich den zweiten Schritt durch "Eier trennen." ersetze und auf "Speichern" klicke. Das zweite Speichern
+    // wird nie freigegeben: Seine Antwort würde die Meldungen ersetzen, geprüft wird der Stand davor.
+    const secondSave = await holdNextRecipeSave(page)
+    await stepField(page, 2).fill('Eier trennen.')
+    await saveForm(page)
+    // Das zweite Speichern läuft wirklich – sonst bestünden die Thens auch ohne erneutes Absenden.
+    await secondSave.arrived
+
+    // Then: während das Speichern noch läuft (die Anfrage bleibt zurückgehalten), am dritten Schritt weiterhin
+    // die Meldung "Schritt-Anweisung darf maximal 1000 Zeichen lang sein."
+    await expectMessageAtSteps(page, [3], STEP_TOO_LONG)
+    // Then: der zweite Schritt ist nicht als fehlerhaft markiert
+    await expectStepsNotMarked(page, [2])
+  })
+
+  // Eine Zeile je Beispiel der Scenario Outline.
+  waysWhileSaving.forEach(({ weg, leave }) => {
+    // Szenario: Ein während des Speicherns abgefangener Versuch fragt nach fehlgeschlagenem Speichern nicht nach
+    test(`US602_EdgeCase_LeaveCreateFormWhileSaving_SaveFails_ShowsMessageWithoutQuestion (${weg})`, async ({ page, request }) => {
+      // Given: die Zutat "Mehl" mit Einheit "g" existiert
+      await seedIngredientViaApi(request, 'Mehl', 'g')
+      // Given: das Speichern eines Rezepts dauert spürbar
+      const save = await holdNextRecipeSave(page)
+
+      // When: Formular öffnen, "Pfannkuchen", "250 g Mehk" und "Teig rühren." eingeben, auf "Speichern" klicken
+      await openCreateForm(page)
+      await fillRecipeForm(page, PANCAKES, [FIRST_STEP], '250 g Mehk')
+      await saveForm(page)
+      await save.arrived
+      // When: ich, während das Speichern noch läuft, <Weg> – das Fenster lässt die App den Versuch verarbeiten,
+      // solange das Speichern noch läuft; ohne es träfe er womöglich erst nach der Antwort ein
+      await leave(page)
+      await page.waitForTimeout(QUESTION_SETTLE_MS)
+      // When: das Speichern abgeschlossen ist
+      await save.complete()
+
+      // Then: sehe ich bei den Zutaten die Fehlermeldung "„250 g Mehk“: Zutat 'Mehk' nicht gefunden. …"
+      await expectMessageAtIngredients(page, MEHK_NOT_FOUND)
+      // Then: liegt der Fokus im Zutatenfeld
+      await expect(page.getByLabel('Zutaten')).toBeFocused()
+      // Then: wurde ich nicht gefragt, ob ich Eingaben verwerfen möchte – eine nachträgliche Nachfrage öffnete
+      // sich nach der Antwort; das Fenster gibt ihr die Zeit dazu
+      await page.waitForTimeout(QUESTION_SETTLE_MS)
+      await expect(discardQuestion(page)).toHaveCount(0)
+      // Then: ist das Formular weiterhin unter seiner eigenen Adresse geöffnet (prüft die Adresse mit)
+      await expectFormWithTitle(page, PANCAKES)
+    })
+  })
+})
+
 // @US-602-error – eine Zeile je Beispiel der Scenario Outline
 test.describe('US602_Error: Direktlink ins Leere', () => {
   const links = [
@@ -606,9 +916,9 @@ test.describe('US602_Error: Rezept ohne Pflichtangaben', () => {
     await saveForm(page)
 
     // Then: am Titel, bei den Zutaten und bei den Schritten je die Pflichtmeldung – gleichzeitig
-    await expectMessageAt(page, page.getByLabel('Titel'), 'Titel darf nicht leer sein.')
-    await expectMessageAtIngredients(page, 'Rezept muss mindestens eine Zutat haben.')
-    await expectMessageAt(page, stepsSection(page), 'Rezept muss mindestens einen Schritt haben.')
+    await expectMessageAt(page, page.getByLabel('Titel'), TITLE_EMPTY)
+    await expectMessageAtIngredients(page, INGREDIENTS_REQUIRED)
+    await expectMessageAt(page, stepsSection(page), STEPS_REQUIRED)
     // Then: der Fokus liegt auf dem Titel-Feld – alle drei sind fehlerhaft, das erste gewinnt (ADR-S135-4)
     await expect(page.getByLabel('Titel')).toBeFocused()
     // Then: weiterhin im Formular
@@ -1165,5 +1475,180 @@ test.describe('US602_Error: Titel existiert bereits', () => {
     //   die Rezept-Liste unverändert
     await expectFormWithInputs(page, PANCAKES, [FIRST_STEP])
     expect(await fetchRecipeTitlesViaApi(request)).toEqual([PANCAKES])
+  })
+})
+
+// Szenarien von „Formular·nach dem Speichern" (run-13) und „Verlassen·während des Speicherns" (run-15).
+const MEHK_NOT_FOUND = `„250 g Mehk“: ${notFound('Mehk')}`
+
+// Then „ist keine Fehlermeldung sichtbar" und „ist kein Feld als ungültig markiert" (stehen immer gemeinsam):
+// Kein Feld wird von einer Meldung beschrieben oder ist als fehlerhaft ausgezeichnet – Titel ohne Beschreibung,
+// das Zutatenfeld nur vom Hinweis, die Gruppe „Schritte" ohne, das Schrittfeld wie ein nicht gemeldeter Schritt.
+// Das erfasst jede Meldung, die an einem Feld hängt. `shownBefore` sind die Meldungen, die der Server vor dem
+// erneuten Öffnen gemeldet hat; dass keine davon irgendwo auf der Seite steht, fängt zusätzlich eine Meldung,
+// die ihre Verknüpfung mit dem Feld verloren hat.
+async function expectFormWithoutMessages(page: Readonly<Page>, shownBefore: readonly string[]): Promise<void> {
+  await Promise.all(shownBefore.map(async (message) => {
+    await expect(page.getByText(message, { exact: true })).toHaveCount(0)
+  }))
+  await expect(page.getByLabel('Titel')).toHaveAccessibleDescription('')
+  await expect(page.getByLabel('Titel')).not.toHaveAttribute('aria-invalid', 'true')
+  await expect(page.getByLabel('Zutaten')).toHaveAccessibleDescription(INGREDIENTS_HINT)
+  await expect(page.getByLabel('Zutaten')).not.toHaveAttribute('aria-invalid', 'true')
+  await expect(stepsSection(page)).toHaveAccessibleDescription('')
+  await expectStepsNotMarked(page, [1])
+}
+
+// Endzustand nach einem Erfolg (Step-Code laut Feature-Kommentar): die Detailansicht von „Pfannkuchen" mit
+// „250 g Mehl" und dem Schritt „Teig rühren.".
+async function expectPancakesDetailWithFirstStep(page: Readonly<Page>): Promise<void> {
+  await expect(page).toHaveURL(RECIPE_DETAIL_URL)
+  await expectPancakesDetail(page)
+  await expectDetailSteps(page, [FIRST_STEP])
+}
+
+// Then „steht "Pfannkuchen" genau einmal in der Rezept-Liste" – die Liste hat genau diesen Eintrag.
+async function expectOnlyPancakesInList(page: Readonly<Page>): Promise<void> {
+  await expect(page.getByRole('list', { name: 'Rezepte' }).getByRole('listitem')).toHaveText([PANCAKES])
+}
+
+// @US-602-error
+test.describe('US602_Error: Formular nach dem Speichern', () => {
+  // Szenario: Fokus springt auf das erste fehlerhafte Feld
+  test('US602_Error_CreateRecipe_InvalidLineAndLongStep_ShowsBothAndFocusOnIngredients', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+    // When: Formular öffnen, "Pfannkuchen", "250 g Mehk" und eine Anweisung aus 1001 Zeichen eingeben, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [INSTRUCTION_OF_1001_CHARS], '250 g Mehk')
+    await saveForm(page)
+
+    // Then: bei den Zutaten genau die Meldung zur Zeile
+    await expectMessageAtIngredients(page, MEHK_NOT_FOUND)
+    // Then: am ersten Schritt die Meldung zur Länge
+    await expectMessageAtSteps(page, [1], STEP_TOO_LONG)
+    // Then: bei den Schritten keine Meldung "Rezept muss mindestens einen Schritt haben."
+    await expect(page.getByText(STEPS_REQUIRED, { exact: true })).toHaveCount(0)
+    // Then: der Fokus liegt auf dem Zutatenfeld – es steht im Formular vor den Schritten (ADR-S135-4)
+    await expect(page.getByLabel('Zutaten')).toBeFocused()
+    // Then (Endzustand nach Fehler): weiterhin im Formular mit allen Eingaben, die Rezept-Liste unverändert
+    await expectFormWithInputs(page, PANCAKES, [INSTRUCTION_OF_1001_CHARS], '250 g Mehk')
+    expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
+  })
+
+  // Szenario: Nach Korrektur der gemeldeten Zeile wird das Rezept gespeichert
+  test('US602_Error_CreateRecipe_LineCorrectedAfterMessage_SavesRecipe', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+
+    // When: Formular öffnen, "Pfannkuchen", "250 g Mehk" und "Teig rühren." eingeben, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP], '250 g Mehk')
+    await saveForm(page)
+    // When: die Meldung zur Zeile erscheint
+    await expectMessageShown(page, MEHK_NOT_FOUND)
+    // When: die Zutaten durch "250 g Mehl" ersetzen, speichern
+    await page.getByLabel('Zutaten').fill(INGREDIENTS_MEHL)
+    await saveForm(page)
+
+    // Then: die Detailansicht von "Pfannkuchen" mit der Zutat "250 g Mehl" (und dem Schritt, Endzustand)
+    await expectPancakesDetailWithFirstStep(page)
+    // Then: "Pfannkuchen" steht genau einmal in der Rezept-Liste
+    await page.goto('/recipes')
+    await expectOnlyPancakesInList(page)
+  })
+})
+
+// @US-602-edge-case
+test.describe('US602_EdgeCase: Formular nach dem Speichern', () => {
+  // Szenario: Nach fehlgeschlagenem Speichern und Verwerfen ist das Formular beim erneuten Öffnen fehlerfrei
+  test('US602_EdgeCase_DiscardCreateFormAfterFailedSave_ReopenForm_HasNoMessages', async ({ page }) => {
+    // When: Formular öffnen, "Teig rühren." als Schritt eingeben, speichern
+    await openCreateForm(page)
+    await stepField(page, 1).fill(FIRST_STEP)
+    await saveForm(page)
+    // When: die Meldung "Titel darf nicht leer sein." erscheint
+    await expectMessageShown(page, TITLE_EMPTY)
+    // When: auf "Abbrechen" und "Verwerfen", dann auf "Rezept anlegen" klicken
+    await cancelForm(page)
+    await discardQuestion(page).getByRole('button', { name: 'Verwerfen' }).click()
+    await clickCreateRecipe(page)
+
+    // Then: keine Fehlermeldung sichtbar, kein Feld als ungültig markiert – gemeldet waren der fehlende Titel und
+    //   die fehlende Zutat (der Schritt war eingegeben)
+    await expectForm(page)
+    await expectFormWithoutMessages(page, [TITLE_EMPTY, INGREDIENTS_REQUIRED])
+  })
+
+  // Szenario: Nach fehlgeschlagenem Speichern ohne Eingaben bricht man ohne Nachfrage ab und öffnet das Formular fehlerfrei
+  test('US602_EdgeCase_CancelEmptyCreateFormAfterFailedSave_ShowsListWithoutQuestionAndReopensWithoutMessages', async ({ page }) => {
+    // When: Formular öffnen, speichern
+    await openCreateForm(page)
+    await saveForm(page)
+    // When: die Meldung "Titel darf nicht leer sein." erscheint
+    await expectMessageShown(page, TITLE_EMPTY)
+    // When: auf "Abbrechen" klicken
+    await cancelForm(page)
+
+    // Then: die Rezept-Liste, ohne Nachfrage
+    await expectListWithoutQuestion(page)
+
+    // When: auf "Rezept anlegen" klicken
+    await clickCreateRecipe(page)
+
+    // Then: keine Fehlermeldung sichtbar, kein Feld als ungültig markiert – gemeldet waren alle drei
+    //   Pflichtangaben, wie beim Speichern des leeren Formulars
+    await expectForm(page)
+    await expectFormWithoutMessages(page, [TITLE_EMPTY, INGREDIENTS_REQUIRED, STEPS_REQUIRED])
+  })
+
+  // Szenario: Nach erfolgreichem Speichern ist das Formular beim erneuten Öffnen leer
+  test('US602_EdgeCase_CreateRecipe_ReopenFormViaNavigation_FieldsAreEmpty', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+
+    // When: Formular öffnen, "Pfannkuchen", "250 g Mehl" und "Teig rühren." eingeben, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP])
+    await saveForm(page)
+    // When: die Detailansicht erscheint (Endzustand nach Erfolg: mit allen Eingaben)
+    await expectPancakesDetailWithFirstStep(page)
+    // When: in der Navigationsleiste auf "Rezepte" klicken – kein Neuladen, die Liste kommt aus der laufenden App
+    await navEntry(page, 'Rezepte').click()
+
+    // Then: "Pfannkuchen" steht genau einmal in der Rezept-Liste
+    await expectOnlyPancakesInList(page)
+
+    // When: auf "Rezept anlegen" klicken
+    await clickCreateRecipe(page)
+
+    // Then: Titel und Zutatenfeld leer, genau ein leeres Schrittfeld mit der Nummer 1
+    await expectForm(page)
+    await expectEmptyForm(page)
+  })
+
+  // Szenario: Meldungen bleiben beim Bearbeiten bis zum nächsten Speichern stehen
+  test('US602_EdgeCase_CreateRecipe_EditIngredientsAfterMessage_MessageStays', async ({ page, request }) => {
+    // Given: die Zutat "Mehl" mit Einheit "g" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    const recipesBefore = await fetchRecipeTitlesViaApi(request)
+
+    // When: Formular öffnen, "Pfannkuchen", "250 g Mehk" und "Teig rühren." eingeben, speichern
+    await openCreateForm(page)
+    await fillRecipeForm(page, PANCAKES, [FIRST_STEP], '250 g Mehk')
+    await saveForm(page)
+    // When: die Zutaten durch "250 g Mehl" ersetzen – erst, wenn die Antwort da ist: Käme die Meldung erst nach
+    //   dem Ersetzen an, stünde sie auch dann, wenn Bearbeiten Meldungen entfernte.
+    await expectMessageShown(page, MEHK_NOT_FOUND)
+    await page.getByLabel('Zutaten').fill(INGREDIENTS_MEHL)
+
+    // Then: bei den Zutaten weiterhin die Meldung zur Zeile
+    await expectMessageAtIngredients(page, MEHK_NOT_FOUND)
+    // Then (Endzustand nach Fehler): weiterhin im Formular mit allen Eingaben – die Zutaten schon in der
+    //   ersetzten Fassung –, die Rezept-Liste unverändert
+    await expectFormWithInputs(page, PANCAKES, [FIRST_STEP], INGREDIENTS_MEHL)
+    expect(await fetchRecipeTitlesViaApi(request)).toEqual(recipesBefore)
   })
 })

@@ -1,11 +1,10 @@
-import type { Locator, Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import { navEntry } from './pages/navigation'
 
 // Querschnitt @CROSS-navigation (features/navigation.feature, ADR-S103-1): Jede Hauptseite ist über die
-// Navigationsleiste erreichbar. Die Leiste ist ein Landmark „Hauptnavigation“; der Eintrag der geöffneten
-// Seite trägt aria-current="page" (freigegebener UI-Entwurf: aktiver Eintrag markiert).
-const navEntry = (page: Readonly<Page>, name: string): Locator =>
-  page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name, exact: true })
+// Navigationsleiste erreichbar. Die Leiste ist ein Landmark „Hauptnavigation“ (navEntry); der Eintrag der
+// geöffneten Seite trägt aria-current="page" (freigegebener UI-Entwurf: aktiver Eintrag markiert).
 
 const pages = {
   Zutaten: '/ingredients',

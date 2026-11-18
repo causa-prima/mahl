@@ -179,14 +179,14 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S137-2 – Bash-Hook: bekannte Lücken im Wrapper-Filter ohne Vorkommen im Bestand
 - Quelle: Orchestrator
-- Status: NEU
+- Status: UMGESETZT (S151)
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
 - Beobachtung: Der Wrapper-Filter in check-bash-permission erkennt diese Formen bewusst nicht, weil keine davon im protokollierten Bestand (8.567 erlaubte Befehle) vorkommt: Here-String auf Wrapper-Ausgabe (tail <<< "$(wrapper)"), Kürzung per printf '%.300s', Filter hinter einem Kommentar mit --allow-once, maskierter Befehlsname (dotnet\-test), Filter mit anschließendem Kontrollfluss (wrapper | tail && x), einzelnes & als Trenner, | in Kommentaren, $(…) innerhalb einer Filterstufe. Daneben: Die Liste der filterbaren Wrapper existiert doppelt (Hook und tool-usage.py); ruff-run, coverage-run und mutmut-run geben ebenfalls nur ein Verdikt aus, stehen aber nicht in _FILTERABLE_WRAPPERS – ob sie hinein gehören, ist nicht entschieden. Der Hook hat fünf eigene Quote-Scanner, die je eigene Lücken haben können. Der Eintrag dient als Gedächtnis, falls eine der Formen doch auftritt.
 - Vorprägung: Ein gemeinsamer Quote-Scanner statt fünf eigener würde mehrere der Lücken zugleich schließen.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – Vorgabe des Users: Fälle, die nie vorkommen, werden nicht behandelt, wenn das den Code komplexer oder schwerer wartbar macht.
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: Erledigt durch die Vereinfachung des Wrapper-Filters: Umgeschrieben wird nur ein Filter in der eigenen Pipeline eines Wrappers, jeder Umweg bleibt erlaubt und unverändert (Schutzziel Versehen statt Absicht, docs/process/dev-workflow.md#DEV-schutzziel). Damit sind die aufgezählten nicht erkannten Formen kein Mangel mehr, sondern gewollt. Die Liste in tool-usage.py ist kein Duplikat: Sie ist für die Vergleichbarkeit der Messreihe eingefroren (dort kommentiert, im Hook jetzt auch). ruff-run gibt nur ein Verdikt aus und steht jetzt in _FILTERABLE_WRAPPERS; coverage-run und mutmut-run nicht, ihre Ausgabe ist zum Lesen da. Die fünf Quote-Scanner bleiben: Ein gemeinsamer Scanner lohnt nur gegen gezielte Umgehung.
 
 ## OBS-S139-1 – Ein nacktes cd bleibt trotz Regel ungehindert und wiederholte sich in derselben Session
 - Quelle: Orchestrator
@@ -201,13 +201,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 
 ## OBS-S141-1 – Bash-Hook blockt Heredoc, sed -i und cat >> bei Layer-Subagenten
 - Quelle: Subagent
-- Status: NEU
+- Status: UMGESETZT (S151)
 - Impact: GERING    Häufigkeit: häufig
 - Kategorie: AGENT    Kontext: Bash/Permission
 - Beobachtung: In S141 meldeten drei Layer-Subagenten (Frontend run-2, Backend run-2, Frontend Review-Fixes) unabhängig, dass der Bash-Hook python3-Heredocs, sed -i, cat >> (Redirect) und einen Heredoc-Edit mit anschließendem Wrapper-Aufruf im selben Befehl blockt. Alle wichen ohne Folgen auf Edit aus, verloren dabei aber je einen oder mehrere Versuche und meldeten den Punkt als Prozess-Auffälligkeit im Return. Offen ist, ob die Agent-Definitionen den Weg (Dateien per Edit/Write ändern) so klar nennen, dass der erste Versuch schon richtig ist. Erneut in S143 (US-602 run-6): Drei der vier Layer-Subagenten meldeten in ihrem Prozessverbesserungs-Abschnitt Fehlversuche an Heredoc-Skripten mit Wrapper-Aufruf, sed -i und npx eslint bzw. npm run lint, bevor sie auf Edit und eslint-run wechselten. Erneut in S144 (US-602 run-8): Vier von sechs Layer-Subagenten meldeten Fehlversuche an python3-Heredocs, sed -i oder Redirects auf Repo-Dateien, bevor sie auf Edit/Write wechselten; auch der Orchestrator lief einmal in die Sperre (Heredoc-Anhängen an eine Spec-Datei). Erneut in S148 (US-602 run-11): Fünf von sechs Layer-Subagenten meldeten Fehlversuche an python3-Heredocs bzw. sed -i (einer auch an einem Filter hinter dem Wrapper), bevor sie auf Edit wechselten; der Orchestrator lief einmal in die Sperre (Heredoc-Anhängen an die E2E-Spec).
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-2 als Beobachtung entschieden
-- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Entscheidung/Maßnahme: Zwei Stellen: (a) Die Redirect-Ablehnung nennt jetzt zuerst den Weg zum Ziel – 'Datei anlegen, ändern oder anhängen: Write- bzw. Edit-Tool' – statt 'Output in Variable capturen' mit dotnet-build-Beispiel. (b) Beide Layer-Implementer-Definitionen nennen sed -i, Heredoc (cat > datei <<'EOF') und Python-Skript ausdrücklich als abgelehnt; der Frontend-Definition fehlte die Regel ganz, die Backend-Begründung ('Hook blockt Wrapper mit Heredoc oder Filter') stimmt seit dem vereinfachten Wrapper-Filter nicht mehr. Ob die Fehlversuche damit seltener werden, zeigen die Prozessverbesserungs-Abschnitte der nächsten Läufe.
 
 ## OBS-S141-2 – Analyzer-Kollisionen und -Grenzen im Backend nicht dokumentiert
 - Quelle: Subagent
@@ -315,7 +315,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Mutation-Testing
-- Beobachtung: In US-602 run-9 (S147) meldete mutmut-run --ratchet für prozesscode.qa-check ohne --frisch einen Rückschritt (90,1 % → 90,0 %), obwohl gerade Tests hinzugekommen waren. Derselbe Stand mit --frisch ergab 90,6 % und hielt die Sperrklinke. Der Test, der die neue Meldung prüfte, war dem betroffenen Mutanten im Lauf ohne --frisch nicht zugeordnet. Ungeprüft ist, ob die Zuordnung Test → Mutant aus einem früheren Lauf im Verzeichnis mutants/ wiederverwendet wurde. Folge: Ein roter Ratchet-Lauf ohne --frisch ist kein verlässlicher Befund, und wer das nicht weiß, sucht eine Lücke, die es nicht gibt.
+- Beobachtung: In US-602 run-9 (S147) meldete mutmut-run --ratchet für prozesscode.qa-check ohne --frisch einen Rückschritt (90,1 % → 90,0 %), obwohl gerade Tests hinzugekommen waren. Derselbe Stand mit --frisch ergab 90,6 % und hielt die Sperrklinke. Der Test, der die neue Meldung prüfte, war dem betroffenen Mutanten im Lauf ohne --frisch nicht zugeordnet. Ungeprüft ist, ob die Zuordnung Test → Mutant aus einem früheren Lauf im Verzeichnis mutants/ wiederverwendet wurde. Folge: Ein roter Ratchet-Lauf ohne --frisch ist kein verlässlicher Befund, und wer das nicht weiß, sucht eine Lücke, die es nicht gibt. Zweiter Fall S151, prozesscode.hooks.check-bash-permission: ohne --frisch 98,2 % → 94,6 % mit Zuordnungen „no tests“, derselbe Stand mit --frisch 96,6 %. Dritter Fall S151, diesmal MIT --frisch: prozesscode.playwright-test auf unverändertem Stand einmal 83,3 % (43 überlebt, Sperrklinke gerissen), direkt danach 84,4 % (gehalten); ohne --frisch zuvor 83,7 %. Ein Mutant springt also auch bei frischem Baum um – die Annahme, nur die wiederverwendete Zuordnung in mutants/ sei schuld, trägt damit nicht allein. Welcher Mutant springt, ist ungeprüft (der erste Lauf wurde vom nächsten --frisch weggeräumt); Weg dorthin: mutmut-run --tests-for <mutant>.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-9 als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -356,7 +356,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: In S148 meldete python3 -m prozesscode.eslint-run zweimal auf unverändertem Code den Fehler Client/e2e/api/recipesApi.ts:29:78 functional/prefer-immutable-types „Parameter should have an immutability of at least ReadonlyDeep (actual: ReadonlyShallow)“ für den Parameter recipe: RecipeCommand. Die Datei war in der Session nie geändert (git diff leer), RecipeCommand ist durchgehend readonly. Reproduziert: Fünf Läufe direkt hintereinander, nur der erste meldete den Fehler, die vier folgenden nicht. Über die Session waren es 2 von etwa 9 Läufen, jeweils der erste nach einer Pause oder einer Änderung an anderen Dateien. eslint-run ruft „npm run lint“ = „eslint .“ ohne --cache auf, ein veralteter Cache scheidet aus. Die Regel arbeitet typbasiert. In früheren Session-Logs fand sich die Stelle nicht (grep auf ReadonlyShallow + recipesApi.ts). Ungeprüft: ob der Fehler auch ohne die Änderungen dieses Laufs auftritt (dazu hätte der Arbeitsbaum gestasht werden müssen) und ob der Edit-Hook (eslint_lint, nur die geänderte Datei) betroffen sein kann. Folge, wenn es qa-check trifft: ein falsches Rot ohne Codeursache, das einen Subagenten in eine Fehlersuche schickt.
+- Beobachtung: In S148 meldete python3 -m prozesscode.eslint-run zweimal auf unverändertem Code den Fehler Client/e2e/api/recipesApi.ts:29:78 functional/prefer-immutable-types „Parameter should have an immutability of at least ReadonlyDeep (actual: ReadonlyShallow)“ für den Parameter recipe: RecipeCommand. Die Datei war in der Session nie geändert (git diff leer), RecipeCommand ist durchgehend readonly. Reproduziert: Fünf Läufe direkt hintereinander, nur der erste meldete den Fehler, die vier folgenden nicht. Über die Session waren es 2 von etwa 9 Läufen, jeweils der erste nach einer Pause oder einer Änderung an anderen Dateien. eslint-run ruft „npm run lint“ = „eslint .“ ohne --cache auf, ein veralteter Cache scheidet aus. Die Regel arbeitet typbasiert. In früheren Session-Logs fand sich die Stelle nicht (grep auf ReadonlyShallow + recipesApi.ts). Ungeprüft: ob der Fehler auch ohne die Änderungen dieses Laufs auftritt (dazu hätte der Arbeitsbaum gestasht werden müssen) und ob der Edit-Hook (eslint_lint, nur die geänderte Datei) betroffen sein kann. Folge, wenn es qa-check trifft: ein falsches Rot ohne Codeursache, das einen Subagenten in eine Fehlersuche schickt. Erneut in S151 (US-602 run-14): derselbe Fehler an derselben Stelle (recipesApi.ts:29:78, ReadonlyShallow) im ersten eslint-run nach mehreren Edits an anderen Dateien (RecipesPage.test.tsx, recipes.spec.ts); ein zweiter Lauf rund zwei Minuten später war sauber, der qa-check dazwischen meldete ESLint OK (geprüft). Datei, Typ und eslint.config.js im Lauf unverändert (geprüft: git status, git diff). Der Edit-Hook lief kurz vorher auf den geänderten Dateien; ob er gleichzeitig lief, ist ungeprüft.
 - Vorprägung: Vermutung ohne Beleg: Typ-Immutabilität wird in eslint-plugin-functional/is-immutable-type über Dateien hinweg zwischengespeichert, das Ergebnis könnte von der Lint-Reihenfolge abhängen.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: Recherche – Ursache unklar, braucht Läufe mit gestashtem Arbeitsbaum und isolierter Regel
@@ -367,7 +367,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: MITTEL    Häufigkeit: häufig
 - Kategorie: TOOLING    Kontext: Review
-- Beobachtung: review-code verlangt, dass Auditoren jedes Finding am Stand belegen, auch durch Testläufe, und der Orchestrator-Prompt nannte python3 -m prozesscode.dotnet-test bzw. vitest-run. In US-602 run-11 meldeten mehrere Auditoren (functional-correctness R1 und R2, test-quality R2, code-quality R1), der Hook habe dotnet-test geblockt, laut eigener Angabe auch ohne Pipe oder Redirect; vitest-run lief bei einem. Folge: Befunde kamen als „offene Prüfung" statt belegt, und die Gegenproben musste der Orchestrator bzw. ein Schicht-Subagent nachholen. Nicht nachgestellt: ob der Hook dotnet-test für Auditoren absichtlich sperrt (der Build schreibt bin/obj) oder ob nur der Aufruf mit Filter/Pipe scheiterte. Zu klären: Wrapper für Auditoren freigeben (ggf. im Nur-Lese-Modus ohne Build) oder den Auftrag im Prompt und in review-code auf das ändern, was erlaubt ist. Weiterer Fall S150 (SPA-Auslieferung, ADR-S150-2): In Runde 1 meldeten drei von vier Auditoren (code-quality, functional-correctness, test-quality), der Hook habe python3 -m prozesscode.dotnet-test --filter SpaHosting geblockt, auch ohne Pipe und Redirect; ab Runde 2 stand im Prompt, dass Auditoren keine Tests fahren können. Laufzeitfragen (405 unter /api, POST und HEAD auf Client-Pfade, Groß-/Kleinschreibung, Pfade mit Endung) kamen deshalb nur als offene Prüfung; belegt hat sie erst der RED-Lauf eines Fix-Subagenten, und zwei Annahmen erwiesen sich dabei als falsch: POST auf einen Client-Pfad liefert 405 statt 404, und der erste Fallback überdeckte die 405 unter /api.
+- Beobachtung: review-code verlangt, dass Auditoren jedes Finding am Stand belegen, auch durch Testläufe, und der Orchestrator-Prompt nannte python3 -m prozesscode.dotnet-test bzw. vitest-run. In US-602 run-11 meldeten mehrere Auditoren (functional-correctness R1 und R2, test-quality R2, code-quality R1), der Hook habe dotnet-test geblockt, laut eigener Angabe auch ohne Pipe oder Redirect; vitest-run lief bei einem. Folge: Befunde kamen als „offene Prüfung" statt belegt, und die Gegenproben musste der Orchestrator bzw. ein Schicht-Subagent nachholen. Nicht nachgestellt: ob der Hook dotnet-test für Auditoren absichtlich sperrt (der Build schreibt bin/obj) oder ob nur der Aufruf mit Filter/Pipe scheiterte. Zu klären: Wrapper für Auditoren freigeben (ggf. im Nur-Lese-Modus ohne Build) oder den Auftrag im Prompt und in review-code auf das ändern, was erlaubt ist. Weiterer Fall S150 (SPA-Auslieferung, ADR-S150-2): In Runde 1 meldeten drei von vier Auditoren (code-quality, functional-correctness, test-quality), der Hook habe python3 -m prozesscode.dotnet-test --filter SpaHosting geblockt, auch ohne Pipe und Redirect; ab Runde 2 stand im Prompt, dass Auditoren keine Tests fahren können. Laufzeitfragen (405 unter /api, POST und HEAD auf Client-Pfade, Groß-/Kleinschreibung, Pfade mit Endung) kamen deshalb nur als offene Prüfung; belegt hat sie erst der RED-Lauf eines Fix-Subagenten, und zwei Annahmen erwiesen sich dabei als falsch: POST auf einen Client-Pfad liefert 405 statt 404, und der erste Fallback überdeckte die 405 unter /api. S151: playwright-test ist für Auditoren freigegeben, mit einem Lauf-Lock, der einen zweiten gleichzeitigen E2E-Lauf vor dem Bauen abbricht (Exit 99); vitest-run war es schon. dotnet-test bleibt gesperrt (gemeinsame Build-Ausgabe paralleler Auditoren) – dafür bleibt die Beobachtung offen; der Lauf-Lock wäre auch dort ein Weg.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-11 als Beobachtung entschieden; Ursache erst beim Drain nachstellen
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -421,3 +421,44 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: keiner
 - Aufschubgrund: User – in der Abschluss-Triage von US-602 run-11 entschieden: diesmal einmalig per Edit umbenannt, Werkzeug-Fix später
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S151-1 – implementing-scenario: kein Weg für einen Lauf, dessen E2E-Tests sofort grün sind
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: TDD
+- Beobachtung: US-602 run-13 „Formular·nach dem Speichern“ (als Full-Stack geclustert, 6 Szenarien): Alle sechs neuen E2E-Tests waren sofort grün – das Formular ist eine eigene Seite und hängt beim Verlassen aus, das Backend sammelt alle Meldungen ohnehin. Der Skill verlangt im äußeren Loop einen roten E2E-Test und kennt danach nur den Ablauf mit Schicht-Subagenten, Freigabe-Anker und qa-check samt Stryker. Für „sofort grün“ gibt es keinen Pfad: Der Orchestrator musste ad hoc abweichen (Gegenprobe – Verhalten absichtlich brechen, drei der sechs Tests wurden rot; für zwei fand sich kein einfacher Bruch –, User-Bestätigung für einen Charakterisierungs-Lauf ohne Subagenten und ohne Orchestrator-Check, Review nur über den Test-Diff). Offen ist auch, warum der Workshop beim Clustering nicht erkannte, dass das Verhalten schon existiert.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von run-13 entschieden: Einzelfall; ob die Regel in implementing-scenario oder im Workshop-Clustering gehört, braucht den Blick auf weitere Läufe
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S151-2 – Bash-Hook: Ablehnung einer Befehlskette nennt nicht das gescheiterte Glied
+- Quelle: Subagent
+- Status: UMGESETZT (S151)
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: US-602 run-13: Ein test-quality-auditor schickte `python3 -m prozesscode.decisions list … ; sed -n 325,360p datei` als eine Kette. prozesscode/hooks/check-bash-permission.py lehnte die ganze Kette ab, weil das unquotierte sed damals nicht auf der Auditor-Liste stand (geprüft: Hook mit Auditor-Kontext aufgerufen). Die Meldung beschreibt nur allgemein, was erlaubt ist, und nennt nicht, welches Glied scheiterte. Der Auditor hielt deshalb `decisions list --tag resource:recipes` für gesperrt, berichtete das so und ließ die ADR-Prüfung zu diesem Tag aus. Ein stiller Prüfungsausfall, entstanden aus einer harmlosen Ablehnung. Dieselbe Meldungsform erhält auch die Hauptsession.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von run-13 entschieden: der sed-Anlass ist behoben, die Meldungsform kommt in den Drain
+- Entscheidung/Maßnahme: Die Ablehnung einer Kette beginnt mit 'Abgelehnt wurde dieses Glied: <befehl>' und sagt, dass die Glieder davor erlaubt sind – auch für Auditoren, deren Meldung sonst den Grund ersetzt. Gilt bei mehreren Segmenten und bei Gliedern in einer Substitution, nicht beim Einzelbefehl. Tests in tests/test_bash_permission_hookausgabe.py.
+
+## OBS-S151-3 – mutmut-Lauf stößt an die eigene Speichergrenze, Bedarf je Worker unklar
+- Quelle: User + Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Am 18.11.2026 brachte mutmut mit 20 Workern (Default os.cpu_count()) die WSL-VM in den OOM; die Distro wurde dreimal beendet. Ein Windows-Kollege hat einzelne mutmut-Prozesse mit bis zu 3,3 GB RSS gesehen (ungeprüft durch mich). Seit S151 begrenzt mutmut-run die Worker auf 4 und startet den Lauf in einer eigenen Speichergruppe (MemoryHigh=10G, MemoryMax=12G). Beim Ratchet-Lauf für check-bash-permission habe ich eine Spitze von rund 1,9 GB gemessen (geprüft: Momentaufnahmen der Gruppe). Nach dem Ratchet-Lauf für prozesscode.mutmut-run zählte app.slice aber 340.509 'high'-Ereignisse (geprüft: memory.events unter user@1000.service/app.slice). Mindestens ein Lauf ist also an MemoryHigh=10G gestoßen und wurde gedrosselt; einen OOM-Kill gab es in user.slice nicht. Welcher Lauf und welcher Test den Speicher braucht, ist offen: Fixtures, Testdaten, ein Leck oder einfach 4 x pytest über die ganze Werkzeug-Suite. Folge der Drosselung: lange Laufzeit (über 10 Minuten), und bei mehr Bedarf droht der Kill bei 12G mit einem Verdikt ohne Aussage.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: Recherche – den Bedarf je Worker zu messen braucht mehrere volle mutmut-Läufe mit Speicherprotokoll, je über 10 Minuten
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S151-4 – Layer-Implementer bemerkt Lint-Verbote und Schreibweg erst durch Ablehnung
+- Quelle: Subagent + Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: AGENT    Kontext: Hook/Script
+- Beobachtung: In S151 (US-602 run-14) meldete der Frontend-Subagent zwei Umwege. (a) Dass das Projekt-ESLint if-Anweisungen (functional/no-conditional-statements) und das Schreiben in Refs (functional/immutable-data) verbietet, bemerkte er erst über die Meldung des Edit-Hooks nach dem Schreiben; nach eigener Aussage hatte er den Abschnitt CGT-verbotene-muster der TS-Guideline nicht gelesen. (b) Er versuchte einmal, eine Datei per Heredoc (cat > Datei <<EOF) zu schreiben; der Bash-Hook lehnte ab. Dieses Verbot steht seit derselben Session ausdrücklich in .claude/agents/frontend-layer-implementer.md (Maßnahme zu OBS-S141-1, dort UMGESETZT). Ein Fall, n=1: Ob die neue Regel übersehen oder nicht befolgt wurde, ist ungeklärt. Beide Umwege kosteten je einen Tool-Aufruf, Folgen am Ergebnis gab es keine.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von run-14 entschieden; Ursache unklar, ein Fall reicht für eine Maßnahme nicht
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: OBS-S141-1

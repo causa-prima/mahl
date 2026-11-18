@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """PreToolUse-Hook: Bash-Kommandos prüfen (deny/allow/ask).
 
+Schutzziel: Versehen verhindern und auf das richtige Werkzeug lenken – keine Sicherheitsgrenze
+gegen gezielte Umgehung. Neue Sperren nur für Formen, die Agenten plausibel schreiben
+(docs/process/dev-workflow.md, Abschnitt DEV-schutzziel).
+
 Die Reihenfolge der Prüfungen steht im Docstring von check_command (einzige Quelle).
 Umschreibungen (Repo-Pfad → relativ, Filter hinter Wrappern entfernt) liefert der Hook
 via updatedInput zurück (s. _build_allow_output).
@@ -27,7 +31,7 @@ Rückgabe von check_command / check_simple_command: tuple[str, str, str]
   reason:    Hinweistext für den Agenten (leer wenn kein Hint vorhanden)
   log_type:  ALLOW | WRONG_APPROACH | DESTRUCTIVE | UNSAFE_REDIRECT | UNKNOWN |
              COMPOUND_DESTRUCTIVE | COMPOUND_UNSAFE_REDIRECT | COMPOUND_UNKNOWN |
-             ONE_TIME | UNSUPPORTED_QUOTING | INDIRECT_WRAPPER_FILTER
+             ONE_TIME | UNSUPPORTED_QUOTING
 """
 import datetime
 import json
@@ -158,9 +162,11 @@ def normalize_repo_paths(command: str) -> tuple[str, bool]:
 # Bewusst NUR die Gate-/Test-Wrapper, deren Ausgabe im Erfolgsfall schon das Verdikt ist.
 # Analyse-Scripte (read-breakdown.py, tool-usage.py …) sind zum Zerschneiden gedacht – ein
 # Filter darauf ist bestimmungsgemäß. Dieselbe Abgrenzung zieht `tool-usage.py` (WRAPPERS).
+# Anders als dort ist die Liste hier nicht eingefroren: tool-usage.py hält ihre für die Vergleichbarkeit
+# der Messreihe fest, hier zählt nur, ob ein Wrapper ausschließlich ein Verdikt ausgibt.
 _FILTERABLE_WRAPPERS = ("dotnet-test", "dotnet-stryker", "vitest-run", "playwright-test",
                         "stryker-frontend", "eslint-run", "jscpd-run", "qa-check",
-                        "stryker-summary")
+                        "stryker-summary", "ruff-run")
 def werkzeug_aufruf(modul: str) -> str:
     """Beide Aufrufformen eines Paketmoduls als Regex-Fragment.
 
@@ -179,26 +185,9 @@ _FILTER_CMD_RE = re.compile(r'(?:tail|head|grep|sed|awk)\b')
 # Zähl-Semantik (`-q`, `-c`, `-l`) kehrt sonst still die Logik um, eine Umleitung fiele weg.
 _FILTER_MIT_WIRKUNG_RE = re.compile(
     r'^grep\b.*\s-(?:[a-zA-Z]*[qcl][a-zA-Z]*\b|-(?:quiet|silent|count|files-with-matches)\b)|[<>]')
-_TEE_RE = re.compile(r'tee\b')
 # Ende der eigenen Pipeline eines Wrappers – auf dem maskierten Befehl gesucht, damit ein `)`
 # oder `;` in einem Argument sie nicht vorzeitig beendet.
 _PIPELINE_ENDE_RE = re.compile(r'&&|\|\||;|\n|\)|`')
-# Hinter einem verschachtelten Wrapper: alles, was dessen aufgefangene Ausgabe weiterreichen kann.
-_WEITERGABE_RE = re.compile(r'(?<!\|)\|(?!\|)|<<<|<\(|>\(')
-_BLOCK_WORT_RE = re.compile(r'(?<![\w-])(do|done|if|fi|case|esac)(?![\w-])')
-
-_INDIRECT_FILTER_REASON = (
-    "Die Ausgabe eines Wrappers würde hier gefiltert oder weiterverarbeitet – {erkannt}. "
-    "Wrapper geben im Erfolgsfall nur das Verdikt aus; ein Filter kann es abschneiden, und "
-    "still umschreiben lässt sich dieser Befehl nicht, ohne seine Bedeutung zu ändern.\n"
-    "Ausweg: den Wrapper in einem eigenen Aufruf ungefiltert laufen lassen; mehr Tiefe über "
-    "--verbose. Einen fremden Befehl mit Filter in einen eigenen Aufruf legen."
-)
-# Was `{erkannt}` darin einsetzt – je Fall, den die Prüfung unterscheidet.
-_GRUND_PROZESS_SUBSTITUTION = "der Wrapper steht in einer Prozess-Substitution"
-_GRUND_STUFE = "in seiner Pipeline steht eine Stufe, die nicht nur filtert"
-_GRUND_WEITERGABE = "die aufgefangene Ausgabe kann weitergereicht werden"
-_GRUND_HEREDOC = "er steht in einem Befehl mit Heredoc"
 
 
 _UNGEQUOTETER_HEREDOC_RE = re.compile(r"(?<!<)<<(?!<)-?\s*[A-Za-z_]")
@@ -270,95 +259,48 @@ def _maskiere_strings(command: str) -> str:
     return "".join(zeichen)
 
 
-def _umschliessung(maskiert_davor: str) -> str | None:
-    """Das innerste Konstrukt, in dem ein Wrapper steht und dessen Ausgabe auffängt.
-
-    `"<("`/`">("` für Prozess-Substitution, `"("`/`"{"`/`` "`" `` für Substitution, Subshell,
-    Gruppe, `"block"` für Schleife/if/case – oder None, wenn der Wrapper frei steht.
-    """
-    if maskiert_davor.count("`") % 2:
-        return "`"
-    offen: list[int] = []
-    for i, c in enumerate(maskiert_davor):
-        if c in "({":
-            offen.append(i)
-        elif c in ")}" and offen:
-            offen.pop()
-    if offen:
-        pos = offen[-1]
-        if maskiert_davor[pos] == "(" and maskiert_davor[pos - 1:pos] in ("<", ">"):
-            return maskiert_davor[pos - 1:pos + 1]
-        return maskiert_davor[pos]
-    woerter = [m.group(1) for m in _BLOCK_WORT_RE.finditer(maskiert_davor)]
-    for auf, zu in (("do", "done"), ("if", "fi"), ("case", "esac")):
-        if woerter.count(auf) > woerter.count(zu):
-            return "block"
-    return None
-
-
-def _stufen_urteil(stufen: list[str]) -> str:
-    """Einordnung der Stufen hinter einem Wrapper: 'tee', 'filter' oder 'andere'."""
+def _nur_filter(stufen: list[str]) -> bool:
+    """Folgen dem Wrapper nur einfache Filter? Dann ändert ihr Entfernen nur die Menge der Ausgabe."""
     stufen = [s.strip() for s in stufen]
-    if all(_TEE_RE.match(s) and ">(" not in s for s in stufen):
-        return "tee"  # reicht die vollständige Ausgabe durch
-    if all(_FILTER_CMD_RE.match(s) and not _FILTER_MIT_WIRKUNG_RE.search(s) for s in stufen):
-        return "filter"
-    return "andere"
+    return bool(stufen) and all(
+        _FILTER_CMD_RE.match(s) and not _FILTER_MIT_WIRKUNG_RE.search(s) for s in stufen)
 
 
-def _bewerte_wrapper(command: str) -> tuple[str | None, list[tuple[int, int]]]:
-    """(Ablehnungsgrund oder None, zu entfernende Bereiche) für alle Wrapper-Aufrufe.
+def _filter_schnitte(command: str) -> list[tuple[int, int]]:
+    """Die zu entfernenden Filterbereiche, je Wrapper-Aufruf höchstens einer.
 
-    Je Wrapper drei Fälle, entschieden an der Struktur des maskierten Befehls:
-    - **eigene Pipeline** bis zur ersten Verkettung, zum Zeilenumbruch oder zur schließenden
-      Klammer: Folgen nur einfache Filter, werden sie entfernt; ein reines `tee` bleibt;
-      jede andere Stufe (`wc`, `grep -q`, Umleitung, `>(…)`, `|&`) führt zur Ablehnung, weil
-      das Entfernen die Bedeutung änderte.
-    - **verschachtelt** (`$(…)`, Subshell, Gruppe, Schleife, if): Die Ausgabe fließt weiter.
-      Wird danach gepiped, per Here-String oder `${…}` weiterverarbeitet → Ablehnung.
-      In Prozess-Substitution (`head <(wrapper)`) immer.
-    - **frei**: Was hinter der eigenen Pipeline steht, ist ein fremder Befehl und bleibt.
+    Betrachtet wird nur die eigene Pipeline des Wrappers, bis zur ersten Verkettung, zum
+    Zeilenumbruch oder zur schließenden Klammer. Steht dort eine andere Stufe als ein Filter
+    (`wc`, `grep -q`, Umleitung, `tee`), bleibt der Befehl, wie er ist: Das Entfernen änderte
+    seine Bedeutung. Umwege (Variable, Subshell, Prozess-Substitution) bleiben ebenso
+    unverändert und erlaubt – sie abzulehnen diente keinem Schutzziel: Schlimmstenfalls
+    schneidet ein Filter das Verdikt ab (DEV-schutzziel).
     """
     maskiert = _maskiere_strings(command)
     schnitte: list[tuple[int, int]] = []
     for match in _WRAPPER_RUN_RE.finditer(maskiert):
-        umschliessung = _umschliessung(maskiert[:match.start()])
-        if umschliessung in ("<(", ">("):
-            return _GRUND_PROZESS_SUBSTITUTION, []
-
         ende = _PIPELINE_ENDE_RE.search(maskiert, match.end())
         pipeline_ende = ende.start() if ende else len(maskiert)
-        stufen = maskiert[match.end():pipeline_ende].split("|")[1:]
-        urteil = _stufen_urteil(stufen)  # ohne Stufen: "tee" – nichts zu entfernen
-        if urteil == "andere":
-            return _GRUND_STUFE, []
-        if urteil == "filter":
+        if _nur_filter(maskiert[match.end():pipeline_ende].split("|")[1:]):
             schnitte.append((maskiert.index("|", match.end()), pipeline_ende))
-
-        # `${` bewusst im unmaskierten Befehl: `"${out: -200}"` steht in Anführungszeichen und
-        # wäre in der Maske unsichtbar.
-        if umschliessung and (_WEITERGABE_RE.search(maskiert, pipeline_ende)
-                              or "${" in command[pipeline_ende:]):
-            return _GRUND_WEITERGABE, []
-    return None, schnitte
+    return schnitte
 
 
 def strip_wrapper_filter(command: str) -> tuple[str, bool]:
     """Entfernt einfache Filter in der eigenen Pipeline jedes Wrapper-Aufrufs.
 
-    Gibt (neuer_befehl, geändert) zurück. Abgrenzungen (Einzelheiten: `_bewerte_wrapper`):
+    Gibt (neuer_befehl, geändert) zurück. Abgrenzungen (Einzelheiten: `_filter_schnitte`):
     Ein Filter **vor** dem Wrapper filtert dessen Ausgabe nicht und bleibt; Argumente und
     Redirects des Wrappers (`--layer frontend 2>&1`) bleiben; was hinter der eigenen Pipeline
-    steht, bleibt unverändert. Fälle, in denen ein Rewrite raten müsste, lehnt `check_command`
-    ab, bevor es hierher kommt.
+    steht, bleibt unverändert.
 
     Die Grenzen halten zwei Fehlformen fern. Ein Strip, der alles ab dem Filter verwirft,
     verliert ein `&& nächster-befehl` – ausgeführt würde weniger als angefordert. Einer, der
     alles hinter dem Wrapper durchsucht, entfernt Filter fremder Befehle (`wrapper && git log
     | head`), reißt eine schließende Klammer mit und liest Wrapper-Namen in Strings als Aufruf.
     """
-    grund, schnitte = _bewerte_wrapper(command)
-    if grund or not schnitte:
+    schnitte = _filter_schnitte(command)
+    if not schnitte:
         return command, False
     for von, bis in reversed(schnitte):
         davor, danach = command[:von].rstrip(), command[bis:]
@@ -368,18 +310,6 @@ def strip_wrapper_filter(command: str) -> tuple[str, bool]:
         # `;`, `)` und Zeilenumbruch schließen direkt an.
         command = davor + (" " if danach.startswith(("&&", "||")) else "") + danach
     return command, True
-
-
-def wrapper_filter_ablehnung(command: str) -> str | None:
-    """Grund für die Ablehnung, wenn die Wrapper-Ausgabe nicht sicher umschreibbar gefiltert wird.
-
-    Grenzen: Der Umweg über eine Datei (`wrapper > x`, später `head x`) ist für eine Prüfung
-    des Befehlstexts unsichtbar. Hinter einem verschachtelten Wrapper wird jede Weitergabe
-    abgelehnt, auch eine ohne Bezug zu ihm (`out=$(wrapper); git log | head`) – im Zweifel
-    laut statt still.
-    """
-    grund, _ = _bewerte_wrapper(command)
-    return _INDIRECT_FILTER_REASON.format(erkannt=grund) if grund else None
 
 
 # ---------------------------------------------------------------------------
@@ -762,6 +692,8 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     (re.compile(r'^stat\b'), 'Lesen', 'stat'),
     (re.compile(r'^file\b'), 'Lesen', 'file'),
     (re.compile(r'^diff\b'), 'Lesen', 'diff'),
+    # Lesen ohne Schreib-Option; blockten je einzeln (Deny-Log).
+    (re.compile(r'^(?:od|paste|comm|ps)\b'), 'Lesen', 'od, paste, comm, ps'),
     # Shell: allgemeine Hilfsbefehle, Textverarbeitung, Pfad-Tools
     (re.compile(r'^echo\b'), 'Shell', 'echo'),
     (re.compile(r'^printf\b'), 'Shell', 'printf'),   # wie echo: schreibt nur nach stdout
@@ -772,9 +704,10 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     # via WRONG_APPROACH (Gesamtbefehl, vor Split) gedeckt; jedes Folge-Segment wird
     # ohnehin einzeln geprüft.
     (re.compile(r'^cd\b'), 'Shell', 'cd'),
-    # sed read-only (kein -i / --in-place): druckt nur nach stdout, verändert keine Datei.
-    # In-Place-Edits bleiben deny → Edit-Tool (Ausnahme: \r-Bereinigung, eigenes Pattern oben).
-    (re.compile(r'^sed\b(?!.*\s(?:-i|--in-place))'), 'Shell', "sed (read-only, ohne -i)"),
+    # sed ohne -i / --in-place: druckt nur nach stdout. In-Place-Edits → Edit-Tool.
+    # Bewusst keine Positivliste gegen w/e-Kommandos oder gebündeltes -i: Keine dieser Formen kam in
+    # den Session-Logs vor, und das Schutzziel sind Versehen (DEV-schutzziel).
+    (re.compile(r'^sed\b(?!.*\s(?:-i|--in-place))'), 'Shell', "sed (ohne -i)"),
     # xargs nur mit read-only Child-Command (xargs führt sein Argument als Befehl aus –
     # darum eng auf Lese-Werkzeuge begrenzt; xargs rm/mv/bash etc. bleibt deny).
     (
@@ -847,9 +780,9 @@ ALLOW_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
     ),
     # git read-only (optional mit -C <pfad>, um in anderem Repo/Worktree zu lesen)
     (
-        re.compile(r'^git\s+(?:-C\s+\S+\s+)?(status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog|check-ignore)\b'),
+        re.compile(r'^git\s+(?:-C\s+\S+\s+)?(status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog|check-ignore|grep)\b'),
         None,
-        'git [-C <pfad>] status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog|check-ignore',
+        'git [-C <pfad>] status|log|diff|branch|show|remote|tag|rev-parse|ls-files|shortlog|check-ignore|grep',
     ),
     # git safe write (explizit kein -f/--force – das ist in WRONG_APPROACH_PATTERNS)
     (re.compile(r'^git\s+add\b(?!.*\s(?:-f\b|--force\b))'), None, 'git add <datei>  (ohne -f/--force)'),
@@ -887,21 +820,24 @@ AUDITOREN = frozenset({
 # Build-Ausgabe – und die Mutationsläufe mit ihrem Run-Lock. Aufgenommen wird nur ein Modul, das
 # in keinem Unterbefehl schreibt: `check-atdd-gate` und `next_run` lesen nur Feature-Dateien
 # und geben auf stdout aus – bekommt eines davon eine schreibende Option, gehört es hier heraus.
+# Ausnahme `playwright-test` (User-Entscheidung): Es schreibt nur Ignoriertes (Build-Ausgabe
+# des Backends, `test-results/`) und die eigene E2E-Datenbank; parallele Läufe sperrt sein Lauf-Lock.
 _LESENDE_MODULE = frozenset({
     "doc", "anchors", "decisions", "test-inventory", "tracker", "ordinale",
     "obs", "td", "oq", "lessons", "ruff-run", "eslint-run", "vitest-run",
-    "check-atdd-gate", "next_run",
+    "check-atdd-gate", "next_run", "playwright-test",
 })
 _GIT = r'^git\s+(?:-C\s+\S+\s+)?'
 AUDITOR_PATTERNS: list[re.Pattern[str]] = [
     # Befehle ohne jede Option, die eine Datei schreibt.
     re.compile(r'^(?:ls|cat|head|tail|wc|grep|stat|file|diff|echo|printf|test|\[|cd|pwd|date|'
-               r'which|tr|cut|rev|fold|dirname|basename|realpath|jq|xargs)(?=\s|$)'),
+               r'which|tr|cut|rev|fold|dirname|basename|realpath|jq|xargs|od|paste|comm|ps)(?=\s|$)'),
     re.compile(r'^sort\b(?!.*(?:\s-[a-zA-Z]*o|\s--output))'),
     re.compile(r'^uniq(?:\s+-\S+)*$'),                      # `uniq ein aus` schriebe `aus`
-    re.compile(r"^sed\s+-n\s+'(?:\d+|\$)(?:,(?:\d+|\$))?p'(?:\s|$)"),  # nur Zeilenbereich drucken
+    # Nur einen Zeilenbereich drucken, mit oder ohne Hochkommas (-i schließt die allgemeine Regel aus).
+    re.compile(r"^sed\s+-n\s+(?:'(?:\d+|\$)(?:,(?:\d+|\$))?p'|\d+(?:,\d+)?p)(?:\s|$)"),
     re.compile(r'^find\b(?!.*\s-(?:delete|exec|execdir|ok|okdir|fprint|fprint0|fprintf|fls)\b)'),
-    re.compile(_GIT + r'(?:status|log|diff|show|rev-parse|ls-files|shortlog|check-ignore)\b'
+    re.compile(_GIT + r'(?:status|log|diff|show|rev-parse|ls-files|shortlog|check-ignore|grep)\b'
                r'(?!.*\s--output\b)'),
     re.compile(_GIT + r'branch(?:\s+(?:-a|-r|-v|-vv|--all|--remotes|--list|--show-current))*\s*$'),
     re.compile(_GIT + r'tag(?:\s+(?:-l|--list)(?:\s+\S+)?)?\s*$'),
@@ -917,8 +853,8 @@ AUDITOR_PATTERNS: list[re.Pattern[str]] = [
 
 _NUR_LESEND_DENY_REASON = (
     "Auditoren arbeiten nur lesend: Lesebefehle ohne schreibende Optionen (kein awk, kein sort -o, "
-    "sed nur als `sed -n '10,20p' <datei>`), git lesend, pytest, die Test-Runner und die Lese-, "
-    "Test- und Lint-Werkzeuge aus prozesscode (ohne --fix). Was Dateien, Index oder einen "
+    "sed nur als `sed -n '10,20p' <datei>` oder `sed -n 10,20p <datei>`), git lesend, pytest, die Test-Runner und die Lese-, "
+    "Test- und Lint-Werkzeuge aus prozesscode (ohne --fix, E2E einschließlich). Was Dateien, Index oder einen "
     "Tracker ändert, bleibt dem Orchestrator."
 )
 _NUR_LESEND_FOOTER = (
@@ -1042,6 +978,14 @@ _NO_HINT_MESSAGE = (
 
 _ALLOW_REASON = "Auto-approved by bash permission hook"
 
+# Bei einer Kette steht das abgelehnte Glied vorn: Ohne die Angabe hielt ein Auditor
+# ein erlaubtes Glied für gesperrt und ließ die Prüfung aus, für die er es brauchte.
+_GLIED_ANFANG = "Abgelehnt wurde dieses Glied: "
+_GLIED_KOPF = (
+    _GLIED_ANFANG + "{glied}\n"
+    "Die Glieder davor sind erlaubt, die danach ungeprüft – einzeln aufrufen.\n\n"
+)
+
 _ONE_TIME_UNNEEDED_HINT = (
     "Hinweis: '# --allow-once' war nicht nötig – dieser Befehl steht ohnehin auf der Allow-Liste "
     "und wurde direkt ausgeführt. Künftig ohne Marker aufrufen; der Marker ist nur für echte "
@@ -1067,14 +1011,10 @@ _LOOP_WRITE_DENY_REASON = (
 
 _UNSAFE_REDIRECT_DENY_REASON = (
     "Output-Redirect auf nicht erlaubtes Ziel.\n"
-    "Bevorzugte Alternative: Output in Variable capturen (kein Datei-Müll):\n"
-    "  output=$(dotnet build)\n"
-    "  echo \"$output\" | grep ...\n"
-    "Falls Datei-Redirect nötig (sehr großer Output): nur ins Scratchpad – es liegt außerhalb\n"
-    "des Repos und verschwindet mit der Session, es bleibt also nichts liegen.\n"
-    "Sonstige erlaubte Redirect-Ziele: /dev/null, /dev/stderr, /dev/stdout.\n"
-    "Für dotnet test/stryker: Projekt-Scripts verwenden statt Redirect:\n"
-    "  python3 -m prozesscode.dotnet-test  /  python3 -m prozesscode.dotnet-stryker"
+    "Datei anlegen, ändern oder anhängen (`cat > datei <<'EOF'`, `>>`): Write- bzw. Edit-Tool.\n"
+    "Befehlsausgabe aufheben: in eine Variable (out=$(befehl); echo \"$out\" | grep …) oder,\n"
+    "bei sehr großer Ausgabe, ins Scratchpad – es liegt außerhalb des Repos und verschwindet\n"
+    "mit der Session. Sonstige erlaubte Ziele: /dev/null, /dev/stderr, /dev/stdout."
 )
 
 
@@ -1227,6 +1167,9 @@ _IF_OPEN_RE = re.compile(r'^(if|case)\b')
 # Variablen-Zuweisungs-Präfixe: `FOO=bar cmd`, `out=$(cmd)`, `A=1 B=2 cmd`
 _ASSIGN_PREFIX_RE = re.compile(r'^(?:[A-Za-z_][A-Za-z_0-9]*=(?:"[^"]*"|\'[^\']*\'|[^\s;|&]*)\s*)+')
 
+# Zeit-Vorsätze: `timeout 60 cmd`, `time cmd` – geprüft wird `cmd` (im Deny-Log 30 Fälle).
+_ZEIT_PRAEFIX_RE = re.compile(r'^(?:timeout(?:\s+-\S+)*\s+[\d.]+[smhd]?|time(?:\s+-p)?)\s+')
+
 # Kommando-Substitution und Prozess-Substitution
 _SUBST_RE = re.compile(r'\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)|`([^`]*)`|<\(([^()]*)\)|>\(([^()]*)\)')
 
@@ -1344,8 +1287,10 @@ def expand_segment(segment: str) -> list[tuple[str, bool]]:
             if any(start <= m.start() < ende for start, ende in woertlich):
                 return m.group(0)
             inner = next(g for g in m.groups() if g is not None)  # genau eine Alternative trifft
-            if inner.strip():
-                out.extend(expand_segment(inner))
+            if inner.startswith('(') and inner.endswith(')'):
+                return 'WERT'  # Arithmetik `$((…))` führt nichts aus
+            for glied in split_compound_command(inner):
+                out.extend(expand_segment(glied))
             return 'WERT'
         return _SUBST_RE.sub(repl, text)
 
@@ -1361,6 +1306,7 @@ def expand_segment(segment: str) -> list[tuple[str, bool]]:
     # umgedreht, lief je nach Testreihenfolge endlos oder scheiterte – derselbe Mutant
     # wechselte so von Lauf zu Lauf zwischen „getötet" und „timeout".
     segment = _ASSIGN_PREFIX_RE.sub('', segment).strip()
+    segment = _ZEIT_PRAEFIX_RE.sub('', segment)
     if not segment:
         return out
 
@@ -1379,14 +1325,16 @@ def split_compound_command(command: str) -> list[str]:
     Newline ist seit S121 Trenner (OBS-S111-4): vorher war jeder mehrzeilige Befehl
     per Konstruktion ein einziges unbekanntes Segment und wurde immer abgelehnt.
 
-    Hinweis: Backtick-Command-Substitution (`...`) und $(...) werden nicht als
-    Quote-Kontext behandelt. Praktisch unkritisch, weil WRONG_APPROACH- und
-    DESTRUCTIVE_PATTERNS via .search() auch innerhalb von Subshells matchen.
+    Eine Substitution `$(…)` oder `` `…` `` bleibt ganz im Segment, auch mit `|` oder `;` darin:
+    Sonst blieb von `f=$(find … | head -1)` ein Bruchstück `. -name …` übrig, das als
+    `source` galt. Ihre Glieder zerlegt und prüft `expand_segment`.
     """
     segments: list[str] = []
     current: list[str] = []
     in_single_quote = False
     in_double_quote = False
+    in_backtick = False  # pragma: no mutate – None ist ebenso falsch
+    tiefe = 0  # offene Klammern einer Substitution `$(…)`
     i = 0
 
     def flush() -> None:
@@ -1422,8 +1370,24 @@ def split_compound_command(command: str) -> list[str]:
             i += 1
             continue
 
-        # Ab hier: definitiv außerhalb von Quotes. `||` trennt wie zwei `|` – das leere
-        # Stück dazwischen verwirft flush().
+        # Ab hier: außerhalb von Quotes. In einer Substitution trennt nichts.
+        if command.startswith('$(', i):
+            tiefe += 1
+            current.append('$(')
+            i += 2
+            continue
+        # Eine `(` im Innern zählt nicht mit: Keine Form, die Agenten schreiben, braucht sie
+        # (Arithmetik `$((…))` schließt hier eine Ebene früher – dahinter folgt nur `)`).
+        if c == '`' and not tiefe:
+            in_backtick = not in_backtick
+        elif tiefe and c == ')':
+            tiefe -= 1
+        if tiefe or in_backtick:
+            current.append(c)
+            i += 1
+            continue
+
+        # `||` trennt wie zwei `|` – das leere Stück dazwischen verwirft flush().
         if c == '|':
             flush()
             i += 1
@@ -1513,9 +1477,7 @@ def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
       Pfad-Normalisierung  absolute Repo-Pfade → relativ
       Quoting-Grenzen    → deny bei ungequotetem Heredoc und $'…'
       Heredoc-Ausblendung  Bodies sind Daten, kein Code
-      Wrapper + Heredoc  → deny, wenn ein Wrapper-Filter umzuschreiben wäre
       WRONG_APPROACH     → deny, auf dem Gesamtbefehl vor dem Split
-      Wrapper-Filter     → deny, wo ein Rewrite raten müsste (_bewerte_wrapper)
       Zugriffs-Scripte   → ask, vor dem Segment-Check
       Compound-Split     → Segmente bilden
       Verzeichniswechsel   npm-Sonderfall, braucht die Segmente
@@ -1549,14 +1511,7 @@ def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
 
     # Heredoc-Ausblendung: Bodies sind Daten, kein Code (OBS-S111-4) – vor jeder weiteren
     #     Analyse entfernen, sonst wird Fließtext als Befehlsfolge gelesen.
-    mit_heredoc = command
     command = strip_heredoc_bodies(command)
-
-    # Wrapper mit Filter UND Heredoc: Geprüft würde die Fassung ohne Body, umgeschrieben
-    #     (_build_allow_output) das Original – zwei Fassungen, eine Entscheidung. Kam im Bestand
-    #     nicht vor; ablehnen statt beide abzugleichen.
-    if command != mit_heredoc and strip_wrapper_filter(command)[1]:
-        return ("deny", _INDIRECT_FILTER_REASON.format(erkannt=_GRUND_HEREDOC), "INDIRECT_WRAPPER_FILTER")
 
     # WRONG_APPROACH auf Gesamtbefehl (ohne ^-Anker → matcht auch in Subshells).
     #    String-Argumente nicht-ausführender Befehle werden dabei maskiert: eine
@@ -1564,12 +1519,6 @@ def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
     for pattern, reason in WRONG_APPROACH_PATTERNS:
         if pattern.search(mask_data_strings(command)):
             return ("deny", reason, "WRONG_APPROACH")
-
-    # Wrapper-Ausgabe auf einem Umweg gefiltert: ablehnen statt umschreiben – welcher Teil
-    #    ohne Filter gemeint war, lässt sich nicht sicher erraten (strip_wrapper_filter).
-    ablehnung = wrapper_filter_ablehnung(command)
-    if ablehnung:
-        return ("deny", ablehnung, "INDIRECT_WRAPPER_FILTER")
 
     # Zugriffs-Scripte (schreibend) → ask. Muss VOR dem Segment-Check liegen, sonst greift
     #     das generische Allow-Muster für `prozesscode/<script>.py` und der Text ginge
@@ -1604,13 +1553,16 @@ def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
             loop_depth = max(0, loop_depth - 1)
             continue
 
-        for cmd, is_mass in expand_segment(segment):
+        kommandos = expand_segment(segment)
+        for cmd, is_mass in kommandos:
             checked_any = True
             decision, reason, log_type = check_simple_command(
                 cmd, in_loop=loop_depth > 0 or is_mass, nur_lesend=nur_lesend)
             if decision == "deny":
                 if is_compound:
                     log_type = f"COMPOUND_{log_type}"
+                if is_compound or len(kommandos) > 1:
+                    reason = _GLIED_KOPF.format(glied=cmd) + reason
                 return ("deny", reason, log_type)
 
         # Ohne das führende Strukturwort: Eine innere Schleife steht im Segment `do for …`.
@@ -1626,14 +1578,21 @@ def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
 
 
 def _build_deny_message(reason: str, nur_lesend: bool = False) -> str:
-    """Baut die vollständige Deny-Nachricht für den Agenten."""
+    """Baut die vollständige Deny-Nachricht für den Agenten.
+
+    Die Glied-Angabe einer Kette (`_GLIED_KOPF`) bleibt in jedem Fall vorn stehen.
+    """
+    glied, grund = "", reason
+    if reason.startswith(_GLIED_ANFANG):
+        kopf, _, grund = reason.partition("\n\n")  # pragma: no mutate – rpartition gleichwertig: der Kopf kommt mit demselben Trenner wieder davor
+        glied = kopf + "\n\n"
     # Für Auditoren nie der ursprüngliche Grund: Die Hinweistexte empfehlen `# --allow-once`
     # oder Wrapper, die ihnen gesperrt sind.
     if nur_lesend:
-        return _NUR_LESEND_DENY_REASON + _NUR_LESEND_FOOTER
-    if reason:
-        return reason + _ALLOW_ONCE_WITH_HINT_FOOTER
-    return _NO_HINT_MESSAGE
+        return glied + _NUR_LESEND_DENY_REASON + _NUR_LESEND_FOOTER
+    if grund:
+        return glied + grund + _ALLOW_ONCE_WITH_HINT_FOOTER
+    return glied + _NO_HINT_MESSAGE
 
 
 # Projekt-Tasks, die NIE direkt laufen (Tests/Lint/Mutation) → immer via Wrapper-Script.
@@ -1703,9 +1662,10 @@ _ZUSAMMENSETZEN = (
     "  Heredoc      befehl <<'EOF' … EOF   (Body gilt als Text, nicht als Befehl)\n"
     "  Schleifen    for/while – im Rumpf nur lesende Befehle, keine Datei-Operationen\n"
     "  Sub-Befehle  find … -exec <befehl> \\;  und  xargs <befehl>\n"
+    "  Vorsätze     timeout 60 <befehl>, time <befehl>  (geprüft wird <befehl>)\n"
     "\n"
-    "Nicht erlaubt, weil es jede Prüfung aushebelt: indirekte Ausführung – der Befehl\n"
-    "kommt aus einer Variablen ($CMD), aus eval/source oder aus bash -c."
+    "Nicht erlaubt: indirekte Ausführung – der Befehl kommt aus einer Variablen ($CMD),\n"
+    "aus eval/source oder aus bash -c, und der Hook sieht nicht, was läuft."
 )
 _SCRATCHPAD_TEXT = (
     "Scratchpad (Wegwerf-Scripte, Zwischenergebnisse, Redirect-Ziel):\n"
@@ -1807,7 +1767,8 @@ def _im_repo_root(cwd: str | None) -> bool:
     return cwd is not None and os.path.normpath(cwd) == _NORMALIZE_ROOT
 
 
-def _build_allow_output(command: str, cwd: str | None = _NORMALIZE_ROOT) -> dict:
+def _build_allow_output(command: str, cwd: str | None = _NORMALIZE_ROOT,
+                        tool_input: dict | None = None) -> dict:
     """Baut den allow-`hookSpecificOutput`.
 
     Enthält die Normalisierung einen geänderten Befehl (außer bei # --allow-once und bei
@@ -1818,6 +1779,10 @@ def _build_allow_output(command: str, cwd: str | None = _NORMALIZE_ROOT) -> dict
     Die Pfad-Kürzung gilt nur, wenn `cwd` der Repo-Root ist: Ein `cd` bleibt in der
     Hauptsession bestehen, und von woanders aus zeigt der relative Pfad ins Leere, während der
     absolute stimmt. Geprüft wird ohnehin die normalisierte Fassung (check_command).
+
+    `tool_input` ist die übrige Eingabe des Bash-Aufrufs: Claude Code ersetzt sie durch
+    `updatedInput` als Ganzes – ohne die übrigen Felder gingen `timeout` und
+    `run_in_background` beim Umschreiben verloren.
     """
     hso: dict = {
         "hookEventName": "PreToolUse",
@@ -1843,7 +1808,7 @@ def _build_allow_output(command: str, cwd: str | None = _NORMALIZE_ROOT) -> dict
         hint = (hint + "\n\n" if hint else "") + _FILTER_STRIPPED_HINT
 
     if changed:
-        hso["updatedInput"] = {"command": rewritten}
+        hso["updatedInput"] = {**(tool_input or {}), "command": rewritten}
         hso["additionalContext"] = hint
     return hso
 
@@ -1876,7 +1841,7 @@ def main() -> None:
     # _build_allow_output ergänzt bei normalisiertem Repo-Pfad updatedInput + Hinweis.
     if decision == "allow":
         _log_command(command, "ALLOW", _ALLOWED_LOG_FILE, agent)
-        hso = _build_allow_output(command, inp.get("cwd"))
+        hso = _build_allow_output(command, inp.get("cwd"), inp["tool_input"])
         if log_type == "ONE_TIME_UNNEEDED":  # # --allow-once war unnötig → Agenten nudgen
             hso["additionalContext"] = _ONE_TIME_UNNEEDED_HINT
         print(json.dumps({"hookSpecificOutput": hso}))

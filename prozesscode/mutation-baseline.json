@@ -10,8 +10,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._run_lock": {
-    "beurteilbar": 67,
-    "getoetet": 44,
+    "beurteilbar": 71,
+    "getoetet": 53,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._session_logs": {
@@ -125,8 +125,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-bash-permission": {
-    "beurteilbar": 1193,
-    "getoetet": 1171,
+    "beurteilbar": 1156,
+    "getoetet": 1134,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-code-quality-blocking": {
@@ -295,8 +295,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.mutmut-run": {
-    "beurteilbar": 666,
-    "getoetet": 609,
+    "beurteilbar": 688,
+    "getoetet": 630,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.next_run": {
@@ -350,8 +350,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.playwright-test": {
-    "beurteilbar": 250,
-    "getoetet": 206,
+    "beurteilbar": 257,
+    "getoetet": 217,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.qa-check": {

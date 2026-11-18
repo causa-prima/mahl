@@ -1,11 +1,11 @@
 import { describe, it, expect, onTestFinished, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router'
+import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from 'react-router'
 import { delay, http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
-import { AppRoutes } from '../App'
+import { appRoutes } from '../App'
 import RecipeDetailPage from './RecipeDetailPage'
 
 function createQueryClient() {
@@ -13,14 +13,15 @@ function createQueryClient() {
 }
 
 // Die ganze Anwendung ab dem Pfad: Rezept anlegen ist eine Navigation über mehrere Seiten (ADR-S135-4).
+// Gibt den Router zurück: Browser-Zurück und die Adresse sind nur über ihn erreichbar (ADR-S151-1).
 function renderApp(initialPath: string) {
+  const router = createMemoryRouter(appRoutes, { initialEntries: [initialPath] })
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <AppRoutes />
-      </MemoryRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   )
+  return router
 }
 
 // API-Vertrag POST /api/recipes: Antwort 201 mit vollem Body (ADR-S068-1); die
@@ -95,10 +96,11 @@ function useOpenRecipeHandlers() {
   )
 }
 
+type AppRouter = ReturnType<typeof renderApp>
+
 // Der Browser-Zurück-Knopf: die Anwendung hat selbst keinen Weg von der Detailansicht zur Liste.
-function BrowserBackButton() {
-  const navigate = useNavigate()
-  return <button type="button" onClick={() => { void navigate(-1) }}>Browser zurück</button>
+async function goBack(router: Readonly<Pick<AppRouter, 'navigate'>>) {
+  await act(async () => { await router.navigate(-1) })
 }
 
 // Then (Szenario): die Detailansicht zeigt "Pfannkuchen" mit eigener Zutat, nicht die Zutat von "Brot".
@@ -302,17 +304,10 @@ describe('Rezepte erfassen', () => {
   it('US602_HappyPath_OpenRecipe_SecondRecipeAfterFirst_NeverShowsFirstRecipe', async () => {
     // Given: zwei Rezepte; ich habe "Pfannkuchen" geöffnet und bin per Browser-Zurück zur Liste gegangen
     useOpenRecipeHandlers()
-    render(
-      <QueryClientProvider client={createQueryClient()}>
-        <MemoryRouter initialEntries={['/recipes']}>
-          <AppRoutes />
-          <BrowserBackButton />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
+    const router = renderApp('/recipes')
     fireEvent.click(await screen.findByRole('link', { name: 'Pfannkuchen' }))
     await expectPancakesDetail()
-    fireEvent.click(screen.getByRole('button', { name: 'Browser zurück' }))
+    await goBack(router)
 
     // When: ich auf "Brot" klicke
     fireEvent.click(await screen.findByRole('link', { name: 'Brot' }))
@@ -362,9 +357,10 @@ const ingredientsHint = 'Eine Zutat je Zeile: Menge, Einheit, Zutat – z. B. �
 // navigieren, "Rezept anlegen" klicken.
 async function openCreateFormFromEmptyList() {
   server.use(http.get('/api/recipes', () => HttpResponse.json([])))
-  renderApp('/recipes')
+  const router = renderApp('/recipes')
   fireEvent.click(await screen.findByRole('button', { name: 'Rezept anlegen' }))
   await screen.findByLabelText(/^Titel/)
+  return router
 }
 
 function stepFields() {
@@ -531,6 +527,22 @@ async function expectQuestionClosedAndTitleKept(title: string) {
   expect(screen.getByLabelText(/^Titel/)).toHaveValue(title)
 }
 
+// When (Szenario): Escape drücken. Escape geht an das fokussierte Element: erst warten, bis der Fokus in der
+// Nachfrage liegt.
+async function dismissByEscape(user: User) {
+  await waitFor(() => { expect(questionButton('Weiter bearbeiten')).toHaveFocus() })
+  await user.keyboard('{Escape}')
+}
+
+// When (Szenario): neben die Nachfrage klicken. Das Elternelement der Nachfrage ist der MUI-Dialog-Container (der
+// Backdrop-Bereich). MUI erkennt den Klick daneben zweistufig: erst mouseDown auf den Container, dann click –
+// click allein genügt nicht.
+function dismissByClickingBeside() {
+  const container = discardQuestion().parentElement as HTMLElement
+  fireEvent.mouseDown(container)
+  fireEvent.click(container)
+}
+
 // @US-602-happy-path
 describe('Rezeptformular abbrechen', () => {
   // Szenario: Abbrechen ohne Eingaben führt ohne Nachfrage zur Rezept-Liste
@@ -644,18 +656,8 @@ describe('Rezeptformular abbrechen – Randfälle', () => {
 
   // Szenario: Escape oder Klick neben die Nachfrage behält die Eingaben
   it.each([
-    ['Escape', async (user: User) => {
-      // Escape geht an das fokussierte Element: erst warten, bis der Fokus in der Nachfrage liegt
-      await waitFor(() => { expect(questionButton('Weiter bearbeiten')).toHaveFocus() })
-      await user.keyboard('{Escape}')
-    }],
-    // Das Elternelement der Nachfrage ist der MUI-Dialog-Container (der Backdrop-Bereich). MUI erkennt den
-    // Klick daneben zweistufig: erst mouseDown auf den Container, dann click – click allein genügt nicht.
-    ['Klick neben die Nachfrage', (): void => {
-      const container = discardQuestion().parentElement as HTMLElement
-      fireEvent.mouseDown(container)
-      fireEvent.click(container)
-    }],
+    ['Escape', dismissByEscape],
+    ['Klick neben die Nachfrage', dismissByClickingBeside],
   ])('US602_EdgeCase_CreateForm_DiscardQuestion_DismissedBy_KeepsInputs (%s)', async (_name, dismiss) => {
     // Given: Titel eingegeben, Nachfrage offen
     const user = userEvent.setup()
@@ -686,6 +688,266 @@ describe('Rezeptformular abbrechen – Randfälle', () => {
     // Then: leeres Formular mit genau einem Schrittfeld
     await screen.findByLabelText(/^Titel/)
     expectEmptyForm()
+  })
+})
+
+// Given/When der Verlassen-Szenarien: Zutaten-Liste leer (Ziel der Navigationsleiste), zur Rezepte-Seite,
+// "Rezept anlegen".
+async function openLeavableForm() {
+  server.use(http.get('/api/ingredients', () => HttpResponse.json([])))
+  return openCreateFormFromEmptyList()
+}
+
+// … und "Pfannkuchen" als Titel eingeben (die Szenarien mit Eingaben).
+async function openLeavableFormWithTitle() {
+  const router = await openLeavableForm()
+  await userEvent.setup().type(screen.getByLabelText(/^Titel/), 'Pfannkuchen')
+  return router
+}
+
+function clickNavigationEntry(name: 'Zutaten' | 'Rezepte') {
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Hauptnavigation' })).getByRole('link', { name }))
+}
+
+// Die Wege der Beispiele ("ich <Weg>") samt dem Ziel ("sehe ich <Seite>").
+type LeavingWay = {
+  readonly weg: string
+  readonly leave: (router: Readonly<AppRouter>) => Promise<void>
+  readonly seite: string
+  readonly expectTarget: () => Promise<void>
+}
+const viaIngredientsEntry: LeavingWay = {
+  weg: 'in der Navigationsleiste auf "Zutaten" klicke',
+  leave: () => { clickNavigationEntry('Zutaten'); return Promise.resolve() },
+  seite: 'die Zutaten-Seite',
+  expectTarget: async () => { await screen.findByRole('heading', { level: 1, name: 'Zutaten' }) },
+}
+const viaRecipesEntry: LeavingWay = {
+  weg: 'in der Navigationsleiste auf "Rezepte" klicke',
+  leave: () => { clickNavigationEntry('Rezepte'); return Promise.resolve() },
+  seite: 'die Rezept-Liste',
+  expectTarget: expectListWithoutQuestion,
+}
+const viaBrowserBack: LeavingWay = {
+  weg: 'im Browser zurückgehe',
+  leave: goBack,
+  seite: 'die Rezept-Liste',
+  expectTarget: expectListWithoutQuestion,
+}
+
+// Then: das Formular mit dem Titel "Pfannkuchen", weiterhin unter seiner eigenen Adresse, ohne Nachfrage.
+async function expectFormStillOpenWithTitle(router: Readonly<AppRouter>) {
+  await expectQuestionClosedAndTitleKept('Pfannkuchen')
+  expect(router.state.location.pathname).toBe('/recipes/new')
+}
+
+// @US-602-happy-path
+describe('Rezeptformular verlassen', () => {
+  // Szenario: Verlassen mit Eingaben fragt nach – Verwerfen führt zum gewählten Ziel
+  // Beispiel: alle
+  it.each([viaIngredientsEntry, viaRecipesEntry, viaBrowserBack])(
+    'US602_HappyPath_LeaveCreateForm_WithInput_DiscardShowsTarget ($weg → $seite)',
+    async ({ leave, expectTarget }) => {
+      // Given: Rezepte-Seite, "Rezept anlegen", "Pfannkuchen" als Titel
+      const router = await openLeavableFormWithTitle()
+
+      // When: ich <Weg>
+      await leave(router)
+
+      // Then: Nachfrage "Eingaben verwerfen?"
+      expect(await screen.findByRole('alertdialog', { name: 'Eingaben verwerfen?' })).toBeInTheDocument()
+
+      // When: Verwerfen
+      clickQuestionButton('Verwerfen')
+
+      // Then: <Seite>
+      await expectTarget()
+    },
+  )
+
+  // Szenario: Verlassen mit Eingaben fragt nach – Weiter bearbeiten bleibt im Formular, auch beim zweiten Versuch
+  // Beispiel: alle
+  it.each([viaIngredientsEntry, viaBrowserBack])(
+    'US602_HappyPath_LeaveCreateForm_WithInput_ContinueEditingStaysAndAsksAgain ($weg → $seite)',
+    async ({ leave, expectTarget }) => {
+      // Given: Rezepte-Seite, "Rezept anlegen", "Pfannkuchen" als Titel
+      const router = await openLeavableFormWithTitle()
+
+      // When: ich <Weg> und auf "Weiter bearbeiten" klicke
+      await leave(router)
+      await screen.findByRole('alertdialog', { name: 'Eingaben verwerfen?' })
+      clickQuestionButton('Weiter bearbeiten')
+
+      // Then: Formular mit dem Titel, weiterhin unter seiner eigenen Adresse
+      await expectFormStillOpenWithTitle(router)
+
+      // When: ich <Weg>
+      await leave(router)
+
+      // Then: Nachfrage "Eingaben verwerfen?"
+      expect(await screen.findByRole('alertdialog', { name: 'Eingaben verwerfen?' })).toBeInTheDocument()
+
+      // When: Verwerfen
+      clickQuestionButton('Verwerfen')
+
+      // Then: <Seite>
+      await expectTarget()
+    },
+  )
+})
+
+// @US-602-edge-case
+describe('Rezeptformular verlassen – Randfälle', () => {
+  // Szenario: Ohne Eingaben verlässt man das Formular ohne Nachfrage
+  // Beispiel: alle
+  it.each([viaIngredientsEntry, viaBrowserBack])(
+    'US602_EdgeCase_LeaveCreateForm_WithoutInput_ShowsTargetWithoutQuestion ($weg → $seite)',
+    async ({ leave, expectTarget }) => {
+      // Given: Rezepte-Seite, "Rezept anlegen", nichts eingegeben
+      const router = await openLeavableForm()
+
+      // When: ich <Weg>
+      await leave(router)
+
+      // Then: <Seite>, keine Nachfrage (die Nachfrage hätte den Weg angehalten)
+      await expectTarget()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    },
+  )
+
+  // Szenario: Escape oder Klick neben die Nachfrage nach Browser-Zurück bleibt im Formular
+  // Beispiel: alle
+  it.each([
+    ['Escape drücke', dismissByEscape],
+    ['neben die Nachfrage klicke', dismissByClickingBeside],
+  ])('US602_EdgeCase_LeaveCreateFormViaBack_CloseQuestionAside_StaysInForm (%s)', async (_schliessen, close) => {
+    // Given: Rezepte-Seite, "Rezept anlegen", "Pfannkuchen" als Titel; ich gehe im Browser zurück
+    const router = await openLeavableFormWithTitle()
+    await goBack(router)
+    await screen.findByRole('alertdialog', { name: 'Eingaben verwerfen?' })
+
+    // When: ich <Schließen>
+    await close(userEvent.setup())
+
+    // Then: Formular mit dem Titel, weiterhin unter seiner eigenen Adresse, keine Nachfrage mehr
+    await expectFormStillOpenWithTitle(router)
+  })
+})
+
+// Given: das Speichern eines Rezepts dauert spürbar – der nächste POST antwortet erst, wenn `complete` gerufen
+// wird (kein Promise.withResolvers: lib ES2022). `respond` liefert die Antwort danach. `arrived` löst auf, sobald
+// die Anfrage beim Server angekommen ist: erst dann ist belegt, dass das Speichern tatsächlich abgeschickt wurde.
+function holdNextSave(respond: () => Response) {
+  const gate = new EventTarget()
+  const once = (event: string) => new Promise<void>((resolve) => { gate.addEventListener(event, () => { resolve() }, { once: true }) })
+  const released = once('release')
+  const arrived = once('arrived')
+  server.use(http.post('/api/recipes', async () => {
+    gate.dispatchEvent(new Event('arrived'))
+    await released
+    return respond()
+  }, { once: true }))
+  return { arrived, complete: () => { gate.dispatchEvent(new Event('release')) } }
+}
+
+const createdResponse = () => HttpResponse.json(createdPancakes, { status: 201 })
+
+// Given: das Speichern dauert spürbar und die Liste ist leer; When: Formular füllen, speichern. Der Server
+// antwortet nach `complete` mit `respond` (Standard: Rezept angelegt).
+async function saveWhileHeld(ingredients = recipeIngredients, respond: () => Response = createdResponse) {
+  const { complete } = holdNextSave(respond)
+  server.use(http.get(`/api/recipes/${createdPancakes.id}`, () => HttpResponse.json(createdPancakes)))
+  const user = userEvent.setup()
+  const router = await openLeavableForm()
+  await user.type(screen.getByLabelText(/^Titel/), recipeTitle)
+  await user.type(screen.getByLabelText(/^Zutaten/), ingredients)
+  await enterStep(user, 1, validStep)
+  await clickSave(user)
+  return { router, completeSave: complete }
+}
+
+// Der Router entscheidet über einen Navigationsversuch asynchron (Blocker). Ein Tick lässt ihn entscheiden, bevor
+// geprüft wird: Ohne ihn bestünde „Formular bleibt offen" auch, wenn der Versuch noch gar nicht verarbeitet wäre.
+async function letRouterDecide() {
+  await act(async () => { await Promise.resolve() })
+}
+
+// @US-602-edge-case
+describe('Rezeptformular verlassen während des Speicherns', () => {
+  // Szenario: Während des Speicherns lässt sich das Formular nicht verlassen
+  // Beispiel: alle
+  it.each([viaBrowserBack, viaIngredientsEntry])(
+    'US602_EdgeCase_LeaveCreateFormWhileSaving_StaysInFormThenShowsDetail ($weg)',
+    async ({ leave }) => {
+      // Given: das Speichern dauert spürbar; Formular gefüllt und gespeichert
+      const { router, completeSave } = await saveWhileHeld()
+
+      // When: ich, während das Speichern noch läuft, <Weg>
+      await leave(router)
+      await letRouterDecide()
+
+      // Then: weiterhin das Formular, ohne Nachfrage, unter seiner eigenen Adresse
+      await expectFormStillOpenWithTitle(router)
+
+      // When: das Speichern abgeschlossen ist
+      completeSave()
+
+      // Then: die Detailansicht des Rezepts "Pfannkuchen" – nicht das Ziel des Wegs
+      await screen.findByRole('heading', { level: 1, name: recipeTitle })
+      expect(router.state.location.pathname).toBe(`/recipes/${createdPancakes.id}`)
+    },
+  )
+
+  // Szenario: Ein während des Speicherns abgefangener Versuch fragt nach fehlgeschlagenem Speichern nicht nach
+  // Beispiel: alle
+  it.each([viaBrowserBack, viaIngredientsEntry])(
+    'US602_EdgeCase_LeaveCreateFormWhileSaving_SaveRejected_AsksNoQuestionAfterwards ($weg)',
+    async ({ leave }) => {
+      // Given: das Speichern dauert spürbar; der Server lehnt die Zutat "Mehk" ab
+      const mehkNotFound = "„250 g Mehk“: Zutat 'Mehk' nicht gefunden. Neue Zutaten werden auf der Zutaten-Seite angelegt."
+      const { router, completeSave } = await saveWhileHeld('250 g Mehk', () => HttpResponse.json(
+        { status: 422, errors: { ingredients: [mehkNotFound] } }, { status: 422 },
+      ))
+
+      // When: ich, während das Speichern noch läuft, <Weg>; das Speichern abgeschlossen ist
+      await leave(router)
+      await letRouterDecide()
+      completeSave()
+
+      // Then: die Fehlermeldung bei den Zutaten, der Fokus im Zutatenfeld, keine Nachfrage, Formular unter
+      // seiner eigenen Adresse
+      await screen.findByText(mehkNotFound)
+      await expectFormStillOpenWithTitle(router)
+      expectIngredientMessageList([mehkNotFound])
+      expect(ingredientsField()).toHaveFocus()
+    },
+  )
+
+  // Szenario: Während eines erneuten Speicherns bleibt die Meldung an ihrem Schritt
+  // Das leere zweite Feld fehlt in der ersten gesendeten Liste, in der zweiten ist es dabei (ADR-S144-1).
+  it('US602_EdgeCase_ResaveAfterStepMessage_WhileSaving_MessageStaysAtItsStep', async () => {
+    // Given: das Speichern dauert spürbar; erst lehnt der Server den dritten Schritt ab
+    const { complete: completeFirstSave } = holdNextSave(() => HttpResponse.json(
+      { status: 422, errors: { 'steps[1].instruction': [stepTooLong] } }, { status: 422 },
+    ))
+    const user = userEvent.setup()
+
+    // When: Schritt 1 "Teig rühren.", Schritt 2 "   ", Schritt 3 aus 1001 Zeichen; speichern; Antwort abwarten
+    await fillWithBlankSecondAndTooLongThirdStep(user)
+    await clickSave(user)
+    completeFirstSave()
+    await screen.findByText(stepTooLong)
+
+    // When: ich den zweiten Schritt durch "Eier trennen." ersetze und speichere (die Antwort bleibt aus)
+    const { arrived: secondSaveArrived } = holdNextSave(createdResponse)
+    await user.clear(screen.getByLabelText('Schritt 2'))
+    await enterStep(user, 2, 'Eier trennen.')
+    await clickSave(user)
+    await secondSaveArrived
+
+    // Then: während das Speichern läuft, steht die Meldung weiter am dritten Schritt, der zweite ist unmarkiert
+    expectStepMarked(3, stepTooLong)
+    expectStepUnmarked(2)
   })
 })
 
@@ -761,7 +1023,7 @@ describe('Rezepte erfassen – Fehlerfälle', () => {
   // Kein Szenario fordert den Fall, deshalb ohne US-Tag: useParams liefert die Kennung als `string | undefined`,
   // und der Zweig ohne Kennung ersetzt einen Cast. Fachlich gilt ADR-S142-2: fehlende Kennung = nicht gefunden.
   // Die App-Route /recipes/:id liefert die Kennung immer; der Fall ist nur erreichbar, wenn die Seite direkt unter
-  // einer Route ohne :id gerendert wird – daher der Import der Seite statt AppRoutes. Es gibt keinen Handler:
+  // einer Route ohne :id gerendert wird – daher der Import der Seite statt der Routentabelle appRoutes. Es gibt keinen Handler:
   // ein Abruf ließe den Test über onUnhandledRequest scheitern.
   it('RecipeDetailPage_RouteWithoutId_ShowsNotFoundWithoutRequest', async () => {
     // Given: die Seite hängt an einer Route ohne Kennung
@@ -952,6 +1214,16 @@ async function enterStep(user: User, number: number, instruction: string) {
   await pasteText(user, await screen.findByLabelText(`Schritt ${String(number)}`), instruction)
 }
 
+// When (Szenario): Titel und Zutat füllen; Schritt 1 "Teig rühren.", Schritt 2 nur Leerraum, Schritt 3 mit 1001 Zeichen.
+async function fillWithBlankSecondAndTooLongThirdStep(user: User) {
+  await fillTitleAndIngredients(user)
+  await enterStep(user, 1, validStep)
+  await clickAddStep(user)
+  await enterStep(user, 2, '   ')
+  await clickAddStep(user)
+  await enterStep(user, 3, tooLongInstruction)
+}
+
 // Then: Schrittfeld trägt die Meldung (zugängliche Beschreibung, aria-invalid) – oder nichts davon.
 function expectStepMarked(number: number, message: string) {
   const field = screen.getByLabelText(`Schritt ${String(number)}`)
@@ -1004,12 +1276,7 @@ describe('Rezept mit ungültiger Schritt-Anweisung', () => {
     const user = userEvent.setup()
 
     // When: Schritt 1 gefüllt, Schritt 2 nur Leerraum, Schritt 3 mit 1001 Zeichen; speichern
-    await fillTitleAndIngredients(user)
-    await enterStep(user, 1, validStep)
-    await clickAddStep(user)
-    await enterStep(user, 2, '   ')
-    await clickAddStep(user)
-    await enterStep(user, 3, tooLongInstruction)
+    await fillWithBlankSecondAndTooLongThirdStep(user)
     await clickSave(user)
 
     // Then: die Meldung steht am dritten Schrittfeld, Schritt 1 und 2 sind unmarkiert, der Fokus liegt auf Schritt 3

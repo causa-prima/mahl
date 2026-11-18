@@ -89,7 +89,10 @@ Agent-Prompts enthalten (je Agent):
   die Lese-Werkzeuge. Die Auditoren haben dafür Bash, aber nur lesend: Der Permission-Hook erkennt
   sie und lässt nichts durch, was Arbeitsbaum, Index oder Tracker ändert
   ([Befehlsauswahl](../../../docs/process/dev-workflow.md#DEV-befehlsauswahl)). Was sich nur
-  schreibend prüfen ließe, kennzeichnet das Finding als offene Prüfung.
+  schreibend prüfen ließe, kennzeichnet das Finding als offene Prüfung. E2E (`playwright-test`)
+  ist erlaubt, aber nur ein Lauf zur Zeit: Ein zweiter bricht mit „Konkurrierender E2E-Lauf aktiv"
+  ab, bevor er baut. Dann später erneut oder als offene Prüfung melden. Während die Auditoren
+  laufen, startet der Orchestrator keinen eigenen E2E- oder Mutationslauf.
 - **ADR-Volltexte im Prompt, plus Auftrag zur eigenen Gegenprobe.** Zweigleisig:
   1. Die vom Orchestrator als relevant eingestuften ADRs **im Prompt ausschreiben**.
   2. Den Auditor ausdrücklich beauftragen, **selbst nachzusehen** (`python3 -m prozesscode.decisions
@@ -149,6 +152,10 @@ Fehlerklasse.
 den Guard aber nicht absichtlich brechen. Er beurteilt Struktur, Testdesign und Meldungsqualität –
 **nicht**, ob der Mechanismus wirkt. Dieser Beleg bleibt die Gegenprobe des Autors; ein
 Auditor-Report ersetzt sie nie.
+
+**Maßstab beim Bash-Hook, im Prompt zu nennen:** sein [Schutzziel](../../../docs/process/dev-workflow.md#DEV-schutzziel) –
+Versehen, nicht Absicht. Ein Finding zu einer Umgehungsform zählt nur, wenn ein Agent sie
+plausibel beim normalen Arbeiten schreibt; keine offene Umgehungssuche beauftragen.
 
 <a id="RVC-findings-zusammenfuehren"></a>
 ### Findings zusammenführen

@@ -16,6 +16,9 @@ export default defineConfig({
   workers: 1,
   use: {
     baseURL: 'http://localhost:5173',
+    // Beleg für seltene, nicht reproduzierbare Ausreißer: Der Trace (DOM, Netzwerk, Konsole) bleibt nur bei
+    // einem Fehlschlag liegen, in test-results/<test>/trace.zip.
+    trace: 'retain-on-failure',
   },
   projects: [
     {

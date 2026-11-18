@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from conftest import cli_aufruf
+from prozesscode._run_lock import LOCK_BUSY_EXIT_CODE
 
 modul = import_module("prozesscode.playwright-test")
 
@@ -77,6 +78,16 @@ def test_gruener_lauf_zeigt_nur_das_verdikt_mit_anzahl_und_dauer(monkeypatch, ca
     assert cli_aufruf(monkeypatch, modul, "--filter", "US602_HappyPath_GetRecipes") == 0
     assert aufrufe == [["run", "test:e2e", "--", "--grep", "US602_HappyPath_GetRecipes"]]
     assert capsys.readouterr().out == "✓ 2 E2E-Tests grün, 5.9s\n" + _HINWEIS
+
+
+def test_laufender_e2e_lauf_sperrt_den_zweiten_bevor_npm_startet(monkeypatch, tmp_path, capsys):
+    """Parallele Läufe (Auditoren) bauten dasselbe Backend und stritten um Port 5059."""
+    monkeypatch.setattr(modul, "_LAUF_LOCK", tmp_path / "playwright_run")
+    (tmp_path / "playwright_run.lock").write_text("1", encoding="utf-8")  # PID 1 lebt immer
+    aufrufe = _npm(monkeypatch, _GRUEN, 0)
+    assert cli_aufruf(monkeypatch, modul) == LOCK_BUSY_EXIT_CODE
+    assert aufrufe == []
+    assert "Konkurrierender E2E-Lauf aktiv" in capsys.readouterr().err
 
 
 def test_ohne_filter_laufen_alle_tests(monkeypatch):

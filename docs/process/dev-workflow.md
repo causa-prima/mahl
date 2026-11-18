@@ -14,7 +14,7 @@ kritische-regeln:
 
 | Abschnitt | Inhalt | Wann lesen |
 |-----------|--------|------------|
-| [Befehlsauswahl](#DEV-befehlsauswahl) | Auto-deny/allow-once-Mechanismus, Scratchpad, zusammengesetzte Befehle | Wenn ein Befehl geblockt wird |
+| [Befehlsauswahl](#DEV-befehlsauswahl) | Auto-deny/allow-once-Mechanismus, Scratchpad, zusammengesetzte Befehle, [Schutzziel](#DEV-schutzziel) | Wenn ein Befehl geblockt wird; vor jeder Änderung am Bash-Hook |
 | [Tool-Call-Failure-Analyse](#DEV-failure-analyse) | Root Cause → korrektes Muster ableiten → dokumentieren → wiederholen | Bei fehlgeschlagenen Befehlen |
 | [Rückgaben abhaken](#DEV-rueckgaben) | Knoten für Agenten- und Hintergrund-Ergebnisse, Stop-Erinnerung, `rueckgaben erledigt` | Wenn der Stop-Hook an eine Rückgabe erinnert |
 | [WSL-native Toolchain](#DEV-wsl-toolchain) | .NET + Node nativ; lokale Tool-Manifest; Test/Stryker via Wrapper | Beim Aufrufen von dotnet/npm |
@@ -47,9 +47,21 @@ kritische-regeln:
 
 Das **Ausführen** eines dort liegenden Scripts ist dagegen freigabepflichtig (`python3 <scratchpad>/<name>.py # --allow-once`): Ein Script führt beliebigen Code aus und umginge sonst genau die Prüfung, für die der Hook existiert – der Ablageort ändert daran nichts. Davor steht ohnehin die Werkzeugfrage: Edit, Read, `grep`/`find` und die `prozesscode`-Werkzeuge zuerst; ein eigenes Script lohnt nur, wenn es effizienter oder weniger fehleranfällig ist als diese – nicht deshalb, weil Bash gerade geblockt hat.
 
-**Zusammengesetzte Befehle** sind erlaubt, solange jedes Teilstück erlaubt ist – Verkettung, Zeilenumbruch, Variablenzuweisung, Substitution, Heredoc, Schleifen (im Rumpf nur lesende Befehle) und Sub-Befehle aus `find -exec`/`xargs`. Nicht erlaubt ist indirekte Ausführung (`$CMD`, `eval`, `bash -c`), weil sie jede Prüfung aushebelt.
+**Zusammengesetzte Befehle** sind erlaubt, solange jedes Teilstück erlaubt ist – Verkettung, Zeilenumbruch, Variablenzuweisung, Substitution (auch mit Pipe darin), Heredoc, Schleifen (im Rumpf nur lesende Befehle), Sub-Befehle aus `find -exec`/`xargs` und die Vorsätze `timeout`/`time`. Wird ein Glied abgelehnt, nennt die Meldung es. Nicht erlaubt ist indirekte Ausführung (`$CMD`, `eval`, `bash -c`): Der Hook sieht dann nicht, was läuft.
 
 **Vollständige Liste:** `python3 -m prozesscode.hooks.check-bash-permission --list` zeigt alle erlaubten Befehle, die Projekt-Task-Wrapper (Tests/Lint/Mutation) und die Deny-Mechanik. Wird am Session-Start automatisch in den Kontext geladen.
+
+<a id="DEV-schutzziel"></a>
+### Schutzziel des Hooks: Versehen, nicht Absicht
+
+Der Hook hat zwei Ziele: Er verhindert, dass ein Agent **versehentlich** zu viel löscht oder ändert, und er lenkt auf das **richtige Werkzeug** (Edit statt `sed -i`, Wrapper statt `dotnet test`). Er ist **keine Sicherheitsgrenze** gegen einen Agenten, der eine Prüfung gezielt umgehen will – Agenten tun das nicht mutwillig, und gegen Absicht wäre ein Regex-Filter über Befehlstext ohnehin machtlos (Quoting, Variablen, Substitution, Optionen hinter dem Operanden).
+
+Daraus folgt für jede Änderung am Hook:
+- **Eine neue Sperre braucht eine plausible Form** – eine, die ein Agent beim normalen Arbeiten schreibt. Beleg sind die Session-Logs (`~/.claude/projects/…/*.jsonl`) und das Deny-Log `.claude/tmp/denied-commands.log`, nicht die Vorstellungskraft. Umgehungsformen, die nur absichtlich entstehen, werden nicht abgedichtet.
+- **Jede Sperre kostet Reibung** – ein abgelehnter harmloser Befehl kostet den Agenten eine Runde und lenkt ihn auf Umwege. Im Zweifel erlauben, wenn das Schlimmste ein ineffizienter Aufruf ist; sperren, wenn es Datenverlust oder ungesicherte Änderungen sind.
+- **Reviews eines Hook-Umbaus:** Maßstab und Auftrag stehen in [`RVC-prozess-code`](../../.claude/skills/review-code/SKILL.md#RVC-prozess-code).
+
+Beispiel: Eine sed-Positivliste gegen `w`-, `e`- und gebündelte `-i`-Formen fand keinen einzigen Fall in 15.616 protokollierten Befehlen, baute zwei eigene Lücken ein und sperrte eine Leseform, die 26-mal vorkam – sie wurde zurückgenommen.
 
 ---
 

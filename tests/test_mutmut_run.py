@@ -6,6 +6,7 @@ Ausweisung der Ausnahmeliste. Das Lesen der Ergebnisse selbst steht in
 Ein echter Mutationslauf kommt hier nicht vor – er dauert Minuten bis Stunden und liefe
 pytest aus pytest heraus.
 """
+import shutil
 import subprocess
 import sys
 from importlib import import_module
@@ -83,14 +84,43 @@ def test_ein_voller_mutantenname_laeuft_ohne_platzhalter(tmp_path, monkeypatch, 
     monkeypatch.setattr(mr, "MUTMUT", binaer)
     aufrufe = []
 
-    def fake_laufe(*argv):
+    def fake_laufe(*argv, **_):
         aufrufe.append(argv)
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
     monkeypatch.setattr(mr, "_laufe", fake_laufe)
     monkeypatch.setattr(mr, "lies_ergebnisse", lambda _m: [(f"{ausschnitt}.x__mutmut_1", "killed")])
     mr.main(["--mutate", ausschnitt])
-    assert aufrufe == [("run", filter_)]
+    assert aufrufe == [("run", "--max-children", str(mr.WORKER), filter_)]
+
+
+# --- Speicher eines Laufs (S151) ------------------------------------------------
+# Ohne Grenze startete mutmut je CPU-Kern einen Worker (20), jeder mit 1–3 GB RAM und Swap. Der
+# Speicher der WSL-VM lief voll, ein OOM-Kill in der Gruppe von claude beendete die Distro.
+@pytest.mark.parametrize("argv, in_gruppe", [
+    (("run", "--max-children", "4", "a.*"), True),
+    (("show", "a.x__mutmut_1"), False),
+    (("tests-for-mutant", "a.x__mutmut_1"), False),
+])
+def test_nur_der_lauf_startet_in_eigener_speichergruppe(argv, in_gruppe):
+    befehl = mr._befehl(argv)
+    assert (befehl[:len(mr.SPEICHERGRENZE)] == list(mr.SPEICHERGRENZE)) is in_gruppe
+    assert befehl[-len(argv) - 1:] == [str(mr.MUTMUT), *argv]
+
+
+def test_die_worker_sind_begrenzt():
+    assert 1 <= mr.WORKER <= 4
+
+
+@pytest.mark.skipif(shutil.which("systemd-run") is None, reason="ohne systemd keine Speichergruppe")
+def test_die_speichergrenze_kommt_beim_kind_an():
+    """Am echten Prozessstart: Das Kind läuft in einer eigenen cgroup mit `memory.max`."""
+    lauf = subprocess.run(
+        [*mr.SPEICHERGRENZE, sys.executable, "-c",
+         "import pathlib; g = pathlib.Path('/proc/self/cgroup').read_text().strip().split('::')[1]; "
+         "print(pathlib.Path('/sys/fs/cgroup' + g + '/memory.max').read_text().strip())"],
+        capture_output=True, text=True, timeout=60)
+    assert lauf.stdout.strip() == str(12 * 1024 ** 3), lauf.stderr
 
 
 # --- Abgebrochener Lauf --------------------------------------------------------
@@ -110,7 +140,7 @@ def _main_mit_lauf(monkeypatch, tmp_path, lauf, *argv):
     binaer = tmp_path / "mutmut"
     binaer.touch()
     monkeypatch.setattr(mr, "MUTMUT", binaer)
-    monkeypatch.setattr(mr, "_laufe", lambda *a: lauf)
+    monkeypatch.setattr(mr, "_laufe", lambda *a, **_: lauf)
     # Ergebnisse eines früheren, grünen Laufs liegen noch im Mutantenbaum.
     monkeypatch.setattr(mr, "lies_ergebnisse", lambda _m: [("a.x__mutmut_1", "killed")])
     monkeypatch.setattr(mr, "lies_baseline", lambda: {})
@@ -127,6 +157,17 @@ def test_abgebrochener_lauf_meldet_den_abbruch_statt_alter_ergebnisse(
     assert ausgabe.startswith("✗")
     assert "Failed to collect list of tests" in ausgabe
     assert "Sperrklinke gehalten" not in ausgabe
+
+
+@pytest.mark.aufrufpfad("mutmut-run")
+@pytest.mark.parametrize("code", [-9, 137])
+def test_ein_vom_kernel_beendeter_lauf_nennt_die_speichergrenze(tmp_path, monkeypatch, capsys, code):
+    """SIGKILL heißt hier fast immer: Die Speichergruppe war voll. Ohne den Hinweis sucht man die
+    Ursache im Testcode."""
+    lauf = subprocess.CompletedProcess([], code, stdout="", stderr="")
+    assert _main_mit_lauf(monkeypatch, tmp_path, lauf) == 1
+    ausgabe = capsys.readouterr().out
+    assert "Speichergrenze" in ausgabe and "dmesg" in ausgabe
 
 
 @pytest.mark.aufrufpfad("mutmut-run")

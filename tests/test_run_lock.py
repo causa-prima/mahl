@@ -18,7 +18,7 @@ def test_acquire_and_release(tmp_path):
     assert not lock_file.exists()
 
 
-def test_live_concurrent_lock_aborts(tmp_path):
+def test_live_concurrent_lock_aborts(tmp_path, capsys):
     # // Given ein Lockfile mit einer fremden, garantiert lebenden PID (1 = init)
     target = tmp_path / "stryker_out.txt"
     lock_file = tmp_path / "stryker_out.txt.lock"
@@ -29,6 +29,8 @@ def test_live_concurrent_lock_aborts(tmp_path):
         with rl.RunLock(target):
             pass
     assert exc.value.code != 0
+    # Ohne Angabe ist es ein Stryker-Lauf – die beiden Stryker-Wrapper nennen keine Laufart.
+    assert "Konkurrierender Stryker-Lauf aktiv (PID 1," in capsys.readouterr().err
 
 
 def test_stale_lock_reclaimed(tmp_path):
@@ -65,3 +67,16 @@ def test_live_lock_not_clobbered_on_abort(tmp_path):
     # // Then bleibt der fremde Lock-Inhalt unangetastet – kein Schreiben vor bestätigtem
     #        Ownership (das TOCTOU-Fenster der read-then-write-Variante ist geschlossen).
     assert lock_file.read_text(encoding="utf-8").strip() == "1"
+
+
+def test_abbruch_nennt_die_art_des_laufs(tmp_path, capsys):
+    # // Given ein Lockfile einer lebenden fremden PID (1 = init) für einen E2E-Lauf
+    target = tmp_path / "playwright_run"
+    (tmp_path / "playwright_run.lock").write_text("1", encoding="utf-8")
+    # // When ein zweiter E2E-Lauf startet
+    with pytest.raises(SystemExit) as exc:
+        with rl.RunLock(target, "E2E-Lauf"):
+            pass
+    # // Then nennt der Abbruch den E2E-Lauf, nicht Stryker, mit eigenem Exit-Code
+    assert exc.value.code == rl.LOCK_BUSY_EXIT_CODE
+    assert "Konkurrierender E2E-Lauf aktiv (PID 1," in capsys.readouterr().err

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""PID-basierter Lock-Guard gegen konkurrierende Stryker-Läufe.
+"""PID-basierter Lock-Guard gegen konkurrierende Stryker- und E2E-Läufe.
 
 Schützt die `.claude/tmp/stryker_*_out.txt`-Ausgabedateien: zwei parallele Läufe würden
-in dieselbe Datei schreiben und sich gegenseitige Reports/Output korrumpieren.
+in dieselbe Datei schreiben und sich gegenseitige Reports/Output korrumpieren. Bei E2E
+bauten zwei Läufe dasselbe Backend und stritten um dessen Port (playwright-test.py).
 
 Mechanik: Sidecar-Lockfile (`<tmp>.lock`) enthält die PID des laufenden Prozesses. Beim
 Start wird geprüft, ob bereits ein Lock existiert und dessen Prozess noch lebt
@@ -43,8 +44,9 @@ class RunLock:
     Bricht mit Exit 1 ab, wenn bereits ein lebender Lauf den Lock hält.
     """
 
-    def __init__(self, target: Path):
+    def __init__(self, target: Path, laufart: str = "Stryker-Lauf"):
         self._lock_path = Path(str(target) + ".lock")
+        self._laufart = laufart
 
     def __enter__(self) -> "RunLock":
         self._lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -77,7 +79,7 @@ class RunLock:
 
     def _abort(self, pid: int | None) -> "RunLock":
         print(
-            f"⛔ Konkurrierender Stryker-Lauf aktiv (PID {pid}, Lock {self._lock_path}).\n"
+            f"⛔ Konkurrierender {self._laufart} aktiv (PID {pid}, Lock {self._lock_path}).\n"
             f"   Erst beenden lassen – paralleles Schreiben würde Report/Output korrumpieren.\n"
             f"   Verwaister Lock? Datei manuell löschen: {self._lock_path}",
             file=sys.stderr,

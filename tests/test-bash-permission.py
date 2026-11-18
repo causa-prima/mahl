@@ -367,6 +367,16 @@ def test_allow_patterns() -> int:
         # sed read-only (kein -i) → erlaubt
         ("sed -n '1,40p' docs/process/e2e-testing.md", "sed -n Zeilenbereich"),
         ("cat foo | sed 's/x/y/'", "sed im Pipe (read-only, kein -i)"),
+        # Die Formen, die Sessions brauchen – Bereich drucken oder löschen, ersetzen, mehrere Kommandos.
+        ("sed -n 8,34p \"$f\"", "sed Zeilenbereich einer Datei aus einer Schleifenvariable"),
+        ("python3 -m prozesscode.doc get KPI-kommunikation | sed 1,3d", "sed Kopfzeilen löschen ohne Hochkommas"),
+        ("sed -n 105,120p Client/src/App.tsx", "sed Zeilenbereich ohne Hochkommas"),
+        ("sed -n '10,$p' AGENTS.md", "sed Zeilenbereich bis Dateiende"),
+        ("sed -n '/^## /,/^---/p' AGENTS.md", "sed Bereich über Muster"),
+        ("git log --oneline | sed -n '1p;3p'", "sed mehrere Kommandos"),
+        ("git diff | sed -E 's/[0-9]+/N/g'", "sed -E mit Ersetzung und Flag"),
+        ("sed -n '/Rezept/!p' AGENTS.md", "sed mit negierter Adresse"),
+        ("sed -n '/a\\/b/p' AGENTS.md", "sed mit maskiertem Schrägstrich im Muster"),
         # find | xargs <safe-readonly> → erlaubt
         ("find . -name '*.feature' | xargs grep -l Zutat", "find | xargs grep"),
         ("find . -name '*.md' | xargs wc -l", "find | xargs wc"),
@@ -481,6 +491,11 @@ def test_deny() -> int:
         ("sed -i 's/foo/bar/' file.txt", "sed -i Edit → deny"),
         ("sed -i 's/\\r//' some-file.sh", "sed -i s/\\r// → deny (ext4: kein CRLF)"),
         ("cat x | sed -i 's/a/b/' y.txt", "sed -i im Pipe → deny"),
+        # Die Formen, in denen Agenten sed -i tatsächlich schreiben (Session-Logs, S151).
+        ("sed -i.bak '/x/d' AGENTS.md", "sed -i mit Sicherungs-Suffix"),
+        ("sed -i -E 's/a+/b/' AGENTS.md", "sed -i mit weiterer Option"),
+        ("sed -E -i 's/a+/b/' AGENTS.md", "sed -i hinter einer anderen Option"),
+        ("sed --in-place=.bak 's/a/b/' AGENTS.md", "sed --in-place mit Suffix"),
         # xargs mit nicht-read-only Child bleibt deny
         ("find . -name '*.tmp' | xargs rm", "find | xargs rm → deny"),
         ("find . | xargs -I {} mv {} /tmp", "find | xargs mv → deny"),
@@ -622,12 +637,22 @@ def test_auditoren_nur_lesend() -> int:
         ("python3 -m prozesscode.decisions get ADR-S084-3", "decisions get"),
         ("python3 -m prozesscode.ruff-run", "ruff-run ohne --fix"),
         ("python3 -m prozesscode.vitest-run --filter Liste", "vitest-run"),
+        # S151: E2E am Stand prüfen; parallele Läufe fängt der Lauf-Lock des Wrappers ab.
+        ("python3 -m prozesscode.playwright-test --filter Rezeptformular", "playwright-test"),
         # S143: die Szenarien eines Laufs lesen – drei Auditoren scheiterten daran.
         ("python3 -m prozesscode.check-atdd-gate @US-602 run-6", "check-atdd-gate"),
         ("python3 -m prozesscode.next_run --open --story US-602", "next_run --open"),
         # Die Zusage im Deny-Footer: Umleitung ins Scratchpad geht, ausgeschrieben.
         (f"git diff > {SCRATCH}/r.diff", "Umleitung ins Scratchpad"),
         ("sed -n '10,20p' AGENTS.md", "sed-Zeilenbereich"),
+        # S151: unquotiert geblockt, der Auditor schrieb die Blockade einem anderen Glied der Kette zu.
+        ("sed -n 10,20p AGENTS.md", "sed-Zeilenbereich ohne Hochkommas"),
+        ("sed -n 10p AGENTS.md docs/AGENT_MEMORY.md", "sed-Einzelzeile ohne Hochkommas, zwei Dateien"),
+        ("sed -n '10,$p' AGENTS.md", "sed-Zeilenbereich bis Dateiende in Hochkommas"),
+        ("sed -n 10,20p \"$f\"", "sed-Zeilenbereich einer Datei aus einer Variable"),
+        ("od -c AGENTS.md | paste -sd ' ' | comm -12 - b.txt", "od, paste, comm"),
+        ("git grep -n check_command", "git grep"),
+        ("ps aux", "ps"),
         ("git diff | sort | uniq -c", "sort und uniq in der Pipeline"),
         ("find prozesscode -name '*.py'", "find ohne Schreib-Aktion"),
         ("git branch --show-current", "git branch lesend"),
@@ -656,6 +681,7 @@ def test_auditoren_nur_lesend() -> int:
         ("python3 -m prozesscode.obs-archive", "obs-archive (schreibt ohne Rückfrage)"),
         ("python3 -m prozesscode.mutmut-run --mutate prozesscode.doc", "mutmut-run"),
         ("python3 -m prozesscode.dotnet-test", "dotnet-test (Build-Ausgabe geteilt)"),
+        ("timeout 500 python3 -m prozesscode.dotnet-test", "dotnet-test hinter timeout"),
         ("npm --prefix Client run build", "npm run"),
         ("dotnet build", "dotnet build"),
         ('python3 -m prozesscode.obs add --titel "X"', "Tracker-Schreiben: deny statt ask"),
@@ -1038,89 +1064,45 @@ def test_maskiere_strings() -> int:
 
 
 def test_wrapper_filter_indirekt() -> int:
-    """Wrapper-Ausgabe, die auf einem Umweg gefiltert wird, wird abgelehnt statt umgeschrieben.
+    """Wrapper-Ausgabe auf einem Umweg gefiltert: erlaubt und unverändert (S151).
 
-    Der Strip greift nur in der Pipeline des Wrappers selbst. Liest ein Filter dahinter etwas,
-    das die Wrapper-Ausgabe tragen kann – Variable, Klammer, Gruppe, Prozess-Substitution –,
-    wäre jeder Rewrite geraten: ablehnen, laut. Ein gewöhnlicher fremder Befehl bleibt frei.
+    Umgeschrieben wird nur ein Filter in der eigenen Pipeline des Wrappers. Bis S151 lehnte der
+    Hook die Umwege ab (Klammer, Variable, Prozess-Substitution, andere Stufe, Heredoc) – rund
+    100 Zeilen Erkennung für 35 Ablehnungen, ein Teil davon mit irreführendem Grund. Ein Umweg
+    kostet schlimmstenfalls ein abgeschnittenes Verdikt, keinen Schaden (DEV-schutzziel).
     """
-    print(f"\n{Colors.BOLD}=== Wrapper-Filter auf Umwegen ablehnen ==={Colors.RESET}")
+    print(f"\n{Colors.BOLD}=== Wrapper-Filter auf Umwegen: unverändert ==={Colors.RESET}")
     failures = 0
 
-    cases = [
-        ("( python3 -m prozesscode.dotnet-test ) | tail -5", "deny", "Subshell-Klammer"),
-        ("{ python3 -m prozesscode.dotnet-test; } | head", "deny", "Gruppe"),
-        ('out=$(python3 -m prozesscode.dotnet-test 2>&1); echo "$out" | head -1', "deny",
-         "Ausgabe in Variable, dann gefiltert"),
-        ('for f in A B; do s=$(date +%s%N); out=$(python3 -m prozesscode.dotnet-test --filter $f 2>&1); '
-         'e=$(date +%s%N); echo "Runde $f: $(( (e-s)/1000000 )) ms  | $(echo "$out" | head -1)"; done',
-         "deny", "Messschleife aus dem Bestand: Variable in verschachtelter Substitution gefiltert"),
-        ("head -5 <(python3 -m prozesscode.dotnet-test)", "deny", "Prozess-Substitution"),
-        ('echo "$(python3 -m prozesscode.dotnet-test)" | head -1', "deny",
-         "Substitution in Anführungszeichen"),
-        ("( python3 -m prozesscode.dotnet-test ) 2>&1 | tail -5", "deny", "Subshell mit Umleitung"),
-        ('out=$(python3 -m prozesscode.dotnet-test); echo "$out" | cat | head', "deny",
-         "Variable über Zwischenstufe gefiltert"),
-        ('out=$(python3 -m prozesscode.dotnet-test); head -1 <<< "$out"', "deny", "Here-String"),
-        ('out=$(python3 -m prozesscode.dotnet-test); echo "${out: -200}"', "deny",
-         "Variable per Parameter-Expansion gekürzt"),
-        ("for f in A B; do python3 -m prozesscode.dotnet-test --filter $f; done | tail -3", "deny",
-         "Schleife gepiped"),
-        ("if python3 -m prozesscode.dotnet-test; then echo ok; fi | head -1", "deny", "if-Block gepiped"),
-        ("python3 -m prozesscode.dotnet-test | grep -q FAIL && echo rot", "deny",
-         "grep -q: Entfernen kehrte die Logik um"),
-        ("python3 -m prozesscode.dotnet-test | tail -5 > out.txt", "deny",
-         "Umleitung hinter dem Filter fiele beim Entfernen weg"),
-        ("python3 -m prozesscode.dotnet-test | wc -l", "deny", "andere Stufe als ein Filter"),
-        ("python3 -m prozesscode.dotnet-test | tee >(head -1)", "deny", "tee in Prozess-Substitution"),
-        ('echo "`python3 -m prozesscode.dotnet-test`" | tail -3', "deny", "Backticks in Anführungszeichen"),
-        ('out=`python3 -m prozesscode.dotnet-test`; echo "$out" | tail -3', "deny",
-         "Backticks als Zuweisung"),
-        # Prüfung sieht den Befehl ohne Heredoc-Body, der Rewrite das Original – beides zugleich
-        # (Wrapper mit Filter und Heredoc) wird abgelehnt statt in zwei Fassungen bewertet.
-        ("python3 -m prozesscode.dotnet-test <<'X' | tail -3\nfoo\nX", "deny",
-         "Wrapper mit Filter und Heredoc in einem Befehl"),
-        # Gegenproben: gewöhnliche fremde Befehle, direkte Filter und Variablen ohne Filter.
-        ("python3 -m prozesscode.dotnet-test && git log --format=%s | grep -v '^$' | head", "allow",
-         "GEGENPROBE: $ im Regex eines fremden Befehls"),
-        ('echo "Hook lehnt head <(python3 -m prozesscode.dotnet-test) ab"', "allow",
-         "GEGENPROBE: Wrapper-Erwähnung in einem String"),
-        ("python3 -m prozesscode.dotnet-test && git log --oneline | head -3", "allow",
-         "GEGENPROBE: fremder Befehl hinter &&"),
-        ("python3 -m prozesscode.playwright-test --filter X; git diff Client/src/main.tsx | grep '^[+-] '",
-         "allow", "GEGENPROBE: fremder Befehl hinter ;"),
-        ("python3 -m prozesscode.dotnet-test | tail -5", "allow",
-         "GEGENPROBE: direkter Filter wird umgeschrieben, nicht abgelehnt"),
-        ('out=$(python3 -m prozesscode.dotnet-test); echo "$out"', "allow",
-         "GEGENPROBE: Variable ohne Filter"),
-        # Ein abgeschlossenes Konstrukt VOR dem Wrapper macht ihn nicht verschachtelt.
-        ("echo `date`; python3 -m prozesscode.dotnet-test; git log --oneline | head -2", "allow",
-         "GEGENPROBE: geschlossene Backticks davor"),
-        ("for f in a b; do echo $f; done; python3 -m prozesscode.dotnet-test; git log --oneline | head -2",
-         "allow", "GEGENPROBE: beendete Schleife davor"),
-    ]
-    for command, expected, desc in cases:
-        if not assert_decision(command, expected, desc):
-            failures += 1
-
-    # Direkt an der Bewertung: Diese Fälle lehnt sonst auch die Allow-Liste ab (tee, <(…)),
-    # ein Test über check_command sähe einen Fehler hier also nicht.
-    for befehl, erwartet in [
-        ("python3 -m prozesscode.dotnet-test | tee >(head -1)", "nicht nur filtert"),
+    unveraendert = [
+        ('echo "$(python3 -m prozesscode.dotnet-test)" | tail -5', "Substitution, dann gefiltert"),
+        ('out=$(python3 -m prozesscode.dotnet-test 2>&1); echo "$out" | head -1', "Variable, dann gefiltert"),
         ("head -5 <(python3 -m prozesscode.dotnet-test)", "Prozess-Substitution"),
-    ]:
-        grund = hook.wrapper_filter_ablehnung(befehl) or ""
-        if erwartet in grund:
-            print(f"  {Colors.GREEN}PASS{Colors.RESET} [bewertung   ] {erwartet}")
+        ("for f in A B; do python3 -m prozesscode.dotnet-test --filter $f; done | tail -3", "Schleife gepiped"),
+        ("python3 -m prozesscode.dotnet-test | grep -q FAIL && echo rot", "grep -q: Entfernen kehrte die Logik um"),
+        ("python3 -m prozesscode.dotnet-test | wc -l", "andere Stufe als ein Filter"),
+        ("python3 -m prozesscode.dotnet-test <<'X' | tail -3\nfoo\nX", "Wrapper mit Filter und Heredoc"),
+        ("python3 -m prozesscode.dotnet-test && git log --oneline | head -3", "fremder Befehl hinter &&"),
+    ]
+    for command, desc in unveraendert:
+        out = build_allow_output(command)
+        if check_command(command)[0] == "allow" and "updatedInput" not in out:
+            print(f"  {Colors.GREEN}PASS{Colors.RESET} [unverändert ] {desc}")
         else:
-            print(f"  {Colors.RED}FAIL{Colors.RESET} [bewertung   ] {befehl}: {grund!r}")
+            print(f"  {Colors.RED}FAIL{Colors.RESET} [unverändert ] {desc}: {check_command(command)} {out}")
             failures += 1
 
-    decision, reason, log_type = check_command("( python3 -m prozesscode.dotnet-test ) | tail -5")
-    if decision == "deny" and "eigenen Aufruf" in reason and log_type == "INDIRECT_WRAPPER_FILTER":
-        print(f"  {Colors.GREEN}PASS{Colors.RESET} [reason      ] Meldung nennt den Ausweg, eigene Kennung")
+    # Andere Regeln greifen weiter: Die Umleitung ins Repo bleibt abgelehnt.
+    if not assert_decision("python3 -m prozesscode.dotnet-test | tail -5 > out.txt", "deny",
+                           "GEGENPROBE: Umleitung hinter dem Filter bleibt abgelehnt"):
+        failures += 1
+
+    # ruff-run gibt nur ein Verdikt aus wie die übrigen Gate-Wrapper (OBS-S137-2).
+    if hook.strip_wrapper_filter("python3 -m prozesscode.ruff-run | tail -3") == (
+            "python3 -m prozesscode.ruff-run", True):
+        print(f"  {Colors.GREEN}PASS{Colors.RESET} [strip       ] ruff-run wird bereinigt")
     else:
-        print(f"  {Colors.RED}FAIL{Colors.RESET} [reason      ] Ausweg/Kennung fehlt: {log_type!r} {reason!r}")
+        print(f"  {Colors.RED}FAIL{Colors.RESET} [strip       ] ruff-run wird nicht bereinigt")
         failures += 1
 
     # Aufrufpfad: Der Rewrite der neuen Fälle kommt über check_command + Allow-Ausgabe an.
@@ -1173,6 +1155,36 @@ def test_segment_expansion() -> int:
         ('CMD="rm -rf /"; $CMD', "deny", "GEGENPROBE: indirekte Ausführung via Variable"),
         ("eval \"git status\"", "deny", "GEGENPROBE: eval"),
         ("bash -c 'ls -la'", "deny", "GEGENPROBE: bash -c"),
+
+        # --- Kette in einer Substitution (S151) ----------------------------------
+        # Der Splitter trennte an `|` auch in $(…): Übrig blieb ein Bruchstück `. -name …`, das als
+        # `source` galt – abgelehnt mit „Indirekte Befehlsausführung" (Session-Logs: 162 Befehle).
+        ('f=$(find . -name x.md | head -1); python3 -m prozesscode.doc toc "$f"', "allow",
+         "Pipe in einer Substitution"),
+        ('for d in a b; do n=$(find "$d" -name x | wc -l); [ "$n" -gt 0 ] && echo "$d $n"; done', "allow",
+         "Pipe in einer Substitution im Schleifenrumpf"),
+        ("n=`ls | wc -l`; echo $n", "allow", "Pipe in Backticks"),
+        ('n=`find . -name x | head -1`; wc -l "$n"', "allow", "Pipe in Backticks hinter einem Argument"),
+        ('out=$(echo $(ls | wc -l) | head -1); echo "$out"', "allow", "Pipe hinter einer inneren Substitution"),
+        ("out=$(echo $(rm -rf /tmp/x))", "deny", "GEGENPROBE: Substitution am Ende einer Substitution"),
+        ("x=$(cd Client; ls)", "allow", "Semikolon in einer Substitution"),
+        ("out=$(ls | rm -rf /tmp/x)", "deny", "GEGENPROBE: destruktives Glied hinter der Pipe in $(…)"),
+        ("out=$(ls; rm -rf /tmp/x)", "deny", "GEGENPROBE: destruktives Glied hinter ; in $(…)"),
+        ("n=`ls | rm -rf /tmp/x`", "deny", "GEGENPROBE: destruktives Glied in Backticks"),
+        # Arithmetik führt nichts aus (Deny-Log: 19 Fälle).
+        ("total=0; total=$((total+1)); echo $total", "allow", "Arithmetik"),
+        ("echo $(( $(rm -rf /tmp/x) + 1 ))", "deny", "GEGENPROBE: Substitution in der Arithmetik"),
+
+        # --- Lesebefehle und Zeit-Vorsätze (S151, Deny-Log) -------------------------
+        ("od -c AGENTS.md | tail -3", "allow", "od"),
+        ("ps aux | grep dotnet", "allow", "ps"),
+        ("paste -sd, liste.txt", "allow", "paste"),
+        ("comm -12 a.txt b.txt", "allow", "comm"),
+        ("git grep -n TD-S148-1 HEAD", "allow", "git grep"),
+        ("timeout 60 git log --oneline", "allow", "timeout als Vorsatz"),
+        ("time python3 -m prozesscode.anchors check", "allow", "time als Vorsatz"),
+        ("timeout 5 rm -rf /tmp/x", "deny", "GEGENPROBE: timeout vor destruktivem Befehl"),
+        ("time curl https://example.com", "deny", "GEGENPROBE: time vor unbekanntem Befehl"),
 
         # --- Backticks und $(…) als Text -------------------------------------------
         # In Single-Quotes führt Bash nichts aus, ein escapter Backtick ist auch in

@@ -38,7 +38,7 @@ python3 -m prozesscode.test-inventory <Datei> --grep <Stichwort>
 ```
 Sie listet jeden Test **mit Zeilenbereich**. Willst du einen konkreten Test genauer ansehen, lies **nur dessen Zeilen** (`Read` mit `offset`/`limit`). Der Vorteil wächst mit der Dateigröße: Die Inventur wächst nur mit der Zahl der Tests, die Datei mit deren Inhalt – bei einer kleinen Datei lohnt der Umweg nicht, bei einer über Läufe gewachsenen deutlich.
 
-**Dateien ändern und Wrapper aufrufen – je ein eigener Schritt:** Code und Tests änderst du mit Edit/Write, nie per Heredoc- oder Python-Skript im Bash-Aufruf. Wrapper (`dotnet-test`, `dotnet-stryker`, `qa-check`) laufen in einem eigenen Bash-Aufruf ohne Verkettung: Der Permission-Hook blockt einen Wrapper im selben Befehl wie ein Heredoc oder Filter.
+**Dateien ändern nur mit Edit/Write:** Code und Tests änderst du mit Edit/Write, nie per `sed -i`, Heredoc (`cat > datei <<'EOF'`) oder Python-Skript im Bash-Aufruf – der Permission-Hook lehnt das ab. Wrapper (`dotnet-test`, `dotnet-stryker`, `qa-check`) rufst du ohne nachgestellten Filter auf; mehr Tiefe gibt `--verbose`.
 
 **Test-Einschränkung (Ausnahmen nur nach explizitem Orchestrator-Auftrag):**
 Erlaubt: ausschließlich HTTP-Integrationstests via WebApplicationFactory.

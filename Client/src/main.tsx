@@ -3,9 +3,12 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
-import App from './App.tsx'
+import { createBrowserRouter, RouterProvider } from 'react-router'
+import { appRoutes } from './App.tsx'
 
 const queryClient = new QueryClient()
+// ADR-S151-1: Data-Router (useBlocker für die Nachfrage beim Verlassen des Rezeptformulars).
+const router = createBrowserRouter(appRoutes)
 
 // docs/process/nfr.md (Accessibility): Touch-Targets ≥ 44×44px. Als Komponenten-Default statt je
 // Element, damit ein neuer Button nicht durchfällt (MUI-Defaults: Button 36,5px, IconButton 40px).
@@ -28,7 +31,7 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
-        <App />
+        <RouterProvider router={router} />
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>

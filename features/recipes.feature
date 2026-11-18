@@ -1028,6 +1028,56 @@ Feature: Rezepte erfassen
       | im Browser zurückgehe                         |
       | in der Navigationsleiste auf "Zutaten" klicke |
 
+  # Ein Versuch, das Formular während des Speicherns zu verlassen, verfällt: Scheitert das Speichern,
+  # bleibt das Formular mit der Meldung stehen. Eine nachträgliche Nachfrage für den alten Klick käme
+  # unerwartet und nähme den Fokus von der Meldung.
+  # @run-15 · Verlassen·während des Speicherns · Full-Stack · Phase:MVP
+  @US-602-edge-case
+  Scenario Outline: Ein während des Speicherns abgefangener Versuch fragt nach fehlgeschlagenem Speichern nicht nach
+    Given die Zutat "Mehl" mit Einheit "g" existiert
+    And das Speichern eines Rezepts dauert spürbar
+    When ich zur Rezepte-Seite navigiere
+    And ich auf "Rezept anlegen" klicke
+    And ich "Pfannkuchen" als Titel eingebe
+    And ich "250 g Mehk" als Zutaten eingebe
+    And ich "Teig rühren." als Schritt eingebe
+    And ich auf "Speichern" klicke
+    And ich, während das Speichern noch läuft, <Weg>
+    And das Speichern abgeschlossen ist
+    Then sehe ich bei den Zutaten die Fehlermeldung "„250 g Mehk“: Zutat 'Mehk' nicht gefunden. Neue Zutaten werden auf der Zutaten-Seite angelegt."
+    And liegt der Fokus im Zutatenfeld
+    And wurde ich nicht gefragt, ob ich Eingaben verwerfen möchte
+    And ist das Formular weiterhin unter seiner eigenen Adresse geöffnet
+
+    Examples:
+      | Weg                                           |
+      | im Browser zurückgehe                         |
+      | in der Navigationsleiste auf "Zutaten" klicke |
+
+  # Meldungen bleiben bis zur Antwort des nächsten Speicherns stehen – an dem Feld, zu dem sie
+  # gehören. Beim erneuten Speichern wird das zuvor leere zweite Feld mitgeschickt; die alte
+  # Meldung darf deshalb nicht auf das zweite Feld rutschen.
+  # @run-15 · Verlassen·während des Speicherns · Full-Stack · Phase:MVP
+  @US-602-edge-case
+  Scenario: Während eines erneuten Speicherns bleibt die Meldung an ihrem Schritt
+    Given die Zutat "Mehl" mit Einheit "g" existiert
+    And das Speichern eines Rezepts dauert spürbar
+    When ich zur Rezepte-Seite navigiere
+    And ich auf "Rezept anlegen" klicke
+    And ich "Pfannkuchen" als Titel eingebe
+    And ich "250 g Mehl" als Zutaten eingebe
+    And ich "Teig rühren." als Schritt eingebe
+    And ich auf "Schritt hinzufügen" klicke
+    And ich "   " als Schritt eingebe
+    And ich auf "Schritt hinzufügen" klicke
+    And ich eine Anweisung aus 1001 Zeichen als Schritt eingebe
+    And ich auf "Speichern" klicke
+    And das Speichern abgeschlossen ist
+    And ich den zweiten Schritt durch "Eier trennen." ersetze
+    And ich auf "Speichern" klicke
+    Then sehe ich, während das Speichern noch läuft, am dritten Schritt weiterhin die Fehlermeldung "Schritt-Anweisung darf maximal 1000 Zeichen lang sein."
+    And ist der zweite Schritt nicht als fehlerhaft markiert
+
   # Nach abgefangenem Browser-Zurück muss das Schließen der Nachfrage auch Adresse und Verlauf
   # wiederherstellen – eigene Logik neben „Weiter bearbeiten".
   # @run-14 · Verlassen·Nachfrage · Frontend-only · Phase:MVP · braucht:CROSS-navigation/run-1

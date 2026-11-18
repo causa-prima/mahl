@@ -295,12 +295,6 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Behebung:** Mit dem DB-Inkonsistenz-Szenario Create(Guid) validierend machen (UUIDv7-Prädikat, OneOf) und den Fehlerzweig auf die Regel aus ARC-db-inkonsistenz abbilden (Liste: überspringen + loggen, Einzel-Endpoint: 500).
 **Aufschubgrund:** User – beim Architektur-Check von US-602 run-2 ist der Lesepfad ohne Prüfung als Zwischenschritt gewählt; ein validierender Zweig wäre ohne Szenario ungetestet
 
-## TD-S141-8 — E2E: Rezept-Liste nach dem Anlegen nur nach Neuladen geprüft
-**Fällig:** Szenario:„Nach erfolgreichem Speichern ist das Formular beim erneuten Öffnen leer" – das Szenario geht nach dem Speichern über die Navigationsleiste zur Rezept-Liste; sein E2E ist die Behebung
-**Problem:** Client/e2e/recipes.spec.ts prüft „steht genau einmal in der Rezept-Liste“ per page.goto('/recipes'), also nach einem vollständigen Neuladen. Ein veralteter React-Query-Cache der Liste nach dem Anlegen bliebe so unsichtbar; CreateRecipePage invalidiert ['recipes'] nicht, es hilft nur staleTime 0. Mit Collection-ETag und Caching ab dem Sortier-Lauf ist das die wahrscheinlichste Stelle für eine stille Regression.
-**Behebung:** Im E2E nach dem Speichern über die Navigationsleiste zur Rezept-Liste wechseln statt neu zu laden; ggf. ['recipes'] nach dem Anlegen invalidieren, falls der Test es verlangt.
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-2 entschieden; heute fehlt ein Weg zur Liste innerhalb der App
-
 ## TD-S141-10 — Rezept-Eingaben ohne Obergrenze für Zutatentext, Zeilen- und Schrittzahl
 **Fällig:** Phase:MVP – im Workshop der MVP-Stufe von US-602 als Szenario festlegen, ggf. später
 **Problem:** POST /api/recipes begrenzt weder die Länge des Zutatentexts noch die Zahl der Zutatenzeilen oder Schritte; die Spalten sind text ohne Constraint, die einzige Schranke ist Kestrels Default-Body-Grenze (30 MB). features/recipes.feature begrenzt nur Titel (100) und Schritt-Anweisung (1000). Versehentlich unsinnige Eingaben (z.B. eingefügter Großtext) werden so ungeprüft gespeichert. Die 422-Antwort wächst zudem mit der Schrittzahl: Jeder leere (seit US-602 run-8) und jeder zu lange Schritt (seit run-9) ergibt einen eigenen Eintrag steps[i].instruction – 10 000 Schritte mit je 1001 Zeichen liefern 10 000 Meldungen. Eine Schrittobergrenze begrenzt damit auch die Fehlerantwort (Security-Review run-8). Seit US-602 run-11 schlägt jedes Anlegen die Zutatennamen aller Zeilen in einer DB-Abfrage nach (bis zu zwei Namen je Zeile als Parameter-Array), auch bei sonst ungültigem Request; ohne Zeilenobergrenze wächst diese Abfrage mit der Eingabe (Security-Review run-11).
@@ -332,10 +326,10 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 ---
 
 ## TD-S143-1 — Rezeptformular: Schrittfeld-Fokus hängt am Einhängen (autoFocus)
-**Fällig:** Szenario:„Fokus springt auf das erste fehlerhafte Feld" – dort trifft die Fokus-Regel nach Fehlern auf den Fokus der Schrittfelder
+**Fällig:** Phase:MVP – beim Bearbeiten (US-614) hängt das Formular mit vorbefüllten Schritten ein; ein Szenario „Fokus beim Öffnen auf dem Titel" mit mehreren Schritten macht den Fehler dort sichtbar
 **Problem:** Client/src/pages/CreateRecipePage.tsx (StepsSection) setzt autoFocus={index > 0}: Jedes Schrittfeld ab Nummer 2 holt sich beim Einhängen den Fokus. Das trägt nur, solange Schrittfelder ausschließlich einzeln angehängt werden. Hängt die Gruppe einmal mit mehreren Feldern neu ein (Remount nach Fehler, Vorbefüllung, Entwurf), stiehlt das letzte Feld den Fokus und kollidiert mit „Fokus aufs erste fehlerhafte Feld" (ADR-S135-4).
 **Behebung:** Im Lauf mit dem Fehler-Fokus prüfen, ob die Gruppe neu einhängt; falls ja, den Fokus nach „Schritt hinzufügen" imperativ per Ref im onAdd-Handler setzen statt über autoFocus.
-**Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-5 als Merkposten für den Fehler-Fokus-Lauf entschieden; heute fordert kein Szenario das Verhalten
+**Aufschubgrund:** User – in run-13 entschieden: nach einem Fehler hängt die Schrittgruppe nicht neu ein (Szenario „Fokus springt auf das erste fehlerhafte Feld" und der Test mit drei Schrittfeldern grün), das Risiko entsteht erst beim Vorbefüllen
 
 ## TD-S143-4 — Nachfrage „Eingaben verwerfen?“: Aktionen brechen bei 320 px um
 **Fällig:** Phase:MVP – wenn weitere Dialoge mit zwei Text-Aktionen dazukommen, als gemeinsame Baseline-Regel
@@ -362,18 +356,6 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** Client/src/services/recipesApi.ts createRecipe behandelt nur 422 als Fehler (toFieldErrors); bei 400 oder 500 wird der Problem-Body als Recipe gelesen, created.id ist undefined und die Seite navigiert nach /recipes/undefined. Ein 500 ohne JSON-Body lässt response.json() rejecten (fromSafePromise, unbehandelt). Seit US-602 run-8 gibt es zusätzlich den 400-Pfad für fehlende Properties (ADR-S144-2), über das Formular nicht erreichbar.
 **Behebung:** response.ok prüfen; 422 → FieldErrors, sonst UnexpectedError, sodass das Formular mit allen Eingaben stehen bleibt (Querschnittsvertrag „Formular speichern“, recipes.feature).
 **Aufschubgrund:** User – in der Abschluss-Triage von US-602 run-8 entschieden
-
----
-
-## TD-S147-1 — Rezeptformular: Meldungs-Zuordnung beim erneuten Speichern
-**Fällig:** Szenario:„Meldungen bleiben beim Bearbeiten bis zum nächsten Speichern stehen" – run-13 legt das Verhalten zwischen zwei Speichervorgängen fest
-**Problem:** Client/src/pages/CreateRecipePage.tsx und hooks/useRecipeFieldMessages.ts (US-602 run-9): sentFieldIndexes wird in onSubmit per useState neu gesetzt, useResultMutation hält bis zur neuen Antwort aber die alte Fehlerantwort. Während ein zweites Speichern läuft, ordnet der Hook die alten Meldungen steps[i].instruction deshalb über die neuen Indizes zu – eine Meldung kann an einem anderen Schrittfeld erscheinen, und der Fokus springt dorthin. Ursache ist, dass Fehlerantwort und Feld-Zuordnung zwei getrennte Zustände sind, die nicht gemeinsam wechseln. Dazu aus dem Code-Review run-9 (Runde 3): Der Typ von StepField lässt Listenmeldung und eigene Anweisungsmeldung zugleich zu, obwohl immer nur eine erscheinen darf; der Fokus-Kandidat für die erste Anweisungsmeldung liest sich schwer (Tupel-Index firstInstruction?.[0], Fallback ?? 0).
-**Behebung:** Fehlerantwort und Indizes beim Speichern als ein Zustand führen (die Zuordnung gehört zur Antwort, nicht zum Formular), mit dem Szenario aus run-13 als Test für das Verhalten während eines laufenden zweiten Speicherns; StepField-Props als Union (Listenmeldung | Anweisungsmeldung) und den Fokus-Kandidaten mit benannten Feldern statt Tupel-Index.
-**Aufschubgrund:** User – in run-9 entschieden: zurückstellen an run-13, dessen Szenario das Verhalten bis zum nächsten Speichern festlegt; Review-Loop nach drei Runden beendet, Rest ebenfalls an run-13
-
----
-
----
 
 ## TD-S148-2 — Backend: Zeilenauflösung des Rezept-Anlegens steckt in RecipesEndpoints und arbeitet auf Strings
 **Fällig:** Phase:MVP – mit US-607, das das Freitext-Zutatenfeld durch Zutaten je Schritt ablöst (ADR-S135-2): Die Zeilenauflösung wird dort ersetzt, ein Umbau vorher polierte Code, der wegfällt
@@ -420,3 +402,13 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** Server/appsettings.json setzt AllowedHosts auf "*": Der Server nimmt jeden Host-Header an. Seit das Backend auch die Oberfläche ausliefert (ADR-S150-2), ist der ganze Server unter jedem Namen erreichbar, unter dem er im Netz auftaucht (Befund des Sicherheits-Reviews zur SPA-Auslieferung).
 **Behebung:** AllowedHosts auf die tatsächlichen Hostnamen des Deployments einschränken (je Umgebung in appsettings.<Umgebung>.json) und zusammen mit HTTPS und CSP aus nfr.md#NFR-security einführen.
 **Aufschubgrund:** User – in der Abschluss-Triage als MVP-Thema vermerkt, in SKELETON läuft die Anwendung nur lokal im Heimnetz
+
+---
+
+---
+
+## TD-S151-1 — Rezeptformular: keine Sperre und kein Ladezustand während des Speicherns
+**Fällig:** Szenario:„Backend liefert Serverfehler beim Speichern – Formular bleibt offen", Phase:MVP – erstes Szenario, das das Formular nach einem laufenden Speichern beobachtet; es ist noch keinem Lauf zugeordnet, daher der Phasen-Backstop
+**Problem:** ADR-S135-4 fordert, dass während des Speicherns „Speichern“, „Abbrechen“, die Felder, „Schritt hinzufügen“ und das Absenden per Enter gesperrt sind. Umgesetzt ist nur die Sperre der Navigation mit Eingaben (useDiscardQuestion, run-15). Folgen (geprüft am Code von Client/src/pages/CreateRecipePage.tsx, S151; nicht im Browser nachgestellt): Ein zweites Absenden während des Speicherns ist möglich (Doppel-Submit, zwei Rezepte); zwei Antworten können sich überholen; Klicks auf Navigationsleiste, Abbrechen oder Browser-Zurück tun mit Eingaben während des Speicherns still nichts, ohne sichtbaren Ladezustand.
+**Behebung:** Szenarien für Sperre und Ladezustand ergänzen (gherkin-workshop), dann Felder und Schaltflächen während des Speicherns sperren und an „Speichern“ einen Ladezustand zeigen; die Querschnitts-Suite nach ADR-S112-5 dabei mitmigrieren.
+**Aufschubgrund:** User – in der Abschluss-Triage von run-15 entschieden: braucht eigene Szenarien und die Migration der Querschnitts-Suite (ADR-S112-5)
