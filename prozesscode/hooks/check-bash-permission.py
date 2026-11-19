@@ -511,6 +511,13 @@ def _mit_vorschau(command: str, reason: str) -> str:
     return f"{block}\n\n{reason}" if block else reason
 
 
+_TRACKER_KETTE_HINT = (
+    "Tracker-Schreibbefehle (obs/lessons/td/oq add|set|remove) nur als einzelnen Bash-Aufruf: "
+    "Den Diff der Änderung zeigt der Mod `tracker-diff` nur für einen Befehl, der allein steht – "
+    "in einer Kette gäbe der User ohne Diff frei. Den Tracker-Befehl allein aufrufen, die "
+    "übrigen Befehle in einem eigenen Aufruf davor oder danach."
+)
+
 # Ein echtes Hilfe-Argument: eigenständiges Token, nicht Teil eines längeren Wortes.
 _HILFE_ARGUMENT = re.compile(r"(?:^|\s)(?:--help|-h)(?=\s|$)")
 
@@ -816,16 +823,17 @@ AUDITOREN = frozenset({
 })
 # Das Paket-Muster der Allow-Liste erlaubt jedes Modul, auch solche, die ohne Rückfrage
 # schreiben (`obs-archive`). Die schreibenden Unterbefehle der Tracker-Werkzeuge fängt
-# WRITE_ACCESS ab. Nicht dabei: `dotnet-test` – parallel laufende Auditoren teilten sich die
-# Build-Ausgabe – und die Mutationsläufe mit ihrem Run-Lock. Aufgenommen wird nur ein Modul, das
-# in keinem Unterbefehl schreibt: `check-atdd-gate` und `next_run` lesen nur Feature-Dateien
-# und geben auf stdout aus – bekommt eines davon eine schreibende Option, gehört es hier heraus.
-# Ausnahme `playwright-test` (User-Entscheidung): Es schreibt nur Ignoriertes (Build-Ausgabe
-# des Backends, `test-results/`) und die eigene E2E-Datenbank; parallele Läufe sperrt sein Lauf-Lock.
+# WRITE_ACCESS ab. Nicht dabei: die Mutationsläufe mit ihrem Run-Lock. Aufgenommen wird nur ein
+# Modul, das in keinem Unterbefehl schreibt: `check-atdd-gate` und `next_run` lesen nur
+# Feature-Dateien und geben auf stdout aus – bekommt eines davon eine schreibende Option, gehört
+# es hier heraus. Ausnahmen (User-Entscheidungen) sind die Testläufe, die nur Ignoriertes
+# schreiben: `playwright-test` (Build-Ausgabe des Backends, `test-results/`, eigene
+# E2E-Datenbank; ein zweiter Lauf bricht am Lauf-Lock ab) und `dotnet-test` (bin/obj,
+# TestResults/; parallele Läufe reiht der Lauf-Lock bis zu 60 s ein – S152, OBS-S148-3).
 _LESENDE_MODULE = frozenset({
     "doc", "anchors", "decisions", "test-inventory", "tracker", "ordinale",
     "obs", "td", "oq", "lessons", "ruff-run", "eslint-run", "vitest-run",
-    "check-atdd-gate", "next_run", "playwright-test",
+    "check-atdd-gate", "next_run", "playwright-test", "dotnet-test", "cm",
 })
 _GIT = r'^git\s+(?:-C\s+\S+\s+)?'
 AUDITOR_PATTERNS: list[re.Pattern[str]] = [
@@ -1530,6 +1538,10 @@ def _entscheide(command: str, nur_lesend: bool) -> tuple[str, str, str]:
     if not _HILFE_ARGUMENT.search(mask_data_strings(command)):
         for pattern, reason in WRITE_ACCESS_PATTERNS:
             if pattern.search(command):
+                # Nur als Einzelbefehl: Der Diff im Pane (Mod `tracker-diff`) erkennt ihn
+                # nur am Anfang des Befehls; in einer Kette gäbe der User blind frei.
+                if len(split_compound_command(command)) > 1:
+                    return ("deny", _TRACKER_KETTE_HINT, "WRONG_APPROACH")
                 return ("ask", _mit_vorschau(command, reason), "WRITE_ACCESS")
 
     # Compound-Split + Segment-Check (check_simple_command ohne WRONG_APPROACH)
@@ -1767,6 +1779,36 @@ def _im_repo_root(cwd: str | None) -> bool:
     return cwd is not None and os.path.normpath(cwd) == _NORMALIZE_ROOT
 
 
+_CWD_HINWEIS = (
+    "Hinweis: Das Arbeitsverzeichnis ist `{verzeichnis}/` – ein früheres `cd` bleibt in der "
+    "Hauptsession bestehen. Relative Pfade in diesem Befehl beziehen sich darauf, und die "
+    "Wrapper erwarten den Repo-Root. Zurück: `cd {root}`. Künftig den Pfad direkt angeben statt "
+    "zu wechseln: `grep … Client/src`, `git -C <dir>`, `npm --prefix <dir>`."
+)
+
+
+_BEGINNT_MIT_CD = re.compile(r"\s*cd(\s|$)")
+
+
+def verzeichnis_hinweis(cwd: str | None, command: str) -> str | None:
+    """Hinweis, wenn die Shell in einem Unterverzeichnis des Repos steht (OBS-S139-1).
+
+    Ein `cd` in ein Unterverzeichnis bleibt in der Hauptsession bestehen, und die relativen
+    Pfade der folgenden Befehle zeigen still woandershin. Gemeldet wird beim nächsten Befehl,
+    nicht geblockt: Das `cd` selbst schadet nicht, erst das unbemerkte Verrutschen. Kein
+    Hinweis, wenn der Befehl selbst mit `cd` beginnt (er setzt das Verzeichnis bewusst) und
+    außerhalb des Repos (dort setzt Claude Code das Verzeichnis selbst zurück).
+    """
+    if cwd is None:
+        return None
+    pfad = os.path.normpath(cwd)
+    if not pfad.startswith(_NORMALIZE_ROOT + os.sep):
+        return None
+    if _BEGINNT_MIT_CD.match(command):
+        return None
+    return _CWD_HINWEIS.format(verzeichnis=os.path.relpath(pfad, _NORMALIZE_ROOT), root=_NORMALIZE_ROOT)
+
+
 def _build_allow_output(command: str, cwd: str | None = _NORMALIZE_ROOT,
                         tool_input: dict | None = None) -> dict:
     """Baut den allow-`hookSpecificOutput`.
@@ -1844,6 +1886,10 @@ def main() -> None:
         hso = _build_allow_output(command, inp.get("cwd"), inp["tool_input"])
         if log_type == "ONE_TIME_UNNEEDED":  # # --allow-once war unnötig → Agenten nudgen
             hso["additionalContext"] = _ONE_TIME_UNNEEDED_HINT
+        cwd_hinweis = verzeichnis_hinweis(inp.get("cwd"), command)
+        if cwd_hinweis:
+            vorher = hso.get("additionalContext")
+            hso["additionalContext"] = f"{vorher}\n\n{cwd_hinweis}" if vorher else cwd_hinweis
         print(json.dumps({"hookSpecificOutput": hso}))
         sys.exit(0)
 

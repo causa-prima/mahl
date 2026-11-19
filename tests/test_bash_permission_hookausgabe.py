@@ -341,6 +341,23 @@ def test_freigabe_stellt_die_vorschau_vor_den_grund():
     assert hook.check_command(_TRACKER)[1] == f"{vorschau}\n\n{grund}"
 
 
+# Der Mod `tracker-diff` erkennt einen Tracker-Schreibbefehl nur am Anfang des Befehls; in einer
+# Kette fehlte der Diff im Pane, und der User gab in S152 eine Änderung frei, ohne sie zu sehen.
+@pytest.mark.parametrize("befehl", [
+    "python3 -m prozesscode.rueckgaben erledigt b1 --ausgang x; " + _TRACKER,
+    _TRACKER + " && git status",
+    _TRACKER + " | tail -3",
+    "python3 -m prozesscode.obs set OBS-S1-1 --status X\npython3 -m prozesscode.obs set OBS-S1-2 --status Y",
+])
+def test_tracker_schreibbefehl_in_einer_kette_wird_abgelehnt(befehl):
+    assert hook.check_command(befehl) == ("deny", hook._TRACKER_KETTE_HINT, "WRONG_APPROACH")
+
+
+def test_trennzeichen_im_eintragstext_machen_keine_kette():
+    befehl = 'python3 -m prozesscode.obs set OBS-S1-1 --entscheidung "erst a; dann b && c | d"'
+    assert hook.check_command(befehl)[0] == "ask"
+
+
 def test_ohne_vorschau_bleibt_der_grund_allein(monkeypatch):
     assert hook._mit_vorschau("ls", "Grund") == "Grund"
     monkeypatch.setattr(hook, "tracker_preview", None)
@@ -370,6 +387,56 @@ def test_allow_ausgabe_nur_pfad_normalisiert():
         "updatedInput": {"command": "ls docs"},
         "additionalContext": hook._NORMALIZE_HINT,
     }
+
+
+# --- Verrutschtes Arbeitsverzeichnis (OBS-S139-1) --------------------------------
+# Ein `cd` in ein Unterverzeichnis bleibt in der Hauptsession bestehen; relative Pfade der
+# folgenden Befehle zeigen dann woandershin, ohne dass es auffällt. Seit S139 etwa 70 solche
+# Wechsel, im Hauptkontext gefolgt von Reparatur-Aufrufen (`cd <Repo-Root> && …`). Der Guard
+# blockt nichts, er sagt es beim nächsten Befehl – Claude Code nennt ihm `cwd`.
+_CLIENT = os.path.join(hook._NORMALIZE_ROOT, "Client")
+
+
+def test_verrutschtes_arbeitsverzeichnis_wird_beim_naechsten_befehl_gemeldet(monkeypatch, capsys, logs, tmp_path):
+    # Der Hook-Prozess läuft woanders als die Shell des Agenten: Der Name des Verzeichnisses
+    # muss aus `cwd` gegen den Repo-Root gebildet sein, nicht gegen das eigene Verzeichnis.
+    monkeypatch.chdir(tmp_path)
+    code, out = _hook(monkeypatch, capsys, _bash("ls src", cwd=_CLIENT + "/src"))
+    assert code == 0
+    assert json.loads(out) == {"hookSpecificOutput": {
+        **_ROH, "additionalContext": hook._CWD_HINWEIS.format(verzeichnis="Client/src", root=hook._NORMALIZE_ROOT)}}
+
+
+@pytest.mark.parametrize("cwd", [hook._NORMALIZE_ROOT, hook._NORMALIZE_ROOT + "/", "/tmp", None,
+                                 hook._NORMALIZE_ROOT + "-anderes-repo/Client"])
+def test_kein_verzeichnishinweis_im_repo_root_und_ausserhalb(monkeypatch, capsys, logs, cwd):
+    """Außerhalb der Arbeitsverzeichnisse setzt Claude Code das Verzeichnis selbst zurück;
+    ein Nachbarordner mit demselben Namensanfang liegt nicht im Repo."""
+    _, out = _hook(monkeypatch, capsys, _bash("ls -la", cwd=cwd))
+    assert json.loads(out) == {"hookSpecificOutput": _ROH}
+
+
+@pytest.mark.parametrize("befehl", [f"cd {hook._NORMALIZE_ROOT} && ls", "cd", "  cd src; ls"])
+def test_befehl_der_selbst_das_verzeichnis_setzt_bekommt_keinen_hinweis(monkeypatch, capsys, logs, befehl):
+    _, out = _hook(monkeypatch, capsys, _bash(befehl, cwd=_CLIENT))
+    assert json.loads(out) == {"hookSpecificOutput": _ROH}
+
+
+@pytest.mark.parametrize("befehl", ["echo cd", "ls; cd .."])
+def test_cd_nur_als_erster_befehl_unterdrueckt_den_hinweis(monkeypatch, capsys, logs, befehl):
+    """Ein Befehl, der erst später wechselt, läuft zuerst im verrutschten Verzeichnis."""
+    _, out = _hook(monkeypatch, capsys, _bash(befehl, cwd=_CLIENT))
+    assert "Arbeitsverzeichnis ist `Client/`" in json.loads(out)["hookSpecificOutput"].get("additionalContext", "")
+
+
+def test_verzeichnishinweis_steht_hinter_den_anderen_hinweisen(monkeypatch, capsys, logs):
+    hinweis = hook._CWD_HINWEIS.format(verzeichnis="Client", root=hook._NORMALIZE_ROOT)
+    _, out = _hook(monkeypatch, capsys, _bash("ls -la # --allow-once", cwd=_CLIENT))
+    assert json.loads(out)["hookSpecificOutput"]["additionalContext"] == (
+        hook._ONE_TIME_UNNEEDED_HINT + "\n\n" + hinweis)
+    _, out = _hook(monkeypatch, capsys, _bash("python3 -m prozesscode.vitest-run | tail -5", cwd=_CLIENT))
+    assert json.loads(out)["hookSpecificOutput"]["additionalContext"] == (
+        hook._FILTER_STRIPPED_HINT + "\n\n" + hinweis)
 
 
 def test_allow_ausgabe_beide_hinweise_getrennt():

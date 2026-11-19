@@ -49,6 +49,7 @@ Auswahl. TD-Einträge mit
 
 ## Nächste Prioritäten
 
+- **Prüfen, dass Agent-Teams ohne Eintrag aus sind** — `Fällig: S153` · Quelle: `docs/process/claude-code-anknuepfung.md` (Zeile „Subagenten"; Flag in S152 global und im Projekt entfernt, die Session selbst lief noch mit dem Testwert 0) · Done: Beim ersten benannten Subagenten trägt dessen `meta.json` unter `~/.claude/projects/<repo>/<session>/subagents/` kein `taskKind`/`teamName`; sonst die Quelle des Flags suchen.
 - **Mutanten sichten, Stufe 2: schreibende Tracker-Werkzeuge** — `Fällig: S147` · Quelle: `docs/guidelines/coding-guideline-python.md#CGP-mutanten-sichten`; Module `obs`, `td`, `oq`, `lessons`, `decisions`, `tracker`, `tracker_preview`, `obs_entry`, `td_entry`, `oq_entry`, `lessons_entry`, `tracker_entry` · Done: Je Modul überlebt kein Mutant mit Folge mehr (`mutmut-run --mutate prozesscode.<modul> --ratchet`), offene sind begründet.
 - **Mutanten sichten, Stufe 3: Produktcode-Guards** — `Fällig: S148` · Quelle: wie Stufe 2; Module `hooks.checks.immutability`, `immutability_strict`, `rop`, `throw_check`, `constructors`, `primitives`, `test_patterns`, `common` · Done: wie Stufe 2.
 - **Mutanten sichten, Stufe 4: Berichte und übrige Werkzeuge** — `Fällig: S149` · Quelle: wie Stufe 2; alle Module, die in `prozesscode/mutation-baseline.json` danach noch unter 90 % stehen (u. a. `retro_report`, `session-agenda`, `read-breakdown`, `tool-usage`, `jenga_score`, `guard-stats`) · Done: wie Stufe 2.

@@ -53,10 +53,19 @@ CHECKS = [
 ]
 
 
-def collect_reasons(data: dict) -> list[str]:
-    """Führt alle Checks aus und sammelt ihre Blockier-Gründe (fail-open je Check)."""
+def collect_reasons(data: dict, ohne: frozenset[str] = frozenset()) -> list[str]:
+    """Führt alle Checks aus und sammelt ihre Blockier-Gründe (fail-open je Check).
+
+    `ohne`: Checks, die ein ausdrücklicher Schalter des Aufrufers abbestellt hat – genutzt von
+    `tracker_diff` für `oq remove --trotz-verweisen`; der Hook selbst lässt nie etwas aus.
+    Ein Name, den es nicht gibt, ist ein Programmierfehler und wirft: Still ignoriert liefe die
+    Auslassung nach einer Umbenennung ins Leere.
+    """
+    unbekannt = ohne - set(CHECKS)
+    if unbekannt:
+        raise ValueError(f"Auszulassende Checks gibt es nicht: {', '.join(sorted(unbekannt))}")
     reasons: list[str] = []
-    for name in CHECKS:
+    for name in (n for n in CHECKS if n not in ohne):
         try:
             reason = import_module(PAKET + name).check(data)
         except Exception as exc:  # noqa: BLE001 – defekter Check darf nie blockieren

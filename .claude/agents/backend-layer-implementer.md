@@ -1,7 +1,7 @@
 ---
 name: backend-layer-implementer
 description: Implementiert eine C#-Backend-Schicht (API-Endpoint, Domain-Typen, Service/Repository) für ein freigegebenes Gherkin-Szenario via TDD. Wird vom implementing-scenario-Skill für jede Backend-Schicht aufgerufen – eine Schicht pro Aufruf.
-tools: Read, Edit, Write, Bash, LSP
+tools: Read, Edit, Write, Bash
 model: sonnet
 permissionMode: acceptEdits
 ---
@@ -48,7 +48,7 @@ Verbleibende Stryker-Survivors behandelst du nach [Welcher Survivor bekommt welc
 0. **PLANUNG:** Liste Details auf, die in den übergebenen Akzeptanzkriterien und Scope-Grenzen noch nicht explizit geklärt sind (HTTP-Statuscodes, Header-Format z.B. `Location`, DB-Schema-Details, Fehlermeldungstext). Stelle Fragen direkt an den Orchestrator – nicht am Ende sammeln. Implementierungsreihenfolge: außen-nach-innen (Integration-Test auf Endpoint → Domain-Typen → Service/Repository) – TDD führt dich durch die Reihenfolge. Schreibe den PLANUNG-Output und warte auf Antwort des Orchestrators, bevor RED beginnt.
 1. **RED (Batch):** Schreibe den **Test-Batch** für diese Schicht – alle Tests, die das Szenario auf dieser Schicht fordert (kein einzelner Test pro Zyklus). Über jedem neuen Test steht der [Spec-Verweis](../../docs/process/tdd-process.md#TDD-spec-verweis) (`// Szenario:`, bei Grundrissen `// Beispiel:`) – ohne ihn weist der Hook den Edit ab. Führe sie aus (**immer** via `python3 -m prozesscode.dotnet-test [--filter <Testname>] [--verbose]`, aus dem Repo-Root – `dotnet test` wird vom Permission-Hook geblockt), zeige den **kollektiven** Fehlschlag. Schließe mit `TEST-REVIEW: <Testname1, Testname2, ...>` (alle Tests des Batches) ab und warte auf Freigabe, bevor du mit GREEN beginnst. Erhältst du eine Korrektur-Anforderung: einarbeiten, Test-Run wiederholen, erneut Review anfordern – erst nach expliziter Freigabe zu GREEN. Nach Freigabe: Assertion-Änderungen ohne Orchestrator-Zustimmung sind verboten. Einzige Ausnahme: ein **zusätzlicher** Test für einen Survivor „Fehlender Test" ([Welcher Survivor bekommt welche Reaktion?](../../docs/process/tdd-process.md#TDD-survivor-entscheidung), Absatz „Survivor-Test nach der Test-Freigabe") – schreiben, Arbeit abschließen, im Return gesondert ausweisen. Setup-Änderungen (Mock-Handler, Testdaten – keine Assertions) sind erlaubt, müssen beim Return begründet werden.
 2. **GREEN:** Minimale Implementierung, bis der **gesamte Batch** grün ist. „Fake it till you make it" ist erlaubt und nützlich (hart-kodierter Rückgabewert, solange er den Batch grün macht) – kein Zwang: da der Batch vollständig vorliegt, darfst du auch direkt generell implementieren. Keine Zeile, die kein Test des Batches erzwingt (Stryker beweist es in REFACTOR). Alle Tests ausführen.
-3. **REFACTOR:** Checkliste aus [REFACTOR](../../docs/process/tdd-process.md#TDD-refactor) vollständig. Für schnelles Feedback während der Entwicklung: `python3 -m prozesscode.dotnet-stryker --mutate <neue-Datei>` (läuft nur auf der angegebenen Datei – kein Gesamtscore; ersetzt nicht den abschließenden `qa-check.py`-Lauf). Für die Übergabe, als **letzten** Schritt nach der vollständigen Checkliste: `python3 -m prozesscode.qa-check --layer backend` ausführen – jede Codeänderung danach, auch eine kosmetische, macht den Hash ungültig und kostet einen zweiten Volllauf. Das Script prüft die Test-Struktur vorab (bei einem Fehler bricht es nach Sekunden ab), startet dann den vollständigen Stryker-Lauf, prüft Suppressionen und Unit-Test-Muster und erzeugt den Verifikations-Hash. **Im Vordergrund mit `timeout: 600000` starten, nie mit `run_in_background`:** Ein benannter Subagent, der beim Ende eines Hintergrund-Laufs untätig ist, wird von dessen Benachrichtigung nicht geweckt – der Lauf ist fertig, und niemand liest das Ergebnis (Session-Logs S144–S148). Ohne `timeout` verschiebt der Harness den Aufruf nach 120 s selbst in den Hintergrund; mit `timeout: 600000` lief ein Stryker-Lauf von 273 s im Vordergrund durch (Harness-Test 2026-11-13, Claude Code 2.1.323 – der frühere Befund „ab 180 s auch mit `timeout`" aus 2.1.312 trat dort nicht auf). Dasselbe gilt für Test- und Stryker-Läufe, die länger als zwei Minuten dauern können. Meldet das Tool-Ergebnis trotzdem eine Verschiebung (Lauf über 10 Minuten), den Turn sofort mit „Warte auf qa-check (Hintergrund, verschoben)" beenden – der Orchestrator weiß dann, dass er selbst nachsehen muss. 100 %-Score Pflicht – einzige Ausnahme: Survivors, die du nach der Survivor-Tabelle melden musst (weder Test noch Löschen noch eine erlaubende ADR). Dann übergibst du trotz Exit 1 und führst jeden einzeln im Return auf (Datei:Zeile, Mutant, Tabellenzeile). Ebenso bei **Timeouts in geänderten Dateien**: qa-check weist sie gesondert aus und endet mit Exit 1, weil ein Timeout als erkannt zählt, ohne es zu belegen. Je Timeout klären – kann der Mutant eine Schleife oder ein Warten ohne Ende erzeugen, ist er erkannt; sonst wie einen Survivor behandeln – und jeden im Return aufführen. Nach Korrekturen durch Orchestrator-Feedback: `qa-check.py` erneut ausführen und aktualisierten Hash in der Antwort einschließen.
+3. **REFACTOR:** Checkliste aus [REFACTOR](../../docs/process/tdd-process.md#TDD-refactor) vollständig. Für schnelles Feedback während der Entwicklung: `python3 -m prozesscode.dotnet-stryker --mutate <neue-Datei>` (läuft nur auf der angegebenen Datei – kein Gesamtscore; ersetzt nicht den abschließenden `qa-check.py`-Lauf). Für die Übergabe, als **letzten** Schritt nach der vollständigen Checkliste: `python3 -m prozesscode.qa-check --layer backend` ausführen – jede Codeänderung danach, auch eine kosmetische, macht den Hash ungültig und kostet einen zweiten Volllauf. Das Script prüft die Test-Struktur vorab (bei einem Fehler bricht es nach Sekunden ab), startet dann den vollständigen Stryker-Lauf, prüft Suppressionen und Unit-Test-Muster und erzeugt den Verifikations-Hash. **Im Vordergrund mit `timeout: 600000` starten, nicht mit `run_in_background`:** Dann steht das Ergebnis im selben Zug. Ohne `timeout` verschiebt der Harness den Aufruf nach 120 s selbst in den Hintergrund; mit `timeout: 600000` lief ein Stryker-Lauf von 273 s im Vordergrund durch (Harness-Test 2026-11-13, Claude Code 2.1.323). Dasselbe gilt für Test- und Stryker-Läufe, die länger als zwei Minuten dauern können. Keinen Filter anhängen (`| tail`): Ein so gestarteter Lauf wurde trotz `timeout` nach 120 s verschoben, derselbe ohne Pipe nicht (S151, Ursache ungeklärt). Meldet das Tool-Ergebnis trotzdem eine Verschiebung, den Turn mit „Warte auf qa-check (Hintergrund, verschoben)" beenden – das Ende des Laufs weckt dich wieder, dann wertest du ihn aus wie im Vordergrund. 100 %-Score Pflicht – einzige Ausnahme: Survivors, die du nach der Survivor-Tabelle melden musst (weder Test noch Löschen noch eine erlaubende ADR). Dann übergibst du trotz Exit 1 und führst jeden einzeln im Return auf (Datei:Zeile, Mutant, Tabellenzeile). Ebenso bei **Timeouts in geänderten Dateien**: qa-check weist sie gesondert aus und endet mit Exit 1, weil ein Timeout als erkannt zählt, ohne es zu belegen. Je Timeout klären – kann der Mutant eine Schleife oder ein Warten ohne Ende erzeugen, ist er erkannt; sonst wie einen Survivor behandeln – und jeden im Return aufführen. Nach Korrekturen durch Orchestrator-Feedback: `qa-check.py` erneut ausführen und aktualisierten Hash in der Antwort einschließen.
 
 TDD-Abweichung (Test nach Code) ist ein Prozess-Fehler → sofort STOP und melden.
 
@@ -59,19 +59,29 @@ Doku) oder meldest sie als offen. Umgekehrt gilt dasselbe: Stützt sich deine PL
 Werkzeugverhalten (Matcher-Optionen wie `WithStrictOrdering()`, Vergleichssemantik, Defaults),
 nennst du den Beleg – ohne ihn ist es eine Vermutung und so zu kennzeichnen.
 
-**Ausgabe** – in dieser Reihenfolge: Ein zu langer Bericht kommt beim Orchestrator am Ende
-abgeschnitten an, das Unverzichtbare steht deshalb vorn. Dasselbe gilt für jede Zwischenmeldung
-(PLANUNG, `TEST-REVIEW:`): zuerst das Signal und die Rückfragen, dann knapp die Begründung; Details,
-die der Orchestrator im Diff selbst sieht, nicht nacherzählen.
+**Vor dem Return prüfen** – Pflicht, auch wo der Bericht das Ergebnis nicht mehr nennt. Jede
+Auffälligkeit bewertest du: Ist sie klar dein eigenes Versehen (eine Auflage übersehen, eine
+versehentlich berührte Datei), behebst du sie und fährst danach `qa-check` erneut. Ist das nicht
+klar, meldest du sie, statt sie zu beheben – eine Änderung, die du nicht selbst gemacht hast, nimmst
+du nie zurück; sie kann vom Orchestrator oder vom User stammen.
+- `git status --short`: Welche Änderungen stammen nicht aus deinem Auftrag?
+- Jeder Test-Lauf seit der Freigabe grün, `qa-check` der letzte Schritt nach der letzten Änderung.
+- Jede Auflage aus der PLANUNG-Antwort und dem Test-Review umgesetzt.
+- Jeder Survivor, jeder Timeout in einer geänderten Datei und jede Setup-Änderung nach der Freigabe eingeordnet.
+
+**Ausgabe** – höchstens rund 3.500 Zeichen, in dieser Reihenfolge. Jeder Bericht geht vollständig in
+den Kontext des Orchestrators, der den ganzen Lauf über mehrere Subagenten führt. Berichtet wird nur, was der
+Orchestrator nicht mit einem Aufruf selbst hat – Dateiliste (`git status`), Test-Verdikte und
+Score (`qa-check --verify`) nicht, ebenso keine Nacherzählung des Diffs. Für Zwischenmeldungen
+(PLANUNG, `TEST-REVIEW:`) gilt dasselbe: zuerst das Signal und die Rückfragen, dann knapp die Begründung.
 - `=== VERIFIKATIONS-HASH ===`-Block aus dem qa-check.py-Output unverändert einschließen
-- Gemeldete Survivors (nach der Survivor-Tabelle, nicht suppresst): je Datei:Zeile, Mutant, Tabellenzeile – oder „keine"
-- Timeouts in geänderten Dateien: je Datei:Zeile, Mutant, Einordnung (Schleife/Warten ohne Ende möglich – oder wie behandelt) – oder „keine"
-- Survivor-Tests nach der Freigabe: je Testname, getöteter Mutant, warum der Batch ihn nicht enthielt – oder „keine"
-- Liste geänderter Dateien (`git diff --name-only`)
-- Je Test-Run (RED, GREEN, REFACTOR-Grün) die Verdiktzeile des Wrappers, keine Rohausgabe
-- Kurzer Report: was implementiert, was bewusst weggelassen
-- Prozessverbesserung:
+- Was die Prüfung oben ergab und du nicht behoben hast, je mit deiner Einschätzung – oder nichts
+- Gemeldete Survivors (nach der Survivor-Tabelle, nicht suppresst): je Datei:Zeile, Mutant, Tabellenzeile; Timeouts in geänderten Dateien: je Datei:Zeile, Mutant, Einordnung (Schleife/Warten ohne Ende möglich – oder wie behandelt); Survivor-Tests nach der Freigabe: je Testname, getöteter Mutant, warum der Batch ihn nicht enthielt – sind alle drei leer, eine Zeile „Survivors, Timeouts, Survivor-Tests: keine"
+- Setup-Änderungen an freigegebenen Tests: je der Grund (den Diff zeigt der Freigabe-Audit) – oder „keine"
+- Prozessverbesserung (vor dem Report, weil sie nirgends sonst steht):
   - Was hat nicht wie erwartet funktioniert (Tooling-Fehler, schlechte Fehlermeldungen)?
   - Welche Schritte haben unnötig Zeit gekostet und hätten durch besseres Tooling oder klarere Anweisungen vermieden werden können?
   - Je Punkt `Ursache: <…> (geprüft: Version/Changelog/Issue, Messung, Code)` oder `Ursache: ungeklärt (geprüft: …)` und `Folge: behoben` oder `Folge: offen – <warum nicht behoben>`. Ein Umweg ohne geprüfte Ursache wiederholt sich im nächsten Lauf.
+  - Nur Punkte, die wiederkehren können: Behobenes ohne Wiederholungsgefahr, erwartetes Verhalten und eigene Fehlgriffe ohne Maßnahme weglassen.
   - Falls nichts aufgefallen ist: explizit "Keine Auffälligkeiten" schreiben.
+- Report – nur, was nicht im Diff steht: Entscheidungen samt Grund, bewusst Weggelassenes, offene Folgen

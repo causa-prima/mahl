@@ -110,22 +110,15 @@ def test_since_includes_the_stichtag_itself(tmp_path):
 
 
 @pytest.mark.aufrufpfad("tool-usage")
-def test_since_mit_lsp_meldet_sich_statt_still_zu_wirkungslos_zu_sein(monkeypatch, capsys):
-    """`--since` wirkt nur auf die Filter-Quote – das muss auffallen, nicht durchrutschen.
+def test_aufruf_mit_stichtag_nennt_ihn_in_der_ausgabe(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["tool-usage", "--since", "2026-08-08"])
+    tu.main()
+    assert "ab 2026-08-08" in capsys.readouterr().out
 
-    In S130 wurde `--lsp --since <datum>` aufgerufen, um die LSP-Nutzung ab einem Stichtag zu
-    messen. Die Ausgabe war identisch zum Lauf ohne `--since`: Die Option wird von `print_lsp`
-    gar nicht entgegengenommen. Beide Zahlen sahen plausibel aus, und nur der Vergleich beider
-    Läufe deckte auf, dass die zweite gar nicht die erhobene Größe war.
-    """
-    monkeypatch.setattr("sys.argv", ["tool-usage", "--lsp", "--since", "2026-07-25"])
+
+def test_stichtag_in_falscher_form_wird_abgelehnt(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["tool-usage", "--since", "8.8.2026"])
     with pytest.raises(SystemExit) as fehler:
         tu.main()
     assert fehler.value.code != 0
-    assert "--since" in capsys.readouterr().err
-
-
-def test_since_mit_filter_laeuft_weiterhin(monkeypatch):
-    """GEGENPROBE: Die Ablehnung darf den regulären Anwendungsfall nicht mittreffen."""
-    monkeypatch.setattr("sys.argv", ["tool-usage", "--filter", "--since", "2026-08-08"])
-    tu.main()  # kein SystemExit
+    assert "YYYY-MM-DD" in capsys.readouterr().err

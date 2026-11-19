@@ -33,6 +33,10 @@ def kopien(tmp_path, monkeypatch):
     monkeypatch.setattr(tde, "memory_path", lambda root=None: tmp_path / tde.MEMORY_FILE)
     monkeypatch.setattr(obs_mod, "obs_path",
                         lambda root=None: tmp_path / "docs/kaizen/observations.md")
+    # Diese Tests prüfen die Darstellung, nicht die Edit-Prüfungen – die laufen gegen die echten
+    # Tracker (eigener Block unten). An den Kopien schlügen sie teils an (Verweise im Repo),
+    # teils gar nicht (Zuständigkeit am Repo-Pfad); beides sagte hier nichts aus.
+    monkeypatch.setattr(td_diff, "edit_pruefungen", lambda _geschrieben, ohne=frozenset(): [])
     return tmp_path
 
 
@@ -135,6 +139,136 @@ def test_ein_scheiternder_befehl_nennt_den_grund_statt_eines_diffs(kopien):
     befund = td_diff.befund("python3 -m prozesscode.td set TD-S000-0 --titel X", kopien)
     assert befund["dateien"] == []
     assert "TD-S000-0" in befund["fehler"]
+
+
+# --- Edit-Prüfungen vor der Freigabe (OBS-S136-3) ------------------------------------
+# Gegen die echten Tracker im Repo statt gegen Kopien: Die Edit-Prüfungen entscheiden ihre
+# Zuständigkeit am Pfad relativ zum Repo, eine Kopie unter tmp_path sähen sie nie – der Test
+# wäre grün, ohne dass eine Prüfung lief. Sicher, weil befund() nichts schreibt (siehe
+# test_der_diff_schreibt_nichts).
+
+def _obs_add(beobachtung: str) -> str:
+    return ("python3 -m prozesscode.obs add --titel T --quelle User --impact MITTEL "
+            "--haeufigkeit gelegentlich --kategorie TOOLING --kontext Doku "
+            f"--beobachtung '{beobachtung}' --zusammen-erledigen keiner "
+            "--aufschubgrund 'User – später'")
+
+
+def test_text_der_eine_edit_pruefung_verletzt_wird_vor_der_freigabe_abgewiesen():
+    # // Given ein Eintrag, der auf einen Abschnitt per Nummer statt per Name verweist
+    befehl = _obs_add("siehe [Schritt 5](process.md#KPR-drain)")  # ordinal-ok – Testeingabe
+    # // When der Mod den Befehl vor dem Freigabedialog berechnet
+    befund = td_diff.befund(befehl)
+    # // Then weist er ihn mit der Meldung der Gliederungsprüfung ab, statt einen Diff zu zeigen
+    assert befund["dateien"] == []
+    assert befund["fehler"].startswith(td_diff.PRUEFUNG_SCHLAEGT_AN)
+    assert "Gliederungsnummer" in befund["fehler"]
+
+
+def test_sauberer_obs_text_besteht_die_edit_pruefungen():
+    # // Given ein gewöhnlicher neuer Eintrag ohne Regelverstoß
+    # // When der Mod ihn gegen den echten Tracker berechnet
+    befund = td_diff.befund(_obs_add("Ein Werkzeug meldet zu wenig."))
+    # // Then lässt keine Edit-Prüfung ihn scheitern – auch die für Handeinträge gebauten nicht
+    assert befund["fehler"] is None
+    assert befund["dateien"]
+
+
+def test_sauberer_td_text_besteht_die_edit_pruefungen():
+    # // Given ein neuer TD-Eintrag mit gültiger Fälligkeit (td pflegt AGENT_MEMORY nicht mit)
+    befehl = ("python3 -m prozesscode.td add --titel T --faellig 'Phase:MVP – vorher nicht nötig' "
+              "--problem P --behebung B --aufschubgrund 'User – später'")
+    # // When der Mod ihn gegen den echten Tracker berechnet
+    befund = td_diff.befund(befehl)
+    # // Then lässt keine Edit-Prüfung ihn scheitern
+    assert befund["fehler"] is None
+
+
+def _erste_id(datei: str, muster: str) -> str:
+    ids = re.findall(muster, (REPO / datei).read_text(encoding="utf-8"), re.M)
+    assert ids, f"Testvoraussetzung: {datei} braucht mindestens einen Eintrag"
+    return ids[0]
+
+
+@pytest.fixture
+def verweis_auf(tmp_path, monkeypatch):
+    """Ein Mini-Repo, in dem genau eine Datei auf die übergebene ID verweist.
+
+    Die Verweissuche liest ihre Repo-Wurzel aus einer Modulvariablen; umgebogen auf tmp_path
+    findet sie genau diesen Verweis, unabhängig davon, was der echte Bestand gerade enthält –
+    sonst müsste der Test still überspringen, sobald kein Eintrag mehr referenziert ist.
+    """
+    refs = import_module("prozesscode.hooks.check-dangling-refs")
+    monkeypatch.setattr(refs, "_REPO_ROOT", tmp_path)
+
+    def anlegen(eid: str) -> None:
+        (tmp_path / "docs").mkdir(exist_ok=True)
+        (tmp_path / "docs" / "verweis.md").write_text(f"Siehe {eid}.\n", encoding="utf-8")
+    return anlegen
+
+
+def test_td_remove_eines_referenzierten_eintrags_wird_vor_der_freigabe_abgewiesen(verweis_auf):
+    # // Given ein TD-Eintrag, auf den noch verwiesen wird
+    tid = _erste_id(tde.TD_FILE, r"^## (TD-S\d{3}-\d+)")
+    verweis_auf(tid)
+    # // When `td remove` ihn löschen will
+    befund = td_diff.befund(f"python3 -m prozesscode.td remove {tid}")
+    # // Then greift die Verweisprüfung, die bisher nur bei Edit lief
+    assert "Dangling-Referenzen" in befund["fehler"]
+    assert "docs/verweis.md" in befund["fehler"]
+
+
+def test_trotz_verweisen_wird_von_der_verweispruefung_nicht_kassiert(verweis_auf):
+    # // Given ein OQ-Eintrag, auf den noch verwiesen wird
+    oid = _erste_id("docs/open-questions.md", r"^## (OQ-S\d{3}-\d+)")
+    verweis_auf(oid)
+    # // When er ausdrücklich trotz Verweisen gelöscht wird
+    befund = td_diff.befund(f"python3 -m prozesscode.oq remove {oid} --trotz-verweisen")
+    # // Then lässt die Prüfkette den Befehl durch – über die echte Kette, nicht über eine Attrappe
+    assert befund["fehler"] is None
+
+
+def test_ohne_trotz_verweisen_bleibt_das_loeschen_gesperrt(verweis_auf):
+    # // Given derselbe referenzierte OQ-Eintrag
+    oid = _erste_id("docs/open-questions.md", r"^## (OQ-S\d{3}-\d+)")
+    verweis_auf(oid)
+    # // When er ohne den Schalter gelöscht werden soll
+    befund = td_diff.befund(f"python3 -m prozesscode.oq remove {oid}")
+    # // Then weist schon das Werkzeug ihn ab (Gegenstück zum vorigen Test)
+    assert "wird noch referenziert" in befund["fehler"]
+
+
+def test_die_auslassung_nennt_einen_check_den_es_gibt():
+    # Ein umbenannter Check machte die Auslassung lautlos wirkungslos; collect_reasons wirft
+    # zwar bei unbekannten Namen, aber erst, wenn jemand --trotz-verweisen benutzt.
+    assert td_diff._OHNE_TROTZ_VERWEISEN <= set(td_diff._dispatch.CHECKS)
+
+
+def test_jede_geschriebene_datei_geht_durch_die_pruefkette(monkeypatch):
+    # // Given ein Befehl, der zwei Dateien schreibt (`td set --faellig jetzt` pflegt AGENT_MEMORY mit)
+    tid = _erste_id(tde.TD_FILE, r"^## (TD-S\d{3}-\d+)")
+    geprueft: list[str] = []
+    monkeypatch.setattr(td_diff._dispatch, "collect_reasons", lambda data, ohne=frozenset():
+                        geprueft.append(Path(data["tool_input"]["file_path"]).name) or [])
+    # // When der Mod ihn berechnet
+    td_diff.befund(f'python3 -m prozesscode.td set {tid} --faellig "jetzt – Test" --done "X"')
+    # // Then wird jede der beiden Dateien geprüft, nicht nur die erste
+    assert sorted(geprueft) == ["AGENT_MEMORY.md", "tech-debt.md"]
+
+
+def test_ein_werfender_check_faellt_nicht_still_aus(monkeypatch):
+    # // Given eine Prüfkette mit einem Check, der wirft (fail-open: er darf nichts blockieren)
+    class Kaputt:
+        @staticmethod
+        def check(_data):
+            raise RuntimeError("defekt")
+    monkeypatch.setattr(td_diff._dispatch, "CHECKS", ["check-kaputt"])
+    monkeypatch.setattr(td_diff._dispatch, "import_module", lambda _name: Kaputt)
+    # // When ein Tracker-Befehl berechnet wird
+    befund = td_diff.befund(_obs_add("Ein Werkzeug meldet zu wenig."))
+    # // Then blockiert er nicht, aber die Warnung im Pane nennt den ausgefallenen Check
+    assert befund["fehler"] is None
+    assert "check-kaputt" in befund["warnung"]
 
 
 def test_ungueltige_argumente_nennen_die_meldung_von_argparse(kopien):

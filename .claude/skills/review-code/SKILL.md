@@ -91,8 +91,11 @@ Agent-Prompts enthalten (je Agent):
   ([Befehlsauswahl](../../../docs/process/dev-workflow.md#DEV-befehlsauswahl)). Was sich nur
   schreibend prüfen ließe, kennzeichnet das Finding als offene Prüfung. E2E (`playwright-test`)
   ist erlaubt, aber nur ein Lauf zur Zeit: Ein zweiter bricht mit „Konkurrierender E2E-Lauf aktiv"
-  ab, bevor er baut. Dann später erneut oder als offene Prüfung melden. Während die Auditoren
-  laufen, startet der Orchestrator keinen eigenen E2E- oder Mutationslauf.
+  ab, bevor er baut. Dann später erneut oder als offene Prüfung melden. Backend-Tests
+  (`dotnet-test`, gern mit `--filter`) sind ebenfalls erlaubt; parallele Läufe wartet der Wrapper
+  bis zu 60 s ab („Warte auf laufenden Backend-Testlauf"), erst danach bricht er ab. Im
+  Vordergrund aufrufen, nie mit `run_in_background`. Während die Auditoren laufen, startet der
+  Orchestrator keinen eigenen Test-, E2E- oder Mutationslauf.
 - **ADR-Volltexte im Prompt, plus Auftrag zur eigenen Gegenprobe.** Zweigleisig:
   1. Die vom Orchestrator als relevant eingestuften ADRs **im Prompt ausschreiben**.
   2. Den Auditor ausdrücklich beauftragen, **selbst nachzusehen** (`python3 -m prozesscode.decisions

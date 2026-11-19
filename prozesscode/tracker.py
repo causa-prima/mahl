@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Übersicht über alle Eintrags-Tracker – ein Hilfe-Aufruf statt fünf.
+"""Übersicht über alle Eintrags-Tracker – ein Hilfe-Aufruf statt einem je Werkzeug.
 
 Warum (OBS-S120-2): Das Projekt führt fünf Dokumente mit strukturierten Einträgen, und wer
 einen anlegen wollte, musste erst wissen, welches Werkzeug für seine Datei zuständig ist und
@@ -43,6 +43,10 @@ TRACKER = [
     ("docs/open-questions.md", "oq",
      "Noch nicht entschiedene Frage am Produkt, mit dem User zu klären",
      "wird gelöscht"),
+    ("docs/kaizen/countermeasures.md", "cm",
+     "Stehende Maßnahme gegen ein wiederkehrendes Prozessproblem (Prozess; nur lesend, "
+     "Pflege per Edit in der Retro)",
+     "bleibt als BEWÄHRT/OBSOLET stehen"),
 ]
 
 _UNTERBEFEHL = re.compile(r"^\s{2,}\{([a-z,\-]+)\}", re.M)

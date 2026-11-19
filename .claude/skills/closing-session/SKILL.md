@@ -86,9 +86,9 @@ user-invocable: true
    existierende CM-ID oder `neu`, falls keine bestehende Maßnahme passt. Der Anschluss entsteht
    damit hier, solange der Kontext frisch ist; die Retro überträgt ihn.
    **Passende Maßnahme finden, ohne die Datei (>100 KB) ganz zu lesen:** erst alle Titel listen –
-   `grep -n "^### CM-S" docs/kaizen/countermeasures.md` –, daraus 1–3 Kandidaten wählen und nur
-   deren Abschnitt per `Read` mit `offset`/`limit` ab der gelisteten Zeile lesen; erst der Volltext
-   (Abgrenzung) entscheidet, ob sie wirklich passt.
+   `python3 -m prozesscode.cm list` –, daraus 1–3 Kandidaten wählen und nur deren Volltext holen
+   (`python3 -m prozesscode.cm get CM-SNNN-N`); erst der Volltext (Abgrenzung) entscheidet, ob
+   sie wirklich passt.
 
    Eintrag-Format + Erfassungs-Test + Beispiel: **Header von `docs/kaizen/lessons_learned.md`**. Impact/Kategorie-Definitionen + Reaktionsregeln: `docs/kaizen/process.md`
 

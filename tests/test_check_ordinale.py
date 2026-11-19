@@ -103,4 +103,62 @@ def test_meldung_zitiert_gekuerzt_und_hoechstens_zehn_funde(md):
     funde = [z for z in zeilen if z.startswith("  - ")]
     assert zeilen[0] + "\n" == check_ordinale._KOPF
     assert len(funde) == check_ordinale._MAX_HITS
-    assert funde[0].endswith(f"`{lang[:check_ordinale._MAX_ZEICHEN]}`")
+    assert funde[0].endswith(f"`{lang[:check_ordinale._MAX_ZEICHEN]}…`")
+
+
+def test_in_einer_langen_zeile_zitiert_die_meldung_die_fundstelle_statt_des_anfangs(md):
+    # // Given eine lange Zeile, wie sie die Tracker-Werkzeuge schreiben (ein Feld = eine Zeile),
+    #    mit dem Verstoß weit hinter der Kürzungsgrenze
+    md.write_text("# Guide\n\nText.\n", encoding="utf-8")
+    vorspann = "- Beobachtung: " + "Eine lange Beschreibung ohne jede Nummer. " * 6
+    zeile = vorspann + "Siehe [Schritt 5](#KPR-drain) dort."  # ordinal-ok – Testeingabe
+    # // When die Zeile hinzukommt
+    grund = check_ordinale.check(_edit(md, "Text.", "Text.\n\n" + zeile))
+    # // Then zitiert die Meldung den Satz mit dem Verstoß, als Ausschnitt gekennzeichnet
+    [fund] = [z for z in grund.split("\n") if z.startswith("  - ")]
+    assert "[Schritt 5](#KPR-drain)" in fund  # ordinal-ok – Testeingabe
+    assert "`…Siehe" in fund
+
+
+# --- Ausschnitt: was genau zitiert wird ------------------------------------------
+_VERSTOSS = "Siehe [Schritt 5](#KPR-drain) dort"  # ordinal-ok – Testeingabe
+_VORSPANN = "Eine lange Beschreibung ohne jede Nummer. " * 3
+_M = check_ordinale._MAX_ZEICHEN
+
+
+def _zitat(datei, zeile):
+    """Der zitierte Ausschnitt aus der Meldung für eine hinzukommende Zeile."""
+    datei.write_text("Text.\n", encoding="utf-8")
+    grund = check_ordinale.check(_edit(datei, "Text.", "Text.\n\n" + zeile))
+    [fund] = [z for z in grund.split("\n") if z.startswith("  - ")]
+    return fund.split("`", 1)[1].rsplit("`", 1)[0]
+
+
+def _satz_der_laenge(n):
+    """Ein Satz mit dem Verstoß, genau n Zeichen lang."""
+    return _VERSTOSS + "y" * (n - len(_VERSTOSS) - 1) + "."
+
+
+@pytest.mark.parametrize("zeile, erwartet", [
+    pytest.param("Vorweg. " + _satz_der_laenge(_M - 8), "Vorweg. " + _satz_der_laenge(_M - 8),
+                 id="genau an der Grenze: ganz, ohne Kürzungszeichen"),
+    pytest.param(_VERSTOSS + ". " + _VORSPANN.strip(), _VERSTOSS + ".…",
+                 id="Verstoß vorn: nur hinten gekürzt"),
+    pytest.param(_VORSPANN + _satz_der_laenge(_M), "…" + _satz_der_laenge(_M),
+                 id="Verstoß am Ende, Satz genau an der Grenze: nur vorn gekürzt"),
+    pytest.param(_VORSPANN + _satz_der_laenge(_M + 20), "…" + _satz_der_laenge(_M + 20)[:_M] + "…",
+                 id="Satz selbst zu lang: beidseitig gekürzt"),
+    pytest.param(_VORSPANN + "Gilt für die Schritte (3–5) dort.", "…Gilt für die Schritte (3–5) dort.",
+                 id="Markdown-Muster: der Satz wird mit derselben Dateiart geprüft"),
+])
+def test_ausschnitt_kennzeichnet_genau_die_gekuerzten_seiten(md, zeile, erwartet):
+    assert _zitat(md, zeile) == erwartet
+
+
+def test_ausschnitt_im_code_prueft_den_satz_als_code(tmp_path, monkeypatch):
+    """Im Code zählt der Klartext-Verweis, den es in Markdown nicht gibt – der Satz muss mit
+    derselben Dateiart geprüft werden wie die Zeile, sonst fiele er auf den Zeilenanfang zurück."""
+    monkeypatch.setattr(check_ordinale.anchors, "REPO_ROOT", tmp_path)
+    satz = "Siehe docs/x.md#KPR-drain Schritt 5 dort."  # ordinal-ok – Testeingabe
+    zeile = "# " + _VORSPANN + satz
+    assert _zitat(tmp_path / "skript.py", zeile) == "…" + satz

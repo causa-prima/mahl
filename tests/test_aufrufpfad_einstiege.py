@@ -105,7 +105,11 @@ def test_bash_hook_fuehrt_absoluten_pfad_ausserhalb_des_repo_roots_unveraendert_
                                       f"python3 {root}/tests/test-bash-permission.py", cwd)
     assert entscheidung["permissionDecision"] == "allow"
     assert "updatedInput" not in entscheidung
-    assert "additionalContext" not in entscheidung
+    # Kein Hinweis auf eine Pfad-Kürzung. In `Client/` steht stattdessen der Hinweis auf das
+    # verrutschte Arbeitsverzeichnis (OBS-S139-1), ohne `cwd` gar keiner.
+    hook = import_module("prozesscode.hooks.check-bash-permission")
+    erwartet = hook._CWD_HINWEIS.format(verzeichnis="Client", root=root) if cwd_relativ else None
+    assert entscheidung.get("additionalContext") == erwartet
 
 
 def test_bash_hook_entfernt_filter_auch_ausserhalb_des_repo_roots(tmp_path, monkeypatch, capsys):

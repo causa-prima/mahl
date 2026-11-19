@@ -10,6 +10,9 @@ from collections import Counter
 
 
 from pathlib import Path
+
+import pytest
+
 from prozesscode import _session_logs as sl
 
 
@@ -130,6 +133,37 @@ def test_falls_back_to_heuristic_without_any_skill():
 
 def test_unknown_when_nothing_at_all_is_available():
     assert sl.session_type("abc", Counter(), {}, set()) == (sl.UNBEKANNT, "-")
+
+
+# `write-code` und `review-code` laufen auch bei Prozess-Code (S138 gefunden): Als prägende
+# Skills machten sie jede Werkzeug- und Drain-Session zur Implementierung – seit 2026-08-04
+# galten so 11 Sessions als Implementierung, bei praktisch keinem echten Lauf.
+@pytest.mark.parametrize("skill", ["write-code", "review-code"])
+def test_code_skills_allein_machen_keine_implementierung(skill):
+    art = sl.session_type("abc", Counter({skill: 40}), {}, {"prozesscode/obs.py"})
+    assert art == ("tooling", "heuristik")
+
+
+def test_code_skills_ueberstimmen_den_lauf_nicht():
+    """Die Implementer rufen `write-code` je Schicht – ihre Records überwiegen leicht."""
+    skills = Counter({"implementing-scenario": 10, "write-code": 80, "review-code": 30})
+    assert sl.session_type("abc", skills, {}) == ("implementierung", "skill")
+
+
+def test_committing_praegt_keine_session():
+    """`committing` läuft am Ende fast jeder Session – in S149 (Retro) war es nach `write-code`
+    der häufigste Skill und schob die Session in die Edit-Heuristik."""
+    skills = Counter({"write-code": 162, "committing": 35, "kaizen": 15, "closing-session": 4})
+    assert sl.session_type("abc", skills, {}) == ("retro", "skill")
+
+
+def test_mod_bau_ist_tooling():
+    assert sl.session_type("abc", Counter({"plugin-authoring": 40}), {}) == ("tooling", "skill")
+
+
+def test_code_skills_ueberstimmen_den_drain_nicht():
+    skills = Counter({"draining-observations": 10, "write-code": 80})
+    assert sl.session_type("abc", skills, {})[0] == "drain"
 
 
 # --- Log-Parsing -------------------------------------------------------------
@@ -259,3 +293,74 @@ def test_datum_uebersteht_kaputte_zeilen(tmp_path):
     pfad = tmp_path / "kaputt.jsonl"
     pfad.write_text('{kein json\n{"timestamp": "2026-08-01T00:00:00Z"}\n', encoding="utf-8")
     assert sl.session_datum(pfad) == "2026-08-01"
+
+
+# --- Agententyp je Subagenten-Log -------------------------------------------
+# Die Art einer Session lässt sich nur grob bestimmen: Sessions sind gemischt (Durchsicht und
+# Drain, Querschnitt und Lauf) und enthalten 1–3 Läufe. Ein Subagenten-Aufruf dagegen hat
+# genau einen Typ, und Claude Code schreibt ihn neben das Log.
+def test_agententyp_steht_in_der_meta_datei_neben_dem_log(tmp_path):
+    log = tmp_path / "agent-a1.jsonl"
+    log.write_text("", encoding="utf-8")
+    (tmp_path / "agent-a1.meta.json").write_text(
+        json.dumps({"agentType": "frontend-layer-implementer", "finished": True}), encoding="utf-8")
+    assert sl.agent_type(log) == "frontend-layer-implementer"
+
+
+def test_agententyp_eines_teammates_ist_der_definierte_nicht_sein_name(tmp_path):
+    """Mit Agent-Teams (bis S152 gesetzt) trug `agentType` den vergebenen Namen; der Typ der
+    Definition steht dann in `spawnedAgentType` (Form aus einem echten Log, Claude Code 2.1.328)."""
+    (tmp_path / "agent-a1.meta.json").write_text(json.dumps({
+        "agentType": "backend-recipes-2", "name": "backend-recipes-2",
+        "taskKind": "in_process_teammate", "customAgentType": "backend-layer-implementer",
+        "spawnedAgentType": "backend-layer-implementer"}), encoding="utf-8")
+    assert sl.agent_type(tmp_path / "agent-a1.jsonl") == "backend-layer-implementer"
+
+
+def test_agententyp_ohne_meta_datei_ist_unbekannt(tmp_path):
+    assert sl.agent_type(tmp_path / "agent-a1.jsonl") == sl.UNBEKANNT
+
+
+def test_agententyp_bei_kaputter_meta_datei_ist_unbekannt(tmp_path):
+    (tmp_path / "agent-a1.meta.json").write_text("{kein json", encoding="utf-8")
+    assert sl.agent_type(tmp_path / "agent-a1.jsonl") == sl.UNBEKANNT
+
+
+# --- Regel-Zitate und Abschnitts-Abrufe (OBS-S114-2) --------------------------
+# Jedes Auditor-Finding nennt seit S146 den Anker der verletzten Regel („Regel: <ANKER>").
+# Gezählt wird nur, was der Agent selbst schreibt: Der Auftrag (user) erklärt das Format mit
+# Beispielen, und Werkzeug-Ausgaben zitieren Doku, ohne dass eine Regel verletzt wäre.
+def test_regel_zitate_zaehlen_nur_den_eigenen_text_des_agenten():
+    records = [
+        _rec({"type": "text", "text": "Regel: <ANKER> bzw. Regel: keine"}, typ="user"),
+        _rec({"type": "tool_result", "tool_use_id": "t1", "content": "Regel: CGG-kiss"}, typ="user"),
+        _rec({"type": "text", "text": "F1 … Regel: CGG-naming\nF2 … Regel: keine\nF3 Regel: CGG-naming"}),
+    ]
+    assert sl.regel_zitate(records) == Counter({"CGG-naming": 2, "keine": 1})
+
+
+def test_regel_zitate_kommen_aus_dem_bericht_ohne_den_entwurf_doppelt_zu_zaehlen():
+    """Subagenten liefern per `SubagentHandback`, Teammates per `SendMessage` (Form aus echten
+    Logs, 2.1.328). Steht derselbe Befund vorher als Entwurf im Text, zählt nur der Bericht."""
+    def werkzeug(name, text):
+        return _rec({"type": "tool_use", "name": name, "input": {"message": text}})
+    records = [
+        _rec({"type": "text", "text": "Entwurf: F1 Regel: CGG-naming"}),
+        werkzeug("SubagentHandback", "F1 Regel: CGG-naming\nF2 Regel: CGT-result"),
+        werkzeug("SendMessage", "Nachtrag F3 Regel: keine"),
+        werkzeug("Bash", "echo Regel: CGG-kiss"),
+    ]
+    assert sl.regel_zitate(records) == Counter({"CGG-naming": 1, "CGT-result": 1, "keine": 1})
+
+
+def test_doc_abrufe_zaehlen_jeden_get_im_befehl():
+    def bash(befehl):
+        return _rec({"type": "tool_use", "name": "Bash", "input": {"command": befehl}})
+    records = [
+        bash("python3 -m prozesscode.doc get CGT-result"),
+        bash("python3 -m prozesscode.doc get CGG-kiss; python3 -m prozesscode.doc get CGT-result"),
+        bash("python3 prozesscode/doc.py get TDD-refactor --zeilen 40"),
+        bash("python3 -m prozesscode.doc toc docs/guidelines/coding-guideline-general.md"),
+        bash("python3 -m prozesscode.decisions get ADR-0042"),
+    ]
+    assert sl.doc_abrufe(records) == Counter({"CGT-result": 2, "CGG-kiss": 1, "TDD-refactor": 1})

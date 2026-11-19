@@ -30,7 +30,7 @@
 | Workflow-/Prozess-Audit durchführen | Skill `review-workflow` verwenden |
 | Projektdokumentation prüfen | Skill `review-docs` verwenden |
 | Learnings dokumentieren | `docs/kaizen/lessons_learned.md` (Format: `docs/kaizen/process.md`) |
-| Tracker-Eintrag lesen/schreiben (OBS, LL, TD, OQ, ADR) | `python3 -m prozesscode.tracker` zeigt, welches Werkzeug welchen Tracker pflegt und welche Befehle es kennt – dann `obs.py` / `lessons.py` / `td.py` / `oq.py` / `decisions.py`, statt Read/Edit auf der ganzen Datei |
+| Tracker-Eintrag lesen/schreiben (OBS, LL, TD, OQ, ADR, CM) | `python3 -m prozesscode.tracker` zeigt, welches Werkzeug welchen Tracker pflegt und welche Befehle es kennt – dann `obs.py` / `lessons.py` / `td.py` / `oq.py` / `decisions.py` / `cm.py` (nur lesend), statt Read/Edit auf der ganzen Datei |
 | Wohin geht das Read-/Token-Budget? | `python3 -m prozesscode.read-breakdown` (nach Session-Art), `tool-usage.py` |
 | Güte des Prozess-Codes messen (Guard-Auslösungen, Testabdeckung, Mutation) | Skill `kaizen` (Retro-Schritte dazu), Skill `write-code` → Prozess-Code (`mutmut-run`) |
 | Skill schreiben oder ändern | `.claude/agents/workflow-auditor.md`, Abschnitt [Ressourceneffizienz](.claude/agents/workflow-auditor.md#WFA-ressourceneffizienz) – deterministische Schritte als Script |

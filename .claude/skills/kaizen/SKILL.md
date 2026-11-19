@@ -179,7 +179,10 @@ grep "^  CM-Bezug:" docs/kaizen/lessons_learned.md | sort | uniq -c
 
 Erst danach der Review der bestehenden Einträge.
 
-Lies `docs/kaizen/countermeasures.md`. **Kein Eintrag – CM, LL oder OBS – wird dem User nur per ID
+Verschaff dir die Übersicht mit `python3 -m prozesscode.cm list` (ID, Status, Titel; `--status
+AKTIV` filtert) und hol jeden Eintrag, den du bewertest, mit `python3 -m prozesscode.cm get
+<ID>` – die Datei ist größer als die Read-Grenze, ein Read zeigt nur ihren Anfang und keinen
+BEWÄHRT-Eintrag. **Kein Eintrag – CM, LL oder OBS – wird dem User nur per ID
 vorgelegt**: Kurztitel und ein paar erklärende Sätze gehören dazu
 ([`principles.md`, Kommunikation](../../../docs/kaizen/principles.md#KPI-kommunikation)).
 Für jeden AKTIV/OFFEN-Eintrag:

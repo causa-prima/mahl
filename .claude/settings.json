@@ -107,7 +107,6 @@
     ]
   },
   "enabledPlugins": {
-    "typescript-lsp@claude-plugins-official": true,
     "tracker-diff@mahl-mods": true,
     "naechste-aufgabe@mahl-mods": true
   }

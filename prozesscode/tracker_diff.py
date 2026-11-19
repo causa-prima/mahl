@@ -35,6 +35,13 @@ from ._cli import Parser
 from . import tracker_preview
 from ._util import REPO_ROOT
 
+_dispatch = import_module("prozesscode.hooks.dispatch-edit-write")
+
+_OHNE_TROTZ_VERWEISEN = frozenset({"check-dangling-refs"})
+
+PRUEFUNG_SCHLAEGT_AN = ("Eine Edit-Prüfung schlägt an – noch nichts geschrieben. Befund beheben, "
+                        "dann den Befehl erneut senden:\n\n")
+
 _WARNUNG = ("Shell-Metazeichen im Befehl (` oder $(…)): Die Shell wertet sie aus, bevor das "
             "Script sie sieht – der Diff zeigt sie wörtlich.")
 
@@ -196,6 +203,26 @@ def _relativ(pfad: Path, root: Path) -> str:
         return str(pfad)
 
 
+def edit_pruefungen(geschrieben: dict[Path, str], ohne: frozenset[str] = frozenset()) -> list[str]:
+    """Die Befunde der Edit-Prüfungen, als hätte der Agent den neuen Inhalt per Write geschrieben.
+
+    Warum (OBS-S136-3): Die Doku-Prüfungen (Gliederungsnummern, Anker, Verweisrichtung, …)
+    hängen am Edit/Write-Hook. Was ein Tracker-Werkzeug per Bash schreibt, sahen sie nie – in
+    S136 kam so eine Zeilenangabe in einen Eintrag, die erst ein Bestandslauf fand. Hier liegt
+    der neue Inhalt schon vor der Freigabe fertig vor; ein nachgebildeter Write-Aufruf geht durch
+    dieselbe Prüfkette wie ein echter, also auch durch jede, die dort später hinzukommt.
+
+    Zwei Unterschiede zum echten Edit, beide hingenommen: Schreibt ein Befehl zwei Dateien, sieht
+    die Prüfung der einen die andere noch im alten Stand. Und ein Anschlagen landet im
+    Guard-Protokoll wie ein abgewiesener Edit – als Wirkungsnachweis gewollt, nur ist die Quelle
+    dort nicht unterscheidbar.
+    """
+    return [befund for pfad, neu in geschrieben.items()
+            for befund in _dispatch.collect_reasons(
+                {"tool_name": "Write", "tool_input": {"file_path": str(pfad), "content": neu}},
+                ohne=ohne)]
+
+
 def befund(command: str, root: Path = REPO_ROOT) -> dict | None:
     """Was der Befehl schriebe – None, wenn er kein Tracker-Schreibbefehl ist."""
     aufruf = tracker_preview.schreibaufruf(command)
@@ -221,6 +248,19 @@ def befund(command: str, root: Path = REPO_ROOT) -> dict | None:
     warnung = _WARNUNG if tracker_preview.metazeichen(command) else None
     if code not in (None, 0):
         return {"dateien": [], "fehler": fehler.getvalue().strip() or f"Exit {code}",
+                "warnung": warnung}
+    # `--trotz-verweisen` (oq remove) ist die ausdrückliche Erlaubnis, Verweise stehen zu lassen;
+    # die Verweisprüfung darf sie nicht wieder kassieren.
+    ohne = _OHNE_TROTZ_VERWEISEN if "--trotz-verweisen" in argumente else frozenset()
+    # Ein Check, der wirft, blockiert nicht (fail-open) und meldet sich auf stderr – das sähe hier
+    # niemand, der Mod liest nur stdout. Deshalb wird die Meldung zur Warnung im Pane.
+    ausfaelle = io.StringIO()
+    with contextlib.redirect_stderr(ausfaelle):
+        befunde = edit_pruefungen(geschrieben, ohne)
+    if ausfaelle.getvalue().strip():
+        warnung = "\n".join(filter(None, [warnung, ausfaelle.getvalue().strip()]))
+    if befunde:
+        return {"dateien": [], "fehler": PRUEFUNG_SCHLAEGT_AN + "\n\n".join(befunde),
                 "warnung": warnung}
     dateien = [{"datei": _relativ(pfad, root),
                 "bloecke": bloecke(pfad.read_text(encoding="utf-8") if pfad.exists() else "", neu)}

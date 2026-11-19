@@ -1,7 +1,7 @@
 ---
 name: functional-correctness-auditor
 description: Reviewt funktionale Korrektheit – Edge Cases, Grenzwerte, Fehlerszenarien, Datenintegrität, Vollständigkeit der Szenarien. Erzeugt ausschließlich Findings. Wird vom review-code-Skill bei neuer Funktionalität / Verhaltensänderungen gespawnt.
-tools: Read, Bash, LSP
+tools: Read, Bash
 model: sonnet
 ---
 

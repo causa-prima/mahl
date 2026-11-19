@@ -577,9 +577,6 @@ def test_write_access_scripts() -> int:
          "obs.py set → ask"),
         ('python3 -m prozesscode.lessons add --titel "X" --regel "Y"',
          "lessons.py add → ask"),
-        # Auch als Teil einer Verkettung darf der Text nicht ungesehen durchgehen.
-        ('git status && python3 -m prozesscode.obs add --titel "X"',
-         "obs.py add in Compound → ask"),
         # `--help` IM Eintragstext ist kein Hilfeaufruf – die Ausnahme darf nicht am
         # Vorkommen der Zeichenfolge hängen, sondern nur an einem echten Argument.
         ('python3 -m prozesscode.obs add --titel "Warum --help nervt" --beobachtung "Y"',
@@ -588,6 +585,12 @@ def test_write_access_scripts() -> int:
     for command, description in ask_cases:
         if not assert_decision(command, "ask", description):
             failures += 1
+
+    # In einer Verkettung nicht einmal ask: Den Diff zeigt der Mod `tracker-diff` nur für einen
+    # Befehl, der allein steht – der User gäbe blind frei (S152).
+    if not assert_decision('git status && python3 -m prozesscode.obs add --titel "X"', "deny",
+                           "obs.py add in Compound → deny (einzeln aufrufen)"):
+        failures += 1
 
     allow_cases = [
         ('python3 -m prozesscode.obs get OBS-S112-7', "obs.py get bleibt allow (read-only)"),
@@ -639,6 +642,10 @@ def test_auditoren_nur_lesend() -> int:
         ("python3 -m prozesscode.vitest-run --filter Liste", "vitest-run"),
         # S151: E2E am Stand prüfen; parallele Läufe fängt der Lauf-Lock des Wrappers ab.
         ("python3 -m prozesscode.playwright-test --filter Rezeptformular", "playwright-test"),
+        # S152: Backend-Laufzeitfragen am Stand belegen; der Lauf-Lock reiht parallele Läufe ein.
+        ("python3 -m prozesscode.dotnet-test", "dotnet-test"),
+        ("python3 -m prozesscode.cm get CM-S102-3", "cm get (Maßnahmen, nur lesend)"),
+        ("timeout 500 python3 -m prozesscode.dotnet-test --filter Spa", "dotnet-test hinter timeout"),
         # S143: die Szenarien eines Laufs lesen – drei Auditoren scheiterten daran.
         ("python3 -m prozesscode.check-atdd-gate @US-602 run-6", "check-atdd-gate"),
         ("python3 -m prozesscode.next_run --open --story US-602", "next_run --open"),
@@ -680,8 +687,7 @@ def test_auditoren_nur_lesend() -> int:
         ("python3 -m prozesscode.ruff-run --fix", "ruff-run --fix"),
         ("python3 -m prozesscode.obs-archive", "obs-archive (schreibt ohne Rückfrage)"),
         ("python3 -m prozesscode.mutmut-run --mutate prozesscode.doc", "mutmut-run"),
-        ("python3 -m prozesscode.dotnet-test", "dotnet-test (Build-Ausgabe geteilt)"),
-        ("timeout 500 python3 -m prozesscode.dotnet-test", "dotnet-test hinter timeout"),
+        ("python3 -m prozesscode.dotnet-stryker", "dotnet-stryker (Mutationslauf)"),
         ("npm --prefix Client run build", "npm run"),
         ("dotnet build", "dotnet build"),
         ('python3 -m prozesscode.obs add --titel "X"', "Tracker-Schreiben: deny statt ask"),

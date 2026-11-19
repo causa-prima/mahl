@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wie nutzen die Agenten ihr Werkzeug? Zwei terminierte Wiedervorlage-Messungen.
+"""Wie nutzen die Agenten ihr Werkzeug? Die Filter-Quote der Wrapper-Läufe.
 
 **Filter-Quote (OBS-S085-3):** Wie oft wird die Ausgabe eines Wrapper-Scripts nachgelagert
 durch `| grep`/`| tail`/… gefiltert, obwohl die Wrapper seit S109 im Erfolgsfall nur noch das
@@ -7,15 +7,8 @@ Verdikt ausgeben? Sinkt die Quote nicht, ist die Gewohnheits-These bestätigt un
 mechanischer Guard wirksam. Gezählt wird ausschließlich die AUSFÜHRUNG eines Wrappers, nicht
 das Lesen seiner Datei (`grep … qa-check.py`) – sonst zählte Datei-Inspektion als Filterung.
 
-**LSP-Nutzung (OBS-S085-4):** Wird der Language-Server tatsächlich benutzt? Die Bewertung
-hängt daran; eine dritte Nullrunde bedeutet laut Eintrag verwerfen. Die Aufschlüsselung nach
-Session-Art ist hier entscheidend: LSP soll in implementing-scenario-Sessions helfen, und nur
-dort ist die Nullnutzung ein Urteil über das Werkzeug statt über die Gelegenheit.
-
 Beispiele:
-  python3 -m prozesscode.tool-usage              # beide Messungen
-  python3 -m prozesscode.tool-usage --filter     # nur die Filter-Quote
-  python3 -m prozesscode.tool-usage --lsp        # nur die LSP-Nutzung
+  python3 -m prozesscode.tool-usage              # Filter-Quote je Monat
   python3 -m prozesscode.tool-usage --verbose    # zusätzlich Beispielzeilen
   python3 -m prozesscode.tool-usage --since 2026-07-30   # nur nach dem S109-Umbau
 
@@ -25,20 +18,10 @@ ließe sich die Wirkung nur aus Monatssummen ableiten – rechnen statt messen.
 """
 import argparse
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 
 
 from ._cli import Parser
-from ._session_logs import (  # noqa: E402
-    content_blocks,
-    load_mapping,
-    load_records,
-    project_log_dir,
-    session_logs,
-    session_type,
-    skills_in,
-    edited_paths,
-)
 from ._util import REPO_ROOT  # noqa: E402
 
 ALLOWED_LOG = REPO_ROOT / ".claude" / "tmp" / "allowed-commands.log"
@@ -148,68 +131,12 @@ def print_filter_quote(verbose: bool, since: str | None = None) -> None:
             print(f"    {example}")
 
 
-def measure_lsp() -> tuple[Counter, Counter, dict[str, Counter], int]:
-    """(Calls je Session-Art, Operationen, Sessions je Art mit/ohne LSP, Sessions gesamt)."""
-    log_dir = project_log_dir()
-    mapping = load_mapping()
-    calls_by_type: Counter = Counter()
-    ops: Counter = Counter()
-    sessions_by_type: dict[str, Counter] = defaultdict(Counter)
-    total = 0
-
-    for session_id, main_log, sub_logs in session_logs(log_dir):
-        total += 1
-        records = load_records(main_log)
-        sub_records = [load_records(p) for p in sub_logs]
-
-        skills = skills_in(records)
-        edits = edited_paths(records)
-        for recs in sub_records:
-            skills += skills_in(recs)
-            edits |= edited_paths(recs)
-        art, _ = session_type(session_id, skills, mapping, edits)
-
-        calls = 0
-        for recs in [records, *sub_records]:
-            for rec in recs:
-                for block in content_blocks(rec):
-                    if (isinstance(block, dict) and block.get("type") == "tool_use"
-                            and block.get("name") == "LSP"):
-                        calls += 1
-                        ops[str((block.get("input") or {}).get("operation", "?"))] += 1
-
-        calls_by_type[art] += calls
-        sessions_by_type[art]["mit" if calls else "ohne"] += 1
-
-    return calls_by_type, ops, dict(sessions_by_type), total
-
-
-def print_lsp() -> None:
-    calls_by_type, ops, sessions_by_type, total = measure_lsp()
-    print("=" * 78)
-    print("OBS-S085-4: LSP-Nutzung je Session-Art")
-    print("=" * 78)
-    print(f"  {'Art':<18} {'Sessions':>9} {'davon mit LSP':>15} {'Calls':>8}")
-    for art in sorted(sessions_by_type, key=lambda a: -calls_by_type[a]):
-        counts = sessions_by_type[art]
-        gesamt = counts["mit"] + counts["ohne"]
-        print(f"  {art:<18} {gesamt:>9} {counts['mit']:>15} {calls_by_type[art]:>8}")
-
-    gesamt_calls = sum(calls_by_type.values())
-    print(f"\n  Sessions gesamt: {total}   LSP-Calls gesamt: {gesamt_calls}")
-    print(f"  Operationen: {dict(ops.most_common()) if ops else '–'}")
-    if not gesamt_calls:
-        print("\n  ⚠ Nullnutzung – laut OBS-S085-4 bedeutet die dritte Nullrunde: verwerfen.")
-
-
 def main() -> None:
     parser = Parser(
-        description="Werkzeug-Nutzung der Agenten: Filter-Quote und LSP-Nutzung.",
+        description="Werkzeug-Nutzung der Agenten: Filter-Quote der Wrapper-Läufe.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("--filter", action="store_true", help="nur die Filter-Quote (OBS-S085-3)")
-    parser.add_argument("--lsp", action="store_true", help="nur die LSP-Nutzung (OBS-S085-4)")
     parser.add_argument("--verbose", action="store_true", help="Beispielzeilen zeigen")
     parser.add_argument("--since", metavar="YYYY-MM-DD",
                         help="nur Läufe ab diesem Tag (inklusiv) – trennt Vor/Nach einer Maßnahme")
@@ -217,21 +144,7 @@ def main() -> None:
 
     if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
         parser.error(f"--since braucht das Format YYYY-MM-DD, nicht {args.since!r}")
-
-    beide = not (args.filter or args.lsp)
-    # `--since` wirkt nur auf die Filter-Quote; die LSP-Auswertung kennt keinen Stichtag.
-    # Ohne diese Meldung liefe `--lsp --since <datum>` durch und gäbe die Zahlen über den
-    # GESAMTEN Zeitraum aus – plausibel aussehend, aber eine andere Größe als die verlangte
-    # (S130, real passiert: Nur der Vergleich mit dem Lauf ohne `--since` deckte es auf).
-    if args.since and args.lsp and not args.filter:
-        parser.error("--since wirkt nur auf die Filter-Quote (--filter), nicht auf --lsp. "
-                     "Die LSP-Auswertung gruppiert nach Session-Art, nicht nach Datum.")
-    if args.filter or beide:
-        print_filter_quote(args.verbose, args.since)
-    if beide:
-        print()
-    if args.lsp or beide:
-        print_lsp()
+    print_filter_quote(args.verbose, args.since)
 
 
 if __name__ == "__main__":

@@ -19,36 +19,65 @@ Beispiele:
   python3 -m prozesscode.read-breakdown --top 20         # größte Einzeldateien
   python3 -m prozesscode.read-breakdown --sessions       # erkannte Art je Session
   python3 -m prozesscode.read-breakdown --json
+  python3 -m prozesscode.read-breakdown --by-agent --since 2026-10-24   # je Agententyp
+  python3 -m prozesscode.read-breakdown --agent frontend-layer-implementer --top 15
+  python3 -m prozesscode.read-breakdown --anker --since 2026-11-05     # Zitate/Abrufe je Anker
+
+**Je Agent statt je Art (OBS-S109-1, OBS-S114-2):** Die Session-Art ist eine grobe Einheit
+geworden – Sessions sind gemischt (Durchsicht und Drain, Querschnitt und Lauf) und enthalten
+1–3 Läufe, ein Wert je Implementierungs-Session hängt also an der Zahl der Läufe darin. Ein
+Subagenten-Aufruf hat genau einen Typ, und ein Implementer-Aufruf gehört zu genau einem Lauf.
+Zwei Zeiträume vergleicht `--since … --until …`.
+
+**Je Anker (OBS-S114-2):** Ob ein Abschnitt der Pflichtlektüre seinen Lesepreis wert ist, zeigt
+sich daran, ob er je eine Regel für ein Finding liefert („Regel: <ANKER>", Pflicht seit S146)
+oder gezielt abgerufen wird (`doc get`). Ohne Zitat kann ein Abschnitt trotzdem gelesen,
+befolgt und nötig gewesen sein – die Liste der ungenutzten Anker benennt Kandidaten, kein Urteil.
 """
 import argparse
 import json
 import sys
+import textwrap
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 
+from . import anchors
 from ._cli import Parser
 from ._session_logs import (  # noqa: E402
     MAPPING_FILE,
     UNBEKANNT,
+    agent_type,
     categorize,
+    doc_abrufe,
     edited_paths,
     load_mapping,
     load_records,
     project_log_dir,
     read_events,
+    regel_zitate,
     relative_path,
     session_datum,
     session_logs,
     session_type,
     skills_in,
 )
+from ._util import REPO_ROOT
+
+# Der Kontext des Orchestrators – in der Auswertung je Agent neben den Subagententypen.
+HAUPTSESSION = "hauptsession"
+PFLICHT_ORDNER = ("docs/guidelines", "docs/process")
+PFLICHT_BEREICHE = ("docs/guidelines (Pflichtlektüre)", "docs/process (Pflichtlektüre)")
 
 
 class Totals:
     """Sammelt die Kennzahlen einer Auswertung."""
 
     def __init__(self) -> None:
+        self.kontexte = 0          # ausgewertete Logs: je Subagenten-Aufruf bzw. Hauptsession eins
+        self.zitate: Counter = Counter()   # „Regel: <ANKER>" im eigenen Text
+        self.abrufe: Counter = Counter()   # `doc get <ANKER>`
         self.volume = 0
         self.calls = 0
         self.by_area: Counter = Counter()
@@ -80,14 +109,22 @@ class Totals:
             self.reread_calls += 1
 
 
-def scan_context(records: list[dict], sinks: list[Totals]) -> None:
+def scan_context(records: list[dict], sinks: list[Totals], mit_zitaten: bool = True) -> None:
     """Wertet einen Kontext (Hauptlog ODER ein Subagent-Log) aus und speist alle Senken.
 
     „Kontext" ist bewusst das einzelne Log: Ein Subagent startet frisch, seine Re-Reads und
     Vor-Edit-Reads sind seine eigenen und dürfen nicht mit denen des Orchestrators verrechnet
-    werden.
+    werden. Regel-Zitate zählen nur in Subagenten-Logs (`mit_zitaten`): Der Orchestrator
+    reicht Findings weiter – an den User, per SendMessage an den Implementer –, seine Zitate
+    wären Kopien.
     """
     touched = edited_paths(records)
+    zitate = regel_zitate(records) if mit_zitaten else Counter()
+    abrufe = doc_abrufe(records)
+    for sink in sinks:
+        sink.kontexte += 1
+        sink.zitate += zitate
+        sink.abrufe += abrufe
     seen: set[str] = set()
     for path, size, targeted in read_events(records):
         is_reread = path in seen
@@ -96,30 +133,46 @@ def scan_context(records: list[dict], sinks: list[Totals]) -> None:
             sink.add(path, size, path in touched, is_reread, targeted)
 
 
-def collect(log_dir: Path, since: str | None = None
-            ) -> tuple[Totals, dict[str, Totals], dict[str, int], list[tuple[str, str]]]:
-    """Misst alle Sessions. Liefert Gesamt, je Art, Sessions je Art und die Art-Zuordnung.
+@dataclass
+class Messung:
+    gesamt: Totals
+    je_art: dict[str, Totals]
+    sessions_je_art: dict[str, int]
+    zuordnung: list[tuple[str, str, str]]
+    # Je Subagententyp, dazu HAUPTSESSION. Feiner als die Art: Sessions sind gemischt und
+    # enthalten 1–3 Läufe, ein Subagenten-Aufruf hat genau einen Typ.
+    je_agent: dict[str, Totals]
 
-    `since` (`YYYY-MM-DD`, inklusiv) beschränkt auf Sessions ab diesem Tag. Ohne diese
-    Trennung lässt sich die Wirkung einer Maßnahme nicht messen: Der Aggregatwert über alle
-    Sessions verdünnt jede Änderung, bis sie unsichtbar ist. Genau daran scheiterte die für
-    S120 geplante Re-Messung zu OBS-S109-1 – seit der Maßnahme in S114 lief nur eine einzige
-    Implementierungs-Session, gegen 24 im Gesamtwert.
+
+def _im_fenster(tag: str | None, since: str | None, until: str | None) -> bool:
+    # ISO-Datum: lexikographischer Vergleich ist chronologisch. Eine Session ohne Zeitstempel
+    # fällt heraus, sobald ein Fenster gesetzt ist – sie einzurechnen hieße, sie ins gewählte
+    # Fenster zu raten, und das Fenster ist der ganze Zweck des Filters.
+    if tag is None:
+        return False
+    return not (since and tag < since) and not (until and tag > until)
+
+
+def collect(log_dir: Path, since: str | None = None, until: str | None = None) -> Messung:
+    """Misst alle Sessions – gesamt, je Session-Art und je Agententyp.
+
+    `since`/`until` (`YYYY-MM-DD`, beide inklusiv) beschränken auf Sessions in diesem Fenster.
+    Ohne diese Trennung lässt sich die Wirkung einer Maßnahme nicht messen: Der Aggregatwert
+    über alle Sessions verdünnt jede Änderung, bis sie unsichtbar ist. Genau daran scheiterte
+    die für S120 geplante Re-Messung zu OBS-S109-1 – seit der Maßnahme in S114 lief nur eine
+    einzige Implementierungs-Session, gegen 24 im Gesamtwert. `until` macht zudem zwei
+    Zeiträume vergleichbar (wächst das Lesen je Aufruf?).
     """
     mapping = load_mapping()
     gesamt = Totals()
     je_art: dict[str, Totals] = defaultdict(Totals)
+    je_agent: dict[str, Totals] = defaultdict(Totals)
     sessions_je_art: Counter = Counter()
-    zuordnung: list[tuple[str, str]] = []
+    zuordnung: list[tuple[str, str, str]] = []
 
     for session_id, main_log, sub_logs in session_logs(log_dir):
-        if since:
-            tag = session_datum(main_log)
-            # ISO-Datum: lexikographischer Vergleich ist chronologisch. Eine Session ohne
-            # Zeitstempel fällt heraus – sie einzurechnen hieße, sie ins gewählte Fenster zu
-            # raten, und das Fenster ist der ganze Zweck des Filters.
-            if tag is None or tag < since:
-                continue
+        if (since or until) and not _im_fenster(session_datum(main_log), since, until):
+            continue
         haupt = load_records(main_log)
         sub_records = [load_records(p) for p in sub_logs]
 
@@ -132,11 +185,21 @@ def collect(log_dir: Path, since: str | None = None
 
         zuordnung.append((session_id, art, herkunft))
         sessions_je_art[art] += 1
-        sinks = [gesamt, je_art[art]]
-        for recs in [haupt, *sub_records]:
-            scan_context(recs, sinks)
+        scan_context(haupt, [gesamt, je_art[art], je_agent[HAUPTSESSION]], mit_zitaten=False)
+        for pfad, recs in zip(sub_logs, sub_records, strict=True):
+            scan_context(recs, [gesamt, je_art[art], je_agent[agent_type(pfad)]])
 
-    return gesamt, dict(je_art), dict(sessions_je_art), zuordnung
+    return Messung(gesamt, dict(je_art), dict(sessions_je_art), zuordnung, dict(je_agent))
+
+
+def pflicht_anker(root: Path = REPO_ROOT) -> dict[str, str]:
+    """Anker der Pflichtlektüre (`docs/guidelines`, `docs/process`) → repo-relative Datei."""
+    return {
+        anker: datei.relative_to(root).as_posix()
+        for ordner in PFLICHT_ORDNER
+        for datei in sorted((root / ordner).glob("*.md"))
+        for anker in anchors.anker_in(datei.read_text(encoding="utf-8"))
+    }
 
 
 def _bar(anteil: float, breite: int = 24) -> str:
@@ -190,6 +253,42 @@ def print_top_files(totals: Totals, limit: int, titel: str) -> None:
         print(f"  {value / 1000:>7.0f}k  {path[:64]}")
 
 
+def print_agents(je_agent: dict[str, Totals]) -> None:
+    print()
+    print("=" * 78)
+    print("Je Agent   (Aufruf = ein Subagenten-Log bzw. eine Hauptsession)")
+    print("=" * 78)
+    print(f"  {'Agent':<34} {'Aufrufe':>7} {'Volumen':>8} {'Ø/Aufruf':>9} {'gezielt':>8} "
+          f"{'Pflicht Ø':>10} {'doc get':>8}")
+    for agent, t in sorted(je_agent.items(), key=lambda kv: -kv[1].volume):
+        n = t.kontexte or 1
+        gezielt = t.targeted / t.volume * 100 if t.volume else 0
+        pflicht = sum(t.by_area[b] for b in PFLICHT_BEREICHE)
+        print(f"  {agent:<34} {t.kontexte:>7} {t.volume / 1000:>7.0f}k {t.volume / n:>9.0f} "
+              f"{gezielt:>7.0f}% {pflicht / n:>10.0f} {sum(t.abrufe.values()):>8}")
+    print("\n  „Pflicht Ø\" = Zeichen aus docs/guidelines und docs/process je Aufruf.\n"
+          "  Dateien eines Typs: --agent TYP --top N, Bereiche: --agent TYP --by-area.")
+
+
+def print_anker(totals: Totals, titel: str, bestand: dict[str, str]) -> None:
+    print()
+    print("=" * 78)
+    print(f"Anker – {titel}   (Zitate = „Regel: <ANKER>\" im Finding, Abrufe = doc get)")
+    print("=" * 78)
+    genutzt = (set(totals.zitate) | set(totals.abrufe)) - {"keine"}
+    print(f"  {'Anker':<34} {'Zitate':>7} {'Abrufe':>7}  Datei")
+    for anker in sorted(genutzt, key=lambda a: (-totals.zitate[a] - totals.abrufe[a], a)):
+        datei = bestand.get(anker, "(nicht Pflichtlektüre)")
+        print(f"  {anker:<34} {totals.zitate[anker]:>7} {totals.abrufe[anker]:>7}  {datei}")
+    print(f"\n  Findings mit „Regel: keine\": {totals.zitate['keine']}")
+
+    rest = sorted(set(bestand) - genutzt)
+    print(f"\n  Pflichtlektüre-Anker nie zitiert und nie abgerufen: {len(rest)} von {len(bestand)}")
+    print(textwrap.fill(", ".join(rest), width=76, initial_indent="    ",
+                        subsequent_indent="    "))
+    print("  Vorbehalt: Ohne Zitat kann ein Abschnitt trotzdem gelesen, befolgt und nötig gewesen sein.")
+
+
 def print_sessions(zuordnung: list[tuple[str, str, str]]) -> None:
     print()
     print("=" * 78)
@@ -217,49 +316,73 @@ def main() -> None:
     parser.add_argument("--json", action="store_true", help="maschinenlesbar")
     parser.add_argument("--since", metavar="YYYY-MM-DD",
                         help="nur Sessions ab diesem Tag – trennt vor/nach einer Maßnahme")
+    parser.add_argument("--until", metavar="YYYY-MM-DD",
+                        help="nur Sessions bis zu diesem Tag (inklusiv) – macht Zeiträume vergleichbar")
+    parser.add_argument("--by-agent", action="store_true",
+                        help="je Agententyp: Aufrufe, Volumen und Pflichtlektüre je Aufruf")
+    parser.add_argument("--agent", metavar="TYP",
+                        help="nur einen Agententyp auswerten (z.B. hauptsession, code-quality-auditor)")
+    parser.add_argument("--anker", action="store_true",
+                        help="Regel-Zitate und doc-get-Abrufe je Anker, dazu ungenutzte Pflichtlektüre")
     args = parser.parse_args()
+    if args.agent and args.type:
+        parser.error("--agent und --type schließen sich aus: ein Subagent gehört zu einer "
+                     "Session, aber nicht jede Session-Art hat ihn")
 
     log_dir = project_log_dir()
     if not log_dir.exists():
         print(f"Keine Session-Logs unter {log_dir}", file=sys.stderr)
         sys.exit(1)
 
-    gesamt, je_art, sessions, zuordnung = collect(log_dir, since=args.since)
-    if args.since and not sum(sessions.values()):
-        print(f"Keine Sessions ab {args.since} – der Vergleich trägt nichts.", file=sys.stderr)
+    m = collect(log_dir, since=args.since, until=args.until)
+    if (args.since or args.until) and not sum(m.sessions_je_art.values()):
+        fenster = " ".join(f"{wort} {tag}" for wort, tag in (("ab", args.since), ("bis", args.until)) if tag)
+        print(f"Keine Sessions {fenster} – der Vergleich trägt nichts.", file=sys.stderr)
         sys.exit(1)
 
-    if args.type:
-        if args.type not in je_art:
-            print(f"Unbekannte Art '{args.type}'. Verfügbar: {', '.join(sorted(je_art))}",
+    gewaehlt, titel = m.gesamt, "alle Session-Arten"
+    for wert, auswahl, wort in ((args.type, m.je_art, "Art"), (args.agent, m.je_agent, "Agent")):
+        if not wert:
+            continue
+        if wert not in auswahl:
+            print(f"Unbekannter Wert für {wort} '{wert}'. Verfügbar: {', '.join(sorted(auswahl))}",
                   file=sys.stderr)
             sys.exit(1)
-        gewaehlt, titel = je_art[args.type], args.type
-    else:
-        gewaehlt, titel = gesamt, "alle Session-Arten"
+        gewaehlt, titel = auswahl[wert], wert
 
     if args.json:
         print(json.dumps({
-            "gesamt": {"volumen": gesamt.volume, "aufrufe": gesamt.calls},
+            "gesamt": {"volumen": m.gesamt.volume, "aufrufe": m.gesamt.calls},
             "je_art": {
-                art: {"volumen": t.volume, "aufrufe": t.calls, "sessions": sessions[art]}
-                for art, t in je_art.items()
+                art: {"volumen": t.volume, "aufrufe": t.calls, "sessions": m.sessions_je_art[art]}
+                for art, t in m.je_art.items()
+            },
+            "je_agent": {
+                agent: {"volumen": t.volume, "aufrufe": t.calls, "kontexte": t.kontexte}
+                for agent, t in m.je_agent.items()
             },
             "bereiche": dict(gewaehlt.by_area),
             "dateien": dict(gewaehlt.by_file.most_common(args.top or 20)),
-            "zuordnung": {sid: {"art": art, "herkunft": h} for sid, art, h in zuordnung},
+            "zitate": dict(gewaehlt.zitate),
+            "abrufe": dict(gewaehlt.abrufe),
+            "zuordnung": {sid: {"art": art, "herkunft": h} for sid, art, h in m.zuordnung},
         }, ensure_ascii=False, indent=2))
         return
 
-    print_overview(gesamt, je_art, sessions)
+    print_overview(m.gesamt, m.je_art, m.sessions_je_art)
+    if args.by_agent:
+        print_agents(m.je_agent)
     if args.by_area:
         print_areas(gewaehlt, titel)
     if args.top:
         print_top_files(gewaehlt, args.top, titel)
+    if args.anker:
+        print_anker(gewaehlt, titel, pflicht_anker())
     if args.sessions:
-        print_sessions(zuordnung)
-    if not (args.by_area or args.top or args.sessions):
-        print("\n  Mehr Tiefe: --by-area | --top N | --sessions | --type ART")
+        print_sessions(m.zuordnung)
+    if not (args.by_area or args.top or args.sessions or args.by_agent or args.anker):
+        print("\n  Mehr Tiefe: --by-area | --top N | --sessions | --type ART | --by-agent | "
+              "--agent TYP | --anker")
 
 
 if __name__ == "__main__":

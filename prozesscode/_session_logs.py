@@ -22,6 +22,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from . import anchors
 from ._util import REPO_ROOT, projekt_verzeichnis
 
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
@@ -30,8 +31,6 @@ MAPPING_FILE = REPO_ROOT / ".claude" / "session-types.json"
 # Welcher Skill steht für welche Art von Arbeit?
 SKILL_TO_TYPE = {
     "implementing-scenario": "implementierung",
-    "write-code": "implementierung",
-    "review-code": "implementierung",  # läuft als Review-Loop innerhalb von implementing-scenario
     # Szenario-Entwurf ist eigene Arbeit mit eigenem Leseprofil (Stories, Feature-Dateien –
     # kein Testcode) und gehört deshalb nicht zu „implementierung".
     "gherkin-workshop": "workshop",
@@ -41,12 +40,19 @@ SKILL_TO_TYPE = {
     "review-docs": "tooling",
     "skill-creator": "tooling",
     "update-config": "tooling",
+    "plugin-authoring": "tooling",   # Mods bauen
     "schedule": "tooling",
 }
 
 # Skills, die eine Session begleiten, statt sie zu prägen – sie dürfen die Art nicht bestimmen,
-# solange irgendein prägender Skill lief. `closing-session` läuft in fast jeder Session.
-BEGLEIT_SKILLS = frozenset({"closing-session", "recall-session", "session-recall", "grill-me"})
+# solange irgendein prägender Skill lief. `closing-session` und `committing` laufen in fast
+# jeder Session.
+# `write-code` und `review-code` laufen in Läufen ebenso wie bei Prozess-Code (Drain, Tooling,
+# Retro); als prägende Skills machten sie jede solche Session zur Implementierung (S138
+# gefunden: 11 Sessions seit 2026-08-04, praktisch kein echter Lauf darunter). Ohne
+# prägenden Skill entscheidet die Edit-Heuristik – `prozesscode/` → tooling, `Client/` → implementierung.
+BEGLEIT_SKILLS = frozenset({"closing-session", "committing", "recall-session", "session-recall",
+                            "grill-me", "write-code", "review-code"})
 
 UNBEKANNT = "unbekannt"
 SONSTIGES = "sonstiges"
@@ -318,6 +324,67 @@ def session_datum(main_log: Path) -> str | None:
     except OSError:
         return None
     return None
+
+
+def agent_type(sub_log: Path) -> str:
+    """Typ des Subagenten, dessen Log das ist – aus `<log>.meta.json` daneben.
+
+    Claude Code schreibt dort u.a. `agentType` (gemessen 2.1.328, 443 von 443 Logs). Bei einem
+    Teammate (mit Agent-Teams gestartet, bis S152) ist `agentType` aber der vergebene Name; den
+    Typ der Definition trägt dann `spawnedAgentType`. Fehlt die Datei oder ist sie unlesbar,
+    bleibt der Typ unbekannt, statt geraten zu werden.
+    """
+    try:
+        meta = json.loads(sub_log.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return UNBEKANNT
+    return meta.get("spawnedAgentType") or meta.get("agentType") or UNBEKANNT
+
+
+# „Regel: <ANKER>" bzw. „Regel: keine" – das Format, in dem Auditor-Findings seit S146 die
+# verletzte Regel nennen. Das Anker-Muster selbst kommt aus `anchors`, nicht als Kopie.
+_REGEL_RE = re.compile(rf"Regel: ({anchors._ANKER}|keine)\b")
+# `doc get <ANKER>` in jeder Aufrufform: `-m prozesscode.doc`, `prozesscode/doc.py`.
+_DOC_GET_RE = re.compile(rf"\bdoc(?:\.py)?\s+get\s+({anchors._ANKER})\b")
+
+
+# Die Werkzeuge, mit denen ein Subagent seinen Bericht abliefert: `SubagentHandback` (gewöhnliche
+# Subagenten), `SendMessage` (Teammates, mit Agent-Teams bis S152). Der Text steht in `message`.
+_BERICHT_WERKZEUGE = ("SubagentHandback", "SendMessage")
+
+
+def _assistant_bloecke(records: list[dict]):
+    for rec in records:
+        if rec.get("type") == "assistant":
+            yield from (b for b in content_blocks(rec) if isinstance(b, dict))
+
+
+def regel_zitate(records: list[dict]) -> Counter:
+    """Wie oft der Agent welche Regel zitiert (`keine` eingeschlossen).
+
+    Gezählt wird der Bericht, der den Orchestrator erreicht. Fehlt ein Bericht-Werkzeug im
+    Log (ältere Logs, in denen die letzte Antwort das Ergebnis war), der eigene Text. Beides
+    zusammen zählte einen Befund doppelt, sobald der Agent ihn erst als Entwurf schreibt.
+    Nie gezählt: der Auftrag (er erklärt das Format mit Beispielen) und Werkzeug-Ausgaben.
+    """
+    bloecke = list(_assistant_bloecke(records))
+    berichte = [str((b.get("input") or {}).get("message") or "") for b in bloecke
+                if b.get("type") == "tool_use" and b.get("name") in _BERICHT_WERKZEUGE]
+    texte = berichte or [b.get("text") or "" for b in bloecke if b.get("type") == "text"]
+    return Counter(m for text in texte for m in _REGEL_RE.findall(text))
+
+
+def doc_abrufe(records: list[dict]) -> Counter:
+    """Welche Abschnitte per `doc get` abgerufen wurden – je `get` im Befehl einer."""
+    return Counter(
+        anker
+        for rec in records
+        for block in content_blocks(rec)
+        if isinstance(block, dict)
+        and block.get("type") == "tool_use"
+        and block.get("name") == "Bash"
+        for anker in _DOC_GET_RE.findall((block.get("input") or {}).get("command") or "")
+    )
 
 
 def session_logs(log_dir: Path) -> list[tuple[str, Path, list[Path]]]:

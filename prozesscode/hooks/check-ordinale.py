@@ -20,6 +20,7 @@ Zeilen-Ausnahme: `ordinal-ok` in der Zeile.
 Mechanik: PreToolUse läuft VOR der Anwendung; der Hook simuliert den Post-Edit-Inhalt.
 Fail-open: ein Hook-eigener Fehler blockt nie einen Edit.
 """
+import re
 from pathlib import Path
 
 
@@ -28,6 +29,7 @@ from .. import anchors, ordinale
 
 _MAX_HITS = 10
 _MAX_ZEICHEN = 110  # je zitierter Zeile
+_SATZGRENZE = re.compile(r"(?<=[.;!?])\s+")
 
 _KOPF = "❌ Gliederungsnummer (Poka-Yoke): neue selbstvergebene Nummer/Buchstabe:\n"
 _HINWEIS = (
@@ -59,6 +61,23 @@ def _zustaendig(file_path: str) -> bool:
     return "ordinal" not in anchors.ausnahmen_fuer(rel)
 
 
+def _ausschnitt(zeile: str, markdown: bool) -> str:
+    """Die Fundstelle so, dass der Verstoß darin zu sehen ist.
+
+    Kurze Zeilen ganz. Bei langen der erste Satz, der für sich allein anschlägt: Die
+    Tracker-Werkzeuge schreiben ein Feld als eine Zeile, und der Zeilenanfang zeigte dort nur
+    Vorspann, nie den Verstoß (S152). Schlägt kein Satz allein an, der Zeilenanfang wie bisher.
+    """
+    if len(zeile) <= _MAX_ZEICHEN:
+        return zeile
+    for satz in _SATZGRENZE.split(zeile):
+        if ordinale.ordinale_in(satz, markdown=markdown):
+            vorne = "" if zeile.startswith(satz) else "…"
+            hinten = "…" if len(satz) > _MAX_ZEICHEN or not zeile.endswith(satz) else ""
+            return vorne + satz[:_MAX_ZEICHEN] + hinten
+    return zeile[:_MAX_ZEICHEN] + "…"
+
+
 def check(data: dict) -> str | None:
     """Dispatcher-Einstieg: Blockier-Grund oder None. Siehe dispatch-edit-write.py."""
     zustand = edit_zustand(data, _zustaendig)
@@ -74,5 +93,6 @@ def check(data: dict) -> str | None:
     if not funde:
         return None
 
-    zeilen = "\n".join(f"  - {art}: `{zeile[:_MAX_ZEICHEN]}`" for _nr, zeile, art in funde[:_MAX_HITS])
+    zeilen = "\n".join(f"  - {art}: `{_ausschnitt(zeile, markdown)}`"
+                       for _nr, zeile, art in funde[:_MAX_HITS])
     return f"{_KOPF}{zeilen}\n{_HINWEIS}"

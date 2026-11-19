@@ -10,13 +10,13 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._run_lock": {
-    "beurteilbar": 71,
-    "getoetet": 53,
+    "beurteilbar": 97,
+    "getoetet": 78,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._session_logs": {
-    "beurteilbar": 280,
-    "getoetet": 216,
+    "beurteilbar": 372,
+    "getoetet": 325,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._stryker_report": {
@@ -59,6 +59,11 @@
     "getoetet": 156,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
+  "prozesscode.cm": {
+    "beurteilbar": 115,
+    "getoetet": 85,
+    "messung": "mutmut 3.8.1, Wertung 3"
+  },
   "prozesscode.commit_msg": {
     "beurteilbar": 228,
     "getoetet": 226,
@@ -85,8 +90,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.dotnet-test": {
-    "beurteilbar": 472,
-    "getoetet": 450,
+    "beurteilbar": 482,
+    "getoetet": 460,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.eintrag_felder": {
@@ -125,8 +130,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-bash-permission": {
-    "beurteilbar": 1156,
-    "getoetet": 1134,
+    "beurteilbar": 1198,
+    "getoetet": 1176,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-code-quality-blocking": {
@@ -360,8 +365,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.read-breakdown": {
-    "beurteilbar": 478,
-    "getoetet": 43,
+    "beurteilbar": 783,
+    "getoetet": 291,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.repo_kontext": {
@@ -425,8 +430,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.tool-usage": {
-    "beurteilbar": 347,
-    "getoetet": 92,
+    "beurteilbar": 169,
+    "getoetet": 80,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.tracker": {
@@ -435,8 +440,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.tracker_diff": {
-    "beurteilbar": 420,
-    "getoetet": 344,
+    "beurteilbar": 464,
+    "getoetet": 384,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.tracker_entry": {

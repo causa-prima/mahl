@@ -85,6 +85,34 @@ def test_collects_reasons_from_all_checks_not_only_the_first(monkeypatch):
     assert dispatcher.collect_reasons({}) == ["Grund A", "Grund C"]
 
 
+def test_ausgelassene_checks_laufen_nicht(monkeypatch):
+    # // Given zwei anschlagende Checks
+    class FakeMod:
+        def __init__(self, reason):
+            self.reason = reason
+
+        def check(self, data):
+            return self.reason
+
+    mods = {"a": FakeMod("Grund A"), "c": FakeMod("Grund C")}
+    monkeypatch.setattr(dispatcher, "CHECKS", ["a", "c"])
+    monkeypatch.setattr(dispatcher, "import_module",
+                        lambda name: mods[name.removeprefix(dispatcher.PAKET)])
+    # // When einer davon ausdrücklich ausgelassen wird (tracker_diff bei --trotz-verweisen)
+    # // Then meldet nur der andere
+    assert dispatcher.collect_reasons({}, ohne=frozenset({"a"})) == ["Grund C"]
+
+
+def test_eine_unbekannte_auslassung_wirft_statt_still_nichts_zu_tun(monkeypatch):
+    # // Given eine Prüfkette ohne Check namens „check-vertippt“
+    monkeypatch.setattr(dispatcher, "CHECKS", ["a"])
+    # // When ein Aufrufer genau diesen auslassen will
+    # // Then ist das ein Programmierfehler, der laut wird – sonst liefe die Auslassung ins Leere
+    #   (zwei auf einmal: die Meldung nennt jeden, nicht nur den ersten)
+    with pytest.raises(ValueError, match="check-auch-falsch, check-vertippt$"):
+        dispatcher.collect_reasons({}, ohne=frozenset({"check-vertippt", "check-auch-falsch"}))
+
+
 def test_no_reasons_when_all_checks_pass(monkeypatch):
     class Passing:
         def check(self, data):

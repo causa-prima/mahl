@@ -269,7 +269,7 @@ def cmd_check(args):
         sys.exit(0)
 
     # Nur Befunde zeilenweise, Gültiges als Zählzeile: Bis S133 stand jede Fundstelle mit
-    # „✓ Accepted" da – 195 Zeilen ohne einen Befund, die qa-check (CHECK 6) in jedem
+    # „✓ Accepted" da – 195 Zeilen ohne einen Befund, die qa-check (Prüfung ADR-REFERENZEN) in jedem
     # Übergabe-Lauf in den Subagenten-Kontext schrieb. ⚠ bleibt sichtbar, obwohl Exit 0.
     exit_code = 0
     col_width = max(len(f"{r[0]}:{r[1]}") for r in refs) + 2

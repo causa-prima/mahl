@@ -464,8 +464,10 @@ def check_tsc() -> int:
     return subprocess.run(["npm", "run", "typecheck"], cwd=str(_CLIENT_DIR)).returncode
 
 
-CHECK_ESLINT_TITLE = "CHECK 4: ESLINT"
-CHECK_ADR_TITLE = "CHECK 6: ADR-REFERENZEN"
+# Prüfungen tragen Namen, keine Nummern: Eine Nummer wäre eine zweite, ungeprüfte Adresse, die
+# beim Umsortieren still falsch wird (OBS-S133-2, Prinzip „Namen statt Nummern").
+CHECK_ESLINT_TITLE = "ESLINT"
+CHECK_ADR_TITLE = "ADR-REFERENZEN"
 
 # eslint-run zeigt schon ohne --verbose jede Meldung; --verbose ergänzt nur die npm-Kopfzeilen.
 ESLINT_DETAILS_HINT = "  Alle Meldungen samt Warnungen: python3 -m prozesscode.eslint-run"
@@ -742,17 +744,17 @@ def main() -> None:
         print(f"\n⚠️  {metrics['counts']['NoCoverage']} NoCoverage (von keinem Test ausgeführt):")
         print("\n".join(format_mutant_group(nocoverage)))
 
-    print("\n=== CHECK 1: GEÄNDERTE TEST-DATEIEN ===")
+    print("\n=== GEÄNDERTE TEST-DATEIEN ===")
     print("\n".join(test_files) if test_files else "keine")
 
-    print("\n=== CHECK 2: NEUE SUPPRESSIONEN ===")
+    print("\n=== NEUE SUPPRESSIONEN ===")
     if suppressions:
         for f, line in suppressions:
             print(f"  {f}:  {line}")
     else:
         print("keine")
 
-    print("\n=== CHECK 3: UNIT-TEST-MUSTER ===")
+    print("\n=== UNIT-TEST-MUSTER ===")
     if unit_tests:
         for f, line in unit_tests:
             print(f"  {f}:  {line}")
@@ -763,7 +765,7 @@ def main() -> None:
         print(f"\n=== {CHECK_ESLINT_TITLE} ===")
         print(lint_status)
 
-    print("\n=== CHECK 5: TEST-STRUKTUR (Given/When/Then) ===")
+    print("\n=== TEST-STRUKTUR (Given/When/Then) ===")
     if test_structure:
         for f, msg in test_structure:
             print(f"  {f}:  {msg}")

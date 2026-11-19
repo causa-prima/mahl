@@ -19,6 +19,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from ._cli import Parser
+from ._run_lock import RunLock
 from ._util import REPO_ROOT, run_dotnet
 
 _RELEVANT = re.compile(
@@ -32,6 +33,13 @@ _RESULTS_DIR = REPO_ROOT / "TestResults" / "coverage"
 _STRYKER_CONFIG = REPO_ROOT / "stryker-config.json"
 _TEST_PROJECT = "Server.Tests/mahl.Server.Tests.csproj"
 _THRESHOLD = 1.0  # 100 %
+
+# Parallele Läufe (Auditoren eines Reviews) teilen sich bin/obj und TestResults/; der Lock reiht
+# sie ein. Die Datenbank ist kein Konflikt – Testcontainers startet je Lauf eine eigene.
+_LAUF_LOCK = REPO_ROOT / ".claude" / "tmp" / "dotnet_test_run"
+# Ein voller Lauf dauert ~16 s (S152). 60 s Warten plus Lauf bleiben unter den 120 s, nach denen
+# der Harness einen Aufruf ohne explizites timeout in den Hintergrund schiebt (OBS-S144-4).
+_WARTEZEIT = 60
 
 
 _SUMMARY_PASSED = re.compile(r"Test run summary: Passed!.*?total: (\d+).*?duration: ([^\n]+)", re.DOTALL)
@@ -291,7 +299,11 @@ def main() -> None:
                         help="Substring des voll-qualifizierten Testnamens (Namespace.Klasse.Methode)")
     parser.add_argument("--verbose", action="store_true", help="Vollständigen Output anzeigen")
     args = parser.parse_args()
+    with RunLock(_LAUF_LOCK, "Backend-Testlauf", wartezeit=_WARTEZEIT):
+        _laufen(args)
 
+
+def _laufen(args: argparse.Namespace) -> None:
     # Coverage nur beim vollen Lauf – ein gefilterter Lauf deckt per Definition nicht alles ab.
     collect_coverage = not args.filter_name
 

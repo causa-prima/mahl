@@ -166,14 +166,14 @@ def test_frontend_lauf_zeigt_alle_checks_den_hash_und_scheitert_am_score(tmp_pat
         + _stryker_block("FRONTEND", "81.8%", _FRONTEND_REPORT) +
         f"\n⚠️  1 Survivor(s):\n{_gruppe(report, 'Survived')}\n"
         f"\n⚠️  1 NoCoverage (von keinem Test ausgeführt):\n{_gruppe(report, 'NoCoverage')}\n"
-        "\n=== CHECK 1: GEÄNDERTE TEST-DATEIEN ===\nClient/src/app.test.ts\n"
-        "\n=== CHECK 2: NEUE SUPPRESSIONEN ===\n  Client/src/app.ts:  // Stryker disable next-line all\n"
-        "\n=== CHECK 3: UNIT-TEST-MUSTER ===\n  Client/src/app.test.ts:  it('a', () => {\n"
-        "\n=== CHECK 4: ESLINT ===\nOK\n"
-        "\n=== CHECK 5: TEST-STRUKTUR (Given/When/Then) ===\nalle neuen Tests strukturiert\n"
-        f"\n=== CHECK 6: ADR-REFERENZEN ===\n{_ADR_ROT[0]}\n"
+        "\n=== GEÄNDERTE TEST-DATEIEN ===\nClient/src/app.test.ts\n"
+        "\n=== NEUE SUPPRESSIONEN ===\n  Client/src/app.ts:  // Stryker disable next-line all\n"
+        "\n=== UNIT-TEST-MUSTER ===\n  Client/src/app.test.ts:  it('a', () => {\n"
+        "\n=== ESLINT ===\nOK\n"
+        "\n=== TEST-STRUKTUR (Given/When/Then) ===\nalle neuen Tests strukturiert\n"
+        f"\n=== ADR-REFERENZEN ===\n{_ADR_ROT[0]}\n"
         f"\n=== VERIFIKATIONS-HASH ===\n{erwartet_hash}\n"
-        "⚠️  Rot: CHECK 6: ADR-REFERENZEN. Der Hash ist verifizierbar, die Übergabe aber erst gültig, wenn "
+        "⚠️  Rot: ADR-REFERENZEN. Der Hash ist verifizierbar, die Übergabe aber erst gültig, wenn "
         "der Check grün ist – Befund oben beheben und qa-check erneut laufen lassen (oder den Befund im "
         "Return begründen).\n")
     assert err == _achtung("81.8%")
@@ -182,11 +182,11 @@ def test_frontend_lauf_zeigt_alle_checks_den_hash_und_scheitert_am_score(tmp_pat
 
 
 _BACKEND_CHECKS_LEER = (
-    "\n=== CHECK 1: GEÄNDERTE TEST-DATEIEN ===\nkeine\n"
-    "\n=== CHECK 2: NEUE SUPPRESSIONEN ===\nkeine\n"
-    "\n=== CHECK 3: UNIT-TEST-MUSTER ===\nkeine verdächtigen Treffer\n"
-    "\n=== CHECK 5: TEST-STRUKTUR (Given/When/Then) ===\nalle neuen Tests strukturiert\n"
-    f"\n=== CHECK 6: ADR-REFERENZEN ===\n{_ADR_GRUEN[0]}\n")
+    "\n=== GEÄNDERTE TEST-DATEIEN ===\nkeine\n"
+    "\n=== NEUE SUPPRESSIONEN ===\nkeine\n"
+    "\n=== UNIT-TEST-MUSTER ===\nkeine verdächtigen Treffer\n"
+    "\n=== TEST-STRUKTUR (Given/When/Then) ===\nalle neuen Tests strukturiert\n"
+    f"\n=== ADR-REFERENZEN ===\n{_ADR_GRUEN[0]}\n")
 
 
 @pytest.mark.aufrufpfad("qa-check")
@@ -243,13 +243,13 @@ def test_skip_stryker_zeigt_alle_befunde_aber_keinen_hash(tmp_path, monkeypatch,
     # // Then: kein tsc, kein Stryker, kein Fast-Fail – jeder Befund steht da, statt des Hashes der Hinweis
     assert out == (
         _stryker_block("FRONTEND", "100.0%", str(report)) +
-        "\n=== CHECK 1: GEÄNDERTE TEST-DATEIEN ===\nClient/src/app.test.ts\n"
-        "\n=== CHECK 2: NEUE SUPPRESSIONEN ===\nkeine\n"
-        "\n=== CHECK 3: UNIT-TEST-MUSTER ===\n  Client/src/app.test.ts:  it('a', () => {})\n"
-        f"\n=== CHECK 4: ESLINT ===\n{_LINT_ROT[0]}\n"
-        "\n=== CHECK 5: TEST-STRUKTUR (Given/When/Then) ===\n"
+        "\n=== GEÄNDERTE TEST-DATEIEN ===\nClient/src/app.test.ts\n"
+        "\n=== NEUE SUPPRESSIONEN ===\nkeine\n"
+        "\n=== UNIT-TEST-MUSTER ===\n  Client/src/app.test.ts:  it('a', () => {})\n"
+        f"\n=== ESLINT ===\n{_LINT_ROT[0]}\n"
+        "\n=== TEST-STRUKTUR (Given/When/Then) ===\n"
         "  Client/src/app.test.ts:  it('a', () => {})  →  fehlt: // Given, // When, // Then\n"
-        f"\n=== CHECK 6: ADR-REFERENZEN ===\n{_ADR_ROT[0]}\n"
+        f"\n=== ADR-REFERENZEN ===\n{_ADR_ROT[0]}\n"
         "\n=== VERIFIKATIONS-HASH ===\n"
         "(übersprungen – --skip-stryker erzeugt KEINEN Übergabe-Hash. Nur Läufe ohne --skip-stryker sind "
         "zur Übergabe gültig; Verifikation durch den Orchestrator via --verify <hash>.)\n")
@@ -310,7 +310,7 @@ def test_verify_meldet_rote_checks_und_audit_befund_und_haelt_das_score_gate(tmp
     #    Datei – und der Score unter 100 % macht die Übergabe trotzdem ungültig
     assert out.endswith(
         "\n=== VERIFY ===\n✅ Hash verifiziert – frischer Lauf, Code/Report-Zustand stimmt überein.\n"
-        "⚠️  Rot: CHECK 4: ESLINT, CHECK 6: ADR-REFERENZEN. Der Hash ist verifizierbar, die Übergabe aber "
+        "⚠️  Rot: ESLINT, ADR-REFERENZEN. Der Hash ist verifizierbar, die Übergabe aber "
         "erst gültig, wenn der Check grün ist – Befund oben beheben und qa-check erneut laufen lassen (oder "
         "den Befund im Return begründen).\n"
         "\n=== TEST-FREIGABE-AUDIT ===\n"
@@ -476,7 +476,7 @@ def test_timeout_in_geaenderter_datei_wird_ausgewiesen_und_macht_den_lauf_unguel
         "[qa-check] tsc -b (Typecheck) …\n[qa-check] Starte Stryker (frontend) …\n"
         + _stryker_block("FRONTEND", "100.0%", _FRONTEND_REPORT)
         + f"\n{qa.TIMEOUT_TITEL.format(anzahl=1)}\n{_gruppe(report, 'Timeout')}\n"
-        + "\n=== CHECK 1: GEÄNDERTE TEST-DATEIEN ===\n")
+        + "\n=== GEÄNDERTE TEST-DATEIEN ===\n")
     assert out.endswith(f"\n=== VERIFIKATIONS-HASH ===\n{erwartet_hash}\n")
     assert (err, code) == (_timeout_achtung(1), 1)
     # // When der Orchestrator den Hash verifiziert

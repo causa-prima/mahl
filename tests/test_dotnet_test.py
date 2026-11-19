@@ -7,6 +7,7 @@ coverlet.MTP hängt einen Zeitstempel an den Dateinamen, ein fester Pfad ist nic
 import json
 import os
 import sys
+import threading
 import xml.etree.ElementTree as ET
 from importlib import import_module
 from pathlib import Path
@@ -16,6 +17,63 @@ import pytest
 from conftest import cli_aufruf
 
 dt = import_module("prozesscode.dotnet-test")
+
+
+@pytest.fixture(autouse=True)
+def _eigener_lauf_lock(tmp_path, monkeypatch):
+    """Kein Test nimmt den Lock des echten Arbeitsbaums – ein laufender Backend-Testlauf ließe
+    ihn sonst warten, und ein abgebrochener Test hinterließe dort einen Lock."""
+    monkeypatch.setattr(dt, "_LAUF_LOCK", tmp_path / "dotnet_test_run")
+    # Ein wartender Lauf sieht sonst nur alle 0,5 s nach.
+    monkeypatch.setattr("prozesscode._run_lock._PRUEF_ABSTAND", 0.01)
+
+
+def test_belegter_lauf_lock_bricht_ab_ohne_zu_bauen(tmp_path, monkeypatch, capsys):
+    # // Given ein Backend-Testlauf eines anderen Prozesses hält den Lock (PID 1 lebt immer)
+    (tmp_path / "dotnet_test_run.lock").write_text("1", encoding="utf-8")
+    monkeypatch.setattr(dt, "_WARTEZEIT", 0)
+    aufrufe: list[list[str]] = []
+    monkeypatch.setattr(dt, "run_dotnet", lambda argumente: aufrufe.append(argumente) or ("", 0))
+    monkeypatch.setattr(sys, "argv", ["dotnet-test", "--filter", "X"])
+    # // When ein zweiter Lauf startet und die Wartezeit verstreicht
+    with pytest.raises(SystemExit) as exc:
+        dt.main()
+    # // Then bricht er mit dem Belegt-Code ab, ohne dotnet zu starten
+    assert exc.value.code == 99
+    assert aufrufe == []
+    assert "Konkurrierender Backend-Testlauf aktiv" in capsys.readouterr().err
+
+
+def test_wartet_auf_einen_laufenden_lauf_und_startet_danach(tmp_path, monkeypatch, capsys):
+    # // Given ein Backend-Testlauf eines anderen Prozesses, der den Lock gleich freigibt
+    lock_file = tmp_path / "dotnet_test_run.lock"
+    lock_file.write_text("1", encoding="utf-8")
+    freigabe = threading.Timer(0.2, lambda: lock_file.unlink())
+    freigabe.start()
+    aufrufe: list[list[str]] = []
+    monkeypatch.setattr(dt, "run_dotnet", lambda argumente: aufrufe.append(argumente) or (MTP_SUMMARY, 0))
+    monkeypatch.setattr(sys, "argv", ["dotnet-test", "--filter", "X"])
+    # // When ein zweiter Lauf startet
+    with pytest.raises(SystemExit) as exc:
+        dt.main()
+    freigabe.join()
+    # // Then hat er gewartet und ist danach gelaufen, statt abzubrechen
+    assert exc.value.code == 0
+    assert len(aufrufe) == 1
+    assert "Warte auf laufenden Backend-Testlauf" in capsys.readouterr().err
+
+
+# Ohne explizites timeout schiebt der Harness einen Bash-Aufruf nach dieser Frist in den
+# Hintergrund, und ein untätiger benannter Subagent erfährt das Ende nie (OBS-S144-4).
+HARNESS_FRIST_S = 120
+# Voller Lauf samt Coverage, gemessen in S152 (16 s Wanduhr); wächst mit der Suite.
+VOLLER_LAUF_S = 16
+# Spielraum für einen Lauf, der erst bauen muss, und für das Wachsen der Suite.
+PUFFER_S = 30
+
+
+def test_wartezeit_plus_voller_lauf_bleibt_unter_der_frist_des_harness():
+    assert dt._WARTEZEIT + VOLLER_LAUF_S + PUFFER_S < HARNESS_FRIST_S
 
 STRYKER = {
     "stryker-config": {
