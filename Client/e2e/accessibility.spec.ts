@@ -36,12 +36,13 @@ async function navigationControlCount(page: Readonly<Page>): Promise<number> {
 }
 
 // Verstoß-Beschreibung "<Beschriftung>: <Breite>×<Höhe>" oder undefined, wenn das Element groß genug ist.
-// Timeout, damit ein zwischen Auflisten und Messen verschwundenes Element den Versuch abbricht statt ihn
-// über das toPass-Fenster hinaus aufzuhalten.
+// Timeout an jedem Aufruf, damit ein zwischen Auflisten und Messen verschwundenes Element den Versuch mit einem
+// Fehler abbricht: Ohne actionTimeout wartet ein Aufruf über das toPass-Fenster hinaus, und toPass meldet dann
+// nur seinen Timeout statt des Fehlers.
 async function touchTargetViolation(control: Readonly<Locator>): Promise<string | undefined> {
   const box = await control.boundingBox({ timeout: 500 })
   if (box && box.width >= MIN_TOUCH_TARGET_PX && box.height >= MIN_TOUCH_TARGET_PX) return undefined
-  const label = await control.getAttribute('aria-label') ?? await control.innerText()
+  const label = await control.getAttribute('aria-label', { timeout: 500 }) ?? await control.innerText({ timeout: 500 })
   return box ? `${label}: ${String(box.width)}×${String(box.height)}` : `${label}: ohne Box`
 }
 

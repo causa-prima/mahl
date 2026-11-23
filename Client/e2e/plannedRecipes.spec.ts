@@ -1,5 +1,18 @@
+import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import { planRecipeViaApi } from './api/plannedRecipesApi'
 import { seedRecipesWithSaltViaApi } from './api/recipesApi'
+import { exactly } from './exactText'
+import { navEntry } from './pages/navigation'
+import { plannedEntries } from './pages/plannedRecipesPage'
+import { planningToggle } from './pages/recipesPage'
+
+// „zeigt die Rezept-Liste bei "Pfannkuchen" "Vorgemerkt" und bei "Kartoffelsuppe" "Vormerken"“
+async function expectRecipeListToggles(page: Readonly<Page>) {
+  await expect(page.getByRole('heading', { level: 1, name: 'Rezepte' })).toBeVisible()
+  await expect(planningToggle(page, 'Pfannkuchen', 'vorgemerkt')).toBeVisible()
+  await expect(planningToggle(page, 'Kartoffelsuppe', 'vormerken')).toBeVisible()
+}
 
 // @US-803-happy-path
 test.describe('US803_HappyPath: Vorgemerkt-Seite', () => {
@@ -24,5 +37,109 @@ test.describe('US803_HappyPath: Vorgemerkt-Seite', () => {
     await expect(page).toHaveURL(/\/recipes$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Rezepte' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Pfannkuchen' })).toBeVisible()
+  })
+})
+
+// @US-803-happy-path
+test.describe('US803_HappyPath: Vormerken', () => {
+  // Die Orte, an denen der Umschalter steht: `open` öffnet den Ort, `expectShown` prüft, dass er weiter zu sehen
+  // ist, `expectPlanned` ist die <Anzeige> der Beispielzeile.
+  const places = [
+    {
+      name: 'die Rezept-Liste',
+      open: async (page: Readonly<Page>) => { await page.goto('/recipes') },
+      expectShown: async (page: Readonly<Page>) => {
+        await expect(page).toHaveURL(/\/recipes$/)
+        await expect(page.getByRole('heading', { level: 1, name: 'Rezepte' })).toBeVisible()
+      },
+      expectPlanned: async (page: Readonly<Page>) => { await expectRecipeListToggles(page) },
+    },
+    {
+      name: 'die Detailansicht des Rezepts "Pfannkuchen"',
+      open: async (page: Readonly<Page>, pancakesId: string) => { await page.goto(`/recipes/${pancakesId}`) },
+      expectShown: async (page: Readonly<Page>, pancakesId: string) => {
+        await expect(page).toHaveURL(new RegExp(`/recipes/${pancakesId}$`))
+        await expect(page.getByRole('heading', { level: 1, name: 'Pfannkuchen' })).toBeVisible()
+      },
+      expectPlanned: async (page: Readonly<Page>) => { await expect(planningToggle(page, 'Pfannkuchen', 'vorgemerkt')).toBeVisible() },
+    },
+  ] as const
+
+  places.forEach(({ name, open, expectShown, expectPlanned }) => {
+    // Szenario: Ein Rezept vormerken
+    // Beispiel: alle
+    test(`US803_HappyPath_PlanRecipe_ClickToggle_ShowsPlannedEverywhere (${name})`, async ({ page, request }) => {
+      // Given: die Rezepte "Kartoffelsuppe" und "Pfannkuchen" existieren, und kein Rezept ist vorgemerkt (DB-Reset der Auto-Fixture)
+      const [, pancakesId] = await seedRecipesWithSaltViaApi(request, 'Kartoffelsuppe', 'Pfannkuchen')
+
+      // When: ich <Ort> öffne
+      await open(page, pancakesId)
+
+      // And: ich bei "Pfannkuchen" auf "Vormerken" klicke
+      await planningToggle(page, 'Pfannkuchen', 'vormerken').click()
+
+      // Then: <Anzeige>
+      await expectPlanned(page)
+
+      // And: sehe ich weiterhin <Ort>
+      await expectShown(page, pancakesId)
+
+      // And: sehe ich keinen Toast – geprüft, nachdem die Anzeige die Antwort des Servers zeigt; ein Toast trägt die
+      // Rolle alert (MUI-Snackbar) oder status
+      await expect(page.getByRole('alert')).toHaveCount(0)
+      await expect(page.getByRole('status')).toHaveCount(0)
+
+      // When: ich in der Navigationsleiste auf "Vorgemerkt" klicke
+      await navEntry(page, 'Vorgemerkt').click()
+
+      // Then: zeigt die Vorgemerkt-Seite genau das Rezept "Pfannkuchen" – „genau“ schließt den Leerzustand-Hinweis aus
+      await expect(plannedEntries(page)).toHaveText([exactly('Pfannkuchen')])
+      await expect(page.getByText('Noch keine Rezepte vorgemerkt.')).toBeHidden()
+
+      // When: ich in der Navigationsleiste auf "Rezepte" klicke
+      await navEntry(page, 'Rezepte').click()
+
+      // Then: zeigt die Rezept-Liste bei "Pfannkuchen" "Vorgemerkt" und bei "Kartoffelsuppe" "Vormerken"
+      await expectRecipeListToggles(page)
+
+      // When: ich die Seite neu lade
+      await page.reload()
+
+      // Then: zeigt die Rezept-Liste bei "Pfannkuchen" "Vorgemerkt" und bei "Kartoffelsuppe" "Vormerken"
+      await expectRecipeListToggles(page)
+    })
+  })
+})
+
+// @US-803-edge-case
+test.describe('US803_EdgeCase: Vormerken', () => {
+  // Szenario: Ein inzwischen anderswo vorgemerktes Rezept vormerken
+  test('US803_EdgeCase_PlanRecipe_AlreadyPlannedElsewhere_ShowsPlannedOnce', async ({ page, request }) => {
+    // Given: das Rezept "Pfannkuchen" existiert, und kein Rezept ist vorgemerkt (DB-Reset der Auto-Fixture)
+    const [pancakesId] = await seedRecipesWithSaltViaApi(request, 'Pfannkuchen')
+
+    // And: ich habe die Rezept-Liste geöffnet – geladen, sobald der Umschalter steht
+    await page.goto('/recipes')
+    await expect(planningToggle(page, 'Pfannkuchen', 'vormerken')).toBeVisible()
+
+    // And: das Rezept "Pfannkuchen" wird danach auf einem anderen Gerät vorgemerkt
+    await planRecipeViaApi(request, pancakesId)
+
+    // When: ich bei "Pfannkuchen" auf "Vormerken" klicke
+    await planningToggle(page, 'Pfannkuchen', 'vormerken').click()
+
+    // Then: zeigt die Rezept-Liste bei "Pfannkuchen" "Vorgemerkt"
+    await expect(planningToggle(page, 'Pfannkuchen', 'vorgemerkt')).toBeVisible()
+
+    // When: ich in der Navigationsleiste auf "Vorgemerkt" klicke
+    await navEntry(page, 'Vorgemerkt').click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Vorgemerkt' })).toBeVisible()
+
+    // And: ich die Seite neu lade
+    await page.reload()
+
+    // Then: zeigt die Vorgemerkt-Seite genau das Rezept "Pfannkuchen" – „genau“ schließt den Leerzustand-Hinweis aus
+    await expect(plannedEntries(page)).toHaveText([exactly('Pfannkuchen')])
+    await expect(page.getByText('Noch keine Rezepte vorgemerkt.')).toBeHidden()
   })
 })

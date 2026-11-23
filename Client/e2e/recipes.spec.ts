@@ -4,7 +4,7 @@ import type { APIRequestContext, Locator, Page, Route } from '@playwright/test'
 import {
   createRecipeViaApi, fetchRecipeTitlesViaApi, postRecipeViaApi, seedRecipesWithSaltViaApi, UNKNOWN_RECIPE_ID,
 } from './api/recipesApi'
-import { discardQuestion } from './pages/recipesPage'
+import { discardQuestion, recipeListTitles } from './pages/recipesPage'
 import { navEntry } from './pages/navigation'
 import { escapeRegExp, exactly } from './exactText'
 
@@ -58,7 +58,7 @@ test.describe('US602_HappyPath: Rezepte erfassen', () => {
 
     // Then: "Pfannkuchen" steht genau einmal in der Rezept-Liste (die Liste hat genau diesen Eintrag)
     await page.goto('/recipes')
-    await expect(page.getByRole('list', { name: 'Rezepte' }).getByRole('listitem')).toHaveText(['Pfannkuchen'])
+    await expect(recipeListTitles(page)).toHaveText(['Pfannkuchen'])
   })
 
   // Szenario: Mehrere Rezepte erscheinen alphabetisch sortiert
@@ -75,7 +75,7 @@ test.describe('US602_HappyPath: Rezepte erfassen', () => {
     await page.goto('/recipes')
 
     // Then: die Rezept-Liste zeigt genau diese Einträge in dieser Reihenfolge
-    await expect(page.getByRole('list', { name: 'Rezepte' }).getByRole('listitem'))
+    await expect(recipeListTitles(page))
       .toHaveText(['apfelstrudel', 'Brot', 'Mohnkuchen', 'Möhrensuppe', 'Mohrrübeneintopf', 'Ölkuchen', 'Zwiebelkuchen'])
   })
 })
@@ -1144,7 +1144,7 @@ test.describe('US602_EdgeCase: Eingaben bereinigen und erkennen', () => {
     await expectDetailSteps(page, ['Linsen kochen.'])
     // Then: "linsensuppe vom blech" steht in der Rezept-Liste (die Liste hat genau diesen Eintrag)
     await page.goto('/recipes')
-    await expect(page.getByRole('list', { name: 'Rezepte' }).getByRole('listitem')).toHaveText([exactly(LENTIL_SOUP)])
+    await expect(recipeListTitles(page)).toHaveText([exactly(LENTIL_SOUP)])
   })
 
   // Eine Zeile je Beispiel der Scenario Outline.
@@ -1507,7 +1507,7 @@ async function expectPancakesDetailWithFirstStep(page: Readonly<Page>): Promise<
 
 // Then „steht "Pfannkuchen" genau einmal in der Rezept-Liste" – die Liste hat genau diesen Eintrag.
 async function expectOnlyPancakesInList(page: Readonly<Page>): Promise<void> {
-  await expect(page.getByRole('list', { name: 'Rezepte' }).getByRole('listitem')).toHaveText([PANCAKES])
+  await expect(recipeListTitles(page)).toHaveText([PANCAKES])
 }
 
 // @US-602-error

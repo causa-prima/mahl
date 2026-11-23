@@ -56,7 +56,7 @@ describe('Vorgemerkt-Seite', () => {
     expect(await screen.findByRole('link', { name: 'Pfannkuchen' })).toBeInTheDocument()
   })
 
-  // ADR-S112-5
+  // ADR-S106-3
   // Querschnittsvertrag aus dem Kopf von features/planned-recipes.feature: während des Ladens steht unter
   // der Überschrift nichts – weder Leerzustand noch Spinner. Kein Szenario treibt den Test.
   it('PlannedRecipesLoading_ResponsePending_ShowsOnlyHeading', async () => {
@@ -78,7 +78,7 @@ describe('Vorgemerkt-Seite', () => {
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
-  // ADR-S112-5
+  // ADR-S106-3
   // Querschnittsvertrag aus dem Kopf von features/planned-recipes.feature: ein Ladefehler zeigt nie den
   // Leerzustand (der Fehlerhinweis selbst ist noch nicht gebaut). Kein Szenario treibt den Test.
   it('PlannedRecipesLoading_ServerError_NeverShowsEmptyState', async () => {

@@ -73,7 +73,7 @@ function FormActions({ onCancel }: Readonly<{ onCancel: () => void }>) {
     <Stack
       direction="row"
       spacing={1}
-      // Stryker disable next-line ObjectLiteral,StringLiteral: Layout-Wert, in jsdom nicht beobachtbar (Einzelfall, vom User freigegeben S143)
+      // Stryker disable next-line ObjectLiteral,StringLiteral: Layout-Wert, in jsdom nicht beobachtbar (ADR-S136-2)
       sx={{ justifyContent: 'flex-end' }}
     >
       <Button type="button" onClick={onCancel}>Abbrechen</Button>

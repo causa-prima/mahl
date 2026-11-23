@@ -40,6 +40,23 @@ namespace mahl.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PlannedRecipes",
+                columns: table => new
+                {
+                    RecipeId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PlannedRecipes", x => x.RecipeId);
+                    table.ForeignKey(
+                        name: "FK_PlannedRecipes_Recipes_RecipeId",
+                        column: x => x.RecipeId,
+                        principalTable: "Recipes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "RecipeIngredients",
                 columns: table => new
                 {
@@ -106,6 +123,9 @@ namespace mahl.Infrastructure.Migrations
         {
             migrationBuilder.Sql($"DROP INDEX IF EXISTS \"{UniqueIndexNames.RecipeTitle}\";");
             migrationBuilder.Sql($"DROP INDEX IF EXISTS \"{UniqueIndexNames.IngredientName}\";");
+
+            migrationBuilder.DropTable(
+                name: "PlannedRecipes");
 
             migrationBuilder.DropTable(
                 name: "RecipeIngredients");

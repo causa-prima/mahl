@@ -97,16 +97,17 @@ def _zellen(zeile: str) -> tuple[str, ...]:
     return tuple(z.strip() for z in zeile.strip().strip("|").split("|"))
 
 
-def _szenarien(features: list[str]) -> dict[str, set[tuple[str, ...]] | None]:
-    """Titel → Beispielzeilen (ohne Kopfzeile) bei einem Grundriss, None bei einem Szenario."""
-    ergebnis: dict[str, set[tuple[str, ...]] | None] = {}
+def _szenarien(features: list[str]) -> dict[str, list[tuple[str, ...]] | None]:
+    """Titel → Beispielzeilen (ohne Kopfzeile, in Tabellenreihenfolge) bei einem Grundriss, None bei
+    einem Szenario."""
+    ergebnis: dict[str, list[tuple[str, ...]] | None] = {}
     for text in features:
         for s in parse_feature(text)[2]:
             if not s["lines"][0].strip().startswith("Scenario Outline:"):
                 ergebnis[s["title"]] = None
                 continue
             tabelle = [z for z in s["lines"] if z.strip().startswith("|")]
-            ergebnis[s["title"]] = {_zellen(z) for z in tabelle[1:]}
+            ergebnis[s["title"]] = [_zellen(z) for z in tabelle[1:]]
     return ergebnis
 
 
@@ -130,7 +131,8 @@ def _pruefe_testfall(name: str, block: list[str], szenarien: dict, adrs: set[str
             continue
         if not beispiele:
             meldungen.append(BEISPIEL_FEHLT.format(test=name, titel=t))
-        meldungen += [BEISPIEL_UNBEKANNT.format(test=name, beispiel=b, titel=t)
+        gueltig = ", ".join(f"`{' | '.join(z)}`" for z in zeilen)
+        meldungen += [BEISPIEL_UNBEKANNT.format(test=name, beispiel=b, titel=t, gueltig=gueltig)
                       for b in beispiele if b != ALLE and _zellen(b) not in zeilen]
     return meldungen
 
@@ -192,7 +194,7 @@ SZENARIO_FEHLT = "Test „{test}“: `// Szenario: {titel}` – kein Szenario di
 BEISPIEL_FEHLT = ("Test „{test}“: „{titel}“ ist ein Szenariogrundriss – `// Beispiel: <Zeile>` "
                   "(oder `alle`) fehlt.")
 BEISPIEL_UNBEKANNT = ("Test „{test}“: `// Beispiel: {beispiel}` steht nicht in der Beispieltabelle "
-                      "von „{titel}“.")
+                      "von „{titel}“. Gültig: {gueltig} oder `alle`.")
 US_TAG_OHNE_SZENARIO = ("Test „{test}“ trägt einen US-Tag, nennt aber nur eine ADR – ein US-Tag "
                         "braucht ein Szenario (ADR-Verweis gilt nur für Querschnittstests ohne Tag).")
 ADR_UNBEKANNT = "Test „{test}“: `// {adr}` – diese ADR gibt es nicht (docs/history/adr.md)."

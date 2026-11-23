@@ -190,8 +190,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.check-test-spec-ref": {
-    "beurteilbar": 223,
-    "getoetet": 218,
+    "beurteilbar": 230,
+    "getoetet": 225,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.hooks.checks.common": {

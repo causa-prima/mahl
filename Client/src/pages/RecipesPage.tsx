@@ -8,6 +8,7 @@ import ListItemText from '@mui/material/ListItemText'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { Link as RouterLink, useNavigate } from 'react-router'
+import PlanningToggle from '../components/PlanningToggle'
 import { useResultQuery } from '../hooks/useResultQuery'
 import { fetchRecipes } from '../services/recipesApi'
 
@@ -31,10 +32,14 @@ export default function RecipesPage() {
         ) : (
           <List aria-labelledby="recipes-heading" disablePadding>
             {recipes.map((recipe) => (
-              <ListItem key={recipe.id} disableGutters disablePadding>
+              // Umschalter neben dem Link statt als secondaryAction: UX-Guideline, Visuelle Baseline
+              // „Listeneinträge mit eigener Aktion" (CGU-visuelle-baseline).
+              // Stryker disable next-line ObjectLiteral,StringLiteral: Layout-Wert, in jsdom nicht beobachtbar (ADR-S136-2)
+              <ListItem key={recipe.id} disableGutters disablePadding sx={{ gap: 1 }}>
                 <ListItemButton component={RouterLink} to={`/recipes/${recipe.id}`} disableGutters>
                   <ListItemText primary={recipe.title} />
                 </ListItemButton>
+                <PlanningToggle recipe={recipe} />
               </ListItem>
             ))}
           </List>

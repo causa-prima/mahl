@@ -15,7 +15,6 @@ public class RecipesEndpointsTests(PostgresContainerFixture postgres) : Endpoint
 #pragma warning disable CA1812 // instantiated by JSON deserializer via reflection
     private sealed record RecipeResponse(
         Guid Id, string Title, IReadOnlyList<RecipeIngredientResponse> Ingredients, IReadOnlyList<StepPayload> Steps);
-    private sealed record RecipeSummaryResponse(Guid Id, string Title);
     private sealed record ProblemDetailsResponse(string? Detail, string? ErrorCode);
 #pragma warning restore CA1812
 

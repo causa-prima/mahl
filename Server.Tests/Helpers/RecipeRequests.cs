@@ -15,4 +15,7 @@ public sealed record RecipeIngredientResponse(string Name, decimal? Quantity, st
 
 // ADR-S090-1: 422-Body feld-keyed.
 public sealed record ValidationErrorResponse(IReadOnlyDictionary<string, IReadOnlyList<string>> Errors);
+
+// Wire-Format der Rezept-Liste (GET /api/recipes und GET /api/planned-recipes).
+public sealed record RecipeSummaryResponse(Guid Id, string Title);
 #pragma warning restore MA0048, CA1812

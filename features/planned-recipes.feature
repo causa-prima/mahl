@@ -23,8 +23,11 @@ Feature: Rezepte vormerken
   # Ein Rezept ist höchstens einmal vorgemerkt; Vormerken und Entfernen sind idempotent – ein
   # schon vorgemerktes Rezept erneut vormerken gilt als Erfolg (ADR-S153-1).
   #
-  # Umschalter: Ein Button, beschriftet „Vormerken“ bzw. „Vorgemerkt“ (das Häkchen ist nur
-  # Symbol). Er zeigt den neuen Zustand erst mit der Antwort des Servers, nicht vorab.
+  # Umschalter: Ein Button mit Symbol und Text, in Rezept-Liste und Detailansicht gleich – nicht
+  # vorgemerkt „Vormerken“ mit einer Liste mit Plus, vorgemerkt „Vorgemerkt“ mit einer Liste mit
+  # Häkchen in Primärfarbe (Text und Form tragen den Zustand, die Farbe nur zusätzlich). Sein Name
+  # für Screenreader nennt das Rezept: „Pfannkuchen vormerken“ bzw. „Pfannkuchen vorgemerkt“. Er
+  # zeigt den neuen Zustand erst mit der Antwort des Servers, nicht vorab.
   # Umschalten zeigt keinen Toast. In der Rezept-Liste öffnet der Umschalter nicht die
   # Detailansicht. Solange die Vormerkungen noch laden, zeigen Rezept-Liste und Detailansicht
   # keinen Umschalter.

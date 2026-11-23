@@ -350,7 +350,7 @@ describe('Rezepte erfassen', () => {
     expect(screen.queryByRole('heading', { name: 'Pfannkuchen' })).not.toBeInTheDocument()
   })
 
-  // ADR-S112-5
+  // ADR-S106-3
   // Querschnittsvertrag aus dem Kopf von features/recipes.feature: während des Ladens erscheint der
   // Leerzustand nicht. Kein Szenario treibt den Test, deshalb ohne US-Tag.
   it('RecipesLoading_ResponsePending_ShowsNoEmptyState', async () => {
@@ -370,7 +370,7 @@ describe('Rezepte erfassen', () => {
     expect(screen.queryByText('Noch keine Rezepte angelegt.')).not.toBeInTheDocument()
   })
 
-  // ADR-S112-5
+  // ADR-S106-3
   // Querschnittsvertrag aus dem Kopf von features/recipes.feature: ein Ladefehler zeigt nie den
   // Leerzustand (der Fehlerhinweis selbst ist noch nicht gebaut). Kein Szenario treibt den Test.
   it('RecipesLoading_ServerError_NeverShowsEmptyState', async () => {

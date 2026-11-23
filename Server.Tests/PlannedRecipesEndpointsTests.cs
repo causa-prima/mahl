@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using AwesomeAssertions;
+using mahl.Infrastructure.DatabaseTypes;
 using mahl.Server.Tests.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace mahl.Server.Tests;
@@ -25,4 +27,48 @@ public class PlannedRecipesEndpointsTests(PostgresContainerFixture postgres) : E
         var body = await response.Content.ReadFromJsonAsync<object[]>(TestContext.Current.CancellationToken);
         body.Should().BeEmpty();
     }
+
+    // Szenario: Ein Rezept vormerken
+    // Beispiel: alle
+    [Fact]
+    public async Task US803_HappyPath_PutPlannedRecipe_RecipeExists_Returns204AndPlansOnlyThatRecipe()
+    {
+        // Given: die Rezepte "Kartoffelsuppe" und "Pfannkuchen" existieren, kein Rezept ist vorgemerkt
+        var soup = ARecipe("Kartoffelsuppe");
+        var pancake = ARecipe("Pfannkuchen");
+        Db.Recipes.AddRange(soup, pancake);
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // When
+        var response = await Client.PutAsync($"/api/planned-recipes/{pancake.Id}", content: null, TestContext.Current.CancellationToken);
+
+        // Then
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await ReadPlannedRecipesAsync())
+            .Should().BeEquivalentTo([new PlannedRecipeDbType { RecipeId = pancake.Id }]);
+        var body = await Client.GetFromJsonAsync<RecipeSummaryResponse[]>("/api/planned-recipes", TestContext.Current.CancellationToken);
+        body.Should().BeEquivalentTo([new RecipeSummaryResponse(Id: pancake.Id, Title: "Pfannkuchen")]);
+    }
+
+    // Szenario: Ein inzwischen anderswo vorgemerktes Rezept vormerken
+    [Fact]
+    public async Task US803_EdgeCase_PutPlannedRecipe_AlreadyPlanned_Returns204AndStaysPlannedOnce()
+    {
+        // Given: das Rezept "Pfannkuchen" existiert und ist (auf einem anderen Gerät) schon vorgemerkt
+        var pancake = ARecipe("Pfannkuchen");
+        Db.Recipes.Add(pancake);
+        Db.PlannedRecipes.Add(new PlannedRecipeDbType { RecipeId = pancake.Id });
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // When
+        var response = await Client.PutAsync($"/api/planned-recipes/{pancake.Id}", content: null, TestContext.Current.CancellationToken);
+
+        // Then
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await ReadPlannedRecipesAsync())
+            .Should().BeEquivalentTo([new PlannedRecipeDbType { RecipeId = pancake.Id }]);
+    }
+
+    private async Task<List<PlannedRecipeDbType>> ReadPlannedRecipesAsync() =>
+        await Db.PlannedRecipes.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken);
 }

@@ -17,7 +17,7 @@ namespace mahl.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -48,6 +48,16 @@ namespace mahl.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Ingredients");
+                });
+
+            modelBuilder.Entity("mahl.Infrastructure.DatabaseTypes.PlannedRecipeDbType", b =>
+                {
+                    b.Property<Guid>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("RecipeId");
+
+                    b.ToTable("PlannedRecipes");
                 });
 
             modelBuilder.Entity("mahl.Infrastructure.DatabaseTypes.RecipeDbType", b =>
@@ -108,6 +118,15 @@ namespace mahl.Infrastructure.Migrations
                     b.HasKey("RecipeId", "StepNumber");
 
                     b.ToTable("Steps");
+                });
+
+            modelBuilder.Entity("mahl.Infrastructure.DatabaseTypes.PlannedRecipeDbType", b =>
+                {
+                    b.HasOne("mahl.Infrastructure.DatabaseTypes.RecipeDbType", null)
+                        .WithMany()
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("mahl.Infrastructure.DatabaseTypes.RecipeIngredientDbType", b =>

@@ -137,7 +137,19 @@ def test_beispielzeile_die_unter_dem_grundriss_fehlt_wird_abgewiesen():
     # When / Then
     assert _verstoesse(post) == [hook.BEISPIEL_UNBEKANNT.format(
         test="US602_HappyPath_Neu", beispiel='"Teig rühren." als zweiten Schritt eingebe',
-        titel="Abbrechen mit Eingaben fragt nach – Verwerfen führt zur Rezept-Liste")]
+        titel="Abbrechen mit Eingaben fragt nach – Verwerfen führt zur Rezept-Liste",
+        gueltig='`"Pfannkuchen" als Titel eingebe`, `"Salz" als Zutaten eingebe`')]
+
+
+def test_unbekannte_beispielzeile_nennt_die_gueltigen_zeilen_in_tabellenreihenfolge():
+    # Given: ein mehrspaltiger Grundriss; die Zeile im Test passt zu keiner seiner Zeilen
+    post = _neu_ts('// Szenario: Ungültiger Titel\n// Beispiel: "x" | "y"\n')
+    # When
+    meldungen = _verstoesse(post)
+    # Then: die Meldung zeigt jede Zeile so, wie `// Beispiel:` sie erwartet, dazu `alle`
+    assert meldungen == ['Test „US602_HappyPath_Neu“: `// Beispiel: "x" | "y"` steht nicht in der '
+                         'Beispieltabelle von „Ungültiger Titel“. Gültig: `"" | "Bitte einen Titel '
+                         'angeben"`, `"   " | "Bitte einen Titel angeben"` oder `alle`.']
 
 
 def test_kopfzeile_der_beispieltabelle_ist_keine_beispielzeile():

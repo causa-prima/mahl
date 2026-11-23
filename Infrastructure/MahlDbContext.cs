@@ -9,6 +9,7 @@ public class MahlDbContext(DbContextOptions<MahlDbContext> options) : DbContext(
     public DbSet<RecipeDbType> Recipes => Set<RecipeDbType>();
     public DbSet<RecipeIngredientDbType> RecipeIngredients => Set<RecipeIngredientDbType>();
     public DbSet<StepDbType> Steps => Set<StepDbType>();
+    public DbSet<PlannedRecipeDbType> PlannedRecipes => Set<PlannedRecipeDbType>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +23,11 @@ public class MahlDbContext(DbContextOptions<MahlDbContext> options) : DbContext(
         modelBuilder.Entity<IngredientDbType>().ConfigureXmin();
 
         ConfigureRecipe(modelBuilder);
+
+        // ADR-S153-1: Rezept-ID als Primär- und Fremdschlüssel – höchstens eine Vormerkung je Rezept.
+        var planned = modelBuilder.Entity<PlannedRecipeDbType>();
+        planned.HasKey(p => p.RecipeId);
+        planned.HasOne<RecipeDbType>().WithMany().HasForeignKey(p => p.RecipeId);
     }
 
     // Rezept-Aggregat: Kind-Tabellen ohne Navigation-Properties, nur FK-Skalare – EF sortiert die

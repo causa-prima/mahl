@@ -273,3 +273,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: keiner
 - Aufschubgrund: Recherche – die Ursache verlangt einen eigenen Test des Harness-Verhaltens (Subagent, langer Befehl, verschiedene Timeouts)
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S153-2 – Primitive-Obsession-Hook warnt bei Guid-Parameter eines Infrastructure-Helfers
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Beim Schreiben von Infrastructure/PlannedRecipeExtensions.cs (US-803 run-2) meldete der PostToolUse-Hook gegen Primitive Obsession eine Warnung für den Parameter `Guid recipeId` von `PlanRecipeAsync`. Der Bestand nimmt Kennungen am Rand durchgängig als `Guid` entgegen (Endpoints, Route-Constraint `:guid`); der Backend-Subagent wertete die Warnung deshalb als Fehlalarm und ging weiter. Ungeklärt ist, ob der Hook `Guid` als eingebauten Typ zählt und wie oft er an solchen Randstellen anschlägt.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: Recherche – Hook-Regel lesen und Auslösungen im Bestand zählen, bevor sich Fehlalarm oder berechtigter Hinweis sagen lässt
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

@@ -334,6 +334,9 @@ dotnet_diagnostic.MA0051.severity = none
 dotnet_diagnostic.MA0048.severity = none
 dotnet_diagnostic.CA1861.severity = none
 dotnet_diagnostic.CA1062.severity = none
+# S138: Up der einen InitialCreate-Migration wächst mit jeder Tabelle (Drop+Recreate, kein Aufteilen
+#       generierten Codes) – gleiche Begründung wie MA0051 oben.
+dotnet_diagnostic.S138.severity = none
 
 # --- Test project ---
 # {Server.Tests,Server.Tests/**}/*.cs matches both root-level and subdirectory .cs files.

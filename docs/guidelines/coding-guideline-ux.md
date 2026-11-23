@@ -259,6 +259,14 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
   um einen `ListItemButton component={RouterLink} disableGutters` – die ganze Zeile ist der Link, das
   Touch-Ziel mindestens 44px hoch, der Text bündig mit Überschrift. Die Hauptaktion der Seite („Rezept
   anlegen") steht über der Liste, per `Stack spacing={2}` von ihr abgesetzt.
+- **Listeneinträge mit eigener Aktion** (Umschalter „Vormerken" der Rezept-Liste): Die Aktion steht neben dem
+  `ListItemButton` im `ListItem` (`sx={{ gap: 1 }}`), nicht als `secondaryAction` – dessen reservierter Platz
+  reicht nur für einen Icon-Button, ein Text-Button läge über dem Titel. Der Button behält seine Breite
+  (`flexShrink: 0`), ein langer Titel bricht um.
+- **Seitentitel mit Aktion** (Rezept-Detailansicht): Titel und Aktion in einer `Stack direction="row" spacing={2}`
+  mit `alignItems: 'center'`, `justifyContent: 'space-between'`, `minHeight` in Touch-Target-Höhe und `mb: 1`;
+  der Titel selbst ohne `gutterBottom`. Sonst verschiebt der Titelabstand die Mitte, und die Seite springt, wenn
+  die Aktion erst nach dem Laden erscheint.
 - **Fließtext und Leerzustand:** `Typography` mit `gutterBottom`, damit der Abstand zum folgenden
   Button dem einer Liste entspricht.
 - **Formularfelder im Dialog:** `fullWidth` und `margin="dense"`.
@@ -275,7 +283,9 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
   (`color="error"`) – sie ist kenntlich, ohne zur Hauptaktion zu werden. Escape und ein Klick neben die
   Nachfrage wirken wie die sichere Aktion: Eine beiläufige Geste darf nichts verwerfen.
 - **Farbe:** Die Primärfarbe trägt die Hauptaktion einer Ansicht (`variant="contained"`, etwa
-  „Zutat anlegen", „Speichern"). Aktionen auf dunklem Grund (Snackbar) übernehmen dessen
+  „Zutat anlegen", „Speichern"). Ein Umschalter mit Text in einer Liste füllt deshalb auch im
+  Zustand „an" nicht: aus `outlined`, an `text` – Text und Symbol tragen den Zustand, und viele
+  eingeschaltete Zeilen konkurrieren nicht mit der Hauptaktion. Aktionen auf dunklem Grund (Snackbar) übernehmen dessen
   Textfarbe (`color="inherit"`) – Primärblau erreicht dort nicht die geforderten 4,5:1.
 
 ✅ Neuer Bearbeiten-Dialog: Felder `fullWidth margin="dense"`, Speichern `contained`, sonst keine eigenen Abstände.

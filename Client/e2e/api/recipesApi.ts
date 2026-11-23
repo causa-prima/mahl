@@ -46,10 +46,11 @@ export async function fetchRecipeTitlesViaApi(request: Readonly<APIRequestContex
 // derselben Zutat käme als Duplikat nicht durch. Nacheinander statt parallel: Die Anlege-Reihenfolge
 // ist Teil der Vorbedingung, wenn ein Test sie bewusst von der erwarteten Listen-Reihenfolge abweichen lässt.
 // Die Promise-Kette per reduce ersetzt eine for…of-Schleife, die `functional/no-loop-statements` verbietet.
-export async function seedRecipesWithSaltViaApi(request: Readonly<APIRequestContext>, ...titles: readonly string[]): Promise<void> {
+// Gibt die Ids in der Reihenfolge der Titel zurück (Ziel eines Direktlinks oder einer Vormerkung).
+export async function seedRecipesWithSaltViaApi(request: Readonly<APIRequestContext>, ...titles: readonly string[]): Promise<readonly string[]> {
   await seedIngredientViaApi(request, 'Salz', 'g')
-  await titles.reduce(async (previous, title) => {
-    await previous
-    await createRecipeViaApi(request, { title, ingredients: 'Salz', instruction: 'Zubereiten.' })
-  }, Promise.resolve())
+  return titles.reduce<Promise<readonly string[]>>(async (previous, title) => {
+    const ids = await previous
+    return [...ids, await createRecipeViaApi(request, { title, ingredients: 'Salz', instruction: 'Zubereiten.' })]
+  }, Promise.resolve([]))
 }

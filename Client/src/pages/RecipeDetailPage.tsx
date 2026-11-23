@@ -4,12 +4,15 @@ import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
+import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
+import PlanningToggle from '../components/PlanningToggle'
 import { Link as RouterLink, useParams } from 'react-router'
 import { formatIngredient } from '../domain/recipe'
 import type { Recipe } from '../domain/recipe'
 import { useResultQuery } from '../hooks/useResultQuery'
 import { fetchRecipe } from '../services/recipesApi'
+import { MIN_TOUCH_TARGET } from '../touchTarget'
 
 // ADR-S142-2: Die Seite lädt das Rezept immer über die Kennung aus der Adresse – auch direkt nach dem Anlegen.
 export default function RecipeDetailPage() {
@@ -21,7 +24,7 @@ export default function RecipeDetailPage() {
 
 function LoadedRecipe({ id }: Readonly<{ id: string }>) {
   // Während des Ladens bleibt die Seite leer: weder Hinweis noch Spinner.
-  // Stryker disable next-line StringLiteral: Query-Key-Präfix, äquivalent solange nichts per Präfix invalidiert (Einzelfall, vom User freigegeben S143)
+  // Stryker disable next-line StringLiteral: Query-Key-Präfix, äquivalent solange nichts per Präfix invalidiert (ADR-S153-2)
   const lookup = useResultQuery(['recipes', id], () => fetchRecipe(id))
 
   if (lookup === undefined) return null
@@ -40,7 +43,16 @@ function RecipeNotFound() {
 function RecipeDetail({ recipe }: Readonly<{ recipe: Recipe }>) {
   return (
     <Container component="main" maxWidth="sm">
-      <Typography variant="h5" component="h1" gutterBottom>{recipe.title}</Typography>
+      {/* Titelzeile mit Umschalter: UX-Guideline, Visuelle Baseline „Seitentitel mit Aktion" (CGU-visuelle-baseline). */}
+      <Stack
+        direction="row"
+        spacing={2}
+        // Stryker disable next-line ObjectLiteral,StringLiteral: Layout-Wert, in jsdom nicht beobachtbar (ADR-S136-2)
+        sx={{ alignItems: 'center', justifyContent: 'space-between', minHeight: MIN_TOUCH_TARGET, mb: 1 }}
+      >
+        <Typography variant="h5" component="h1">{recipe.title}</Typography>
+        <PlanningToggle recipe={recipe} />
+      </Stack>
       <Typography variant="h6" component="h2" id="recipe-ingredients-heading" gutterBottom>Zutaten</Typography>
       <List aria-labelledby="recipe-ingredients-heading">
         {recipe.ingredients.map((ingredient, index) => (

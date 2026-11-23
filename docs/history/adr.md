@@ -900,7 +900,7 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 **Status:** Accepted
 **Tags:** scope:feature, resource:planned-recipes, http:put, http:delete, http:204
 
-**Entscheidung:** Eine *Vormerkung* (Glossar) wird über die Rezept-ID adressiert, nicht über eine eigene ID: `GET /api/planned-recipes` listet die vorgemerkten Rezepte, `PUT /api/planned-recipes/{recipeId}` merkt vor, `DELETE /api/planned-recipes/{recipeId}` entfernt. Vormerken ist idempotent – ein schon vorgemerktes Rezept erneut vormerken antwortet `204` wie das erste Mal; symmetrisch zum Entfernen (ADR-S000-5). Ein Rezept ist damit höchstens einmal vorgemerkt.
+**Entscheidung:** Eine *Vormerkung* (Glossar) wird über die Rezept-ID adressiert, nicht über eine eigene ID: `GET /api/planned-recipes` listet die vorgemerkten Rezepte, `PUT /api/planned-recipes/{recipeId}` merkt vor, `DELETE /api/planned-recipes/{recipeId}` entfernt. Vormerken ist idempotent – ein schon vorgemerktes Rezept erneut vormerken antwortet `204` wie das erste Mal; symmetrisch zum Entfernen (ADR-S000-5). Ein Rezept ist damit höchstens einmal vorgemerkt. Vormerken und Entfernen verlangen kein `If-Match` – abweichend von ADR-S058-1: Sie setzen einen Zielzustand, statt einen gelesenen Stand zu ändern, und ein veralteter Stand ist hier gerade der Fall, der gelingen soll.
 
 **Begründung:** Eine Vormerkung trägt im SKELETON keine Daten außer dem Rezept – sie ist Mengenzugehörigkeit. Der Umschalter in Rezept-Liste und Detailansicht (US-803) kann mit veralteter Anzeige ein schon vorgemerktes Rezept erneut vormerken (zweites Gerät, Doppeltipp); für den Nutzer ist das Ziel erreicht. Eine Ablehnung (`409`) müsste der Client ausdrücklich als Erfolg werten – ein Sonderzweig ohne Nutzen. Die Adressierung über die Rezept-ID verhindert zudem, dass ein Entfernen mit veralteter Eintrags-ID still eine andere, neu angelegte Vormerkung verfehlt.
 
@@ -1781,13 +1781,14 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 **Status:** Accepted
 **Tags:** scope:cross-cutting, testing:integration-test, testing:gherkin
 
-**Entscheidung:** Backend-Integrationstests, die reines Querschnitts-Verhalten absichern und NICHT von einem Gherkin-Szenario getrieben sind, tragen bewusst KEINEN `USxxx_`-Tag. Zwei Kategorien:
+**Entscheidung:** Backend-Integrationstests und Frontend-Komponententests, die NICHT von einem Gherkin-Szenario getrieben sind, tragen bewusst KEINEN `USxxx_`-Tag. Drei Kategorien:
 1. **Protokoll-/Infrastruktur-Mechanik** – HTTP-Precondition-Verhalten aus einer Querschnitts-ADR (ETag-Format, `If-Match`-Pflicht 428/400/412, POST-liefert-ETag; ADR-S058-1/-3, ADR-S106-1/-2). Präzedenz: die `ETagMiddleware`-Tests (Collection-ETag) tragen ebenfalls keinen US-Tag.
 2. **Stryker-blinde Invarianten** – Tests, die eine bewusste Reihenfolge-/Prioritäts-Invariante gegen Refactoring-Regression pinnen, die Stryker strukturell nicht fangen kann (Statement-Reorder ist kein Mutant; z.B. die 404-vor-If-Match-Dominanz, ADR-S000-5-Addendum). Dieselbe Klasse wie ein Fokus-Prioritäts-Pin, den ein 100 %-Mutation-Score über Einzelfälle allein nicht absichert.
+3. **Vertrag aus dem Feature-Kopf** – eine Regel, die der Kopf einer Feature-Datei festlegt und ausdrücklich nicht als Szenario, sondern per Komponententest sichert (etwa „während des Ladens kein Leerzustand", „der Umschalter zeigt den neuen Zustand erst mit der Antwort des Servers"). Der Kommentar nennt die Feature-Datei und die Regel.
 
 **Begründung:** `docs/process/e2e-testing.md` verlangt US-Tag + ScenarioType als Spec↔Test-Traceability für **szenario-getriebene** Tests. Ein Querschnitts-/Invarianten-Test hat per Definition kein einzelnes treibendes Szenario; ein erzwungener US-Tag wäre eine falsche Traceability-Behauptung. Zentral hier dokumentiert, statt in jedem betroffenen Test einzeln (vermeidet die Kommentar-Wiederholung über die betroffenen Tests und deren Drift).
 
-**Guard (Abgrenzung zu Gold-Plating):** Ein US-Tag-loser Test MUSS per Kommentar einer der beiden Kategorien zugeordnet sein – **Protokoll-/Infrastruktur-Mechanik** oder **Stryker-blinde Invariante** – samt Angabe, welche ADR bzw. welche Invariante (S124: beim Namen statt bei der Nummer, damit die Zuordnung eine Umsortierung übersteht). Prüft ein Test hingegen Domänen-/Szenario-Verhalten, ist US-Tag + Gherkin-Szenario Pflicht – fehlt beides, ist es eine Outside-In-Verletzung / Gold-Plating (review-checklist.md „Test-Audit").
+**Guard (Abgrenzung zu Gold-Plating):** Ein US-Tag-loser Test MUSS per Kommentar einer der drei Kategorien zugeordnet sein – **Protokoll-/Infrastruktur-Mechanik**, **Stryker-blinde Invariante** oder **Vertrag aus dem Feature-Kopf** – samt Angabe, welche ADR, welche Invariante bzw. welche Kopf-Regel (S124: beim Namen statt bei der Nummer, damit die Zuordnung eine Umsortierung übersteht). Prüft ein Test hingegen Domänen-/Szenario-Verhalten, ist US-Tag + Gherkin-Szenario Pflicht – fehlt beides, ist es eine Outside-In-Verletzung / Gold-Plating (review-checklist.md „Test-Audit").
 
 **Verworfen:** Die Ausnahme pro betroffenem Test als Kommentar wiederholen – driftet und macht die Grenze „legitime Infra-Ausnahme vs. Gold-Plating" für jeden Review neu verhandelbar.
 
@@ -2022,20 +2023,36 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 
 ---
 
-### ADR-S136-2: Frontend-Suppressionen: Daten-Default ohne Szenario, CSS-Klassennamen
+### ADR-S136-2: Frontend-Suppressionen: Daten-Default ohne Szenario, CSS-Klassennamen, Layout-Werte
 
 **Status:** Accepted
 **Tags:** scope:cross-cutting, testing:stryker, frontend:react
 
-**Entscheidung:** Zwei wiederkehrende Mutanten-Klassen im Frontend werden unterdrückt; die Begründung im Kommentar nennt diese ADR.
+**Entscheidung:** Drei wiederkehrende Mutanten-Klassen im Frontend werden unterdrückt; die Begründung im Kommentar nennt diese ADR.
 - **Daten-Default, den kein Szenario fordert** (`data ?? []` hinter `useQuery`): `ArrayDeclaration`. In Tests liefert MSW immer Daten, der Default greift nur im Ladezustand. Fordert ein Szenario den Ladezustand, wird er dort getestet und die Suppression entfällt.
 - **CSS-Klassennamen** (`className="…"`): `StringLiteral`. Tests prüfen Verhalten, keine Gestaltung; ein Test auf Klassennamen wäre Code ohne treibendes Szenario.
+- **Feste Layout-Werte in `sx`** (`sx={{ justifyContent: 'flex-end' }}`): `ObjectLiteral`, `StringLiteral`. Gleicher Grund wie bei Klassennamen; jsdom berechnet kein Layout. Ein bedingter Wert (`planned ? 'a' : 'b'`) hat Verhalten und bleibt testpflichtig.
 
 Syntax und Beispiele: [Stryker-Survivor: `= []` Default-Wert](../guidelines/coding-guideline-typescript.md#CGT-stryker-survivor-default), [CSS-className-Strings](../guidelines/coding-guideline-typescript.md#CGT-stryker-survivor-classname).
 
-**Begründung:** Beide Klassen entstehen mit fast jeder neuen Seite (git: f1ff899, 834ad19) – eine Einzelfreigabe je Fall wäre Verwaltung ohne Erkenntnis ([Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung)).
+**Begründung:** Alle drei Klassen entstehen mit fast jeder neuen Seite (git: f1ff899, 834ad19) – eine Einzelfreigabe je Fall wäre Verwaltung ohne Erkenntnis ([Welcher Survivor bekommt welche Reaktion?](../process/tdd-process.md#TDD-survivor-entscheidung)).
 
 **Verworfen:** Tests auf Klassennamen oder auf den Ladezustand ohne Szenario – prüfen nichts, was ein Nutzer fordert.
+
+---
+
+### ADR-S153-2: Frontend-Suppression: Query-Keys und Invalidierungs-Filter ohne sichtbare Folge
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, testing:stryker, frontend:react
+
+**Entscheidung:** Mutanten an einem Query-Key (`['recipes', id]` → `['', id]`) oder am Filter einer Invalidierung (`{ queryKey: … }` → `{}`) werden unterdrückt, wenn ihre einzige Folge andere Cache-Treffer oder zusätzliche Abrufe sind – die Anzeige bleibt gleich. Die Begründung im Kommentar nennt diese ADR.
+
+**Grenze:** Ändert der Mutant, was angezeigt wird, ist er nicht äquivalent und braucht einen Test – etwa wenn eine Invalidierung die angezeigte Query nicht mehr trifft oder zwei Ansichten über einen gemeinsamen Key dieselben Daten lesen müssen. Beispiel: Die Mutanten am gemeinsamen Key `plannedRecipesKey` tötet der Test des Vormerkens.
+
+**Begründung:** Die Klasse kehrt mit jeder Abfrage und jeder Mutation wieder, die eine Query invalidiert (Präfix des Detail-Keys, Filter nach dem Vormerken; das Aufheben einer Vormerkung invalidiert ebenso). Ein Test, der Abrufe zählt, prüft Netzwerkeffizienz, die kein Szenario fordert.
+
+**Verworfen:** Tests auf die Zahl der Abrufe – Code ohne treibendes Szenario. Einzelfreigabe je Fall – Verwaltung ohne Erkenntnis.
 
 ---
 

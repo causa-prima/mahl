@@ -9,15 +9,23 @@ export function discardQuestion(page: Readonly<Page>) {
   return page.getByRole('alertdialog', { name: 'Eingaben verwerfen?' })
 }
 
+// Die Titel der Rezept-Liste: je Zeile genau ein Link zur Detailansicht. Gelesen über die Links, nicht über die
+// Zeilen – eine Zeile enthält auch den Umschalter „Vormerken“ samt Text.
+export function recipeListTitles(page: Readonly<Page>) {
+  return page.getByRole('list', { name: 'Rezepte' }).getByRole('link')
+}
+
+// Der Umschalter „Vormerken“ eines Rezepts in Rezept-Liste oder Detailansicht, im genannten Zustand: Sein Name
+// nennt Rezept und Zustand („Pfannkuchen vormerken“ / „Pfannkuchen vorgemerkt“, Kopf von planned-recipes.feature).
+export function planningToggle(page: Readonly<Page>, title: string, state: 'vormerken' | 'vorgemerkt') {
+  return page.getByRole('button', { name: `${title} ${state}`, exact: true })
+}
+
 // Zustände der Rezeptseiten für die Touch-Target-Suite: Rezept-Liste, Formular samt Nachfrage
 // „Eingaben verwerfen?" und Detailansicht (recipes.feature, Querschnitts-Deklaration „Bedienbarkeit per
-// Finger"). Die Reihenfolge ist Vorbedingung: Jeder Zustand startet dort, wo der vorige endet („Formular"
-// auf der Liste, „Nachfrage" im offenen Formular).
-// Die Detailansicht eines gefundenen Rezepts hat noch kein eigenes Bedienelement – gemessen werden dort nur
-// die Einträge der Navigationsleiste, die für den Leerlauf-Schutz nicht zählen. Der Zustand steht trotzdem
-// hier, weil die Deklaration sie einschließt: Ein künftiges Bedienelement wird ohne weiteren Eingriff
-// gemessen, und die Suite meldet dann, dass `withoutControls` zu entfernen ist. Der einzige Button der
-// Detailansicht steht im Zustand „Rezept nicht gefunden".
+// Finger"; der Umschalter „Vormerken“ nach planned-recipes.feature). Die Reihenfolge ist Vorbedingung: Jeder
+// Zustand startet dort, wo der vorige endet („Formular" auf der Liste, „Nachfrage" im offenen Formular).
+// Rezept-Liste und Detailansicht warten auf den Umschalter: Er erscheint erst, wenn die Vormerkungen geladen sind.
 export const recipesTouchTargets: TouchTargetPageDefinition = {
   name: 'Rezepte',
   states: (page, request) => [
@@ -26,7 +34,7 @@ export const recipesTouchTargets: TouchTargetPageDefinition = {
       reach: async () => {
         await seedRecipesWithSaltViaApi(request, 'Pfannkuchen')
         await page.goto('/recipes')
-        await expect(page.getByRole('link', { name: 'Pfannkuchen' })).toBeVisible()
+        await expect(planningToggle(page, 'Pfannkuchen', 'vormerken')).toBeVisible()
       },
     },
     {
@@ -46,11 +54,11 @@ export const recipesTouchTargets: TouchTargetPageDefinition = {
     },
     {
       name: 'Detailansicht',
-      withoutControls: true,
       reach: async () => {
         await page.goto('/recipes')
         await page.getByRole('link', { name: 'Pfannkuchen' }).click()
         await expect(page.getByRole('heading', { level: 1, name: 'Pfannkuchen' })).toBeVisible()
+        await expect(planningToggle(page, 'Pfannkuchen', 'vormerken')).toBeVisible()
       },
     },
     {

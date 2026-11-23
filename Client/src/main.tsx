@@ -5,14 +5,14 @@ import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { appRoutes } from './App.tsx'
+import { MIN_TOUCH_TARGET } from './touchTarget.ts'
 
 const queryClient = new QueryClient()
 // ADR-S151-1: Data-Router (useBlocker für die Nachfrage beim Verlassen des Rezeptformulars).
 const router = createBrowserRouter(appRoutes)
 
-// docs/process/nfr.md (Accessibility): Touch-Targets ≥ 44×44px. Als Komponenten-Default statt je
-// Element, damit ein neuer Button nicht durchfällt (MUI-Defaults: Button 36,5px, IconButton 40px).
-const MIN_TOUCH_TARGET = 44
+// Touch-Targets ≥ 44×44px (touchTarget.ts) als Komponenten-Default statt je Element, damit ein neuer Button
+// nicht durchfällt (MUI-Defaults: Button 36,5px, IconButton 40px).
 const theme = createTheme({
   components: {
     // Seitenrumpf: MUIs Container polstert nur seitlich – ohne das klebt die Überschrift am oberen Rand.
