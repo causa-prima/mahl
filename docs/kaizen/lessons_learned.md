@@ -105,3 +105,11 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Warum: Die Empfehlung wurde aus der Lage formuliert, ohne die Zeitangabe gegen den aktuellen Stand zu lesen und ohne nach einer bestehenden Regelung im Projekt zu suchen (Dimension Quellen).
   Regel: Vor einer Empfehlung zu einer Strukturfrage zuerst die bestehende Regelung im Projekt suchen; eine Empfehlung mit Zeitangabe gegen den aktuellen Stand gegenlesen, bevor sie dem User vorliegt.
   CM-Bezug: CM-S095-2
+
+## Session 153 – 2026-11-23
+
+- **[MITTEL] [AGENT] [Agent-Prompt] LL-S153-1 – Prämisse an Subagenten als „geprüft“ gekennzeichnet, ohne die Stelle gelesen zu haben**
+  Quelle: Orchestrator
+  Was: US-803 run-4, Review-Fix Runde 2: Im Auftrag an den Backend-Fix-Subagenten stand „Der PUT-Test … prüft ebenfalls nur DB-Zustand (geprüft: Datei gelesen)“ – als Konsistenzargument dafür, den GET-Teil nur aus dem DELETE-Test zu entfernen. Tatsächlich prüfte der PUT-Test ebenfalls über GET. Gelesen hatte ich nur das Testinventar und einen Diff-Ausschnitt, der den Edge-Case-Test zeigte. Dieselbe falsche Aussage stand in meiner Begründung an den User. Der Subagent fing es ab; der Fix wurde auf beide Tests ausgedehnt.
+  Warum: Die Aussage stammte aus einer Erinnerung an einen ähnlich aussehenden Nachbartest, nicht aus dem Lesen der genannten Stelle; das „geprüft“ wurde aus Gewohnheit angehängt, weil die Datei in der Session schon einmal (teilweise) zu sehen war.
+  Regel: Vor „(geprüft: …)“ in einem Auftrag oder einer Vorlage die genannte Stelle in diesem Zug lesen; „Datei gelesen“ heißt die konkrete Zeile, nicht die Datei irgendwann oder ihr Inventar. Sonst „(ungeprüft)“ schreiben.
