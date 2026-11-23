@@ -17,10 +17,8 @@ test.describe('US602_HappyPath: Rezepte erfassen', () => {
   test('US602_HappyPath_GetRecipes_EmptyDb_ShowsEmptyList', async ({ page }) => {
     // Given: keine Rezepte vorhanden (DB-Reset der Auto-Fixture)
     // When: ich zur Rezepte-Seite navigiere
-    // Die Antwort des Listen-GET wird abgewartet und ihr Status geprüft: Solange ein fehlgeschlagenes
-    // GET im Frontend als leere Liste erscheint (TD-S083-1) und die Ladephase denselben Leerzustand
-    // zeigt (TD-S101-1), belegte der Hinweis allein weder, dass das Backend geantwortet hat, noch,
-    // dass die Seite fertig geladen ist.
+    // Die Antwort des Listen-GET wird abgewartet und ihr Status geprüft: So ist belegt, dass das Backend
+    // mit 200 geantwortet hat und nicht nur ein Zustand ohne Antwort vorliegt.
     const recipesResponse = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/recipes')
     await page.goto('/recipes')
     expect((await recipesResponse).status()).toBe(200)

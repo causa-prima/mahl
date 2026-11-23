@@ -15,8 +15,8 @@ const recipesKey = ['recipes'] as const
 
 export default function RecipesPage() {
   const navigate = useNavigate()
-  // Während des Ladens erscheint der Leerzustand (TD-S101-1).
-  const recipes = useResultQuery(recipesKey, fetchRecipes) ?? []
+  // Solange keine Antwort da ist (Laden oder Fehler), steht weder Leerzustand noch Liste (Querschnittsvertrag im Kopf von features/recipes.feature).
+  const recipes = useResultQuery(recipesKey, fetchRecipes)
 
   return (
     <Container component="main" maxWidth="sm">
@@ -26,7 +26,7 @@ export default function RecipesPage() {
         <Box>
           <Button variant="contained" onClick={() => { void navigate('/recipes/new') }}>Rezept anlegen</Button>
         </Box>
-        {recipes.length === 0 ? (
+        {recipes === undefined ? null : recipes.length === 0 ? (
           <Typography>Noch keine Rezepte angelegt.</Typography>
         ) : (
           <List aria-labelledby="recipes-heading" disablePadding>

@@ -35,11 +35,7 @@ from ._wrapper_output import emit, strip_noise
 # lagen – ein Bootstrap muss dem ersten Import vorausgehen und kann deshalb nicht aus einem
 # Modul kommen, das er selbst erst auffindbar macht. Im Paket findet der relative Import sein
 # Ziel ohne Eingriff; die fünf Klone sind damit ersatzlos entfallen, nicht unterdrückt.
-BEKANNTE_KLONE: dict[tuple[str, str], str] = {
-    ("prozesscode/dotnet-stryker.py", "prozesscode/stryker-frontend.py"):
-        "vier Zeilen Kommentar über drei Zeilen Code, mit der beide Wrapper ihren Rohoutput "
-        "nach derselben Regel zeigen – ein Helfer für drei Zeilen wäre teurer als die Kopie",
-}
+BEKANNTE_KLONE: dict[tuple[str, str], str] = {}
 
 # Ausnahme von „ein Eintrag deckt einen Klon": Liegen zwischen zwei Dateien mehrere getrennte
 # Fundstellen, steht hier die erwartete Anzahl. Derzeit leer – der zweite Fund im

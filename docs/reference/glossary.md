@@ -17,7 +17,7 @@ kritische-regeln:
 | [Planung](#GLO-domaene-planung) | Wochenplanung | Planungs-Entwurf, Vormerkung, Harte Regel, Sortier-Regel, Fallback-Strategie, Esser-Profil, Slot, Globale/Tages-/Session-Regel |
 | [Einkauf](#GLO-domaene-einkauf) | Einkaufsliste | Einkaufsliste, Einkaufslisten-Eintrag, Delta-Menge, Fix-Eintrag, Shop-Kategorie |
 | [Klassifizierung](#GLO-domaene-klassifizierung) | Taxonomie | Tag (DAG-Struktur) |
-| [Oberfläche](#GLO-oberflaeche) | Seiten & Bedienelemente | Zutaten-/Rezepte-Seite, Zutaten-/Rezept-Liste, Detailansicht, Direktlink, Navigationsleiste, Leerzustand, Zutatenfeld, Schrittfeld, Pflichtangabe, Nachfrage, Sperrmeldung |
+| [Oberfläche](#GLO-oberflaeche) | Seiten & Bedienelemente | Zutaten-/Rezepte-/Vorgemerkt-Seite, Zutaten-/Rezept-Liste, Detailansicht, Direktlink, Navigationsleiste, Leerzustand, Zutatenfeld, Schrittfeld, Pflichtangabe, Nachfrage, Sperrmeldung |
 
 Dieses Dokument definiert die **Ubiquitäre Sprache** (Ubiquitous Language) für das Projekt "Mahl". Diese Begriffe sind in allen Anforderungen, User Stories und im Code bindend zu verwenden.
 
@@ -247,7 +247,7 @@ Begriffe, mit denen Gherkin-Szenarien die Oberfläche beschreiben. Sie benennen,
 
 <a id="GLO-seiten"></a>
 ### Seite, Liste, Detailansicht
-*   **Zutaten-Seite / Rezepte-Seite:** Die Hauptseiten, erreichbar über die *Navigationsleiste*. Die Rezepte-Seite zeigt die **Rezept-Liste**, die Zutaten-Seite die **Zutaten-Liste** – „Liste" meint immer diese Bestandsliste, nie das *Zutatenfeld* eines Rezepts.
+*   **Zutaten-Seite / Rezepte-Seite / Vorgemerkt-Seite:** Die Hauptseiten, erreichbar über die *Navigationsleiste*. Die Rezepte-Seite zeigt die **Rezept-Liste**, die Zutaten-Seite die **Zutaten-Liste** – „Liste" meint immer diese Bestandsliste, nie das *Zutatenfeld* eines Rezepts. Die Vorgemerkt-Seite zeigt die *Vormerkungen*.
 *   **Detailansicht:** Die Ansicht eines einzelnen Rezepts mit Zutaten und nummerierten Schritten.
 *   **Direktlink:** Die eigene Adresse einer Ansicht, die sich direkt aufrufen lässt (Lesezeichen, neues Fenster). Nur Rezepte haben einen (ADR-S135-5).
 *   **Navigationsleiste:** Die immer sichtbare Leiste mit den Hauptseiten.

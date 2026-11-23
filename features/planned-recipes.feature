@@ -88,6 +88,8 @@ Feature: Rezepte vormerken
   # Hinweise für die Step-Implementierung (kein Verhalten): „Given das Rezept X existiert“ wie im
   # Kopf von features/recipes.feature; „Given das Rezept X ist vorgemerkt“ legt es bei Bedarf an.
   # „ich navigiere zur Vorgemerkt-Seite“ ruft die Adresse auf, nicht die Navigationsleiste.
+  # „zeigt die Vorgemerkt-Seite genau …“ schließt den Leerzustand-Hinweis „Noch keine Rezepte
+  # vorgemerkt.“ aus.
 
   Background:
     Given die Anwendung ist gestartet

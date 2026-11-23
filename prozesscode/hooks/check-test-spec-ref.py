@@ -186,7 +186,8 @@ def check(data: dict) -> str | None:
 
 
 OHNE_VERWEIS = ("Test „{test}“ nennt keine Spec – darüber fehlt `// Szenario: <Titel>` "
-                "(bzw. ohne US-Tag `// ADR-SNNN-N`).")
+                "(bzw. ohne US-Tag `// ADR-SNNN-N`), je als eigene Kommentarzeile direkt über dem "
+                "Test; ein Verweis im Rumpf oder mitten im Fließtext zählt nicht.")
 SZENARIO_FEHLT = "Test „{test}“: `// Szenario: {titel}` – kein Szenario dieses Titels in features/."
 BEISPIEL_FEHLT = ("Test „{test}“: „{titel}“ ist ein Szenariogrundriss – `// Beispiel: <Zeile>` "
                   "(oder `alle`) fehlt.")

@@ -93,6 +93,18 @@ def test_neuer_test_ohne_jeden_verweis_wird_abgewiesen():
     assert meldungen == [hook.OHNE_VERWEIS.format(test="US602_HappyPath_Neu")]
 
 
+def test_verweis_im_rumpf_statt_darueber_nennt_die_geforderte_position():
+    # Given: der Szenario-Verweis steht im Rumpf statt als Kommentarzeile über dem Test
+    post = _neu_ts("// nur ein Erklärkommentar\n",
+                   rumpf="    // Szenario: Abbrechen ohne Eingaben führt ohne Nachfrage zur Rezept-Liste\n"
+                         + GEGLIEDERT)
+    # When
+    meldungen = _verstoesse(post)
+    # Then: abgewiesen, und die Meldung sagt, wo der Verweis stehen muss
+    assert len(meldungen) == 1
+    assert "eigene Kommentarzeile direkt über dem Test" in meldungen[0]
+
+
 def test_szenario_titel_den_es_nicht_gibt_wird_abgewiesen():
     # Given
     post = _neu_ts("// Szenario: Abbrechen mit Leerraum\n")

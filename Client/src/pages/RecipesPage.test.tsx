@@ -126,10 +126,10 @@ describe('Rezepte erfassen', () => {
     renderApp('/recipes')
 
     // Then: die Liste wurde abgefragt, Hinweis und Button sind sichtbar
-    // (Der Leerzustand erscheint auch während des Ladens, TD-S101-1 – deshalb wird belegt, dass der
-    // Abruf stattfand.)
+    // (Der Hinweis erscheint erst mit der Antwort – Querschnittsvertrag in features/recipes.feature –,
+    // deshalb wird er abgewartet.)
     await waitFor(() => { expect(recipesRequested).toHaveBeenCalled() })
-    expect(screen.getByText('Noch keine Rezepte angelegt.')).toBeInTheDocument()
+    expect(await screen.findByText('Noch keine Rezepte angelegt.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Rezept anlegen' })).toBeInTheDocument()
   })
 
@@ -348,6 +348,46 @@ describe('Rezepte erfassen', () => {
     await waitFor(() => { expect(recipeRequested).toHaveBeenCalled() })
     expect(screen.queryByText('Rezept nicht gefunden.')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Pfannkuchen' })).not.toBeInTheDocument()
+  })
+
+  // ADR-S112-5
+  // Querschnittsvertrag aus dem Kopf von features/recipes.feature: während des Ladens erscheint der
+  // Leerzustand nicht. Kein Szenario treibt den Test, deshalb ohne US-Tag.
+  it('RecipesLoading_ResponsePending_ShowsNoEmptyState', async () => {
+    // Given: der Server antwortet auf die Liste noch nicht
+    const requested = vi.fn()
+    server.use(http.get('/api/recipes', async () => {
+      requested()
+      await delay('infinite')
+    }))
+
+    // When: ich zur Rezepte-Seite navigiere
+    renderApp('/recipes')
+
+    // Then: der Abruf lief; die Überschrift ist da, der Leerzustand nicht
+    await waitFor(() => { expect(requested).toHaveBeenCalled() })
+    expect(screen.getByRole('heading', { level: 1, name: 'Rezepte' })).toBeInTheDocument()
+    expect(screen.queryByText('Noch keine Rezepte angelegt.')).not.toBeInTheDocument()
+  })
+
+  // ADR-S112-5
+  // Querschnittsvertrag aus dem Kopf von features/recipes.feature: ein Ladefehler zeigt nie den
+  // Leerzustand (der Fehlerhinweis selbst ist noch nicht gebaut). Kein Szenario treibt den Test.
+  it('RecipesLoading_ServerError_NeverShowsEmptyState', async () => {
+    // Given: der Abruf schlägt mit 500 fehl
+    const requested = vi.fn()
+    server.use(http.get('/api/recipes', () => {
+      requested()
+      return new HttpResponse(null, { status: 500 })
+    }))
+
+    // When: ich zur Rezepte-Seite navigiere
+    renderApp('/recipes')
+
+    // Then: der Abruf lief; die Überschrift ist da, der Leerzustand nicht
+    await waitFor(() => { expect(requested).toHaveBeenCalled() })
+    expect(screen.getByRole('heading', { level: 1, name: 'Rezepte' })).toBeInTheDocument()
+    expect(screen.queryByText('Noch keine Rezepte angelegt.')).not.toBeInTheDocument()
   })
 })
 

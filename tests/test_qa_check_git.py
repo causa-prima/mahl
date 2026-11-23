@@ -12,23 +12,9 @@ import sys
 from importlib import import_module
 from pathlib import Path
 
+from _git_repo import init_repo as _init_repo, write_file as _write
+
 qa = import_module("prozesscode.qa-check")
-
-
-def _init_repo(path):
-    def g(*a):
-        return subprocess.run(["git"] + list(a), cwd=path, capture_output=True, text=True)
-    g("init", "-q")
-    g("config", "user.email", "t@t")
-    g("config", "user.name", "t")
-    return g
-
-
-def _write(path, rel, content):
-    fp = path / rel
-    fp.parent.mkdir(parents=True, exist_ok=True)
-    fp.write_text(content, encoding="utf-8")
-    return fp
 
 
 def _repo_mit_basis(tmp_path, monkeypatch, dateien: dict[str, str]):

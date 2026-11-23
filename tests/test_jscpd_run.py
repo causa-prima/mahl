@@ -132,7 +132,7 @@ def test_echte_ausgabe_von_jscpd_5_4_wird_der_baseline_zugeordnet(monkeypatch, c
         "\x1b[90mFound 1 clones.\x1b[39m\n"
         "\x1b[90mtime: 56.045ms\x1b[39m\n"
     )
-    monkeypatch.setattr(jscpd, "run_npm", lambda *_a, **_k: (echt, 0))
+    _lauf(monkeypatch, echt)
     assert jscpd.main([]) == 0
     assert "✓" in capsys.readouterr().out
 
