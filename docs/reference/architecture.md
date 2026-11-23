@@ -214,7 +214,7 @@ Diese Constraints gelten nur für die **SKELETON-Phase**. Sie rahmen was impleme
 |------------|---------|
 | **AlwaysInStock hat keine Wirkung** | Das Feld existiert in der DB (Vorbereitung für US-906), wird aber im SKELETON nicht ausgewertet. Die Einkaufslisten-Generierung ignoriert es. |
 | **Kein PUT /api/ingredients** | Edit-UI und Rename-Endpoint sind MVP (US-614-analog). Im SKELETON ist nur POST/GET/DELETE + restore. |
-| **WeeklyPool ohne Datumslogik** | Kein `PlannedDate`, keine Kalender-Zuordnung. Der Pool ist eine flache Liste ohne zeitliche Strukturierung. |
+| **Vormerkungen ohne Datumslogik** | Kein `PlannedDate`, keine Kalender-Zuordnung. Die Vormerkungen sind eine flache Liste ohne zeitliche Strukturierung, adressiert über die Rezept-ID (ADR-S153-1). |
 | **Shopping-List-Generierung: Delete+Recreate** | Beim `POST /api/shopping-list/generate` werden alle bestehenden Items gelöscht und neu berechnet. Kein Diff/Delta, kein Tracking welche Zutat aus welchem Rezept. AlwaysInStock-Filter inaktiv. |
 | **Alle Listen alphabetisch nach Name sortiert** | `GET /api/ingredients` und `GET /api/recipes` geben ihre Einträge alphabetisch nach Name/Titel zurück. |
 

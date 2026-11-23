@@ -174,7 +174,7 @@
 *   **US-621 (Rezept zum Ausprobieren) [V1]:** Als *Feierabend-Planer* möchte ich ein neues Rezept erst ausprobieren, bevor es in die Sammlung kommt, und es dabei trotzdem einplanen und einkaufen können.
     *   **Anlässe:** Zutaten von der SoLaWi, für die es kein Rezept gibt; eine große Menge einer Zutat bei nur wenigen passenden Rezepten; mehr Rezepte für eine beliebte Zutat („zu wenig Gnocchi-Rezepte"); einfach mal etwas Neues.
     *   **Akzeptanzkriterien:**
-        *   Ein Rezept kann als „zum Ausprobieren" angelegt werden; es lässt sich in den Pool legen, und seine Zutaten kommen auf die Einkaufsliste wie bei jedem anderen Rezept.
+        *   Ein Rezept kann als „zum Ausprobieren" angelegt werden; es lässt sich vormerken, und seine Zutaten kommen auf die Einkaufsliste wie bei jedem anderen Rezept.
         *   In der Rezept-Liste ist es als solches erkennbar oder getrennt von der Sammlung.
         *   Nach dem Kochen: Entscheidung „in die Sammlung aufnehmen" oder „verwerfen".
     *   **Im Workshop zu klären:** Der Komfort steht und fällt mit dem Erfassen. Erwogen vom User: (1) nur ein Link im Plan, Einkaufsliste von Hand, im Kochmodus öffnet sich die Seite – trivial, aber die Zutaten müssen abgetippt werden; (2) das Rezept importieren (US-601, US-622) – am bequemsten, wenn der Import für die meisten Rezepte einfach funktioniert.

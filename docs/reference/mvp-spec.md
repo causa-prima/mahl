@@ -26,7 +26,7 @@ Details zu jeder Story: `docs/stories/user-stories.md`
 | US-301 | Intelligente Artikelerfassung (Live-Suche) | Einkauf |
 | US-306 | Offline-Verfügbarkeit der Einkaufsliste | Einkauf |
 | US-307 | Non-Food-Items (Freitext-Einträge) | Einkauf |
-| US-501 | Pool-Liste als Dashboard | Kochen |
+| US-501 | Vorgemerkt-Seite als Startseite | Kochen |
 | US-510 | Quellen-Zugriff im Kochmodus | Kochen |
 | US-605 | Schritte anlegen/bearbeiten | Rezepte |
 | US-607 | Zutaten-Zuordnung zu Schritten | Rezepte |

@@ -70,7 +70,7 @@ Alle Punkte sind **Probleme, die gefunden und gefixt werden müssen**. Ein Haken
   → Gilt auch für Methodenparameter und Props, nicht nur Properties/State.
 
 - [ ] TypeScript: Rohe `string`/`number` als IDs zwischen Komponenten/Services weitergereicht, obwohl verschiedene ID-Konzepte existieren?
-  → Verschiedene IDs (RecipeId, IngredientId, WeeklyPoolEntryId) müssen unterschiedliche Branded Types sein – der Compiler soll falsche Zuordnungen verhindern.
+  → Verschiedene IDs (RecipeId, IngredientId) müssen unterschiedliche Branded Types sein – der Compiler soll falsche Zuordnungen verhindern.
 
 - [ ] Neue Domain-Entities werden mit `new` direkt konstruiert statt über eine Factory Method?
 

@@ -15,7 +15,7 @@ kritische-regeln:
 ## Ziel
 
 Minimaler technischer Durchstich (End-to-End), der alle Schichten verbindet:
-**Zutat anlegen → Rezept anlegen → Rezept in Pool → Einkaufsliste generiert & abhakbar**
+**Zutat anlegen → Rezept anlegen → Rezept vormerken → Einkaufsliste generiert & abhakbar**
 
 ---
 
@@ -26,8 +26,8 @@ Minimaler technischer Durchstich (End-to-End), der alle Schichten verbindet:
 |-------|-------------|
 | US-904 | Zutaten-Verwaltung (CRUD) |
 | US-602 | Manuelle Rezepterfassung (Titel + Zutaten als Freitextzeilen + Schritte; Foto-Upload erst MVP) |
-| US-803 | Rezept dem Wochen-Pool hinzufügen (flache Liste, keine Datumslogik) |
-| US-201 | Einkaufsliste anzeigen (generiert aus Pool) |
+| US-803 | Rezepte vormerken (Seite „Vorgemerkt“ als flache Liste, keine Datumslogik) |
+| US-201 | Einkaufsliste anzeigen (generiert aus den Vormerkungen) |
 | US-303 | Artikel abhaken (BoughtAt-Timestamp, verschiebt in "Zuletzt gekauft") |
 
 > Verschoben auf MVP: `PUT /api/ingredients/{id}` (Edit-UI)
@@ -41,7 +41,7 @@ Minimaler technischer Durchstich (End-to-End), der alle Schichten verbindet:
 |--------|---------|
 | `/api/ingredients` | GET, POST, GET/{id}, DELETE/{id}, POST/{id}/restore |
 | `/api/recipes` | GET, POST, GET/{id} (Löschen: US-616, V1) |
-| `/api/weekly-pool` | GET, POST /recipes/{recipeId}, DELETE /recipes/{recipeId} |
+| `/api/planned-recipes` | GET, PUT /{recipeId}, DELETE /{recipeId} |
 | `/api/shopping-list` | GET, POST /generate, PUT /items/{id}/check, PUT /items/{id}/uncheck |
 
 Alle nicht-offensichtlichen Verhaltensdetails (Status-Codes, 409-Varianten, Sortierung etc.) → `docs/history/adr.md` (Abschnitt „Ingredients-Endpoints" / „Recipes-Endpoints").
@@ -53,6 +53,6 @@ Alle nicht-offensichtlichen Verhaltensdetails (Status-Codes, 409-Varianten, Sort
 
 1. Zutat anlegen (z.B. "Tomaten, Stück")
 2. Rezept anlegen (Titel + mind. 1 Zutat + 1 Schritt)
-3. Rezept dem Pool hinzufügen
+3. Rezept vormerken
 4. Einkaufsliste generieren → zeigt "Tomaten Xg"
 5. Artikel abhaken → verschiebt in "Zuletzt gekauft"

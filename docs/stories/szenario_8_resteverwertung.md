@@ -28,14 +28,14 @@
         *   Zutaten-Filter.
         *   Tag-Filter (Mehrfachauswahl möglich).
 
-*   **US-803 (Manuelle Plan-Anpassung) [SKELETON]:** Als *Feierabend-Planer* möchte ich Rezepte zum Wochen-Pool hinzufügen, um meine Einkaufsliste zu erstellen.
+*   **US-803 (Manuelle Plan-Anpassung) [SKELETON]:** Als *Feierabend-Planer* möchte ich Rezepte vormerken, um daraus meine Einkaufsliste zu erstellen.
     *   **Akzeptanzkriterien (SKELETON-Version - vereinfacht):**
-        *   Button "Zum Pool hinzufügen" bei jedem Rezept in der Rezept-Detailansicht
-        *   Rezept wird dem *Wochen-Pool* hinzugefügt (keine Datums-Zuordnung in SKELETON)
-        *   Pool-Ansicht zeigt flache Liste der hinzugefügten Rezepte mit "Entfernen"-Button
-    *   **Akzeptanzkriterien (MVP-Version - mit Kalender):**
-        *   Kalender-Darstellung mit Wochenansicht
-        *   Drag & Drop von Rezepten auf Wochentage
+        *   Umschalter „Vormerken“/„Vorgemerkt“ in jeder Zeile der Rezept-Liste und in der Rezept-Detailansicht
+        *   Das Rezept wird zur *Vormerkung* (keine Tages-Zuordnung in SKELETON)
+        *   Die Seite „Vorgemerkt“ zeigt eine flache Liste der vorgemerkten Rezepte mit "Entfernen"-Button
+    *   **Akzeptanzkriterien (MVP-Version - mit Tagen):**
+        *   Tage in derselben Ansicht: Kalender-/Wochendarstellung der *Vormerkungen*
+        *   Drag & Drop von Vormerkungen auf Tage
         *   **Mengen-Anpassung:** Beim Zuordnen kann direkt die *Planungs-Portion* angepasst werden (Default: *Basis-Portion* des Rezepts)
 
 *   **US-804 (Kategorisierte Übersicht) [V2]:** Als *Feierabend-Planer* möchte ich meine Rezepte in einer gruppierten Ansicht sehen (z.B. Hauptgerichte, Salate, Snacks), die meiner Nutzungshäufigkeit entspricht, um ohne Suche schnell Inspiration zu finden.

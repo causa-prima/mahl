@@ -489,11 +489,11 @@ Der Client erkennt den Code und ruft automatisch den Restore-Endpoint auf (trans
 |----------|---------------------------------------------------------------|
 | `DELETE /api/ingredients/{id}` | 404 – auch bei bereits soft-deleted |
 | `DELETE /api/recipes/{id}` | 404 – auch bei bereits soft-deleted |
-| `DELETE /api/weekly-pool/recipes/{recipeId}` | 204 (idempotent) – auch wenn nicht im Pool |
+| `DELETE /api/planned-recipes/{recipeId}` | 204 (idempotent) – auch wenn nicht vorgemerkt |
 
 **Begründung DELETE → 404:** Nicht-idempotent by design. Ein Client der zweimal DELETE aufruft, soll beim zweiten Mal einen Fehler erhalten – verdeckt echte Fehler (z.B. doppelter Aufruf durch Bug).
 
-**Begründung Weekly-Pool → 204:** Der Pool ist ein Set ohne Ownership-Semantik. "Ist nicht drin" und "wurde gerade entfernt" sind äquivalente Zustände. Race-Conditions sollen transparent sein.
+**Begründung Vormerkungen → 204:** Die Vormerkungen sind ein Set ohne Ownership-Semantik. "Ist nicht drin" und "wurde gerade entfernt" sind äquivalente Zustände. Race-Conditions sollen transparent sein.
 
 **Addendum – Reihenfolge relativ zum If-Match-Check:** Seit `DELETE /api/ingredients/{id}` als erster mutierender Single-Resource-Endpoint auch If-Match prüft (ADR-S058-1), stellt sich die Frage, welcher Check zuerst greift, wenn beide zuschlagen (Ressource nicht (mehr) aktiv UND If-Match fehlt/ist stale). Entscheidung: **Not-Found-Check läuft immer zuerst.** Eine bereits soft-deleted oder nie existente Ressource liefert 404, unabhängig davon ob If-Match fehlt (sonst 428) oder stale ist (sonst 412). Begründung: 404 ist die eindeutigere, für den Client handlungsleitendere Aussage ("es gibt nichts zu aktualisieren") – ein 412 würde fälschlich suggerieren, die Ressource existiere noch und ein Retry mit frischem ETag könnte helfen. Gilt analog für `DELETE /api/recipes/{id}`, sobald dort If-Match eingeführt wird.
 
@@ -893,25 +893,27 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 
 ---
 
-## WeeklyPool-Endpoints
+## Vormerkungen-Endpoints
 
-### ADR-S007-1: POST /api/weekly-pool: 422 (nicht 404) bei Rezept nicht gefunden
+### ADR-S153-1: Vormerkungen: Ressource über die Rezept-ID, Vormerken idempotent
 
 **Status:** Accepted
-**Tags:** scope:feature, resource:weekly-pool, http:post, http:422, arch:validation
+**Tags:** scope:feature, resource:planned-recipes, http:put, http:delete, http:204
 
-**Entscheidung:** `POST /api/weekly-pool/recipes/{recipeId}` antwortet mit `422`, wenn das Rezept nicht existiert oder soft-deleted ist – nicht mit `404`. Der Request ist semantisch ungültig (ungültige `recipeId`), nicht "Ressource nicht gefunden". Konsistent mit Collect-all-Validation-Konvention für referenzielle Integrität.
+**Entscheidung:** Eine *Vormerkung* (Glossar) wird über die Rezept-ID adressiert, nicht über eine eigene ID: `GET /api/planned-recipes` listet die vorgemerkten Rezepte, `PUT /api/planned-recipes/{recipeId}` merkt vor, `DELETE /api/planned-recipes/{recipeId}` entfernt. Vormerken ist idempotent – ein schon vorgemerktes Rezept erneut vormerken antwortet `204` wie das erste Mal; symmetrisch zum Entfernen (ADR-S000-5). Ein Rezept ist damit höchstens einmal vorgemerkt.
+
+**Begründung:** Eine Vormerkung trägt im SKELETON keine Daten außer dem Rezept – sie ist Mengenzugehörigkeit. Der Umschalter in Rezept-Liste und Detailansicht (US-803) kann mit veralteter Anzeige ein schon vorgemerktes Rezept erneut vormerken (zweites Gerät, Doppeltipp); für den Nutzer ist das Ziel erreicht. Eine Ablehnung (`409`) müsste der Client ausdrücklich als Erfolg werten – ein Sonderzweig ohne Nutzen. Die Adressierung über die Rezept-ID verhindert zudem, dass ein Entfernen mit veralteter Eintrags-ID still eine andere, neu angelegte Vormerkung verfehlt.
+
+**Verworfen:** *`POST` mit `409 Conflict` bei Doppel* – die Begründung „doppeltes Rezept ist eher ein Versehen“ trägt beim Umschalter nicht, der Doppel gar nicht erzeugen kann. *Eigene ID je Vormerkung* – unnötig ohne eigene Daten; mit Tag und Planungs-Portion (MVP-Stufe von US-803) neu zu bewerten, falls ein Rezept an mehreren Tagen vorgemerkt werden darf.
 
 ---
 
-### ADR-S008-1: WeeklyPool: Keine Duplikate (409 bei bereits enthaltenem Rezept)
+### ADR-S007-1: Vormerken: 422 (nicht 404) bei Rezept nicht gefunden
 
 **Status:** Accepted
-**Tags:** scope:feature, resource:weekly-pool, http:post, http:409
+**Tags:** scope:feature, resource:planned-recipes, http:put, http:422, arch:validation
 
-**Entscheidung:** `POST /api/weekly-pool/recipes/{recipeId}` mit einem Rezept das bereits im Pool ist → `409 Conflict`.
-
-**Begründung:** Im Familienkontext ist ein doppeltes Rezept in der Wochenplanung wahrscheinlicher ein Versehen als Absicht. Bewusste Einschränkung, kein fachliches Gesetz.
+**Entscheidung:** `PUT /api/planned-recipes/{recipeId}` antwortet mit `422`, wenn das Rezept nicht existiert oder soft-deleted ist – nicht mit `404`. Der Request ist semantisch ungültig (ungültige `recipeId`), nicht "Ressource nicht gefunden". Konsistent mit Collect-all-Validation-Konvention für referenzielle Integrität.
 
 ---
 

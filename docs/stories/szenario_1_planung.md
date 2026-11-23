@@ -26,10 +26,10 @@
 *   **US-101 (Planungs-Wizard) [V1]:** Als *Feierabend-Planer* möchte ich durch einen Assistenten geführt werden (Enddatum -> Reste -> Wünsche -> Regeln -> Generierung), damit ich nichts vergesse und der Prozess strukturiert ist.
     *   **Akzeptanzkriterien:**
         *   Der Wizard zeigt einen Eingabedialog für das "Enddatum" (Default: 7 Tage nach dem aktuellen Datum).
-        *   Bestehende Rezepte im *Wochen-Pool* bleiben erhalten; nur leere Slots bis zum Enddatum werden aufgefüllt.
+        *   Bestehende *Vormerkungen* bleiben erhalten; nur leere Slots bis zum Enddatum werden aufgefüllt.
         *   Validierung: Wenn bis zum Enddatum keine Slots frei sind, erscheint eine Meldung (Optionen: Enddatum anpassen oder Abbrechen).
-        *   Abbruch des Wizards verwirft den temporären *Planungs-Pool*.
-        *   Abschluss ("Plan übernehmen") speichert die generierten Einträge in den *Wochen-Pool*.
+        *   Abbruch des Wizards verwirft den *Planungs-Entwurf*.
+        *   Abschluss ("Plan übernehmen") speichert die generierten Einträge als *Vormerkungen*.
 
 *   **US-102 (Muss-Zutaten) [V1]:** Als *Feierabend-Planer* möchte ich Zutaten angeben, die verbraucht werden müssen (Reste), damit der Algorithmus passende Rezepte priorisiert.
     *   **Akzeptanzkriterien:**
@@ -57,7 +57,7 @@
         *   *Sortier-Regeln* (US-702, z.B. Bevorzuge hohe Bewertung) beeinflussen die Auswahl (erfordert US-702).
         *   *Tagesregeln* (z.B. "Dienstag < 30min") werden eingehalten (erfordert US-107).
 
-*   **US-106 (Besuchs-Planung) [OBSOLET]:** Absorbiert in US-103 und US-803 (MVP) – Planungs-Portion pro Plan-Eintrag ist dort bereits als Akzeptanzkriterium enthalten.
+*   **US-106 (Besuchs-Planung) [OBSOLET]:** Absorbiert in US-103 und US-803 (MVP) – Planungs-Portion pro *Vormerkung* ist dort bereits als Akzeptanzkriterium enthalten.
 
 *   **US-107 (Tagesregeln) [V1]:** Als *Feierabend-Planer* möchte ich Regeln für spezifische Tage definieren können (z.B. "1. Sonntag im Monat = Pfannkuchen"), damit wiederkehrende Rituale automatisch eingeplant sind.
     *   **Akzeptanzkriterien:**

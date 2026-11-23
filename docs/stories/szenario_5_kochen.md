@@ -5,12 +5,12 @@
 ## Inhalt
 
 - Szenario-Narrativ (Auswahl, Kochmodus, Skalierung, Bewertung)
-- US-501 (Pool-Liste) [MVP]
+- US-501 (Vorgemerkt als Startseite) [MVP]
 - US-502 (Smarte Sortierung) [V1]
 - US-503 (Entscheidungs-Hilfe) [V2]
 - US-504 (Einkaufs-Warnung) [V2]
 - US-505 (Zutaten-Übersicht) [V1]
-- US-506 (Koch-Start aus Pool) [V1]
+- US-506 (Koch-Start aus Vormerkung) [V1]
 - US-507 (Koch-Start aus Suche) [V1]
 - US-508 (Kochmodus) [V1]
 - US-509 (Schritt-Zutaten) [V1]
@@ -32,11 +32,11 @@
 
 **Abgeleitete User Stories:**
 
-*   **US-501 (Pool-Liste) [MVP]:** Als *pragmatischer Koch* möchte ich als Startseite den aktuellen *Wochen-Pool* als einfache Liste sehen, um schnell Zugriff auf die geplanten Gerichte zu haben.
+*   **US-501 (Vorgemerkt als Startseite) [MVP]:** Als *pragmatischer Koch* möchte ich als Startseite die aktuellen *Vormerkungen* als einfache Liste sehen, um schnell Zugriff auf die geplanten Gerichte zu haben.
     *   **Akzeptanzkriterien:**
         *   Dashboard zeigt Rezepte des aktuellen Zeitraums.
 
-*   **US-502 (Smarte Sortierung) [V1]:** Als *pragmatischer Koch* möchte ich, dass die Pool-Liste automatisch nach Eignung für heute sortiert ist.
+*   **US-502 (Smarte Sortierung) [V1]:** Als *pragmatischer Koch* möchte ich, dass die Vorgemerkt-Seite automatisch nach Eignung für heute sortiert ist.
     *   **Akzeptanzkriterien:**
         *   Sortierung priorisiert Rezepte, die *Tagesregeln* erfüllen, VOR Rezepten, die nur *Globale Regeln* erfüllen.
 
@@ -44,9 +44,9 @@
     *   **Akzeptanzkriterien:**
         *   Info-Icon oder Text erklärt den Grund für die Sortierung.
 
-*   **US-504 (Einkaufs-Warnung) [V2]:** Als *pragmatischer Koch* möchte ich im Wochenplan gewarnt werden, wenn für ein geplantes Rezept noch Zutaten auf der Einkaufsliste offen sind, damit ich nicht anfange zu kochen und dann Zutaten fehlen.
+*   **US-504 (Einkaufs-Warnung) [V2]:** Als *pragmatischer Koch* möchte ich bei meinen *Vormerkungen* gewarnt werden, wenn für ein geplantes Rezept noch Zutaten auf der Einkaufsliste offen sind, damit ich nicht anfange zu kochen und dann Zutaten fehlen.
     *   **Akzeptanzkriterien:**
-        *   Visueller Indikator am Rezept im Pool, falls zugehörige Items auf der Einkaufsliste noch nicht "erledigt" sind.
+        *   Visueller Indikator an der *Vormerkung*, falls zugehörige Items auf der Einkaufsliste noch nicht "erledigt" sind.
         *   Warnung beim Starten des Kochmodus, falls Zutaten fehlen.
 
 *   **US-505 (Zutaten-Übersicht) [V1]:** Als *pragmatischer Koch* möchte ich vor dem Kochen (im Rezept-View und als erste Seite im Kochmodus) eine Gesamtliste aller Zutaten sehen, um sicherzustellen, dass alles bereitsteht.
@@ -54,16 +54,16 @@
         *   Anzeige der aggregierten Zutatenliste in der Rezept-Detailansicht.
         *   Erster Schritt im *Kochmodus* ist die Zutaten-Übersicht.
 
-*   **US-506 (Koch-Start aus Pool) [V1]:** Als *pragmatischer Koch* möchte ich bei jedem Rezept im *Wochen-Pool* einen "Jetzt kochen"-Button haben, der den Kochmodus öffnet und das Gericht sofort als "gekocht" markiert.
+*   **US-506 (Koch-Start aus Vormerkung) [V1]:** Als *pragmatischer Koch* möchte ich bei jeder *Vormerkung* einen "Jetzt kochen"-Button haben, der den Kochmodus öffnet und das Gericht sofort als "gekocht" markiert.
     *   **Akzeptanzkriterien:**
-        *   Button "Jetzt kochen" an Rezepten im *Wochen-Pool*.
+        *   Button "Jetzt kochen" an jeder *Vormerkung*.
         *   Startet Kochmodus.
-        *   Rezept wird aus dem *Wochen-Pool* entfernt.
+        *   Die *Vormerkung* wird entfernt.
         *   Ein neuer Eintrag in der globalen *Koch-Historie* wird angelegt (Datum + Rezept).
 
 *   **US-507 (Koch-Start aus Suche) [V1]:** Als *pragmatischer Koch* möchte ich auch aus der allgemeinen Rezept-Liste/Suche heraus den Kochmodus starten können (z.B. für spontanes Kochen ohne Planung).
     *   **Akzeptanzkriterien:**
-        *   Button "Jetzt kochen" in der Rezept-Detailansicht (außerhalb des Pools).
+        *   Button "Jetzt kochen" in der Rezept-Detailansicht (auch ohne *Vormerkung*).
         *   Startet Kochmodus.
         *   Ein neuer Eintrag in der globalen *Koch-Historie* wird angelegt (Datum + Rezept).
 
@@ -89,10 +89,10 @@
         *   Eingabefeld für *Planungs-Portion* im Rezept (Default-Einheit: "Personen").
         *   Alle Zutatenmengen aktualisieren sich sofort.
 
-*   **US-512 (Koch-Historie & Undo) [V2]:** Als *pragmatischer Koch* möchte ich ein versehentlich als "gekocht" markiertes Gericht wieder in den Pool zurückholen können, falls sich der Plan spontan geändert hat.
+*   **US-512 (Koch-Historie & Undo) [V2]:** Als *pragmatischer Koch* möchte ich ein versehentlich als "gekocht" markiertes Gericht wieder als *Vormerkung* zurückholen können, falls sich der Plan spontan geändert hat.
     *   **Akzeptanzkriterien:**
         *   Liste der gekochten Gerichte des aktuellen Tages einsehbar.
-        *   Funktion "Nicht gekocht" fügt ein Rezept wieder dem *Wochen-Pool* hinzu.
+        *   Funktion "Nicht gekocht" merkt ein Rezept wieder vor (*Vormerkung*).
 
 *   **US-513 (Rezept-Bewertung) [PARKING]:** Als *pragmatischer Koch* möchte ich nach dem Essen das Rezept für einzelne Profile bewerten (z.B. "Kind 1: 1 Stern"), damit die App beim nächsten Mal bessere Vorschläge macht.
     *   **Akzeptanzkriterien:**
@@ -127,10 +127,11 @@
         *   Begriffe, Zusammenspiel mit US-610/US-611/US-617 und Wartezeiten mitten im Rezept: offene Frage zum Zeitmodell in `docs/open-questions.md`, fällig im Workshop von US-610.
         *   Bewusst nicht je Schritt gemessen: Schritte laufen oft parallel („In der Zwischenzeit …" – in 18 von 114 Rezepten der bisherigen Sammlung). Die Verweildauer eines Schritts sagt dann nichts über seine Dauer – während des Backens steht man längst beim nächsten Schritt –, die Summe aller Verweildauern ist aber genau die Gesamtdauer.
 
-*   **US-518 (Vorlauf-Hinweis) [PARKING]:** Als *Feierabend-Planer* möchte ich sehen, welche Rezepte im Pool schon am Vortag oder Stunden vorher begonnen werden müssen (Teig über Nacht, Kühlzeit), damit ich rechtzeitig anfange.
+*   **US-518 (Vorlauf-Hinweis) [PARKING]:** Als *Feierabend-Planer* möchte ich sehen, welche vorgemerkten Rezepte schon am Vortag oder Stunden vorher begonnen werden müssen (Teig über Nacht, Kühlzeit), damit ich rechtzeitig anfange.
     *   **Akzeptanzkriterien:**
         *   Ein Rezept kann einen Vorlauf tragen (z.B. „am Vortag", „12 Stunden").
-        *   Rezepte mit Vorlauf sind im Pool hervorgehoben. Eine Erinnerung zu einem Zeitpunkt ist nicht vorgesehen – der Pool kennt keine Tages-Zuordnung.
+        *   Rezepte mit Vorlauf sind auf der Vorgemerkt-Seite hervorgehoben. Eine Erinnerung zu einem Zeitpunkt ist nicht vorgesehen.
+    *   **Im Workshop zu klären:** Ab MVP können *Vormerkungen* einen Tag tragen – ob damit eine Erinnerung zum Beginn des Vorlaufs sinnvoll wird.
     *   **Anlass:** In der bisherigen Sammlung u.a. Pizzateig (24 h), Coleslaw (12 h), Cheesecake und Frankfurter Kranz (über Nacht bzw. am Vorabend).
 
 *   **US-519 (Schritt-Timer) [PARKING]:** Als *pragmatischer Koch* möchte ich bei einem Schritt mit Wartezeit („20 Minuten backen") einen Timer im Kochmodus starten, damit ich währenddessen etwas anderes tun kann.

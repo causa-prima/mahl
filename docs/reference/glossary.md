@@ -14,7 +14,7 @@ kritische-regeln:
 |-----------|--------|---------------------|
 | [Zutaten & Einheiten](#GLO-zutaten-einheiten) | Stammdaten | Zutat, Zutaten-Modifizierer, Zutaten-Alias, Basiseinheit, Umrechnungsfaktor, Non-Food-Item |
 | [Rezepte](#GLO-domaene-rezepte) | Rezeptverwaltung | Rezept, Rezept-Variante, Zubereitungszeit, Rezept-Zutat, Zutatenzeile, Sub-Rezept, Schritt (Anweisung), Basis-Portion, Planungs-Portion, Import-Pool, Koch-Historie, Kochmodus |
-| [Planung](#GLO-domaene-planung) | Wochenplanung | Planungs-Pool, Wochen-Pool, Wochenplan, Plan-Eintrag, Harte Regel, Sortier-Regel, Fallback-Strategie, Esser-Profil, Slot, Globale/Tages-/Session-Regel |
+| [Planung](#GLO-domaene-planung) | Wochenplanung | Planungs-Entwurf, Vormerkung, Harte Regel, Sortier-Regel, Fallback-Strategie, Esser-Profil, Slot, Globale/Tages-/Session-Regel |
 | [Einkauf](#GLO-domaene-einkauf) | Einkaufsliste | Einkaufsliste, Einkaufslisten-Eintrag, Delta-Menge, Fix-Eintrag, Shop-Kategorie |
 | [Klassifizierung](#GLO-domaene-klassifizierung) | Taxonomie | Tag (DAG-Struktur) |
 | [Oberfläche](#GLO-oberflaeche) | Seiten & Bedienelemente | Zutaten-/Rezepte-Seite, Zutaten-/Rezept-Liste, Detailansicht, Direktlink, Navigationsleiste, Leerzustand, Zutatenfeld, Schrittfeld, Pflichtangabe, Nachfrage, Sperrmeldung |
@@ -147,25 +147,18 @@ Eine dedizierte Ansicht zur schrittweisen Führung durch die Zubereitung.
 <a id="GLO-domaene-planung"></a>
 ## Domäne: Planung
 
-<a id="GLO-planungs-pool"></a>
-### Planungs-Pool (Planning Pool)
+<a id="GLO-planungs-entwurf"></a>
+### Planungs-Entwurf (Planning Draft)
 Ein isolierter, temporärer Arbeitsbereich während des Planungs-Wizards.
-*   **Zweck:** Ermöglicht Simulation und Anpassung eines Plans, ohne den aktiven *Wochen-Pool* zu beeinflussen.
-*   **Transition:** Wird bei Abschluss ("Commit") in den *Wochen-Pool* überführt.
+*   **Zweck:** Ermöglicht Simulation und Anpassung eines Plans, ohne die aktiven *Vormerkungen* zu beeinflussen.
+*   **Transition:** Wird bei Abschluss ("Commit") in *Vormerkungen* überführt.
 
-<a id="GLO-wochen-pool"></a>
-### Wochen-Pool (Weekly Pool)
-Die Menge aller *Rezepte*, die für den aktuellen Planungszeitraum verbindlich ausgewählt wurden.
-*   **Zustand:** Rezepte warten hier auf Zuweisung zu einem Tag oder auf "Sofort Kochen".
-
-<a id="GLO-wochenplan"></a>
-### Wochenplan (Weekly Plan)
-Die konkrete kalendarische Zuordnung von *Rezepten* aus dem *Wochen-Pool* zu Wochentagen.
-
-<a id="GLO-plan-eintrag"></a>
-### Plan-Eintrag (Plan Entry)
-Die konkrete Zuweisung eines *Rezepts* zu einem *Slot* im *Wochenplan*.
-*   **Eigenschaften:** Datum, Slot-Typ, *Planungs-Portion*.
+<a id="GLO-vormerkung"></a>
+### Vormerkung (Planned Recipe)
+Ein *Rezept*, das für die kommenden Tage eingeplant ist – eingeplant, nicht verbindlich: Nichts zwingt dazu, es zu kochen. Alle Vormerkungen zeigt die Seite „Vorgemerkt“.
+*   **Eigenschaften:** das *Rezept*; ab MVP optional Tag, *Slot* und *Planungs-Portion*. Ein Tag ist eine zusätzliche Eigenschaft, kein eigenes Konzept: Vormerkungen mit und ohne Tag stehen in derselben Ansicht.
+*   **Zustand:** Ohne Tag wartet eine Vormerkung auf Zuweisung zu einem Tag oder auf "Sofort Kochen".
+*   **Abgelöste Begriffe:** Wochen-Pool (kurz Pool), Wochenplan, Plan-Eintrag.
 
 <a id="GLO-harte-regel"></a>
 ### Harte Regel (Hard Constraint)
@@ -217,7 +210,7 @@ Eine aggregierte Liste von *Einkaufslisten-Einträgen* für einen definierten Ze
 ### Einkaufslisten-Eintrag (Shopping List Item)
 Eine Position auf der Einkaufsliste.
 *   **Typen:**
-    *   *Zutat:* Referenziert eine *Zutat*. Menge ist die Summe aller Bedarfe aus dem *Wochenplan*.
+    *   *Zutat:* Referenziert eine *Zutat*. Menge ist die Summe aller Bedarfe aus den *Vormerkungen*.
     *   *Freitext:* Ein manueller Eintrag (siehe *Non-Food-Item*).
 *   **Zustand:** Offen / Gekauft.
 

@@ -16,7 +16,7 @@
 
 **Abgeleitete User Stories:**
 
-*   **US-701 (Harte Regeln / Ausschluss) [MVP]:** Als *Feierabend-Planer* möchte ich "Harte Regeln" definieren (z.B. "Max 2x Fleisch", "Kein Schwein"), die Rezepte strikt aus dem Planungs-Pool ausschließen, wenn das Limit erreicht ist.
+*   **US-701 (Harte Regeln / Ausschluss) [MVP]:** Als *Feierabend-Planer* möchte ich "Harte Regeln" definieren (z.B. "Max 2x Fleisch", "Kein Schwein"), die Rezepte bei der Plan-Generierung strikt ausschließen, wenn das Limit erreicht ist.
     *   **Akzeptanzkriterien:**
         *   Definition von Limits (Count, Frequency) für Tags.
         *   Rezepte, die das Limit verletzen, werden nicht vorgeschlagen.

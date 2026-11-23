@@ -1,7 +1,7 @@
 # Agent Memory – Mahl
 
 **Phase:** SKELETON 🔄
-**Aktuelle Story:** US-602 (Rezept-Erfassung)
+**Aktuelle Story:** US-803 (Rezepte vormerken)
 **Nächster Lauf:** {{NEXT_RUN}}
 
 ---

@@ -93,7 +93,7 @@ export type ValidationError = { readonly message: string }
 **Neuer Brand → in `Client/eslint.config.js` unter `settings.immutability.overrides` eintragen**
 (Grund dort).
 
-**Faustregel:** Wenn ein String-Parameter mehrere verschiedene Konzepte darstellen könnte (z.B. `id` für Rezept, Zutat und Wochenpool), braucht jedes Konzept einen eigenen Branded Type.
+**Faustregel:** Wenn ein String-Parameter mehrere verschiedene Konzepte darstellen könnte (z.B. `id` für Rezept, Zutat und Vormerkung), braucht jedes Konzept einen eigenen Branded Type.
 
 **Dependency Rule:** Factory Functions nehmen Domain-Typen oder Primitives (`string`, `number`) entgegen – niemals API-Response-Typen (DTOs) oder direkte Zugriffe auf `fetch`-Ergebnisse. Das Mapping API-Response → Primitives findet im Service-Layer (`src/services/`) statt.
 

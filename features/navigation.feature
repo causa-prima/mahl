@@ -1,8 +1,8 @@
 @CROSS-navigation
 Feature: Navigation zwischen Seiten
 
-  Jede Hauptseite (Zutaten, Rezepte) ist über die Navigationsleiste erreichbar – nicht nur per
-  Direktlink.
+  Jede Hauptseite (Zutaten, Rezepte, Vorgemerkt) ist über die Navigationsleiste erreichbar – nicht
+  nur per Direktlink.
 
   # @phase: SKELETON
   #
@@ -44,8 +44,16 @@ Feature: Navigation zwischen Seiten
     When ich in der Navigationsleiste auf "Rezepte" klicke
     Then sehe ich die Rezept-Liste mit "Pfannkuchen"
 
+  # @run-4 · Navigationsleiste·Vorgemerkt · Frontend-only · Singleton · braucht:US-803/run-1
+  @CROSS-navigation-recipes-to-planned
+  Scenario: Von der Rezepte-Seite zur Vorgemerkt-Seite navigieren
+    Given ich navigiere zur Rezepte-Seite
+    When ich in der Navigationsleiste auf "Vorgemerkt" klicke
+    Then sehe ich die Vorgemerkt-Seite
+
   # Übergangsregel: Ziel ist laut User die Startseite nach US-001 „Geräte-Kontext“ – das Rezept für
-  # heute, sonst der Pool/Wochenplan. Beide Seiten gibt es noch nicht; bis dahin die Rezept-Liste.
+  # heute, sonst die Vorgemerkt-Seite (US-803). Bis zu US-001 bleibt es die Rezept-Liste, auch
+  # wenn die Vorgemerkt-Seite schon existiert (User-Entscheid im Workshop von US-803).
   # @run-3 · Einstieg · Frontend-only
   @CROSS-navigation-start-page
   Scenario: Ohne Adresse öffnet die Anwendung die Rezepte-Seite
