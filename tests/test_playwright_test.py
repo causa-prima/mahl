@@ -39,11 +39,13 @@ _GRUEN = (
 # Echt: `playwright-test --filter "Zutat anlegen" --verbose` – kein Test heißt so.
 _KEIN_TEST = "\n> mahl-client@0.0.0 test:e2e\n> playwright test --grep Zutat anlegen\n\nError: No tests found\n"
 
-# Was nach dem Entfernen des npm-Kopfs übrig bleibt – genau das zeigt der Wrapper bei Rot.
+# Was nach dem Entfernen des npm-Kopfs übrig bleibt – das zeigt der Wrapper bei Rot, ohne die
+# Zeilen grüner Tests.
+_GRUENE_ZEILE = "  ✓  1 [chromium] › e2e/ingredients.spec.ts:264:3 › Zutaten › Name mit 30 Zeichen (1.0s)\n"
 _ROT_DETAILS = (
     "Running 3 tests using 1 worker\n"
     "\n"
-    "  ✓  1 [chromium] › e2e/ingredients.spec.ts:264:3 › Zutaten › Name mit 30 Zeichen (1.0s)\n"
+    + _GRUENE_ZEILE +
     "  ✘  2 [chromium] › e2e/ingredients.spec.ts:373:3 › Zutaten › Name zu lang (5.9s)\n"
     "  ✘  3 [chromium] › e2e/ingredients.spec.ts:390:3 › Zutaten › Einheit zu lang (5.8s)\n"
     "\n"
@@ -121,11 +123,13 @@ def test_gruener_lauf_mit_verbose_zeigt_die_rohausgabe_und_das_verdikt(monkeypat
 @pytest.mark.aufrufpfad("playwright-test")
 def test_roter_lauf_zeigt_den_fehlerblock_ohne_npm_kopf_und_gibt_den_exit_code_weiter(
         monkeypatch, capsys):
-    """Der Fehlerblock (Erwartung, Locator) IST die Analyse-Information – er bleibt ganz."""
+    """Der Fehlerblock (Erwartung, Locator) IST die Analyse-Information – er bleibt ganz. Die
+    Zeilen grüner Tests fallen weg: Bei 169 Tests schoben sie den Fehlerblock in den Teil, den
+    die Harness beim Kürzen der Ausgabe auslässt."""
     _npm(monkeypatch, _ROT, 1)
     assert cli_aufruf(monkeypatch, modul) == 1
     assert capsys.readouterr().out == (
-        _ROT_DETAILS + "\n\n✗ 2 E2E-Test(s) rot – Details oben\n" + _HINWEIS)
+        _ROT_DETAILS.replace(_GRUENE_ZEILE, "") + "\n\n✗ 2 E2E-Test(s) rot – Details oben\n" + _HINWEIS)
 
 
 @pytest.mark.aufrufpfad("playwright-test")

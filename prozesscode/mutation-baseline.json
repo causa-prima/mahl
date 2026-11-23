@@ -305,8 +305,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.next_run": {
-    "beurteilbar": 1070,
-    "getoetet": 899,
+    "beurteilbar": 1121,
+    "getoetet": 957,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.obs": {
@@ -355,7 +355,7 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.playwright-test": {
-    "beurteilbar": 257,
+    "beurteilbar": 240,
     "getoetet": 217,
     "messung": "mutmut 3.8.1, Wertung 3"
   },

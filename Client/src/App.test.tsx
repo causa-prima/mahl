@@ -6,13 +6,15 @@ import { http, HttpResponse } from 'msw'
 import { server } from './mocks/server'
 import { appRoutes } from './App'
 
-type PageName = 'Zutaten' | 'Rezepte'
+const pageNames = ['Zutaten', 'Rezepte', 'Vorgemerkt'] as const
+type PageName = (typeof pageNames)[number]
 
-// Given (Background): die Anwendung ist gestartet, beide Listen sind leer.
+// Given (Background): die Anwendung ist gestartet, alle Listen sind leer.
 function renderAppAt(initialPath: string) {
   server.use(
     http.get('/api/ingredients', () => HttpResponse.json([])),
     http.get('/api/recipes', () => HttpResponse.json([])),
+    http.get('/api/planned-recipes', () => HttpResponse.json([])),
   )
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -24,12 +26,17 @@ function renderAppAt(initialPath: string) {
 const navEntry = (name: PageName) =>
   within(screen.getByRole('navigation', { name: 'Hauptnavigation' })).getByRole('link', { name })
 
-// Then „sehe ich die <Ziel>-Seite": Seitentitel und markierter Eintrag der Leiste, der andere Eintrag (`other`)
+// Then „sehe ich die <Ziel>-Seite": Seitentitel, markierter Eintrag der Leiste, jeder andere Eintrag sichtbar und
 // nicht markiert (die Adresse prüft der E2E-Test).
-async function expectPageShown(name: PageName, other: PageName) {
+async function expectPageShown(name: PageName) {
   expect(await screen.findByRole('heading', { level: 1, name })).toBeInTheDocument()
   expect(navEntry(name)).toHaveAttribute('aria-current', 'page')
-  expect(navEntry(other)).not.toHaveAttribute('aria-current')
+  pageNames
+    .filter((other) => other !== name)
+    .forEach((other) => {
+      expect(navEntry(other)).toBeVisible()
+      expect(navEntry(other)).not.toHaveAttribute('aria-current')
+    })
 }
 
 describe('CROSS_Navigation: Navigationsleiste', () => {
@@ -43,7 +50,20 @@ describe('CROSS_Navigation: Navigationsleiste', () => {
     fireEvent.click(navEntry('Rezepte'))
 
     // Then: sehe ich die Rezepte-Seite
-    await expectPageShown('Rezepte', 'Zutaten')
+    await expectPageShown('Rezepte')
+  })
+
+  // Szenario: Von der Rezepte-Seite zur Vorgemerkt-Seite navigieren
+  it('CROSS_Navigation_RecipesToPlanned_ClickNavigationEntry_ShowsPlannedPage', async () => {
+    // Given: ich navigiere zur Rezepte-Seite
+    renderAppAt('/recipes')
+    await screen.findByRole('heading', { level: 1, name: 'Rezepte' })
+
+    // When: ich in der Navigationsleiste auf "Vorgemerkt" klicke
+    fireEvent.click(navEntry('Vorgemerkt'))
+
+    // Then: sehe ich die Vorgemerkt-Seite
+    await expectPageShown('Vorgemerkt')
   })
 
   // Szenario: Von der Rezepte-Seite zur Zutaten-Seite navigieren
@@ -56,7 +76,7 @@ describe('CROSS_Navigation: Navigationsleiste', () => {
     fireEvent.click(navEntry('Zutaten'))
 
     // Then: sehe ich die Zutaten-Seite
-    await expectPageShown('Zutaten', 'Rezepte')
+    await expectPageShown('Zutaten')
   })
 
   // Szenario: Von der Zutaten-Seite zur Rezepte-Seite navigieren
@@ -83,7 +103,7 @@ describe('CROSS_Navigation: Einstieg', () => {
     renderAppAt('/')
 
     // Then: sehe ich die Rezepte-Seite
-    await expectPageShown('Rezepte', 'Zutaten')
+    await expectPageShown('Rezepte')
   })
 
   // Szenario: Eine unbekannte Adresse zeigt „Seite nicht gefunden.“ mit Navigationsleiste
@@ -99,6 +119,6 @@ describe('CROSS_Navigation: Einstieg', () => {
     fireEvent.click(navEntry('Rezepte'))
 
     // Then: sehe ich die Rezepte-Seite
-    await expectPageShown('Rezepte', 'Zutaten')
+    await expectPageShown('Rezepte')
   })
 })

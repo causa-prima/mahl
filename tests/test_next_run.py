@@ -453,6 +453,57 @@ def test_dead_dependency_reference_blocks_instead_of_passing_silently():
     assert group is None
 
 
+# Die Lauf-Nummer ist die Build-Reihenfolge innerhalb einer Datei (scenario-clustering.md): Eine
+# Kante zu einem kleineren Lauf derselben Datei steht deshalb nicht als `braucht:` da.
+# Hängt run-1 an einer Kante in eine andere Datei, darf run-8 nicht an ihm vorbeiziehen.
+STORY_RUN1_WARTET = STORY_FEATURE.replace(
+    "# @run-1 · Anlegen · Full-Stack",
+    "# @run-1 · Anlegen · Full-Stack · braucht:CROSS-navigation/run-1",
+)
+NAV_FEATURE = textwrap.dedent("""\
+    @CROSS-navigation
+    Feature: Navigation
+
+      # @phase: SKELETON
+
+      # @run-1 · Navigationsleiste · Frontend-only · Singleton
+      @CROSS-navigation-recipes
+      Scenario: Zur Rezept-Liste navigieren
+        When a
+        Then b
+    """)
+
+
+def test_open_lower_run_of_the_same_file_holds_back_a_higher_run():
+    groups = nr.collect_runs([STORY_RUN1_WARTET, NAV_FEATURE])
+    group = nr.next_run_global(groups, implemented=set(), phase="SKELETON", story="US-904")
+    assert group["scenarios"][0]["title"] == "Zur Rezept-Liste navigieren"
+
+
+def test_lower_run_releases_the_higher_run_once_done():
+    groups = nr.collect_runs([STORY_RUN1_WARTET, NAV_FEATURE])
+    done = {"Zur Rezept-Liste navigieren", "Zutat anlegen"}
+    group = nr.next_run_global(groups, implemented=done, phase="SKELETON", story="US-904")
+    assert group["number"] == 8
+
+
+def test_lower_run_of_a_later_phase_does_not_hold_back_an_earlier_phase():
+    # Ein MVP-Lauf wird in SKELETON nie fällig – er hielte den SKELETON-Lauf sonst bis dahin fest.
+    text = STORY_FEATURE.replace(
+        "# @run-1 · Anlegen · Full-Stack", "# @run-1 · Anlegen · Full-Stack · Phase:MVP")
+    group = nr.next_run_global(nr.collect_runs([text]), implemented=set(),
+                               phase="SKELETON", story="US-904")
+    assert group["number"] == 8
+
+
+def test_edge_to_a_higher_run_of_the_same_file_is_a_cycle():
+    # run-1 braucht run-8, run-8 setzt über die Nummer run-1 voraus: Keiner wird je fällig.
+    text = STORY_FEATURE.replace(
+        "# @run-1 · Anlegen · Full-Stack", "# @run-1 · Anlegen · Full-Stack · braucht:run-8")
+    violations = nr.check_dependencies(nr.collect_runs([text]))
+    assert any("Zyklus" in v and "run-1" in v for v in violations)
+
+
 # --- Guard: Phasen und Kanten --------------------------------------------------
 def test_check_dependencies_clean():
     assert nr.check_dependencies(_collect()) == []
@@ -865,6 +916,25 @@ def test_cli_open_resolves_an_intra_file_edge(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen"})
     assert nr.main(["--open", "--story", "US-904"]) == 0
     assert _open_line(capsys.readouterr().out, "Zutat löschen") == '  `run-8` „Löschen" (Full-Stack): „Zutat löschen"'
+
+
+def test_cli_open_names_an_open_lower_run_of_the_same_file(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", set)
+    assert nr.main(["--open", "--story", "US-904"]) == 0
+    line = _open_line(capsys.readouterr().out, "Zutat löschen")
+    assert line == '  `run-8` „Löschen" (Full-Stack): „Zutat löschen" · wartet auf `run-1`'
+
+
+def test_cli_open_names_lower_run_and_edge_together(tmp_path, monkeypatch, capsys):
+    _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    (tmp_path / "features" / "f0.feature").write_text(STORY_FEATURE.replace(
+        "# @run-8 · Löschen · Full-Stack", "# @run-8 · Löschen · Full-Stack · braucht:CROSS-interaction/run-1"),
+        encoding="utf-8")
+    monkeypatch.setattr(nr, "_gather_implemented", set)
+    assert nr.main(["--open", "--story", "US-904"]) == 0
+    line = _open_line(capsys.readouterr().out, "Zutat löschen")
+    assert line.endswith(" · wartet auf `run-1`, `braucht:CROSS-interaction/run-1`")
 
 
 def test_cli_open_names_every_unmet_edge(tmp_path, monkeypatch, capsys):

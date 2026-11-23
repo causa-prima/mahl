@@ -51,6 +51,18 @@ Feature: Navigation zwischen Seiten
     When ich in der Navigationsleiste auf "Vorgemerkt" klicke
     Then sehe ich die Vorgemerkt-Seite
 
+  # @run-5 · Navigationsleiste·Markierung · Frontend-only · Singleton · braucht:US-602/run-2,US-602/run-4
+  @CROSS-navigation-active-entry-on-subpage
+  Scenario Outline: Auf einer Unterseite der Rezepte ist „Rezepte“ markiert
+    Given das Rezept "Pfannkuchen" existiert
+    When ich <Unterseite> öffne
+    Then ist in der Navigationsleiste nur der Eintrag "Rezepte" markiert
+
+    Examples:
+      | Unterseite                                  |
+      | die Detailansicht des Rezepts "Pfannkuchen" |
+      | das Formular "Rezept anlegen"               |
+
   # Übergangsregel: Ziel ist laut User die Startseite nach US-001 „Geräte-Kontext“ – das Rezept für
   # heute, sonst die Vorgemerkt-Seite (US-803). Bis zu US-001 bleibt es die Rezept-Liste, auch
   # wenn die Vorgemerkt-Seite schon existiert (User-Entscheid im Workshop von US-803).

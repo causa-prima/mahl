@@ -263,3 +263,13 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Aufschubgrund: User – in der Abschluss-Triage von run-14 entschieden; Ursache unklar, ein Fall reicht für eine Maßnahme nicht
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
 - Bezug: OBS-S141-1
+
+## OBS-S153-1 – Langer Befehl eines Subagenten trotz timeout 600000 nach 180 s in den Hintergrund verschoben
+- Quelle: Subagent
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: TOOLING    Kontext: Hook/Script
+- Beobachtung: Beim Frontend-Layer-Implementer (CROSS-navigation run-4, 2026-11-23) wurde der qa-check-Lauf mit Stryker trotz Bash-Parameter timeout: 600000 nach 180 s in den Hintergrund verschoben (Tool-Meldung „moved to the background after running for 180s“, ohne Pipe gestartet). Die Agent-Definition sieht für lange Läufe den Vordergrund mit timeout 600000 vor, damit das Ergebnis im selben Zug vorliegt. Der Subagent wartete daraufhin auf die Benachrichtigung; der Lauf kam durch, kostete aber eine Unterbrechung. Ob der Harness Befehle von Subagenten grundsätzlich nach 180 s verschiebt oder nur unter bestimmten Bedingungen, ist ungeprüft.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: Recherche – die Ursache verlangt einen eigenen Test des Harness-Verhaltens (Subagent, langer Befehl, verschiedene Timeouts)
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

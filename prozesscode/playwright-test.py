@@ -31,6 +31,17 @@ _PASSED = re.compile(r"^\s*(\d+)\s+passed\b", re.MULTILINE)
 _FAILED = re.compile(r"^\s*(\d+)\s+(?:failed|flaky)\b", re.MULTILINE)
 _DURATION = re.compile(r"passed\s+\(([^)]+)\)")
 _KEIN_TEST = re.compile(r"^Error: No tests found", re.MULTILINE)
+# Zeile eines grünen Tests im list-Reporter („  ✓  12 [chromium] › …"). Bei Rot ohne Aussage –
+# und bei einem Volllauf so viele, dass die Harness den Fehlerblock beim Kürzen auslässt.
+_GRUENER_TEST = re.compile(r"^\s*✓\s+\d+\s+\[")
+
+# Hilfetexte als Modulkonstanten (dort mutiert mutmut nicht): Kein Test prüft sie, und ihre
+# Mutanten zählen je nach Lauf mal als getötet, mal als überlebt – die Sperrklinke schwankte sonst
+# ohne jede Codeänderung.
+_HILFE_FILTER = {"metavar": "PATTERN", "help": "Dateiname oder Testname-Filter (Substring-Match)"}
+_HILFE_HANDYBREITE = {"metavar": "PX",
+                      "help": "Tests in dieser Breite laufen lassen und je Test die Bilder ablegen"}
+_HILFE_VERBOSE = {"help": "Vollständiger Output ohne Filterung"}
 
 KEIN_TEST_GEFUNDEN = "✗ --filter traf keinen E2E-Test – Pattern prüfen"
 
@@ -84,12 +95,9 @@ def main() -> None:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--filter", dest="filter_name", metavar="PATTERN",
-                        help="Dateiname oder Testname-Filter (Substring-Match)")
-    parser.add_argument("--handybreite", type=int, metavar="PX",
-                        help="Tests in dieser Breite laufen lassen und je Test die Bilder ablegen")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Vollständiger Output ohne Filterung")
+    parser.add_argument("--filter", dest="filter_name", **_HILFE_FILTER)
+    parser.add_argument("--handybreite", type=int, **_HILFE_HANDYBREITE)
+    parser.add_argument("--verbose", action="store_true", **_HILFE_VERBOSE)
     args = parser.parse_args()
 
     npm_args = ["run", "test:e2e", "--"]
@@ -115,12 +123,12 @@ def main() -> None:
         verdict = KEIN_TEST_GEFUNDEN
     else:
         # Rot: Playwrights Fehlerblock (Erwartung/Ist, Locator, Screenshot-Pfad) IST die
-        # Analyse-Information und bleibt vollständig erhalten.
+        # Analyse-Information und bleibt vollständig erhalten; die grünen Tests fallen weg.
         failed = _FAILED.search(output)
         count = failed.group(1) if failed else "?"
         verdict = f"✗ {count} E2E-Test(s) rot – Details oben"
     emit(verbose=args.verbose, output=output, verdict=verdict + bilder,
-         details=strip_noise(output))
+         details=strip_noise(output, _GRUENER_TEST))
     # Ein ✗ endet nie mit 0 – auch nicht, wenn Playwright selbst 0 meldet (flaky, nichts
     # bestanden): Ein Gate, das nur den Exit-Code liest, hielte den Lauf sonst für grün.
     sys.exit(exit_code or 1)

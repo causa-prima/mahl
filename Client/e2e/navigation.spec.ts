@@ -11,22 +11,32 @@ import { seedIngredientViaApi } from './api/ingredientsApi'
 const pages = {
   Zutaten: '/ingredients',
   Rezepte: '/recipes',
+  Vorgemerkt: '/planned',
 } as const
 
 type PageName = keyof typeof pages
+const pageNames = Object.keys(pages) as PageName[]
 
 async function gotoPage(page: Readonly<Page>, name: PageName): Promise<void> {
   await page.goto(pages[name])
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
 }
 
-// Then „sehe ich die <Ziel>-Seite": Adresse, Seitentitel und markierter Eintrag der Leiste – der andere
-// Eintrag (`other`) ist nicht markiert.
-async function expectPageShown(page: Readonly<Page>, name: PageName, other: PageName): Promise<void> {
+// Then „sehe ich die <Ziel>-Seite": Adresse, Seitentitel und markierter Eintrag der Leiste.
+async function expectPageShown(page: Readonly<Page>, name: PageName): Promise<void> {
   await expect(page).toHaveURL(pages[name])
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
+  await expectOnlyMarked(page, name)
+}
+
+// Then „ist in der Navigationsleiste nur der Eintrag <name> markiert": Er trägt aria-current="page", jeder
+// andere Eintrag steht in der Leiste und ist nicht markiert.
+async function expectOnlyMarked(page: Readonly<Page>, name: PageName): Promise<void> {
   await expect(navEntry(page, name)).toHaveAttribute('aria-current', 'page')
-  await expect(navEntry(page, other)).not.toHaveAttribute('aria-current')
+  await Promise.all(pageNames.filter((other) => other !== name).map(async (other) => {
+    await expect(navEntry(page, other)).toBeVisible()
+    await expect(navEntry(page, other)).not.toHaveAttribute('aria-current')
+  }))
 }
 
 test.describe('CROSS_Navigation: Navigationsleiste', () => {
@@ -39,7 +49,7 @@ test.describe('CROSS_Navigation: Navigationsleiste', () => {
     await navEntry(page, 'Rezepte').click()
 
     // Then: sehe ich die Rezepte-Seite
-    await expectPageShown(page, 'Rezepte', 'Zutaten')
+    await expectPageShown(page, 'Rezepte')
   })
 
   // Szenario: Von der Rezepte-Seite zur Zutaten-Seite navigieren
@@ -51,7 +61,7 @@ test.describe('CROSS_Navigation: Navigationsleiste', () => {
     await navEntry(page, 'Zutaten').click()
 
     // Then: sehe ich die Zutaten-Seite
-    await expectPageShown(page, 'Zutaten', 'Rezepte')
+    await expectPageShown(page, 'Zutaten')
   })
 
   // Szenario: Von der Detailansicht eines Rezepts zur Rezept-Liste navigieren
@@ -72,8 +82,45 @@ test.describe('CROSS_Navigation: Navigationsleiste', () => {
     await navEntry(newWindow, 'Rezepte').click()
 
     // Then: sehe ich die Rezept-Liste mit "Pfannkuchen"
-    await expectPageShown(newWindow, 'Rezepte', 'Zutaten')
+    await expectPageShown(newWindow, 'Rezepte')
     await expect(newWindow.getByRole('link', { name: 'Pfannkuchen' })).toBeVisible()
+  })
+
+  // Szenario: Von der Rezepte-Seite zur Vorgemerkt-Seite navigieren
+  test('CROSS_Navigation_RecipesToPlanned_ClickNavigationEntry_ShowsPlannedPage', async ({ page }) => {
+    // Given: ich navigiere zur Rezepte-Seite
+    await gotoPage(page, 'Rezepte')
+
+    // When: ich in der Navigationsleiste auf "Vorgemerkt" klicke
+    await navEntry(page, 'Vorgemerkt').click()
+
+    // Then: sehe ich die Vorgemerkt-Seite
+    await expectPageShown(page, 'Vorgemerkt')
+  })
+})
+
+test.describe('CROSS_Navigation: Markierung', () => {
+  // Eine Zeile je Beispiel der Scenario Outline.
+  const subpages = [
+    { name: 'die Detailansicht des Rezepts "Pfannkuchen"', path: (id: string) => `/recipes/${id}`, heading: 'Pfannkuchen' },
+    { name: 'das Formular "Rezept anlegen"', path: () => '/recipes/new', heading: 'Rezept anlegen' },
+  ] as const
+
+  subpages.forEach(({ name, path, heading }) => {
+    // Szenario: Auf einer Unterseite der Rezepte ist „Rezepte“ markiert
+    // Beispiel: alle
+    test(`CROSS_Navigation_ActiveEntryOnSubpage_OpenSubpage_MarksOnlyRecipes (${name})`, async ({ page, request }) => {
+      // Given: das Rezept "Pfannkuchen" existiert
+      await seedIngredientViaApi(request, 'Salz', 'g')
+      const pancakesId = await createRecipeViaApi(request, { title: 'Pfannkuchen', ingredients: 'Salz', instruction: 'Zubereiten.' })
+
+      // When: ich <Unterseite> öffne – über die Adresse; die Seite muss geladen sein, bevor die Leiste geprüft wird
+      await page.goto(path(pancakesId))
+      await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
+
+      // Then: ist in der Navigationsleiste nur der Eintrag "Rezepte" markiert
+      await expectOnlyMarked(page, 'Rezepte')
+    })
   })
 })
 
@@ -85,7 +132,7 @@ test.describe('CROSS_Navigation: Einstieg', () => {
     await page.goto('/')
 
     // Then: sehe ich die Rezepte-Seite
-    await expectPageShown(page, 'Rezepte', 'Zutaten')
+    await expectPageShown(page, 'Rezepte')
   })
 
   // Szenario: Eine unbekannte Adresse zeigt „Seite nicht gefunden.“ mit Navigationsleiste
@@ -101,6 +148,6 @@ test.describe('CROSS_Navigation: Einstieg', () => {
     await navEntry(page, 'Rezepte').click()
 
     // Then: sehe ich die Rezepte-Seite
-    await expectPageShown(page, 'Rezepte', 'Zutaten')
+    await expectPageShown(page, 'Rezepte')
   })
 })

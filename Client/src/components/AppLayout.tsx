@@ -7,6 +7,7 @@ import { NavLink, Outlet } from 'react-router'
 const entries = [
   { label: 'Zutaten', to: '/ingredients' },
   { label: 'Rezepte', to: '/recipes' },
+  { label: 'Vorgemerkt', to: '/planned' },
 ] as const
 
 export default function AppLayout() {

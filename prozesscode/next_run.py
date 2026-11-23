@@ -14,8 +14,10 @@ Fälligkeit hat zwei Bedingungen (ADR-S131-1):
   - **Phase** – der Lauf trägt eine Phase (`# @phase:` im Feature-Header, `· Phase:<P>` am
     Run-Tag), und das Projekt hat sie laut `**Phase:**` in AGENT_MEMORY erreicht.
   - **Kanten** – alle in `· braucht:<refs>` genannten Vorgänger-Läufe sind vollständig
-    implementiert. Die Phase allein kann die Reihenfolge nicht leisten: Sie hat drei Stufen, in
-    denen praktisch alles gleichzeitig liegt.
+    implementiert, ebenso jeder kleiner nummerierte Lauf derselben Datei (gleicher oder früherer
+    Phase): Die Nummer ist die Build-Reihenfolge innerhalb der Datei und steht deshalb nicht
+    eigens als `braucht:` da. Die Phase allein kann die Reihenfolge nicht leisten: Sie hat drei
+    Stufen, in denen praktisch alles gleichzeitig liegt.
 Die Auflösung geht über **alle** Feature-Dateien, nicht nur die der aktuellen Story – sonst
 erreicht sie querschnittliche Dateien (`@CROSS-…`, `@NFR-…`) strukturell nie. Die aktuelle Story
 kommt in der Sortierung trotzdem zuerst, damit eine Story am Stück gebaut wird.
@@ -49,7 +51,8 @@ Modi:
                          Entstehung greift der Hook `check-feature-plan.py`.
   --open / --done         Offene bzw. erledigte Läufe je Feature-Datei listen (ein Lauf gilt als
                          "erledigt", wenn alle seine Szenarien implementiert sind). Ein offener
-                         Lauf mit offenem Vorgänger trägt den Zusatz „wartet auf `braucht:…`".
+                         Lauf mit offenem Vorgänger trägt den Zusatz „wartet auf `run-N`"
+                         bzw. „wartet auf `braucht:…`".
   --story US-NNN          Nur mit --open/--done: auf die Feature-Datei(en) dieser Story
                          eingrenzen (z.B. Sibling-Läufe-Überblick ohne Rauschen aus anderen
                          Storys/NFR-Features). Die Kanten prüft es weiter über alle Dateien.
@@ -238,9 +241,34 @@ def unmet_needs(group: dict, groups: list[dict], implemented: set[str]) -> list[
     return [ref for ref in group["needs"] if not erfuellt(ref)]
 
 
+def _rang(phase: str | None) -> int:
+    return phasen_rang(phase) if phase else len(PHASEN)
+
+
+def vorlaeufer(group: dict, groups: list[dict]) -> list[dict]:
+    """Die kleiner nummerierten Läufe derselben Datei – Vorgänger ohne eigene `braucht:`-Kante.
+
+    Die Nummer ist die Build-Reihenfolge innerhalb einer Datei (scenario-clustering.md); der
+    Workshop notiert deshalb nur Kanten, die sie nicht schon ausdrückt. Ohne diese Regel zöge
+    ein Lauf an seinem Vorgänger vorbei, sobald der an einer Kante in eine andere Datei hängt.
+    Ein Vorläufer aus einer späteren Phase zählt nicht: Er wird vorher nie fällig und hielte den
+    Lauf bis dahin fest.
+    """
+    if group["number"] is None:
+        return []
+    return [g for g in groups
+            if g["file_index"] == group["file_index"] and g["number"] is not None
+            and g["number"] < group["number"] and _rang(g["phase"]) <= _rang(group["phase"])]
+
+
+def offene_vorlaeufer(group: dict, groups: list[dict], implemented: set[str]) -> list[str]:
+    return [f"run-{g['number']}" for g in vorlaeufer(group, groups) if not _is_done(g, implemented)]
+
+
 def _needs_satisfied(group: dict, groups: list[dict], implemented: set[str]) -> bool:
-    """Sind alle Vorgänger dieses Laufs erledigt?"""
-    return not unmet_needs(group, groups, implemented)
+    """Sind alle Vorgänger dieses Laufs erledigt – die Kanten und die Vorläufer der Datei?"""
+    return not (unmet_needs(group, groups, implemented)
+                or offene_vorlaeufer(group, groups, implemented))
 
 
 def waiting_note(group: dict, groups: list[dict], implemented: set[str]) -> str:
@@ -249,8 +277,11 @@ def waiting_note(group: dict, groups: list[dict], implemented: set[str]) -> str:
     Wer aus `--open` den nächsten Lauf wählt, soll einen zurückgehaltenen Lauf erkennen, ohne die
     Kanten im Feature-File nachzulesen.
     """
-    offen = unmet_needs(group, groups, implemented)
-    return f" · wartet auf `braucht:{','.join(offen)}`" if offen else ""
+    teile = [f"`{ref}`" for ref in offene_vorlaeufer(group, groups, implemented)]
+    kanten = unmet_needs(group, groups, implemented)
+    if kanten:
+        teile.append(f"`braucht:{','.join(kanten)}`")
+    return f" · wartet auf {', '.join(teile)}" if teile else ""
 
 
 def next_run_global(
@@ -264,9 +295,12 @@ def next_run_global(
 
     Fällig ist ein Lauf, dessen Phase das Projekt erreicht hat und dessen Vorgänger erledigt sind.
     Sortierung: aktuelle Story zuerst (erhält die Arbeitsweise „eine Story am Stück"), dann
-    Phasen-Rang, dann Feature-Datei, dann Run-Nummer.
+    Phasen-Rang, dann Feature-Datei. Die Run-Nummer braucht keinen eigenen Schlüssel: Innerhalb
+    einer Datei und Phase ist nur der kleinste offene nummerierte Lauf Kandidat (`vorlaeufer`),
+    und bei Gleichstand nimmt `min` den ersten – `collect_runs` liefert nummerierte Läufe vor
+    ungetaggten.
     """
-    max_rang = phasen_rang(phase) if phase else len(PHASEN)
+    max_rang = _rang(phase)
     candidates = [
         g for g in groups
         if _group_is_open(g, implemented, exclude_tags)
@@ -278,9 +312,8 @@ def next_run_global(
     story_tag = f"@{story}" if story else None
     return min(candidates, key=lambda g: (
         0 if story_tag and story_tag in g["tags"] else 1,
-        phasen_rang(g["phase"]) if g["phase"] else len(PHASEN),
+        _rang(g["phase"]),
         g["file_index"],
-        g["number"] if g["number"] is not None else 10**6,
     ))
 
 
@@ -506,14 +539,14 @@ def check_run_consistency(scenarios: list[dict]) -> list[str]:
 
 
 def _edge_map(groups: list[dict]) -> dict[int, list[int]]:
-    """Index eines Laufs → Indizes der Läufe, die er laut `braucht:` voraussetzt."""
-    return {
-        i: [
-            j for j, target in enumerate(groups)
-            for ref in g["needs"] if matches_ref(target, ref, g["file_index"])
-        ]
-        for i, g in enumerate(groups)
-    }
+    """Index eines Laufs → Indizes der Läufe, die er voraussetzt: laut `braucht:` und als
+    Vorläufer derselben Datei."""
+    def voraus(group: dict) -> list[int]:
+        vor = vorlaeufer(group, groups)
+        return [j for j, target in enumerate(groups)
+                if any(matches_ref(target, ref, group["file_index"]) for ref in group["needs"])
+                or any(target is v for v in vor)]
+    return {i: voraus(g) for i, g in enumerate(groups)}
 
 
 def _find_cycles(groups: list[dict]) -> list[str]:
@@ -528,8 +561,10 @@ def _find_cycles(groups: list[dict]) -> list[str]:
             current = stack.pop()
             if current == start:
                 violations.append(
-                    f"{run_label(groups[start])}: Zyklus in den `braucht:`-Kanten – keiner der "
-                    f"beteiligten Läufe kann je fällig werden. Eine Kante entfernen; setzen "
+                    f"{run_label(groups[start])}: Zyklus in den Kanten – keiner der beteiligten "
+                    f"Läufe kann je fällig werden (als Kante zählt neben `braucht:` auch die "
+                    f"Nummer: jeder kleinere Lauf derselben Datei). Eine Kante entfernen oder "
+                    f"umnummerieren; setzen "
                     f"sich zwei Läufe gegenseitig voraus, gehören sie zusammengelegt "
                     f"(scenario-clustering.md, Schritt Zustands-Abhängigkeiten auflösen)."
                 )

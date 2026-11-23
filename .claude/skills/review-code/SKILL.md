@@ -93,8 +93,9 @@ Agent-Prompts enthalten (je Agent):
   ist erlaubt, aber nur ein Lauf zur Zeit: Ein zweiter bricht mit „Konkurrierender E2E-Lauf aktiv"
   ab, bevor er baut. Dann später erneut oder als offene Prüfung melden. Backend-Tests
   (`dotnet-test`, gern mit `--filter`) sind ebenfalls erlaubt; parallele Läufe wartet der Wrapper
-  bis zu 60 s ab („Warte auf laufenden Backend-Testlauf"), erst danach bricht er ab. Im
-  Vordergrund aufrufen, nie mit `run_in_background`. Während die Auditoren laufen, startet der
+  bis zu 60 s ab („Warte auf laufenden Backend-Testlauf"), erst danach bricht er ab.
+  Komponententests laufen über `vitest-run` (`--file` für eine Testdatei); `npx vitest` sperrt der
+  Hook. Im Vordergrund aufrufen, nie mit `run_in_background`. Während die Auditoren laufen, startet der
   Orchestrator keinen eigenen Test-, E2E- oder Mutationslauf.
 - **ADR-Volltexte im Prompt, plus Auftrag zur eigenen Gegenprobe.** Zweigleisig:
   1. Die vom Orchestrator als relevant eingestuften ADRs **im Prompt ausschreiben**.
