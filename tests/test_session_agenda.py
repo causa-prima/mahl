@@ -372,68 +372,67 @@ def test_no_findings_yields_no_stub():
 LUECKE = "(kein Lauf fällig – Stories bis Phase SKELETON ohne Feature-Datei: US-602)"
 
 
-def _next_run_ausgabe(offene_laeufe: str, phasenstand: str):
+def _next_run_ausgabe(faelliger_lauf: str, phasenstand: str):
     def ausgabe(modul, *argv):
         assert modul == "next_run"
-        return phasenstand if "--phase-status" in argv else offene_laeufe
+        assert argv[1].endswith("AGENT_MEMORY.md")
+        return {"--due": faelliger_lauf, "--phase-status": phasenstand}[argv[0]]
     return ausgabe
 
 
-# Hermetisch: modul_next_run liest die aktuelle Story aus AGENT_MEMORY. Ohne Ersatz hingen die
-# Tests an der echten Datei – ohne Story dort schlugen zwei von ihnen fehl (Gegenprobe).
-MEMORY_MIT_STORY = "**Phase:** SKELETON\n**Aktuelle Story:** US-904 (Zutaten)\n"
+# Form des Bestands: `next_run --due` liefert genau die Zeile, die {{NEXT_RUN}} im Zustandskopf
+# zeigt – oder nichts. Offene Läufe der Story sind nicht dasselbe: Läufe einer späteren Phase oder
+# mit offener Kante sind offen, aber nicht fällig, und ein fälliger Lauf kann in einer
+# Querschnittsdatei liegen. Die Aufgabe nennte sonst einen anderen Lauf als der Zustandskopf.
+FAELLIGER_LAUF = "`run-2` „Navigationsleiste·aus der Detailansicht\" (Full-Stack · Singleton): „Von …\"\n"
 
 
-def test_offene_laeufe_der_story_beanspruchen_die_aufgabe(monkeypatch):
-    monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
-    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe("run-1 …", LUECKE))
-    block = agenda.modul_next_run()
-    assert block.beansprucht and "run-1" in block.inhalt
-    assert LUECKE not in block.inhalt  # ein fälliger Lauf geht vor
-
-
-# Form des Bestands: `next_run --open` liefert eine Kopfzeile je Feature-Datei und eine Zeile je
-# Lauf. Die volle Liste (19 Läufe, ~5 KB in US-602) kam in jede Session, obwohl der nächste Lauf
-# schon im Zustandskopf steht – und eine größere Story hätte das Budget des Blocks gesprengt.
-OFFENE_LAEUFE = (
-    "=== recipes.feature (@US-904) ===\n"
-    "  `run-1` „Liste·Leerzustand\" (Full-Stack · Singleton): „Liste ist leer\"\n"
-    "  `run-2` „Anlegen·Success\" (Full-Stack · Singleton): „Anlegen\"\n"
-    "  `run-3` „Liste·Sortierung\" (Full-Stack · Singleton): „Sortiert\"\n"
-)
-
-
-def test_offene_laeufe_zeigen_nur_den_ersten_und_die_anzahl(monkeypatch):
-    monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
-    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe(OFFENE_LAEUFE, LUECKE))
-    block = agenda.modul_next_run()
-    assert "`run-1`" in block.inhalt
-    assert "`run-2`" not in block.inhalt and "`run-3`" not in block.inhalt
-    assert "3 offene Läufe" in block.inhalt
-    assert "next_run --open --story US-904" in block.inhalt
-
-
-def test_phasenstand_beansprucht_die_aufgabe_wenn_die_story_fertig_ist(monkeypatch):
-    monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
-    monkeypatch.setattr(agenda, "_modulausgabe",
-                        _next_run_ausgabe("(keine offenen Läufe)", LUECKE + "\n"))
+def test_faelliger_lauf_beansprucht_die_aufgabe(monkeypatch):
+    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe(FAELLIGER_LAUF, LUECKE))
     block = agenda.modul_next_run()
     assert block.beansprucht
-    assert "US-602" in block.inhalt and "US-602" in block.stub
+    assert block.inhalt == ("Nächster fälliger Lauf (wie im Zustandskopf):\n  " + FAELLIGER_LAUF.strip()
+                            + "\n→ Skill `implementing-scenario` (ein Lauf pro Durchlauf).")
+    assert block.stub == "Nächster Lauf: fällig"
 
 
-def test_phasenstand_greift_auch_ohne_aktuelle_story(monkeypatch):
-    monkeypatch.setattr(agenda, "_lies", lambda _pfad: "**Phase:** SKELETON\n")
-    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe("", LUECKE))
-    assert agenda.modul_next_run().beansprucht
+def test_phasenstand_beansprucht_die_aufgabe_ohne_faelligen_lauf(monkeypatch):
+    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe("", LUECKE + "\n"))
+    block = agenda.modul_next_run()
+    assert block.beansprucht
+    assert block.inhalt == f"Phasenstand:\n{LUECKE}"
+    assert block.stub == f"Phasenstand: {LUECKE}"
 
 
-def test_ohne_phasenbefund_bleibt_die_aufgabe_frei(monkeypatch):
-    monkeypatch.setattr(agenda, "_lies", lambda _pfad: MEMORY_MIT_STORY)
-    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe("(keine offenen Läufe)", ""))
+def test_ohne_faelligen_lauf_und_phasenbefund_bleibt_die_aufgabe_frei(monkeypatch):
+    # Etwa: Läufe der Phase warten nur auf ihre Kante – weder ein Lauf noch ein Phasenbefund.
+    monkeypatch.setattr(agenda, "_modulausgabe", _next_run_ausgabe("", ""))
     block = agenda.modul_next_run()
     assert not block.beansprucht
-    assert "alle implementiert" in block.stub
+    assert block.stub == ("Nächster Lauf: keiner fällig, kein Phasenbefund "
+                          "(`python3 -m prozesscode.next_run --open` zeigt, worauf offene Läufe warten)")
+
+
+def test_aufgabe_nennt_ueber_den_echten_aufruf_denselben_lauf_wie_der_zustandskopf(tmp_path, monkeypatch):
+    # Naht ohne Attrappe: Agenda → `next_run --due` im selben Prozess. Bestand: Die aktuelle Story
+    # hat nur noch einen MVP-Lauf offen, fällig ist ein Querschnittslauf der Phase SKELETON.
+    from test_next_run import ALL_TEXTS, MEMORY
+    nr = import_module("prozesscode.next_run")
+    features = tmp_path / "features"
+    features.mkdir()
+    for i, text in enumerate(ALL_TEXTS):
+        (features / f"f{i}.feature").write_text(text, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "AGENT_MEMORY.md").write_text(MEMORY, encoding="utf-8")
+    erledigt = {"Zutat anlegen", "Zutat löschen"}
+    monkeypatch.setattr(agenda, "ROOT", tmp_path)
+    monkeypatch.setattr(nr, "_FEATURES_DIR", features)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: erledigt)
+
+    zustandskopf = nr.render(MEMORY, feature_texts=ALL_TEXTS, implemented=erledigt)
+    lauf = next(z.removeprefix("- ") for z in zustandskopf.splitlines() if z.startswith("- "))
+    assert "Der Undo-Toast" in lauf  # Vorbedingung: der Querschnittslauf ist der fällige
+    assert agenda.modul_next_run().inhalt.splitlines()[1] == f"  {lauf}"
 
 
 # --- Prioritäten: oberster voll, Rest kurz -----------------------------------

@@ -38,6 +38,8 @@ Modi:
                          Nur der Befund über die Phase (Stories/Stufen ohne Workshop bzw.
                          abgeschlossene Phase); leer, solange ein Lauf fällig ist oder nur
                          eine Kante wartet. Für die Session-Agenda.
+  --due <memory.md>      Nur der fällige Lauf als eine Zeile – derselbe wie in {{NEXT_RUN}},
+                         ohne Anhang; leer, wenn keiner fällig ist. Für die Session-Agenda.
   --check                Mapping-Integritäts-Guard: jeder // Szenario:-Kommentar matcht genau
                          einen Feature-Titel, keine Duplikate; jede Run-Tag-Zeile ist syntaktisch
                          gültig; alle Szenarien derselben Run-Nummer tragen identische Metadaten
@@ -603,6 +605,19 @@ def phase_status(
     return _phase_note(groups, implemented, phase, missing, exclude_tags)
 
 
+def due_run(
+    memory_text: str,
+    feature_texts: list[str],
+    implemented: set[str],
+    exclude_tags: frozenset[str] = frozenset(),
+) -> dict | None:
+    """Der fällige Lauf für Phase und Story aus AGENT_MEMORY – None, wenn keiner fällig ist."""
+    from .td_anchors import phase_aus_memory  # lokal: td_anchors importiert next_run seinerseits
+
+    return next_run_global(collect_runs(feature_texts), implemented,
+                           phase_aus_memory(memory_text), extract_story(memory_text), exclude_tags)
+
+
 def _resolve_replacement(
     memory_text: str,
     feature_texts: list[str],
@@ -613,14 +628,12 @@ def _resolve_replacement(
 ) -> str:
     from .td_anchors import phase_aus_memory  # lokal: td_anchors importiert next_run seinerseits
 
-    story = extract_story(memory_text)
-    phase = phase_aus_memory(memory_text)
-    groups = collect_runs(feature_texts)
-
-    group = next_run_global(groups, implemented, phase, story, exclude_tags)
+    group = due_run(memory_text, feature_texts, implemented, exclude_tags)
     if group is not None:
         anhang = laufanhang(group, eintraege)
         return format_run(group) + (f"\n{anhang}" if anhang else "")
+    phase = phase_aus_memory(memory_text)
+    groups = collect_runs(feature_texts)
     missing = open_story_stages(story_texts, feature_texts, phase)
     return (_phase_note(groups, implemented, phase, missing, exclude_tags)
             or _blocked_note(groups, implemented, exclude_tags))
@@ -748,6 +761,13 @@ def _cmd_phase_status(memory_path: str) -> int:
     return 0
 
 
+def _cmd_due(memory_path: str) -> int:
+    group = due_run(_read(Path(memory_path)), _feature_texts(), _gather_implemented())
+    if group is not None:
+        print(format_run(group))
+    return 0
+
+
 def matches_story(text: str, story: str) -> bool:
     """True, wenn die Feature-Datei den Top-Level-Tag der gegebenen Story trägt (z.B. 'US-904')."""
     story_tag = story if story.startswith("@") else f"@{story}"
@@ -819,6 +839,7 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--render", metavar="MEMORY_MD", help="Platzhalter im Memory-Text auflösen")
     group.add_argument("--phase-status", metavar="MEMORY_MD",
                        help="Befund über die Phase, wenn kein Lauf fällig ist")
+    group.add_argument("--due", metavar="MEMORY_MD", help="nur der fällige Lauf, sonst nichts")
     group.add_argument("--check", action="store_true", help="Mapping-Integritäts-Guard")
     group.add_argument("--open", action="store_true", help="offene Läufe je Feature listen")
     group.add_argument("--done", action="store_true", help="erledigte Läufe je Feature listen")
@@ -829,6 +850,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_render(args.render)
     if args.phase_status:
         return _cmd_phase_status(args.phase_status)
+    if args.due:
+        return _cmd_due(args.due)
     if args.open:
         return _cmd_list(only_open=True, story=args.story)
     if args.done:

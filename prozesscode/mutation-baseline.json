@@ -305,8 +305,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.next_run": {
-    "beurteilbar": 1034,
-    "getoetet": 860,
+    "beurteilbar": 1070,
+    "getoetet": 899,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.obs": {
@@ -390,8 +390,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.session-agenda": {
-    "beurteilbar": 1033,
-    "getoetet": 527,
+    "beurteilbar": 1010,
+    "getoetet": 534,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.stryker-frontend": {

@@ -416,47 +416,28 @@ def modul_priorities() -> Block:
     )
 
 
-def _kurzfassung_offene_laeufe(text: str, story: str) -> str:
-    """Erster offener Lauf + Anzahl statt der ganzen Liste.
-
-    Die Liste kam sonst in jede Session (bei US-602: 19 Läufe, ~5 KB), obwohl der nächste Lauf
-    schon im Zustandskopf steht; die Geschwister holt `implementing-scenario` selbst.
-    """
-    laeufe = [zeile.strip() for zeile in text.splitlines() if zeile.startswith("  ")]
-    erster = laeufe[0] if laeufe else text.strip()
-    return (f"Offene Läufe der Story {story}: {len(laeufe)} offene Läufe, als erster:\n  {erster}\n"
-            f"Vollständige Liste: `python3 -m prozesscode.next_run --open --story {story}`")
-
-
 def modul_next_run() -> Block:
-    """Offene Läufe DER AKTUELLEN STORY – und ohne solche der Stand der Phase.
+    """Der fällige Lauf – derselbe wie `{{NEXT_RUN}}` im Zustandskopf –, sonst der Phasenstand.
 
-    Ohne `--story` zählt `next_run.py` auch Szenarien fremder Feature-Dateien mit; ungetaggte
-    Szenarien (z.B. in `interaction.feature`, Scope „nach MVP") gelten dort als eigener offener
-    Einzel-Lauf. Die Aufgabe behauptete dann einen Lauf, den die laufende Story nicht hat.
-
-    Ist die Story fertig, fragt das Modul `--phase-status`: Stories ohne Feature-Datei oder
-    eine abgeschlossene Phase sind der nächste Arbeitsauftrag. Ohne diese Frage schwieg die
-    Agenda genau beim Wechsel zur nächsten Story.
+    Fällig heißt: Phase erreicht und Vorgänger erledigt, über alle Feature-Dateien (`next_run
+    --due`). Die offenen Läufe der aktuellen Story taugen dafür nicht – sie enthalten Läufe
+    späterer Phasen und übersehen fällige Läufe in Querschnittsdateien; die Aufgabe nennte damit
+    einen anderen Lauf als der Zustandskopf. Ohne fälligen Lauf ist der Phasenstand (Stories ohne
+    Workshop, abgeschlossene Phase) der nächste Arbeitsauftrag.
     """
-    from prozesscode import next_run
-    memory = ROOT / "docs" / "AGENT_MEMORY.md"
-    story = next_run.extract_story(_lies(memory))
-    if story is not None:
-        text = _modulausgabe("next_run", "--open", "--story", story)
-        if not text.startswith("(keine"):
-            return Block(stub=f"Nächster Lauf ({story}): offen",
-                         inhalt=_kurzfassung_offene_laeufe(text, story)
-                                + "\n→ Skill `implementing-scenario` (ein Lauf pro Durchlauf).",
-                         beansprucht=True)
-    befund = _modulausgabe("next_run", "--phase-status", str(memory)).strip()
+    memory = str(ROOT / "docs" / "AGENT_MEMORY.md")
+    lauf = _modulausgabe("next_run", "--due", memory).strip()
+    if lauf:
+        return Block(stub="Nächster Lauf: fällig",
+                     inhalt=f"Nächster fälliger Lauf (wie im Zustandskopf):\n  {lauf}\n"
+                            "→ Skill `implementing-scenario` (ein Lauf pro Durchlauf).",
+                     beansprucht=True)
+    befund = _modulausgabe("next_run", "--phase-status", memory).strip()
     if befund:
         return Block(stub=f"Phasenstand: {befund}", inhalt=f"Phasenstand:\n{befund}",
                      beansprucht=True)
-    if story is None:
-        return Block(stub="Nächster Lauf: keine aktuelle Story")
-    return Block(stub=f"Nächster Lauf ({story}): alle implementiert",
-                 inhalt=f"Offene Läufe der Story {story}:\n{text}")
+    return Block(stub="Nächster Lauf: keiner fällig, kein Phasenbefund "
+                      "(`python3 -m prozesscode.next_run --open` zeigt, worauf offene Läufe warten)")
 
 
 # --- Reine Stub-Module -------------------------------------------------------

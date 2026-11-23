@@ -1,5 +1,6 @@
 """Tests für next_run.py – Lauf-Resolver + Mapping-Integritäts-Guard."""
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -602,6 +603,15 @@ def test_render_announces_the_finished_phase():
     assert "Phase MVP" in out  # was danach kommt, bleibt sichtbar
 
 
+def test_render_passes_excluded_tags_to_the_choice_of_the_due_run():
+    # Ohne Ausschluss wäre in Phase MVP der Story-Lauf `run-9` fällig (Story geht vor); der
+    # Ausschluss reicht über `due_run` bis in die Auswahl, also rückt der Querschnittslauf nach.
+    memory = MEMORY.replace("SKELETON", "MVP")
+    out = nr.render(memory, feature_texts=ALL_TEXTS, implemented={"Zutat anlegen", "Zutat löschen"},
+                    exclude_tags=frozenset({"@US-904-happy-path"}))
+    assert out.endswith("- `@CROSS-interaction-happy-path` „Der Undo-Toast lässt sich manuell schließen\"\n")
+
+
 def test_phase_status_is_silent_while_a_run_is_due():
     assert nr.phase_status(MEMORY, ALL_TEXTS, set(), STORY_TEXTS) is None
 
@@ -786,6 +796,43 @@ def test_cli_phase_status_prints_nothing_while_a_run_is_due(tmp_path, monkeypatc
     memory = _bestand(tmp_path, monkeypatch, STORY_TEXTS)
     monkeypatch.setattr(nr, "_gather_implemented", set)
     assert nr.main(["--phase-status", memory]) == 0
+    assert capsys.readouterr().out == ""
+
+
+# --due: der fällige Lauf wie in {{NEXT_RUN}}, ohne den Phasen-Befund – für die Agenda-Aufgabe.
+def test_cli_due_prints_the_due_run_of_the_story(tmp_path, monkeypatch, capsys):
+    memory = _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen"})
+    assert nr.main(["--due", memory]) == 0
+    assert capsys.readouterr().out == "`run-8` „Löschen\" (Full-Stack): „Zutat löschen\"\n"
+
+
+UNDO_TOAST_LAUF = "`@CROSS-interaction-happy-path` „Der Undo-Toast lässt sich manuell schließen\""
+
+
+def test_cli_due_skips_a_later_phase_of_the_story_for_a_due_run_of_another_file(
+        tmp_path, monkeypatch, capsys):
+    # Die Story hat nur noch einen MVP-Lauf offen; fällig ist der Querschnitts-Lauf der Phase.
+    memory = _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen", "Zutat löschen"})
+    assert nr.main(["--due", memory]) == 0
+    assert capsys.readouterr().out == UNDO_TOAST_LAUF + "\n"
+
+
+def test_cli_due_prefers_the_story_of_the_memory_over_an_earlier_phase(tmp_path, monkeypatch, capsys):
+    # In Phase MVP sind der MVP-Lauf der Story und der SKELETON-Querschnittslauf fällig: Die Story
+    # geht vor, sonst sortierte der Phasen-Rang den Querschnittslauf nach vorn.
+    memory = _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    Path(memory).write_text(MEMORY.replace("SKELETON", "MVP"), encoding="utf-8")
+    monkeypatch.setattr(nr, "_gather_implemented", lambda: {"Zutat anlegen", "Zutat löschen"})
+    assert nr.main(["--due", memory]) == 0
+    assert capsys.readouterr().out == "`run-9` „Bearbeiten\" (Full-Stack): „Zutat bearbeiten\"\n"
+
+
+def test_cli_due_prints_nothing_when_only_runs_of_a_later_phase_are_open(
+        tmp_path, monkeypatch, capsys):
+    memory = _bestand(tmp_path, monkeypatch, STORY_TEXTS)
+    assert nr.main(["--due", memory]) == 0
     assert capsys.readouterr().out == ""
 
 
