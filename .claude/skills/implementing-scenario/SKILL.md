@@ -169,6 +169,14 @@ Schreibe selbst die Playwright-Test(s) für **alle** Szenarien des Laufs (je Sze
 
 Diese Tests bleiben rot, bis alle inneren Loops abgeschlossen sind – das ist gewollt. Der Haupt-Thread ändert sie während der inneren Loops nicht.
 
+<a id="IMP-sofort-gruen"></a>**Ein Test ist sofort grün:** Das Verhalten hat ein früherer Lauf mitgebaut. Statt RED führt der
+Haupt-Thread je grünem Test die [Gegenprobe](../../../docs/kaizen/principles.md#KPI-kommunikation): das
+Verhalten im Produktionscode absichtlich brechen, den Test rot sehen, zurücknehmen. Für diese Tests
+entfallen Schicht-Subagent und `qa-check`; rote Tests desselben Laufs gehen den normalen Weg. Ändert der
+Lauf danach ausschließlich Tests, entfällt auch der [Review-Loop](#IMP-review-loop): Der Haupt-Thread
+prüft den Batch nach den Punkten des [Test-Reviews](#IMP-test-review) und nennt je Punkt ein Ergebnis.
+Die Abweichung „kein RED, Gegenprobe statt RED“ gehört in den Commit.
+
 <a id="IMP-innerer-loop"></a>
 ### Innerer Loop – Subagent pro Schicht (Delegation ist Pflicht)
 

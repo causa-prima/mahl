@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import { navEntry } from './pages/navigation'
+import { createRecipeViaApi } from './api/recipesApi'
+import { seedIngredientViaApi } from './api/ingredientsApi'
 
 // Querschnitt @CROSS-navigation (features/navigation.feature, ADR-S103-1): Jede Hauptseite ist über die
 // Navigationsleiste erreichbar. Die Leiste ist ein Landmark „Hauptnavigation“ (navEntry); der Eintrag der
@@ -50,6 +52,28 @@ test.describe('CROSS_Navigation: Navigationsleiste', () => {
 
     // Then: sehe ich die Zutaten-Seite
     await expectPageShown(page, 'Zutaten', 'Rezepte')
+  })
+
+  // Szenario: Von der Detailansicht eines Rezepts zur Rezept-Liste navigieren
+  test('CROSS_Navigation_RecipeToRecipes_ClickNavigationEntryAfterDirectLink_ShowsRecipeList', async ({ context, request }) => {
+    // Given: das Rezept "Pfannkuchen" existiert
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    const pancakesId = await createRecipeViaApi(request, { title: 'Pfannkuchen', ingredients: '250 g Mehl', instruction: 'Teig rühren.' })
+
+    // Given: ich habe den Direktlink des Rezepts "Pfannkuchen" in einem neuen Browserfenster geöffnet – eine neue
+    //   Seite ohne vorher geladene Anwendung; der Direktlink ist die Adresse /recipes/{id} (ADR-S135-5). Die
+    //   Detailansicht muss geladen sein, bevor geklickt wird, sonst prüfte der Test den Weg von einer halb
+    //   geladenen Seite.
+    const newWindow = await context.newPage()
+    await newWindow.goto(`/recipes/${pancakesId}`)
+    await expect(newWindow.getByRole('heading', { level: 1, name: 'Pfannkuchen' })).toBeVisible()
+
+    // When: ich in der Navigationsleiste auf "Rezepte" klicke
+    await navEntry(newWindow, 'Rezepte').click()
+
+    // Then: sehe ich die Rezept-Liste mit "Pfannkuchen"
+    await expectPageShown(newWindow, 'Rezepte', 'Zutaten')
+    await expect(newWindow.getByRole('link', { name: 'Pfannkuchen' })).toBeVisible()
   })
 })
 
