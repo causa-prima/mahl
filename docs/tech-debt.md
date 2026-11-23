@@ -311,7 +311,7 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 
 ## TD-S142-3 — Rezeptseiten: Listenzeilen ohne Klick-Hinweis, Zutatenliste der Detailansicht zu locker
 **Fällig:** Phase:MVP – im SKELETON ist die Gestaltung nachrangig (User)
-**Problem:** Client/src/pages/RecipesPage.tsx: Die Einträge der Rezept-Liste sind Links (ListItemButton), sehen am Handy aber wie reiner Text aus – kein Trenner, kein Pfeil, ohne Hover keine Klick-Andeutung. Client/src/pages/RecipeDetailPage.tsx: Die Zutatenliste hat rund 48 px Zeilenabstand bei 16-px-Text (Sichtprüfung bei 375 px); eine Liste mit 15 Zutaten läuft über mehrere Bildschirme, beim Kochen ist sie nicht auf einen Blick lesbar.
+**Problem:** Client/src/pages/RecipesPage.tsx und Client/src/pages/PlannedRecipesPage.tsx: Die Einträge der Rezept-Liste und der Vorgemerkt-Seite sind Links (ListItemButton), sehen am Handy aber wie reiner Text aus – kein Trenner, kein Pfeil, ohne Hover keine Klick-Andeutung. Auf der Vorgemerkt-Seite ist der Titel der einzige Inhalt der Zeile; anders als in der Rezept-Liste lässt dort kein Umschalter daneben die Zeile als bedienbar erkennen. Client/src/pages/RecipeDetailPage.tsx: Die Zutatenliste hat rund 48 px Zeilenabstand bei 16-px-Text (Sichtprüfung bei 375 px); eine Liste mit 15 Zutaten läuft über mehrere Bildschirme, beim Kochen ist sie nicht auf einen Blick lesbar.
 **Behebung:** Klick-Andeutung für Listenzeilen (z. B. Pfeil am Zeilenende und/oder Trenner) und eine dichtere Zutatenliste festlegen, beides als Eintrag in docs/guidelines/coding-guideline-ux.md#CGU-visuelle-baseline statt Einzelwerte per sx; bei 375 px im Browser prüfen.
 **Aufschubgrund:** User – im Review von US-602 run-4 entschieden: im SKELETON nebensächlich, ab MVP beheben
 

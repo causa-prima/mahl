@@ -1,5 +1,4 @@
 using mahl.Infrastructure;
-using mahl.Server.Dtos;
 using Microsoft.EntityFrameworkCore;
 
 namespace mahl.Server.Endpoints;
@@ -12,12 +11,14 @@ internal static class PlannedRecipesEndpoints
         // Stryker disable once Statement,String : Tag name has no routing or behavioral impact (ADR-S136-1)
         group.WithTags("PlannedRecipes");
 
-        // ADR-S153-1: GET listet die vorgemerkten Rezepte. Die Sortierung folgt mit der Vorgemerkt-Seite.
+        // ADR-S153-1: GET listet die vorgemerkten Rezepte.
+        // Sortierung und Projektion: RecipeListQuery.OrderedSummaries.
         group.MapGet(
             "",
             async (MahlDbContext db, CancellationToken ct) =>
                 Results.Ok(await db.PlannedRecipes
-                    .Join(db.Recipes, p => p.RecipeId, r => r.Id, (_, r) => new RecipeSummaryDto(r.Id, r.Title))
+                    .Join(db.Recipes, p => p.RecipeId, r => r.Id, (_, r) => r)
+                    .OrderedSummaries()
                     .ToListAsync(ct)));
 
         // ADR-S153-1: Vormerken setzt einen Zielzustand und ist idempotent – ein schon vorgemerktes Rezept

@@ -69,6 +69,41 @@ public class PlannedRecipesEndpointsTests(PostgresContainerFixture postgres) : E
             .Should().BeEquivalentTo([new PlannedRecipeDbType { RecipeId = pancake.Id }]);
     }
 
+    // Szenario: Die Vorgemerkt-Seite zeigt nur die vorgemerkten Rezepte, alphabetisch
+    [Fact]
+    public async Task US803_HappyPath_GetPlannedRecipes_SeveralPlanned_ReturnsOnlyPlannedAlphabetically()
+    {
+        // Given: vier Rezepte in dieser Anlage-Reihenfolge
+        var pancake = ARecipe("Pfannkuchen");
+        var spaghetti = ARecipe("Spaghetti Bolognese");
+        var lentils = ARecipe("Linsensalat");
+        var soup = ARecipe("Kartoffelsuppe");
+        // je ein Save, damit die Insert-Reihenfolge feststeht und ein unsortierter Endpoint sie sichtbar durchreicht
+        foreach (var recipe in new[] { pancake, spaghetti, lentils, soup })
+        {
+            Db.Recipes.Add(recipe);
+            await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        // And: Spaghetti, Kartoffelsuppe und Pfannkuchen in dieser Reihenfolge vorgemerkt
+        foreach (var recipe in new[] { spaghetti, soup, pancake })
+        {
+            var put = await Client.PutAsync($"/api/planned-recipes/{recipe.Id}", content: null, TestContext.Current.CancellationToken);
+            put.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        }
+
+        // When
+        var body = await Client.GetFromJsonAsync<RecipeSummaryResponse[]>("/api/planned-recipes", TestContext.Current.CancellationToken);
+
+        // Then
+        body.Should().BeEquivalentTo(
+            [
+                new RecipeSummaryResponse(Id: soup.Id, Title: "Kartoffelsuppe"),
+                new RecipeSummaryResponse(Id: pancake.Id, Title: "Pfannkuchen"),
+                new RecipeSummaryResponse(Id: spaghetti.Id, Title: "Spaghetti Bolognese"),
+            ],
+            o => o.WithStrictOrdering());
+    }
+
     private async Task<List<PlannedRecipeDbType>> ReadPlannedRecipesAsync() =>
         await Db.PlannedRecipes.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken);
 }

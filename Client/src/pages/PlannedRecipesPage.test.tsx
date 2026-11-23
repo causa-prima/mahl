@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { delay, http, HttpResponse } from 'msw'
@@ -54,6 +54,52 @@ describe('Vorgemerkt-Seite', () => {
     // Then: ich sehe die Rezept-Liste mit "Pfannkuchen"
     expect(await screen.findByRole('heading', { level: 1, name: 'Rezepte' })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: 'Pfannkuchen' })).toBeInTheDocument()
+  })
+
+  // Szenario: Die Vorgemerkt-Seite zeigt nur die vorgemerkten Rezepte, alphabetisch
+  it('US803_HappyPath_PlannedRecipesPage_SeveralPlanned_ShowsDeliveredOrderUnchanged', async () => {
+    // Given: der Server liefert die Vormerkungen. Die Alphabetik liefert der Server (ADR-S142-1); der Client zeigt
+    // die gelieferte Reihenfolge unverändert. Die Antwort ist hier bewusst nicht alphabetisch: Ein Sortieren im
+    // Client würde die Reihenfolge ändern.
+    server.use(http.get('/api/planned-recipes', () => HttpResponse.json([
+      { id: '3f2b8c1e-0000-4000-8000-000000000502', title: 'Spaghetti Bolognese' },
+      { id: '3f2b8c1e-0000-4000-8000-000000000503', title: 'Kartoffelsuppe' },
+      { id: '3f2b8c1e-0000-4000-8000-000000000501', title: 'Pfannkuchen' },
+    ])))
+
+    // When: ich zur Vorgemerkt-Seite navigiere
+    renderApp('/planned')
+
+    // Then: die Liste "Vorgemerkt" zeigt genau diese Rezepte in der gelieferten Reihenfolge
+    const list = await screen.findByRole('list', { name: 'Vorgemerkt' })
+    expect(within(list).getAllByRole('listitem').map((item) => item.textContent))
+      .toEqual(['Spaghetti Bolognese', 'Kartoffelsuppe', 'Pfannkuchen'])
+  })
+
+  // Szenario: Ein vorgemerktes Rezept von der Vorgemerkt-Seite aus öffnen
+  it('US803_HappyPath_PlannedRecipesPage_ClickTitle_ShowsDetailWithPlannedToggle', async () => {
+    // Given: "Pfannkuchen" (Zutat 250 g Mehl) und "Kartoffelsuppe" sind vorgemerkt; das Detail liefert der Server nach Kennung
+    const pancakes = { id: '3f2b8c1e-0000-4000-8000-000000000501', title: 'Pfannkuchen' }
+    const potatoSoup = { id: '3f2b8c1e-0000-4000-8000-000000000503', title: 'Kartoffelsuppe' }
+    const planned = [potatoSoup, pancakes]
+    server.use(
+      http.get('/api/planned-recipes', () => HttpResponse.json(planned)),
+      http.get('/api/recipes/:id', ({ params }) => {
+        const recipe = planned.find((r) => r.id === params.id)
+        return HttpResponse.json({ ...recipe, ingredients: [{ name: 'Mehl', quantity: 250, unit: 'g' }], steps: [{ instruction: 'Rühren.' }] })
+      }),
+    )
+    const router = renderApp('/planned')
+
+    // When: ich zur Vorgemerkt-Seite navigiere und auf "Pfannkuchen" klicke
+    fireEvent.click(await screen.findByRole('link', { name: 'Pfannkuchen' }))
+
+    // Then: ich sehe die Detailansicht von "Pfannkuchen" mit "250 g Mehl", und der Umschalter zeigt "Vorgemerkt"
+    expect(await screen.findByRole('heading', { level: 1, name: 'Pfannkuchen' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe(`/recipes/${pancakes.id}`)
+    const ingredients = within(await screen.findByRole('list', { name: 'Zutaten' }))
+    expect(ingredients.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['250 g Mehl'])
+    expect(await screen.findByRole('button', { name: 'Pfannkuchen vorgemerkt' })).toHaveTextContent('Vorgemerkt')
   })
 
   // ADR-S106-3

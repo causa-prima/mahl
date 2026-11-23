@@ -3,6 +3,7 @@ import Button from '@mui/material/Button'
 import Container from '@mui/material/Container'
 import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
+import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
@@ -26,8 +27,10 @@ export default function PlannedRecipesPage() {
       ) : (
         <List aria-labelledby="planned-heading" disablePadding>
           {planned.map((recipe) => (
-            <ListItem key={recipe.id} disableGutters>
-              <ListItemText primary={recipe.title} />
+            <ListItem key={recipe.id} disableGutters disablePadding>
+              <ListItemButton component={RouterLink} to={`/recipes/${recipe.id}`} disableGutters>
+                <ListItemText primary={recipe.title} />
+              </ListItemButton>
             </ListItem>
           ))}
         </List>

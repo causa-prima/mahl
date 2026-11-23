@@ -1,10 +1,11 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import { planRecipeViaApi } from './api/plannedRecipesApi'
-import { seedRecipesWithSaltViaApi } from './api/recipesApi'
+import { seedIngredientViaApi } from './api/ingredientsApi'
+import { createRecipeViaApi, seedRecipesWithSaltViaApi } from './api/recipesApi'
 import { exactly } from './exactText'
 import { navEntry } from './pages/navigation'
-import { plannedEntries } from './pages/plannedRecipesPage'
+import { plannedEntries, plannedRecipeLink } from './pages/plannedRecipesPage'
 import { planningToggle } from './pages/recipesPage'
 
 // „zeigt die Rezept-Liste bei "Pfannkuchen" "Vorgemerkt" und bei "Kartoffelsuppe" "Vormerken"“
@@ -37,6 +38,54 @@ test.describe('US803_HappyPath: Vorgemerkt-Seite', () => {
     await expect(page).toHaveURL(/\/recipes$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Rezepte' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Pfannkuchen' })).toBeVisible()
+  })
+
+  // Szenario: Die Vorgemerkt-Seite zeigt nur die vorgemerkten Rezepte, alphabetisch
+  test('US803_HappyPath_GetPlannedRecipes_SeveralPlanned_ShowsOnlyPlannedAlphabetically', async ({ page, request }) => {
+    // Given: die Rezepte "Pfannkuchen", "Spaghetti Bolognese", "Linsensalat" und "Kartoffelsuppe" existieren, in dieser
+    // Reihenfolge angelegt
+    const [pancakesId, spaghettiId, , potatoSoupId] = await seedRecipesWithSaltViaApi(
+      request, 'Pfannkuchen', 'Spaghetti Bolognese', 'Linsensalat', 'Kartoffelsuppe')
+
+    // And: die Rezepte "Spaghetti Bolognese", "Kartoffelsuppe" und "Pfannkuchen" sind in dieser Reihenfolge vorgemerkt
+    await planRecipeViaApi(request, spaghettiId)
+    await planRecipeViaApi(request, potatoSoupId)
+    await planRecipeViaApi(request, pancakesId)
+
+    // When: ich zur Vorgemerkt-Seite navigiere
+    await page.goto('/planned')
+
+    // Then: zeigt die Vorgemerkt-Seite genau die Rezepte "Kartoffelsuppe", "Pfannkuchen", "Spaghetti Bolognese" in
+    // dieser Reihenfolge – „genau“ schließt "Linsensalat" und den Leerzustand-Hinweis aus
+    await expect(plannedEntries(page))
+      .toHaveText([exactly('Kartoffelsuppe'), exactly('Pfannkuchen'), exactly('Spaghetti Bolognese')])
+    await expect(page.getByText('Noch keine Rezepte vorgemerkt.')).toBeHidden()
+  })
+
+  // Szenario: Ein vorgemerktes Rezept von der Vorgemerkt-Seite aus öffnen
+  test('US803_HappyPath_OpenPlannedRecipe_ClickTitle_ShowsDetailWithPlannedToggle', async ({ page, request }) => {
+    // Given: das Rezept "Pfannkuchen" mit der Zutat "250 g Mehl" ist vorgemerkt
+    await seedIngredientViaApi(request, 'Mehl', 'g')
+    const pancakesId = await createRecipeViaApi(request, { title: 'Pfannkuchen', ingredients: '250 g Mehl', instruction: 'Teig rühren.' })
+    await planRecipeViaApi(request, pancakesId)
+
+    // And: das Rezept "Kartoffelsuppe" ist vorgemerkt – es steht alphabetisch vor "Pfannkuchen", ein Klick auf den
+    // falschen Eintrag fiele also auf
+    const [potatoSoupId] = await seedRecipesWithSaltViaApi(request, 'Kartoffelsuppe')
+    await planRecipeViaApi(request, potatoSoupId)
+
+    // When: ich zur Vorgemerkt-Seite navigiere
+    await page.goto('/planned')
+
+    // And: ich auf "Pfannkuchen" klicke
+    await plannedRecipeLink(page, 'Pfannkuchen').click()
+
+    // Then: sehe ich die Detailansicht des Rezepts "Pfannkuchen" mit der Zutat "250 g Mehl" (genau diese Zutat)
+    await expect(page.getByRole('heading', { level: 1, name: 'Pfannkuchen' })).toBeVisible()
+    await expect(page.getByRole('list', { name: 'Zutaten' }).getByRole('listitem')).toHaveText(['250 g Mehl'])
+
+    // And: zeigt der Umschalter "Vorgemerkt"
+    await expect(planningToggle(page, 'Pfannkuchen', 'vorgemerkt')).toBeVisible()
   })
 })
 
