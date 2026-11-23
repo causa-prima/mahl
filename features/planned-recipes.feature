@@ -137,7 +137,7 @@ Feature: Rezepte vormerken
       | die Rezept-Liste                            | zeigt die Rezept-Liste bei "Pfannkuchen" "Vorgemerkt" und bei "Kartoffelsuppe" "Vormerken" |
       | die Detailansicht des Rezepts "Pfannkuchen" | zeigt der Umschalter "Vorgemerkt"                                                          |
 
-  # @run-4 · Umschalter·Aufheben · Full-Stack · Singleton
+  # @run-4 · Umschalter·Aufheben · Full-Stack
   @US-803-happy-path
   Scenario Outline: Eine Vormerkung per Umschalter aufheben
     Given die Rezepte "Kartoffelsuppe" und "Pfannkuchen" sind vorgemerkt
@@ -209,6 +209,22 @@ Feature: Rezepte vormerken
     When ich in der Navigationsleiste auf "Vorgemerkt" klicke
     And ich die Seite neu lade
     Then zeigt die Vorgemerkt-Seite genau das Rezept "Pfannkuchen"
+
+  # @run-4 · Umschalter·Aufheben · Full-Stack
+  # Die Anzeige ist veraltet: Zwischen Laden und Klick hat ein anderes Gerät die Vormerkung
+  # aufgehoben. Für den Nutzer ist das Ziel erreicht. (Eine Fehlermeldung für Umschalten gibt es im
+  # SKELETON nicht – geprüft wird, dass der Umschalter trotzdem umspringt.)
+  @US-803-edge-case
+  Scenario: Eine inzwischen anderswo aufgehobene Vormerkung aufheben
+    Given das Rezept "Pfannkuchen" ist vorgemerkt
+    And sonst ist kein Rezept vorgemerkt
+    And ich habe die Rezept-Liste geöffnet
+    And die Vormerkung von "Pfannkuchen" wird danach auf einem anderen Gerät aufgehoben
+    When ich bei "Pfannkuchen" auf "Vorgemerkt" klicke
+    Then zeigt die Rezept-Liste bei "Pfannkuchen" "Vormerken"
+    When ich in der Navigationsleiste auf "Vorgemerkt" klicke
+    And ich die Seite neu lade
+    Then sehe ich den Hinweis "Noch keine Rezepte vorgemerkt."
 
   # @run-5 · Entfernen·Rückgängig · Full-Stack
   @US-803-edge-case

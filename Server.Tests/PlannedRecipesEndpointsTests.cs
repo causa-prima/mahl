@@ -46,8 +46,6 @@ public class PlannedRecipesEndpointsTests(PostgresContainerFixture postgres) : E
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await ReadPlannedRecipesAsync())
             .Should().BeEquivalentTo([new PlannedRecipeDbType { RecipeId = pancake.Id }]);
-        var body = await Client.GetFromJsonAsync<RecipeSummaryResponse[]>("/api/planned-recipes", TestContext.Current.CancellationToken);
-        body.Should().BeEquivalentTo([new RecipeSummaryResponse(Id: pancake.Id, Title: "Pfannkuchen")]);
     }
 
     // Szenario: Ein inzwischen anderswo vorgemerktes Rezept vormerken
@@ -67,6 +65,46 @@ public class PlannedRecipesEndpointsTests(PostgresContainerFixture postgres) : E
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await ReadPlannedRecipesAsync())
             .Should().BeEquivalentTo([new PlannedRecipeDbType { RecipeId = pancake.Id }]);
+    }
+
+    // Szenario: Eine Vormerkung per Umschalter aufheben
+    // Beispiel: alle
+    [Fact]
+    public async Task US803_HappyPath_DeletePlannedRecipe_TwoPlanned_Returns204AndRemovesOnlyThatOne()
+    {
+        // Given: die Rezepte "Kartoffelsuppe" und "Pfannkuchen" sind vorgemerkt
+        var soup = ARecipe("Kartoffelsuppe");
+        var pancake = ARecipe("Pfannkuchen");
+        Db.Recipes.AddRange(soup, pancake);
+        Db.PlannedRecipes.AddRange(
+            new PlannedRecipeDbType { RecipeId = soup.Id },
+            new PlannedRecipeDbType { RecipeId = pancake.Id });
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // When
+        var response = await Client.DeleteAsync($"/api/planned-recipes/{pancake.Id}", TestContext.Current.CancellationToken);
+
+        // Then
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await ReadPlannedRecipesAsync())
+            .Should().BeEquivalentTo([new PlannedRecipeDbType { RecipeId = soup.Id }]);
+    }
+
+    // Szenario: Eine inzwischen anderswo aufgehobene Vormerkung aufheben
+    [Fact]
+    public async Task US803_EdgeCase_DeletePlannedRecipe_AlreadyUnplanned_Returns204AndNothingPlanned()
+    {
+        // Given: das Rezept "Pfannkuchen" existiert, seine Vormerkung ist (auf einem anderen Gerät) schon aufgehoben
+        var pancake = ARecipe("Pfannkuchen");
+        Db.Recipes.Add(pancake);
+        await Db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // When
+        var response = await Client.DeleteAsync($"/api/planned-recipes/{pancake.Id}", TestContext.Current.CancellationToken);
+
+        // Then
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await ReadPlannedRecipesAsync()).Should().BeEmpty();
     }
 
     // Szenario: Die Vorgemerkt-Seite zeigt nur die vorgemerkten Rezepte, alphabetisch

@@ -418,6 +418,8 @@ Entscheidung + Begründung: `docs/history/adr.md` → Sektion "HTTP-Caching & Op
 | PUT/PATCH/DELETE | `If-Match` stimmt nicht | `If-Match` ≠ aktuellem ETag | 412 |
 | PUT/PATCH/DELETE | `If-Match` stimmt | EF Core prüft `xmin` beim `SaveChanges` nochmals | – |
 
+**Ausnahme:** Ein Endpoint, der einen Zielzustand setzt, statt einen gelesenen Stand zu ändern, verlangt kein `If-Match` und prüft keinen ETag – ein veralteter Stand ist dort gerade der Fall, der gelingen soll (Vormerkungen, ADR-S153-1).
+
 xmin als Shadow-Property über `ConfigureXmin()` in `OnModelCreating` konfigurieren (`UseXminAsConcurrencyToken()` existiert in Npgsql EF 10 nicht, ADR-S106-1), bevor der erste GET-Endpoint für eine Entity gebaut wird.
 
 <a id="CGC-test-code"></a>

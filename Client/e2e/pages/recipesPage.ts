@@ -17,7 +17,9 @@ export function recipeListTitles(page: Readonly<Page>) {
 
 // Der Umschalter „Vormerken“ eines Rezepts in Rezept-Liste oder Detailansicht, im genannten Zustand: Sein Name
 // nennt Rezept und Zustand („Pfannkuchen vormerken“ / „Pfannkuchen vorgemerkt“, Kopf von planned-recipes.feature).
-export function planningToggle(page: Readonly<Page>, title: string, state: 'vormerken' | 'vorgemerkt') {
+export type ToggleState = 'vormerken' | 'vorgemerkt'
+
+export function planningToggle(page: Readonly<Page>, title: string, state: ToggleState) {
   return page.getByRole('button', { name: `${title} ${state}`, exact: true })
 }
 

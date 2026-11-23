@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { fetchPlannedRecipes, planRecipe } from '../services/plannedRecipesApi'
+import { fetchPlannedRecipes, planRecipe, unplanRecipe } from '../services/plannedRecipesApi'
 import { useResultMutation } from './useResultMutation'
 import { useResultQuery } from './useResultQuery'
 
@@ -13,4 +13,11 @@ export function usePlanRecipe() {
   const queryClient = useQueryClient()
   // Stryker disable next-line ObjectLiteral: Invalidierungs-Filter, ohne ihn lädt nur mehr neu (ADR-S153-2)
   return useResultMutation(planRecipe, () => { void queryClient.invalidateQueries({ queryKey: plannedRecipesKey }) })
+}
+
+// Ebenso nach dem Aufheben: die Query lädt neu, erst dann zeigt der Umschalter "Vormerken".
+export function useUnplanRecipe() {
+  const queryClient = useQueryClient()
+  // Stryker disable next-line ObjectLiteral: Invalidierungs-Filter, ohne ihn lädt nur mehr neu (ADR-S153-2)
+  return useResultMutation(unplanRecipe, () => { void queryClient.invalidateQueries({ queryKey: plannedRecipesKey }) })
 }

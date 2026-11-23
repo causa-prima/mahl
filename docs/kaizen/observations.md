@@ -269,7 +269,7 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Beim Frontend-Layer-Implementer (CROSS-navigation run-4, 2026-11-23) wurde der qa-check-Lauf mit Stryker trotz Bash-Parameter timeout: 600000 nach 180 s in den Hintergrund verschoben (Tool-Meldung „moved to the background after running for 180s“, ohne Pipe gestartet). Die Agent-Definition sieht für lange Läufe den Vordergrund mit timeout 600000 vor, damit das Ergebnis im selben Zug vorliegt. Der Subagent wartete daraufhin auf die Benachrichtigung; der Lauf kam durch, kostete aber eine Unterbrechung. Ob der Harness Befehle von Subagenten grundsätzlich nach 180 s verschiebt oder nur unter bestimmten Bedingungen, ist ungeprüft.
+- Beobachtung: Beim Frontend-Layer-Implementer (CROSS-navigation run-4, 2026-11-23) wurde der qa-check-Lauf mit Stryker trotz Bash-Parameter timeout: 600000 nach 180 s in den Hintergrund verschoben (Tool-Meldung „moved to the background after running for 180s“, ohne Pipe gestartet). Die Agent-Definition sieht für lange Läufe den Vordergrund mit timeout 600000 vor, damit das Ergebnis im selben Zug vorliegt. Der Subagent wartete daraufhin auf die Benachrichtigung; der Lauf kam durch, kostete aber eine Unterbrechung. Ob der Harness Befehle von Subagenten grundsätzlich nach 180 s verschiebt oder nur unter bestimmten Bedingungen, ist ungeprüft. Weitere Fälle US-803 run-4 (2026-11-23): bei drei Subagenten (zwei Frontend-, ein Backend-Layer-Implementer) wurde qa-check jeweils nach 180 s in den Hintergrund verschoben, je eine zusätzliche Warte-Unterbrechung. Mein eigener qa-check im Hauptthread lief im Vordergrund durch (rund 3–4 Minuten), ohne Verschiebung (geprüft: Tool-Ausgaben dieser Session).
 - Zusammen-erledigen: keiner
 - Aufschubgrund: Recherche – die Ursache verlangt einen eigenen Test des Harness-Verhaltens (Subagent, langer Befehl, verschiedene Timeouts)
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
@@ -279,7 +279,28 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Status: NEU
 - Impact: GERING    Häufigkeit: gelegentlich
 - Kategorie: TOOLING    Kontext: Hook/Script
-- Beobachtung: Beim Schreiben von Infrastructure/PlannedRecipeExtensions.cs (US-803 run-2) meldete der PostToolUse-Hook gegen Primitive Obsession eine Warnung für den Parameter `Guid recipeId` von `PlanRecipeAsync`. Der Bestand nimmt Kennungen am Rand durchgängig als `Guid` entgegen (Endpoints, Route-Constraint `:guid`); der Backend-Subagent wertete die Warnung deshalb als Fehlalarm und ging weiter. Ungeklärt ist, ob der Hook `Guid` als eingebauten Typ zählt und wie oft er an solchen Randstellen anschlägt.
+- Beobachtung: Beim Schreiben von Infrastructure/PlannedRecipeExtensions.cs (US-803 run-2) meldete der PostToolUse-Hook gegen Primitive Obsession eine Warnung für den Parameter `Guid recipeId` von `PlanRecipeAsync`. Der Bestand nimmt Kennungen am Rand durchgängig als `Guid` entgegen (Endpoints, Route-Constraint `:guid`); der Backend-Subagent wertete die Warnung deshalb als Fehlalarm und ging weiter. Ungeklärt ist, ob der Hook `Guid` als eingebauten Typ zählt und wie oft er an solchen Randstellen anschlägt. Weiterer Fall US-803 run-4: Der Hook warnte erneut beim Parameter `Guid recipeId` von `UnplanRecipeAsync` in Infrastructure/PlannedRecipeExtensions.cs (Signatur identisch zu PlanRecipeAsync); der Backend-Subagent führte es als Rauschen in seiner Prozessverbesserung auf.
 - Zusammen-erledigen: keiner
 - Aufschubgrund: Recherche – Hook-Regel lesen und Auslösungen im Bestand zählen, bevor sich Fehlalarm oder berechtigter Hinweis sagen lässt
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S153-3 – Parallele Fix-Subagenten fahren gleichzeitig Stryker – beide Läufe wegen Speicherknappheit beendet
+- Quelle: Orchestrator
+- Status: NEU
+- Impact: MITTEL    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: TDD
+- Beobachtung: US-803 run-4, Review-Runde 2 (2026-11-23): Ich habe einen Frontend- und einen Backend-Fix-Subagenten parallel gestartet, beide mit dem Auftrag, am Ende qa-check (samt Stryker) zu fahren. Beide Läufe wurden vom Harness wegen kritisch wenig Speicher beendet (Status killed, laut Subagenten-Berichten), ohne Hash. Seriell im Hauptthread nachgeholt liefen beide durch (Frontend 312/312, Backend 245/245). Schon in Runde 1 wurde ein Frontend-qa-check-Lauf eines Subagenten beendet, während parallel kein zweiter Stryker lief – die Ursache ist also nicht allein die Parallelität (ungeprüft). Der Skill implementing-scenario (IMP-review-loop) verbietet bei parallelen Schicht-Subagenten nur den E2E-Lauf, nicht qa-check/Stryker. Kosten: zwei verlorene Stryker-Läufe und je eine Warterunde.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von run-4 als OBS zu erfassen entschieden
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+- Bezug: OBS-S153-1
+
+## OBS-S153-4 – Schicht-Subagenten überspringen das Warten nach der PLANUNG
+- Quelle: Subagent + Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: AGENT    Kontext: TDD
+- Beobachtung: US-803 run-4 (2026-11-23): Beide Schicht-Subagenten legten PLANUNG und RED in einen Return zusammen, statt nach der PLANUNG auf die Antwort des Orchestrators zu warten, wie die Agent-Definition (backend-layer-implementer.md, Schritt PLANUNG) verlangt. Der Frontend-Subagent übersprang sie, „weil das Spec alles festlegt“. Der Backend-Subagent begründete es zweimal damit, dass SubagentHandback den Lauf beende und die Vorgabe deshalb nicht einhaltbar sei. Das widerspricht dem belegten Ablauf: Nach dem Return setzt SendMessage den Subagenten mit vollem Kontext fort, so lief in derselben Session das Test-Review mehrfach (geprüft: Skill implementing-scenario, Hinweis „Getestet ohne Agent-Teams“, und diese Session). Hier ohne Folgen, weil keine Rückfragen offen waren; bei offenen Entscheidungen entstünde RED auf ungeklärter Grundlage.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – in der Abschluss-Triage von run-4 als OBS zu erfassen entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

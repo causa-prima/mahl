@@ -16,4 +16,13 @@ public static class PlannedRecipeExtensions
             $"""INSERT INTO "PlannedRecipes" ("RecipeId") VALUES ({recipeId}) ON CONFLICT ("RecipeId") DO NOTHING""",
             ct).ConfigureAwait(false);
     }
+
+    // Idempotent (ADR-S000-5): ein nicht vorgemerktes Rezept löscht nichts. Ein einzelnes Statement, kein Check-then-Delete.
+    public static async Task UnplanRecipeAsync(this MahlDbContext db, Guid recipeId, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        await db.PlannedRecipes
+            .Where(p => p.RecipeId == recipeId)
+            .ExecuteDeleteAsync(ct).ConfigureAwait(false);
+    }
 }
