@@ -5,7 +5,7 @@ import { seedIngredientViaApi } from './api/ingredientsApi'
 import { createRecipeViaApi, seedRecipesWithSaltViaApi } from './api/recipesApi'
 import { exactly } from './exactText'
 import { navEntry } from './pages/navigation'
-import { plannedEntries, plannedRecipeLink } from './pages/plannedRecipesPage'
+import { noPlannedRecipesHint, plannedEntries, plannedRecipeLink, removeButton } from './pages/plannedRecipesPage'
 import { planningToggle, type ToggleState } from './pages/recipesPage'
 
 // „zeigt die Rezept-Liste bei "<Rezept>" "<Zustand>" und bei "<Rezept>" "<Zustand>"“
@@ -61,7 +61,7 @@ test.describe('US803_HappyPath: Vorgemerkt-Seite', () => {
 
     // Then: ich sehe den Hinweis "Noch keine Rezepte vorgemerkt." und den Link "Zur Rezept-Liste"
     await expect(page.getByRole('heading', { level: 1, name: 'Vorgemerkt' })).toBeVisible()
-    await expect(page.getByText('Noch keine Rezepte vorgemerkt.')).toBeVisible()
+    await expect(noPlannedRecipesHint(page)).toBeVisible()
     const toRecipeList = page.getByRole('link', { name: 'Zur Rezept-Liste' })
     await expect(toRecipeList).toBeVisible()
 
@@ -93,7 +93,7 @@ test.describe('US803_HappyPath: Vorgemerkt-Seite', () => {
     // dieser Reihenfolge – „genau“ schließt "Linsensalat" und den Leerzustand-Hinweis aus
     await expect(plannedEntries(page))
       .toHaveText([exactly('Kartoffelsuppe'), exactly('Pfannkuchen'), exactly('Spaghetti Bolognese')])
-    await expect(page.getByText('Noch keine Rezepte vorgemerkt.')).toBeHidden()
+    await expect(noPlannedRecipesHint(page)).toBeHidden()
   })
 
   // Szenario: Ein vorgemerktes Rezept von der Vorgemerkt-Seite aus öffnen
@@ -152,7 +152,7 @@ test.describe('US803_HappyPath: Vormerken', () => {
 
       // Then: zeigt die Vorgemerkt-Seite genau das Rezept "Pfannkuchen" – „genau“ schließt den Leerzustand-Hinweis aus
       await expect(plannedEntries(page)).toHaveText([exactly('Pfannkuchen')])
-      await expect(page.getByText('Noch keine Rezepte vorgemerkt.')).toBeHidden()
+      await expect(noPlannedRecipesHint(page)).toBeHidden()
 
       // When: ich in der Navigationsleiste auf "Rezepte" klicke
       await navEntry(page, 'Rezepte').click()
@@ -245,7 +245,7 @@ test.describe('US803_EdgeCase: Vormerken', () => {
 
     // Then: zeigt die Vorgemerkt-Seite genau das Rezept "Pfannkuchen" – „genau“ schließt den Leerzustand-Hinweis aus
     await expect(plannedEntries(page)).toHaveText([exactly('Pfannkuchen')])
-    await expect(page.getByText('Noch keine Rezepte vorgemerkt.')).toBeHidden()
+    await expect(noPlannedRecipesHint(page)).toBeHidden()
   })
 })
 
@@ -278,6 +278,117 @@ test.describe('US803_EdgeCase: Vormerkung aufheben', () => {
     await page.reload()
 
     // Then: sehe ich den Hinweis "Noch keine Rezepte vorgemerkt."
-    await expect(page.getByText('Noch keine Rezepte vorgemerkt.')).toBeVisible()
+    await expect(noPlannedRecipesHint(page)).toBeVisible()
+  })
+})
+
+// „sehe ich den Toast "<Text>" mit "Rückgängig"-Aktion“
+async function expectUndoToast(page: Readonly<Page>, text: string) {
+  await expect(page.getByText(text, { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeVisible()
+}
+
+// run-5 „Entfernen·Rückgängig“. Was auf jeder Seite mit Rückgängig-Toast gleich ist (Toast-Lebensdauer, mehrere
+// Toasts, Sperre beim Entfernen), prüft die Querschnitts-Suite interaction.spec.ts über plannedRecipesDeleteWithUndo;
+// hier steht nur, was die Vorgemerkt-Seite betrifft: das Verb, die Wirkung auf die Rezept-Liste und die
+// alphabetische Wiedereinordnung.
+// @US-803-happy-path
+test.describe('US803_HappyPath: Vormerkung entfernen', () => {
+  // Szenario: Eine Vormerkung auf der Vorgemerkt-Seite entfernen
+  test('US803_HappyPath_RemovePlannedRecipe_FromPlannedPage_ShowsRemovedEverywhere', async ({ page, request }) => {
+    // Given: die Rezepte "Kartoffelsuppe" und "Pfannkuchen" sind vorgemerkt
+    const [potatoSoupId, pancakesId] = await seedRecipesWithSaltViaApi(request, 'Kartoffelsuppe', 'Pfannkuchen')
+    await planRecipeViaApi(request, potatoSoupId)
+    await planRecipeViaApi(request, pancakesId)
+
+    // When: ich zur Vorgemerkt-Seite navigiere
+    await page.goto('/planned')
+
+    // And: ich bei "Pfannkuchen" auf "Entfernen" klicke
+    await removeButton(page, 'Pfannkuchen').click()
+
+    // Then: zeigt die Vorgemerkt-Seite genau das Rezept "Kartoffelsuppe"
+    await expect(plannedEntries(page)).toHaveText([exactly('Kartoffelsuppe')])
+
+    // And: sehe ich den Toast "Pfannkuchen entfernt" mit "Rückgängig"-Aktion
+    await expectUndoToast(page, 'Pfannkuchen entfernt')
+
+    // When: ich in der Navigationsleiste auf "Rezepte" klicke
+    await navEntry(page, 'Rezepte').click()
+
+    // Then: zeigt die Rezept-Liste bei "Pfannkuchen" "Vormerken" und bei "Kartoffelsuppe" "Vorgemerkt"
+    await expectRecipeListToggles(page, onlyPotatoSoupPlanned)
+
+    // When: ich in der Navigationsleiste auf "Vorgemerkt" klicke
+    await navEntry(page, 'Vorgemerkt').click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Vorgemerkt' })).toBeVisible()
+
+    // And: ich die Seite neu lade
+    await page.reload()
+
+    // Then: zeigt die Vorgemerkt-Seite genau das Rezept "Kartoffelsuppe"
+    await expect(plannedEntries(page)).toHaveText([exactly('Kartoffelsuppe')])
+  })
+
+  // Szenario: Das Entfernen einer Vormerkung rückgängig machen
+  test('US803_HappyPath_UndoRemovePlannedRecipe_ViaToast_ReturnsInAlphabeticalOrder', async ({ page, request }) => {
+    // Given: die Rezepte "Kartoffelsuppe" und "Pfannkuchen" sind vorgemerkt
+    const [potatoSoupId, pancakesId] = await seedRecipesWithSaltViaApi(request, 'Kartoffelsuppe', 'Pfannkuchen')
+    await planRecipeViaApi(request, potatoSoupId)
+    await planRecipeViaApi(request, pancakesId)
+
+    // When: ich zur Vorgemerkt-Seite navigiere
+    await page.goto('/planned')
+
+    // And: ich bei "Kartoffelsuppe" auf "Entfernen" klicke
+    await removeButton(page, 'Kartoffelsuppe').click()
+
+    // And: ich im Toast auf "Rückgängig" klicke
+    await page.getByRole('button', { name: 'Rückgängig' }).click()
+
+    // Then: zeigt die Vorgemerkt-Seite genau die Rezepte "Kartoffelsuppe", "Pfannkuchen" in dieser Reihenfolge –
+    //   das zurückgeholte Rezept steht wieder vorn, nicht angehängt
+    await expect(plannedEntries(page)).toHaveText([exactly('Kartoffelsuppe'), exactly('Pfannkuchen')])
+
+    // And: sehe ich den Toast "Kartoffelsuppe entfernt" nicht mehr
+    await expect(page.getByText('Kartoffelsuppe entfernt', { exact: true })).toBeHidden()
+
+    // When: ich die Seite neu lade
+    await page.reload()
+
+    // Then: zeigt die Vorgemerkt-Seite genau die Rezepte "Kartoffelsuppe", "Pfannkuchen" in dieser Reihenfolge
+    await expect(plannedEntries(page)).toHaveText([exactly('Kartoffelsuppe'), exactly('Pfannkuchen')])
+  })
+})
+
+// @US-803-edge-case
+test.describe('US803_EdgeCase: Vormerkung entfernen', () => {
+  // Szenario: Die letzte Vormerkung entfernen und zurückholen
+  test('US803_EdgeCase_RemoveLastPlannedRecipe_UndoViaToast_ListReplacesHint', async ({ page, request }) => {
+    // Given: das Rezept "Pfannkuchen" ist vorgemerkt, und sonst ist kein Rezept vorgemerkt (DB-Reset der Auto-Fixture)
+    const [pancakesId] = await seedRecipesWithSaltViaApi(request, 'Pfannkuchen')
+    await planRecipeViaApi(request, pancakesId)
+
+    // When: ich zur Vorgemerkt-Seite navigiere
+    await page.goto('/planned')
+
+    // And: ich bei "Pfannkuchen" auf "Entfernen" klicke
+    await removeButton(page, 'Pfannkuchen').click()
+
+    // Then: sehe ich den Hinweis "Noch keine Rezepte vorgemerkt." und den Link "Zur Rezept-Liste"
+    await expect(noPlannedRecipesHint(page)).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Zur Rezept-Liste' })).toBeVisible()
+
+    // And: sehe ich den Toast "Pfannkuchen entfernt" mit "Rückgängig"-Aktion
+    await expectUndoToast(page, 'Pfannkuchen entfernt')
+
+    // When: ich im Toast auf "Rückgängig" klicke
+    await page.getByRole('button', { name: 'Rückgängig' }).click()
+
+    // Then: zeigt die Vorgemerkt-Seite genau das Rezept "Pfannkuchen"
+    await expect(plannedEntries(page)).toHaveText([exactly('Pfannkuchen')])
+
+    // And: sehe ich den Hinweis "Noch keine Rezepte vorgemerkt." nicht mehr
+    await expect(noPlannedRecipesHint(page)).toBeHidden()
   })
 })

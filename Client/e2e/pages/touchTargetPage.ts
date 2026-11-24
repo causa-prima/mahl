@@ -1,7 +1,7 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 
 // Fähigkeit „Bedienbarkeit per Finger" (@NFR-accessibility-touch) für `accessibility.spec.ts`
-// (ADR-S112-5, Ebene Geltungsbereich). Anders als Anlege-Dialog und Undo-Toast (listPage.ts) hat jede
+// (ADR-S112-5, Ebene Geltungsbereich). Anders als Anlege-Dialog und Undo-Toast (interactionPage.ts) hat jede
 // Seite Bedienelemente – die Fähigkeit liefert deshalb jede Seite, auch eine ohne Listen-Verhalten.
 // Die Seite kennt ihre Zustände; die Suite misst in jedem davon alle sichtbaren Bedienelemente.
 

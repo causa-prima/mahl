@@ -38,7 +38,7 @@ const salz = { id: '7', name: 'Salz', baseUnit: 'g' } as const
 // Test (ingredientsApi.test.ts); hier ist der ETag nur Durchreiche-Wert.
 const mehl = { id: '8', name: 'Mehl', baseUnit: 'g', etag: '"0000a1b2"' } as const
 
-// run-8-Nachtrag: zweite Zutat für die Undo-Toast-Verlässlichkeits-Szenarien (zwei
+// CROSS-interaction run-1: zweite Zutat für die Undo-Toast-Verlässlichkeits-Szenarien (zwei
 // Löschvorgänge nacheinander). Gleiche ETag-Semantik wie "mehl" – nur als Durchreiche-Wert.
 const zucker = { id: '9', name: 'Zucker', baseUnit: 'g', etag: '"0000c3d4"' } as const
 
@@ -345,7 +345,7 @@ describe('IngredientsPage – Zutat anlegen', () => {
   })
 
   // Szenario: Speichern-Button ist während des Speicherns deaktiviert
-  it('US904_HappyPath_SaveInFlight_SaveButtonIsDisabled', async () => {
+  it('CROSS_Interaction_Pending_SaveInFlight_SaveButtonIsDisabled', async () => {
     // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper) – so ist das
     //   Pending-Fenster deterministisch beobachtbar (kein Timer-Race).
     // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
@@ -365,7 +365,7 @@ describe('IngredientsPage – Zutat anlegen', () => {
   })
 
   // Szenario: Abbrechen ist während des Speicherns deaktiviert
-  it('US904_HappyPath_SaveInFlight_CancelButtonIsDisabled', async () => {
+  it('CROSS_Interaction_Pending_SaveInFlight_CancelButtonIsDisabled', async () => {
     // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper)
     // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
     const { resolvePost } = await renderWithPendingSave()
@@ -383,7 +383,7 @@ describe('IngredientsPage – Zutat anlegen', () => {
   })
 
   // Szenario: Der Dialog lässt sich während des Speicherns nicht per Escape schließen
-  it('US904_HappyPath_SaveInFlight_EscapeDoesNotCloseDialog', async () => {
+  it('CROSS_Interaction_Pending_SaveInFlight_EscapeDoesNotCloseDialog', async () => {
     // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper)
     // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
     const { resolvePost } = await renderWithPendingSave()
@@ -414,7 +414,7 @@ describe('IngredientsPage – Zutat anlegen', () => {
   })
 
   // Szenario: Der Dialog lässt sich während des Speicherns nicht per Backdrop-Klick schließen
-  it('US904_HappyPath_SaveInFlight_BackdropClickDoesNotCloseDialog', async () => {
+  it('CROSS_Interaction_Pending_SaveInFlight_BackdropClickDoesNotCloseDialog', async () => {
     // Given: der POST bleibt hängen, bis der Test ihn explizit auflöst (Helper)
     // When: Dialog öffnen, gültige Zutat eingeben, "Speichern" klicken (Helper)
     const { resolvePost } = await renderWithPendingSave()
@@ -654,7 +654,7 @@ describe('IngredientsPage – Reopen nach fehlgeschlagenem Speichern', () => {
   })
 })
 
-// @US-904-happy-path: run-8 „Löschen·Success". Löschen aus der Liste (DELETE mit dem per-Zeile-
+// @CROSS-interaction-undo: run-1 „Löschen·Undo-Toast". Löschen aus der Liste (DELETE mit dem per-Zeile-
 // xmin-ETag als If-Match, ADR-S108-1) + Undo via Toast-„Rückgängig" (Restore ohne If-Match,
 // ADR-S108-2). GET-Handler schaltet zwischen [mehl] (aktiv) und [] (gelöscht) um, gesteuert durch
 // den DELETE/Restore-Aufruf – so ist die invalidate-getriebene Listen-Umschaltung echt beobachtbar.
@@ -685,7 +685,7 @@ function useDeleteRestoreMehlHandlers(): { restoreRequestBody: { current: unknow
   return { restoreRequestBody }
 }
 
-// run-8-Nachtrag „Undo-Toast-Verlässlichkeit": Mehl UND Zucker aktiv, unabhängig voneinander
+// CROSS-interaction run-1 „Undo-Toast-Verlässlichkeit": Mehl UND Zucker aktiv, unabhängig voneinander
 // lösch-/wiederherstellbar (zwei Löschvorgänge nacheinander treiben die Szenarien dieses
 // Blocks). Gleiches Umschalt-Prinzip wie useDeleteRestoreMehlHandlers, nur über eine Menge
 // gelöschter ids statt eines einzelnen Flags.
@@ -730,7 +730,8 @@ async function renderWithDeletableMehl(): Promise<HTMLElement> {
 }
 
 describe('IngredientsPage – Zutat löschen', () => {
-  it('US904_HappyPath_DeleteIngredient_FromList_ListEmptyAndUndoToastShown', async () => {
+  // Szenario: Zutat löschen
+  it('CROSS_Interaction_Undo_DeleteEntry_FromList_ListEmptyAndUndoToastShown', async () => {
     // Given: nur die Zutat "Mehl" (g) existiert
     const list = await renderWithDeletableMehl()
     expect(within(list).getByText('Mehl')).toBeInTheDocument()
@@ -751,7 +752,8 @@ describe('IngredientsPage – Zutat löschen', () => {
     expect(screen.getByRole('button', { name: 'Rückgängig' })).toBeInTheDocument()
   })
 
-  it('US904_HappyPath_UndoDelete_ViaToast_IngredientReappearsInList', async () => {
+  // Szenario: Löschen rückgängig machen via Toast
+  it('CROSS_Interaction_Undo_UndoDelete_ViaToast_EntryReappearsInList', async () => {
     // Given: nur die Zutat "Mehl" (g) existiert
     const list = await renderWithDeletableMehl()
     expect(within(list).getByText('Mehl')).toBeInTheDocument()
@@ -774,13 +776,13 @@ describe('IngredientsPage – Zutat löschen', () => {
   })
 })
 
-// run-8-Nachtrag „Löschen·Success": Verlässlichkeit des Undo-Wegs – der Toast ist die EINZIGE
+// run-1-Nachtrag „Löschen·Undo-Toast" (CROSS-interaction): Verlässlichkeit des Undo-Wegs – der Toast ist die EINZIGE
 // Wiederherstellungsmöglichkeit im UI (UX-Guideline „Destructive Actions schützen", Soft-Delete), solange die
-// Reaktivierung beim Neuanlegen (run-11) fehlt. Drei @US-904-edge-case-Szenarien aus
-// features/ingredients.feature.
+// Reaktivierung beim Neuanlegen (run-11) fehlt. Drei @CROSS-interaction-undo-Szenarien aus
+// features/interaction.feature.
 describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
   // Szenario: Undo-Toast bleibt bei einem Klick daneben erhalten
-  it('US904_EdgeCase_UndoToast_ClickBesideToast_ToastRemainsVisible', async () => {
+  it('CROSS_Interaction_Undo_ClickBesideToast_ToastRemainsVisible', async () => {
     // UX-Guideline „Destructive Actions schützen" ("Destructive Actions schützen"): der Undo-Weg für eine
     //   destruktive Aktion muss die volle autoHideDuration erreichbar bleiben. Ein Klick
     //   irgendwo auf der Seite (clickaway) ist keine bewusste Abbruch-Entscheidung und darf
@@ -820,7 +822,7 @@ describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
   })
 
   // Szenario: Zweites Löschen gibt dem neuen Toast die volle Rückgängig-Zeit
-  it('US904_EdgeCase_SecondDelete_RestartsUndoWindow', async () => {
+  it('CROSS_Interaction_Undo_SecondDelete_RestartsUndoWindow', async () => {
     // Given: die Zutaten "Mehl" und "Zucker" existieren
     useDeleteRestoreMehlAndZuckerHandlers()
     renderWithProviders(<IngredientsPage />)
@@ -864,7 +866,7 @@ describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
   })
 
   // Szenario: Nur der zuletzt gelöschten Zutat lässt sich das Löschen rückgängig machen
-  it('US904_EdgeCase_TwoDeletes_UndoRestoresOnlyTheLatest', async () => {
+  it('CROSS_Interaction_Undo_TwoDeletes_UndoRestoresOnlyTheLatest', async () => {
     // ADR-S108-3: der Undo-Zustand hält genau einen Löschvorgang vor (den zuletzt
     //   ausgeführten) – kein Snackbar-Stacking. Pinnt diese bewusste Einschränkung.
     // Given: die Zutaten "Mehl" und "Zucker" existieren
@@ -886,7 +888,7 @@ describe('IngredientsPage – Undo-Toast-Verlässlichkeit', () => {
   })
 })
 
-// run-9 „Löschen·Pending": das DELETE bleibt hängen, bis der Test es per `resolveDelete`
+// CROSS-interaction run-3 „Löschen·Pending": das DELETE bleibt hängen, bis der Test es per `resolveDelete`
 // auflöst – analog zu `renderWithPendingSave` (deterministisches Pending-Fenster ohne
 // Timer-Race). GET ist zustandsbehaftet (analog `useDeleteRestoreMehlHandlers`), damit der
 // Refetch nach dem aufgelösten DELETE echt auf die leere Liste umschaltet – sonst könnte das
@@ -912,7 +914,7 @@ async function renderWithPendingDelete(): Promise<{ resolveDelete: () => void }>
 
 describe('IngredientsPage – Löschen·Pending', () => {
   // Szenario: Löschen-Button ist während des Löschens deaktiviert
-  it('US904_HappyPath_DeleteInFlight_DeleteButtonIsDisabled', async () => {
+  it('CROSS_Interaction_Pending_DeleteInFlight_DeleteButtonIsDisabled', async () => {
     // Given: nur die Zutat "Mehl" (g) existiert; der DELETE bleibt hängen, bis der Test
     //   ihn auflöst (Helper)
     const { resolveDelete } = await renderWithPendingDelete()
@@ -940,7 +942,7 @@ describe('IngredientsPage – Löschen·Pending', () => {
 
   // Szenario: Löschen-Button ist während des Löschens deaktiviert
   // (nur WÄHREND – kehrt die Zeile per Undo zurück, ist ihr Löschen-Button wieder bedienbar)
-  it('US904_HappyPath_UndoDelete_RestoredRow_DeleteButtonIsEnabledAgain', async () => {
+  it('CROSS_Interaction_Pending_UndoDelete_RestoredRow_DeleteButtonIsEnabledAgain', async () => {
     // Given: nur die Zutat "Mehl" (g) existiert
     const list = await renderWithDeletableMehl()
     expect(within(list).getByText('Mehl')).toBeInTheDocument()

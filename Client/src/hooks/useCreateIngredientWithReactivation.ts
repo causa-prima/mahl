@@ -41,10 +41,10 @@ type CreateIngredientWithReactivation = {
 }
 
 // run-11-Nachbesserung F6 (Refactor, keine Verhaltensänderung): ausgelagert aus IngredientsPage,
-// analog zu useDeleteIngredientWithUndo. Bündelt Anlegen inkl. transparenter Reaktivierung
+// analog zu useDeleteWithUndo. Bündelt Anlegen inkl. transparenter Reaktivierung
 // (ADR-S004-1/S051-4) und Reaktivierungs-Konflikt-Hinweis (ADR-S111-1/-3) samt der davon
 // abgeleiteten Feldfehler (ADR-S090-1). Ein einziger `onSuccess`-Callback (statt mehrerer
-// Einzel-Callbacks) hält die Schnittstelle deckungsgleich mit useDeleteIngredientWithUndo(onChanged)
+// Einzel-Callbacks) hält die Schnittstelle deckungsgleich mit useDeleteWithUndo({ onChanged })
 // – alle Seiteneffekte der Page (Dialog schließen, Liste neu laden, Undo-Toast verwerfen) feuern
 // ohnehin gemeinsam im Erfolgsfall; der Hook selbst kennt nur "danach passiert etwas", nicht was.
 export function useCreateIngredientWithReactivation(onSuccess: () => void): CreateIngredientWithReactivation {

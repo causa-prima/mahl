@@ -192,6 +192,119 @@ def test_test_struktur_prueft_jeden_test_je_datei(tmp_path, monkeypatch):
     ]
 
 
+_GEGLIEDERTER_TEST = "  it('{name}', () => {{\n    // Given: a\n    // When: b\n    expect(1).toBe(1)\n    // Then: c\n  }})\n"
+
+
+def test_test_struktur_umbenannter_test_mit_gliederung_im_rumpf_ist_kein_befund(tmp_path, monkeypatch):
+    # // Given ein gegliederter Test im Bestand, von dem nur die it(-Zeile geändert wird – im Diff steht der
+    #    Rumpf dann als Kontext, nicht als „+“
+    _repo_mit_basis(tmp_path, monkeypatch, {"Client/src/a.test.ts": _GEGLIEDERTER_TEST.format(name="alt")})
+    _write(tmp_path, "Client/src/a.test.ts", _GEGLIEDERTER_TEST.format(name="neu"))
+    # // When / // Then zählt die Gliederung im unveränderten Rumpf
+    assert qa.check_test_structure("frontend") == []
+
+
+def test_test_struktur_neuer_test_erbt_keine_gliederung_vom_kontext_dahinter(tmp_path, monkeypatch):
+    # // Given ein neuer Test ohne Gliederung direkt vor einem gegliederten Bestands-Test – dessen Kommentare
+    #    stehen als Kontext im Diff, gehören aber nicht zum neuen Test
+    _repo_mit_basis(tmp_path, monkeypatch, {"Client/src/a.test.ts": _GEGLIEDERTER_TEST.format(name="alt")})
+    _write(tmp_path, "Client/src/a.test.ts", "  it('neu', () => {\n    expect(2).toBe(2)\n  })\n"
+           + _GEGLIEDERTER_TEST.format(name="alt"))
+    # // When / // Then bleibt der neue Test ein Befund
+    assert qa.check_test_structure("frontend") == [
+        ("Client/src/a.test.ts", "it('neu', () => {  →  fehlt: // Given, // When, // Then"),
+    ]
+
+
+def test_test_struktur_neuer_test_erbt_keine_gliederung_von_folgender_hilfsfunktion(tmp_path, monkeypatch):
+    # // Given ein neuer Test ohne Gliederung vor einer Hilfsfunktion, die Given/When/Then-Kommentare trägt
+    hilfe = "function hilfe() {\n  // Given: x\n  // When: y\n  // Then: z\n}\n"
+    _repo_mit_basis(tmp_path, monkeypatch, {"Client/src/a.test.ts": hilfe})
+    _write(tmp_path, "Client/src/a.test.ts", "it('neu', () => {\n  expect(2).toBe(2)\n})\n" + hilfe)
+    # // When / // Then endet der Test an seiner schließenden Klammer – die Hilfsfunktion zählt nicht
+    assert qa.check_test_structure("frontend") == [
+        ("Client/src/a.test.ts", "it('neu', () => {  →  fehlt: // Given, // When, // Then"),
+    ]
+
+
+def test_test_struktur_entfernte_gliederung_zaehlt_nicht(tmp_path, monkeypatch):
+    # // Given ein gegliederter Bestands-Test, dem Umbenennung und Gliederung zugleich genommen werden – die
+    #    Kommentare stehen danach nur noch als „-“-Zeilen im Diff
+    _repo_mit_basis(tmp_path, monkeypatch, {"Client/src/a.test.ts": _GEGLIEDERTER_TEST.format(name="alt")})
+    _write(tmp_path, "Client/src/a.test.ts", "  it('neu', () => {\n    expect(1).toBe(1)\n  })\n")
+    # // When / // Then zählt nur der neue Stand
+    assert qa.check_test_structure("frontend") == [
+        ("Client/src/a.test.ts", "it('neu', () => {  →  fehlt: // Given, // When, // Then"),
+    ]
+
+
+def test_test_struktur_langer_umbenannter_test_mit_gliederung_am_ende_ist_kein_befund(tmp_path, monkeypatch):
+    # // Given ein gegliederter Test, dessen // Then 100 Zeilen unter der umbenannten Kopfzeile steht – weit
+    #    außerhalb jedes Diff-Kontexts
+    fuell = "".join(f"    expect({i}).toBe({i})\n" for i in range(100))
+    lang = "  it('{name}', () => {{\n    // Given: a\n    // When: b\n" + fuell + "    // Then: c\n  }})\n"
+    _repo_mit_basis(tmp_path, monkeypatch, {"Client/src/a.test.ts": lang.format(name="alt")})
+    _write(tmp_path, "Client/src/a.test.ts", lang.format(name="neu"))
+    # // When / // Then wird der ganze Rumpf gelesen, nicht nur der Kontext um die Änderung
+    assert qa.check_test_structure("frontend") == []
+
+
+def test_test_struktur_ungepaarte_klammer_endet_spaetestens_am_naechsten_test(tmp_path, monkeypatch):
+    # // Given ein neuer ungegliederter Test mit einer ungepaarten „{“ in einem String – die textuelle
+    #    Klammerzählung sieht sein Ende nicht; dahinter ein gegliederter Bestands-Test
+    _repo_mit_basis(tmp_path, monkeypatch, {"Client/src/a.test.ts": _GEGLIEDERTER_TEST.format(name="alt")})
+    _write(tmp_path, "Client/src/a.test.ts", "  it('neu', () => {\n    expect('{').toBe('{')\n  })\n"
+           + _GEGLIEDERTER_TEST.format(name="alt"))
+    # // When / // Then leiht er sich die Gliederung des nächsten Tests trotzdem nicht
+    assert qa.check_test_structure("frontend") == [
+        ("Client/src/a.test.ts", "it('neu', () => {  →  fehlt: // Given, // When, // Then"),
+    ]
+
+
+def test_test_struktur_langer_test_endet_an_seiner_klammer(tmp_path, monkeypatch):
+    # // Given ein langer ungegliederter Test, dessen Kopf umbenannt wird, und weit dahinter (jenseits des
+    #    40-Zeilen-Kontexts) ein zweiter, gegliederter Test, der sich ebenfalls ändert
+    fuell = "".join(f"    expect({i}).toBe({i})\n" for i in range(100))
+    lang = "  it('{name}', () => {{\n" + fuell + "  }})\n"
+    zwischen = "".join(f"const z{i} = {i}\n" for i in range(60))
+    basis = lang.format(name="alt") + zwischen + _GEGLIEDERTER_TEST.format(name="zweit")
+    _repo_mit_basis(tmp_path, monkeypatch, {"Client/src/a.test.ts": basis})
+    _write(tmp_path, "Client/src/a.test.ts",
+           lang.format(name="neu") + zwischen
+           + _GEGLIEDERTER_TEST.format(name="zweit").replace("// Then: c", "// Then: d"))
+    # // When / // Then leiht sich der erste Test die Gliederung des zweiten nicht
+    assert qa.check_test_structure("frontend") == [
+        ("Client/src/a.test.ts", "it('neu', () => {  →  fehlt: // Given, // When, // Then"),
+    ]
+
+
+def _fact(name: str, rumpf: str) -> str:
+    return f"    [Fact]\n    public void {name}()\n    {{\n{rumpf}    }}\n"
+
+
+_GEGLIEDERTER_RUMPF = "        // Given: a\n        // When: b\n        // Then: c\n"
+
+
+def test_test_struktur_backend_rumpf_beginnt_nach_attribut_und_signatur(tmp_path, monkeypatch):
+    # // Given eine bestehende gegliederte Methode, die ein [Fact] erst jetzt bekommt – das Attribut ist die
+    #    einzige „+“-Zeile, die Klammer öffnet erst zwei Zeilen tiefer
+    methode = "    public void M()\n    {\n" + _GEGLIEDERTER_RUMPF + "    }\n"
+    _repo_mit_basis(tmp_path, monkeypatch, {"Server.Tests/T.cs": "public class T\n{\n" + methode + "}\n"})
+    _write(tmp_path, "Server.Tests/T.cs", "public class T\n{\n    [Fact]\n" + methode + "}\n")
+    # // When / // Then erreicht die Prüfung die Kommentare im Methodenrumpf
+    assert qa.check_test_structure("backend") == []
+
+
+def test_test_struktur_backend_rumpf_endet_an_der_methodenklammer(tmp_path, monkeypatch):
+    # // Given ein neuer ungegliederter [Fact] vor einer gegliederten Bestands-Methode
+    bestand = _fact("Alt", _GEGLIEDERTER_RUMPF)
+    _repo_mit_basis(tmp_path, monkeypatch, {"Server.Tests/T.cs": "public class T\n{\n" + bestand + "}\n"})
+    _write(tmp_path, "Server.Tests/T.cs",
+           "public class T\n{\n" + _fact("Neu", "        var x = 1;\n") + bestand + "}\n")
+    # // When / // Then zählt die Gliederung der nächsten Methode nicht für ihn
+    assert qa.check_test_structure("backend") == [("Server.Tests/T.cs", "[Fact]  →  fehlt: // Given, // When, // Then")]
+
+
 def test_struktur_fast_fail_nennt_jeden_befund_auf_eigener_zeile(tmp_path, monkeypatch):
     # // Given zwei neue Tests ohne Struktur
     _repo_mit_basis(tmp_path, monkeypatch, {"Client/src/app.ts": "x\n"})

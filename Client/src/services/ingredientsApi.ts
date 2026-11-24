@@ -63,7 +63,7 @@ export function deleteIngredient(id: IngredientId, etag: ETag): ResultAsync<Resp
 }
 
 // ADR-S111-1 (überholt ADR-S108-2): Restore verlangt ab run-11 einen Pflicht-Body { name,
-// baseUnit } – auch der Undo-Aufruf (run-8/9, useDeleteIngredientWithUndo) schickt ihn jetzt
+// baseUnit } – auch der Undo-Aufruf (useDeleteWithUndo) schickt ihn jetzt
 // mit, fachlich ein No-op, aber ein einziger Codepfad im Endpoint. Erfolgs-Status 200 (statt 204).
 export function restoreIngredient(id: IngredientId, name: IngredientName, baseUnit: Unit): ResultAsync<RestoreOutcome, ApiError> {
   return ResultAsync.fromPromise(

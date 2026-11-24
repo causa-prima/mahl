@@ -6,6 +6,10 @@ import tseslint from 'typescript-eslint'
 import functional from 'eslint-plugin-functional'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
+// Meldung des Snackbar-Import-Guards (Block unten) – eine Quelle für alle gesperrten Importformen.
+const SNACKBAR_GUARD_MESSAGE =
+  'Snackbar nur unter src/components/ importieren. Für „Rückgängig"-Toasts die geteilte Komponente src/components/UndoToast.tsx nutzen (ADR-S112-5).'
+
 export default defineConfig([
   globalIgnores(['dist', '.stryker-tmp']),
   {
@@ -167,6 +171,36 @@ export default defineConfig([
               importNames: ['useQuery', 'useMutation'],
               message: "useQuery/useMutation nicht direkt verwenden. Stattdessen useResultQuery/useResultMutation aus src/hooks/ nutzen. Siehe docs/guidelines/coding-guideline-typescript.md#CGT-react-query.",
             },
+          ],
+        },
+      ],
+    },
+  },
+
+  // --- Import-Guard Snackbar (ADR-S112-5, Schicht „Umgehungsschutz") ---
+  // Toasts leben in src/components/ (UndoToast u. a.): Auto-Hide-Neustart, Clickaway-Schutz und
+  // Kontrastfarbe sind dort einmal gelöst. Eine Seite, die selbst eine Snackbar baut, würde das
+  // Querschnittsverhalten daneben neu erfinden. Eigene Regel (base `no-restricted-imports`), damit
+  // sie sich nicht mit der React-Query-Regel oben um die Optionen eines Regelnamens streitet.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/components/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: '@mui/material/Snackbar', message: SNACKBAR_GUARD_MESSAGE },
+            { name: '@mui/material/SnackbarContent', message: SNACKBAR_GUARD_MESSAGE },
+            {
+              name: '@mui/material',
+              importNames: ['Snackbar', 'SnackbarCloseReason', 'SnackbarContent'],
+              message: SNACKBAR_GUARD_MESSAGE,
+            },
+          ],
+          // Tiefimporte unterhalb der Module (z. B. @mui/material/Snackbar/useSnackbar)
+          patterns: [
+            { group: ['@mui/material/Snackbar/*', '@mui/material/SnackbarContent/*'], message: SNACKBAR_GUARD_MESSAGE },
           ],
         },
       ],

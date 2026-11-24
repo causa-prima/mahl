@@ -1946,6 +1946,10 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 
 **Migrationsreihenfolge:** (1) Querschnitts-Szenarien identifizieren – erledigt S112. (2) Page-Object-Interface definieren. (3) Bestehende Tests in die parametrisierte Suite überführen. (4) Implementierung extrahieren. (5) Szenarien umziehen + umtaggen + Tests umbenennen. (6) Import-Guard setzen. **(2) und (3) sind vor der zweiten Seite machbar und werden vorgezogen** – sie strukturieren nur Testcode und erzeugen keine verfrühte Abstraktion im Produktionscode. (4) bis (6) gehören an die zweite Seite; (5) reist mit (4), damit Testnamen nur einmal angefasst werden.
 
+**Umsetzung (4)–(6) für den Rückgängig-Toast, mit der Vorgemerkt-Seite als zweiter Seite:** geteilter Hook `Client/src/hooks/useDeleteWithUndo.ts` (Wiederherstellen wartet auf ein noch laufendes Entfernen) und Komponente `Client/src/components/UndoToast.tsx`; Import-Guard in `Client/eslint.config.js` (Snackbar nur unter `src/components/`); die Lösch-/Rückgängig- und Pending-Szenarien stehen in `features/interaction.feature` (`@CROSS-interaction-undo`, `@CROSS-interaction-pending`), die Suite läuft über die Fähigkeits-Registry `Client/e2e/pages/interactionPages.ts`.
+
+**Testnamen für Querschnitts-Szenarien:** `CROSS_<Domain>_<Typ>_…` bzw. `NFR_<Domain>_<Typ>_…`, in E2E- und Backend-Tests gleich – festgelegt in [Traceability](../process/e2e-testing.md#E2E-traceability).
+
 **Verworfen:** *Szenario je Seite ohne geteilte Suite* – N-facher Aufwand, wächst mit jeder Seite und **entdeckt** Drift, statt ihn zu verhindern; genau das, was ADR-S103-1 für Navigation vermeiden wollte. *Konvention/Checkliste als alleinige Absicherung* – hängt daran, dass jemand liest und anwendet.
 
 **Quellenlage (in S112 geprüft, mit unterschiedlichem Ergebnis):**
@@ -1954,9 +1958,6 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 - *Page Object* – Definition **belegt** (martinfowler.com), die Verwendung als Parametrisierung für seitenübergreifende Testwiederverwendung jedoch **nicht**: Der Artikel behandelt das gegenteilige Anliegen. Diese Kombination ist eine Ableitung dieses Projekts, keine zitierbare Lehrmeinung.
 - *„Contract Test"* wurde als Bezeichnung **verworfen** – Fowlers `ContractTest` prüft Test-Doubles gegen einen echten externen Service und meint etwas anderes.
 - *Meszaros' „Abstract Test Case"* – **ungeprüft**, xunitpatterns.com ist nur über HTTP erreichbar.
-
-**Grenze / offen:** Für `@CROSS-...`-Szenarien fehlt eine Testnamens-Konvention – `docs/process/e2e-testing.md` (Traceability) kennt nur US-Tags und verlangt sie in `:146` sogar ausdrücklich. Das betrifft bereits die vorhandenen `interaction.feature`-Szenarien und wird mit Schritt (5) entschieden.
-
 ---
 
 ## Offline-Sync-Strategie (US-306)

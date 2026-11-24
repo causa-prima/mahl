@@ -262,7 +262,22 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
 - **Listeneinträge mit eigener Aktion** (Umschalter „Vormerken" der Rezept-Liste): Die Aktion steht neben dem
   `ListItemButton` im `ListItem` (`sx={{ gap: 1 }}`), nicht als `secondaryAction` – dessen reservierter Platz
   reicht nur für einen Icon-Button, ein Text-Button läge über dem Titel. Der Button behält seine Breite
-  (`flexShrink: 0`), ein langer Titel bricht um.
+  (`flexShrink: 0`), ein langer Titel bricht um. Ein **Icon-Button** darf dagegen als `secondaryAction`
+  einer Link-Zeile stehen (Vorgemerkt-Seite): MUI reserviert dafür rechts Platz, Titel und Button
+  überlappen nicht.
+- **Symbol für „Eintrag weg"** – entschieden nach dem, was mit dem Objekt passiert, nicht nach der Liste:
+  - **×** (`Close`): Der Eintrag verlässt die Liste, das Objekt bleibt bestehen – ein Bezug oder eine
+    Zugehörigkeit endet (Vormerkung auf der Vorgemerkt-Seite, Zutat im Rezept). Verb im Toast: „entfernt".
+  - **Papierkorb** (`Delete`): Das Objekt selbst verschwindet – es existiert nur hier oder wird aus dem
+    Bestand genommen (Zutat auf der Zutaten-Seite, Rezept-Schritt). Verb im Toast: „gelöscht".
+
+  Der Name für Screenreader nennt Objekt und Verb („Pfannkuchen entfernen", „Mehl löschen"). Grund: Ein
+  Papierkorb liest sich als Löschen; stünde er für „aus der Liste nehmen", fürchtete der Nutzer um das
+  Rezept. Das × ist ohne Beschriftung mehrdeutig (schließen, abbrechen) – am Ende einer Listenzeile, mit
+  Screenreader-Namen und einem Toast, der sofort „entfernt" samt „Rückgängig" zeigt, trägt es trotzdem.
+  Quellen (Designsysteme und Fachartikel, keine Studie): Soracom Design System „Delete or remove"
+  (Remove = umkehrbar, Delete = endgültig, Papierkorb nur für Delete); UX Magazine „UI copy: Remove vs.
+  Delete" (Papierkorb bei „Remove" wird als Löschen gelesen); NN/g „Cancel vs. Close" (Mehrdeutigkeit des ×).
 - **Seitentitel mit Aktion** (Rezept-Detailansicht): Titel und Aktion in einer `Stack direction="row" spacing={2}`
   mit `alignItems: 'center'`, `justifyContent: 'space-between'`, `minHeight` in Touch-Target-Höhe und `mb: 1`;
   der Titel selbst ohne `gutterBottom`. Sonst verschiebt der Titelabstand die Mitte, und die Seite springt, wenn

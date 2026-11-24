@@ -690,14 +690,13 @@ public class IngredientsEndpointsTests(PostgresContainerFixture postgres) : Endp
         body.Etag.Should().Be(response.Headers.ETag!.Tag);
     }
 
-    // @US-904-happy-path ("Löschen rückgängig machen via Toast"): pinnt das Backend-
-    // Verhalten hinter "Then sehe ich 'Mehl' in der Zutaten-Liste mit Einheit 'g'" – Restore setzt
-    // DeletedAt = null. Szenario-getrieben, daher US-Tag (keine Protokoll-/Infrastruktur-Mechanik nach ADR-S106-3 – das wäre
-    // nur reine Protokoll-/Infrastruktur-Mechanik ohne Domänen-Verhalten). ADR-S111-1 (überholt
-    // ADR-S108-2): Restore-Body ist ab run-11 Pflicht und Erfolgs-Status 200 statt 204 – der Undo-Aufruf
-    // schickt Name/Einheit der gelöschten Zeile unverändert mit (fachlich ein No-op, ein Codepfad).
+    // @CROSS-interaction-undo ("Löschen rückgängig machen via Toast", features/interaction.feature): pinnt
+    // das Backend-Verhalten hinter "Then sehe ich 'Mehl' in der Zutaten-Liste mit Einheit 'g'" – Restore setzt
+    // DeletedAt = null. Szenario-getrieben, daher CROSS-Präfix (keine Protokoll-/Infrastruktur-Mechanik
+    // nach ADR-S106-3). ADR-S111-1 (überholt ADR-S108-2): Restore-Body ist ab run-11 Pflicht und
+    // Erfolgs-Status 200 statt 204 – der Undo-Aufruf schickt Name/Einheit der gelöschten Zeile unverändert mit (fachlich ein No-op, ein Codepfad).
     [Fact]
-    public async Task US904_HappyPath_RestoreIngredient_SoftDeletedIngredient_Returns200AndClearsDeletedAt()
+    public async Task CROSS_Interaction_Undo_RestoreIngredient_SoftDeletedIngredient_Returns200AndClearsDeletedAt()
     {
         // Given: "Rosmarin" exists and was already deleted (first DELETE succeeds, 204)
         var (created, etag) = await CreateIngredientAsync("Rosmarin", "g");

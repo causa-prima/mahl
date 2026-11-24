@@ -5,11 +5,11 @@ Feature: Bedienbarkeit per Finger
   Jedes Bedienelement muss sich deshalb mit dem Finger sicher treffen lassen.
 
   # @phase: SKELETON
-  # @braucht: US-904/run-7,US-904/run-2,US-904/run-8
+  # @braucht: US-904/run-7,US-904/run-2,CROSS-interaction/run-1
   #
   # Gilt für alle Listen-Seiten – der Test läuft je Seite über deren Page Object (ADR-S112-5), die
-  # Kanten decken die gemessenen Zustände der Zutaten-Seite ab: Liste (run-7), Anlege-Dialog (run-2),
-  # Undo-Toast (run-8).
+  # Kanten decken die gemessenen Zustände der Zutaten-Seite ab: Liste (US-904/run-7), Anlege-Dialog
+  # (US-904/run-2), Undo-Toast (CROSS-interaction/run-1).
   # Anforderung: docs/process/nfr.md (Accessibility); Durchsetzung im Theme: UX-Guideline, Visuelle Baseline.
 
   @NFR-accessibility-touch

@@ -17,6 +17,46 @@ function renderApp(initialPath: string) {
 }
 
 const hint = 'Noch keine Rezepte vorgemerkt.'
+const potatoSoup = { id: '3f2b8c1e-0000-4000-8000-000000000503', title: 'Kartoffelsuppe' }
+const pancakes = { id: '3f2b8c1e-0000-4000-8000-000000000501', title: 'Pfannkuchen' }
+
+// Zustandsbehafteter Server (ADR-S153-1: idempotentes PUT/DELETE auf die Rezept-ID, 204). GET liefert
+// wie der echte Server alphabetisch (ADR-S142-1). `planned` hält die IDs der Vormerkungen; die
+// Schreibaufrufe werden als Rezept-ID in `deleted` bzw. `put` mitgezählt. `putDeleteFinished` erhält
+// bei jedem PUT zusätzlich, ob das DELETE desselben Rezepts zu diesem Zeitpunkt schon abgeschlossen war.
+// `deleteGate`: Das DELETE antwortet (und ändert den Serverzustand) erst, wenn das Tor aufgeht.
+function plannedServer(initial: readonly { id: string; title: string }[], deleteGate: Promise<void> = Promise.resolve()) {
+  const all = [potatoSoup, pancakes]
+  // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: GET vor/nach Entfernen/Vormerken
+  let planned: readonly string[] = initial.map((r) => r.id)
+  // eslint-disable-next-line functional/no-let -- MSW-Handler-Zustand: IDs, deren DELETE abgeschlossen ist
+  let finishedDeletes: readonly string[] = []
+  const deleted = vi.fn<(id: string) => void>()
+  const put = vi.fn<(id: string) => void>()
+  const putDeleteFinished = vi.fn<(id: string, deleteFinished: boolean) => void>()
+  server.use(
+    http.get('/api/planned-recipes', () => HttpResponse.json(
+      all.filter((r) => planned.includes(r.id)).sort((a, b) => a.title.localeCompare(b.title, 'de')),
+    )),
+    http.delete('/api/planned-recipes/:id', async ({ params }) => {
+      deleted(String(params.id))
+      await deleteGate
+      planned = planned.filter((id) => id !== params.id)
+      finishedDeletes = [...finishedDeletes, String(params.id)]
+      return new HttpResponse(null, { status: 204 })
+    }),
+    http.put('/api/planned-recipes/:id', ({ params }) => {
+      put(String(params.id))
+      putDeleteFinished(String(params.id), finishedDeletes.includes(String(params.id)))
+      planned = [...planned.filter((id) => id !== params.id), String(params.id)]
+      return new HttpResponse(null, { status: 204 })
+    }),
+  )
+  return { deleted, put, putDeleteFinished }
+}
+
+const titlesShown = () => within(screen.getByRole('list', { name: 'Vorgemerkt' }))
+  .getAllByRole('listitem').map((item) => item.textContent)
 
 // @US-803-happy-path
 describe('Vorgemerkt-Seite', () => {
@@ -100,6 +140,105 @@ describe('Vorgemerkt-Seite', () => {
     const ingredients = within(await screen.findByRole('list', { name: 'Zutaten' }))
     expect(ingredients.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['250 g Mehl'])
     expect(await screen.findByRole('button', { name: 'Pfannkuchen vorgemerkt' })).toHaveTextContent('Vorgemerkt')
+  })
+
+  // Szenario: Eine Vormerkung auf der Vorgemerkt-Seite entfernen
+  it('US803_HappyPath_PlannedRecipesPage_RemoveClicked_DeletesAndShowsRestAndUndoToast', async () => {
+    // Given: "Kartoffelsuppe" und "Pfannkuchen" sind vorgemerkt; der Server hält den Zustand
+    const writes = plannedServer([potatoSoup, pancakes])
+    renderApp('/planned')
+
+    // When: ich bei "Pfannkuchen" auf "Entfernen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Pfannkuchen entfernen' }))
+
+    // Then: der Server wurde mit DELETE auf die Rezept-ID gerufen, die Seite zeigt genau "Kartoffelsuppe",
+    // und der Toast "Pfannkuchen entfernt" bietet "Rückgängig" an
+    await waitFor(() => { expect(titlesShown()).toEqual(['Kartoffelsuppe']) })
+    expect(writes.deleted).toHaveBeenCalledExactlyOnceWith(pancakes.id)
+    expect(screen.getByText('Pfannkuchen entfernt')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rückgängig' })).toBeInTheDocument()
+  })
+
+  // Szenario: Löschen-Button ist während des Löschens deaktiviert
+  // (features/interaction.feature, Querschnitt: auf dieser Seite heißt die Aktion „Entfernen")
+  it('CROSS_Interaction_Pending_PlannedRecipesPage_RemoveRunning_DisablesOnlyThatRowsButton', async () => {
+    // Given: beide Rezepte sind vorgemerkt; das DELETE für "Pfannkuchen" antwortet noch nicht
+    server.use(
+      http.get('/api/planned-recipes', () => HttpResponse.json([potatoSoup, pancakes])),
+      http.delete('/api/planned-recipes/:id', async () => { await delay('infinite') }),
+    )
+    renderApp('/planned')
+
+    // When: ich bei "Pfannkuchen" auf "Entfernen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Pfannkuchen entfernen' }))
+
+    // Then: nur dieser Entfernen-Button ist gesperrt
+    expect(screen.getByRole('button', { name: 'Pfannkuchen entfernen' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Kartoffelsuppe entfernen' })).toBeEnabled()
+  })
+
+  // Szenario: Das Entfernen einer Vormerkung rückgängig machen
+  it('US803_HappyPath_PlannedRecipesPage_UndoClicked_RestoresRowInServerOrderAndHidesToast', async () => {
+    // Given: beide Rezepte sind vorgemerkt; der Server liefert alphabetisch
+    const writes = plannedServer([potatoSoup, pancakes])
+    renderApp('/planned')
+
+    // When: ich bei "Kartoffelsuppe" auf "Entfernen" und im Toast auf "Rückgängig" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Kartoffelsuppe entfernen' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }))
+
+    // Then: PUT auf die Rezept-ID, beide Rezepte in dieser Reihenfolge, der Toast ist weg
+    await waitFor(() => { expect(titlesShown()).toEqual(['Kartoffelsuppe', 'Pfannkuchen']) })
+    expect(writes.put).toHaveBeenCalledExactlyOnceWith(potatoSoup.id)
+    await waitFor(() => { expect(screen.queryByText('Kartoffelsuppe entfernt')).not.toBeInTheDocument() })
+  })
+
+  // Szenario: Rückgängig während das Löschen noch läuft stellt die Zutat dauerhaft wieder her
+  // (features/interaction.feature, Querschnitt: auf dieser Seite heißt die Aktion „Entfernen")
+  it('CROSS_Interaction_Undo_PlannedRecipesPage_UndoWhileRemoveRunning_RestoresOnlyAfterRemoveFinished', async () => {
+    // Given: beide Rezepte sind vorgemerkt; das DELETE für "Kartoffelsuppe" antwortet erst, wenn das Tor aufgeht
+    // eslint-disable-next-line functional/no-let -- Tor: Auflöser der Promise nach außen reichen
+    let openGate: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => { openGate = resolve })
+    const writes = plannedServer([potatoSoup, pancakes], gate)
+    renderApp('/planned')
+
+    // When: ich bei "Kartoffelsuppe" auf "Entfernen" klicke und im Toast auf "Rückgängig", noch bevor das Entfernen fertig ist
+    fireEvent.click(await screen.findByRole('button', { name: 'Kartoffelsuppe entfernen' }))
+    await waitFor(() => { expect(writes.deleted).toHaveBeenCalledExactlyOnceWith(potatoSoup.id) })
+    fireEvent.click(screen.getByRole('button', { name: 'Rückgängig' }))
+
+    // (ein Event-Loop-Durchlauf, damit ein vorschnell gesendetes PUT den Server vor dem Öffnen des Tors erreicht – kein Zeitfenster)
+    await new Promise((resolve) => { setTimeout(resolve, 0) })
+
+    // When: das Entfernen ist abgeschlossen
+    openGate()
+
+    // Then: genau ein PUT folgt, und zwar nach abgeschlossenem DELETE; danach zeigt die Liste wieder beide Rezepte
+    await waitFor(() => { expect(titlesShown()).toEqual(['Kartoffelsuppe', 'Pfannkuchen']) })
+    expect(writes.putDeleteFinished).toHaveBeenCalledExactlyOnceWith(potatoSoup.id, true)
+  })
+
+  // Szenario: Die letzte Vormerkung entfernen und zurückholen
+  it('US803_EdgeCase_PlannedRecipesPage_RemoveLast_ShowsHintAndUndoBringsItBack', async () => {
+    // Given: nur "Pfannkuchen" ist vorgemerkt
+    plannedServer([pancakes])
+    renderApp('/planned')
+
+    // When: ich bei "Pfannkuchen" auf "Entfernen" klicke
+    fireEvent.click(await screen.findByRole('button', { name: 'Pfannkuchen entfernen' }))
+
+    // Then: Hinweis und Link erscheinen, der Toast "Pfannkuchen entfernt" bietet "Rückgängig" an
+    expect(await screen.findByText(hint)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Zur Rezept-Liste' })).toBeInTheDocument()
+    expect(screen.getByText('Pfannkuchen entfernt')).toBeInTheDocument()
+
+    // When: ich im Toast auf "Rückgängig" klicke
+    fireEvent.click(screen.getByRole('button', { name: 'Rückgängig' }))
+
+    // Then: die Seite zeigt genau "Pfannkuchen", der Hinweis ist weg
+    await waitFor(() => { expect(titlesShown()).toEqual(['Pfannkuchen']) })
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
   })
 
   // ADR-S106-3

@@ -33,6 +33,7 @@ import re
 import subprocess
 import sys
 import time
+from itertools import batched
 from pathlib import Path
 
 from ._cli import Parser
@@ -316,40 +317,66 @@ def check_unit_test_patterns(layer: str) -> list[tuple[str, str]]:
 
 # ── Test-Struktur ────────────────────────────────────────────────────────────
 
+_TEST_MARKER = {"backend": r'\s*\[(Fact|Theory)\]', "frontend": r'\s*it\s*\('}
+_DATEI_RE = re.compile(r'^\+\+\+ b/(.*)$', re.M)
+_HUNK_RE = re.compile(r'^@@ -\d+(?:,\d+)? \+(\d+).*$', re.M)
+
+
 def check_test_structure(layer: str) -> list[tuple[str, str]]:
-    """Prüft ob neue Test-Methoden // Given / // When / // Then Kommentare enthalten."""
-    prefixes = _LAYER_PATHS[layer]
-    out = _worktree_diff(prefixes, 40)
+    """Prüft ob neue oder geänderte Test-Methoden // Given / // When / // Then Kommentare enthalten.
+
+    Ausgelöst wird ein Test durch seine hinzugefügte Kopfzeile (`+ it(` bzw. `+ [Fact]`); ein Test, in dem
+    sich nur der Rumpf ändert, wird nicht geprüft, ebenso wenig `it.each(`, `test(` oder `[Fact(Skip=…)]`.
+    Gewertet wird sein ganzer Rumpf aus der Datei im neuen Stand, nicht nur die `+`-Zeilen – sonst meldete
+    eine reine Umbenennung die Gliederung als fehlend. Der Rumpf endet, wo sich seine Klammern
+    schließen, spätestens am nächsten Test-Kopf. Klammern werden textuell gezählt: Eine ungepaarte `{` in
+    einem String oder Kommentar, ebenso ein Einzeiler ohne `{`, lässt den Rumpf bis zum nächsten Test
+    laufen – Kommentare dazwischen (etwa einer Hilfsfunktion) zählen dann mit.
+    """
+    marker = re.compile(_TEST_MARKER[layer])
     findings: list[tuple[str, str]] = []
-    current_file = ""
-    # Hinzugefügte Zeilen je Test-Block: (Datei, Auslöser-Zeile, [hinzugefügte Zeilen im Block]).
-    # Ein Block wird beim Auslöser angelegt und danach über `current_block` befüllt.
-    blocks: list[tuple[str, str, list[str]]] = []
-    current_block: list[str] | None = None
-
-    if layer == "backend":
-        test_marker = re.compile(r'^\+\s*\[(Fact|Theory)\]')
-    else:
-        test_marker = re.compile(r'^\+\s*it\s*\(')
-
-    for line in out.splitlines():
-        if line.startswith("+++ b/"):
-            current_file = line[6:]
-            current_block = None
-        elif not _is_test_file(current_file):
-            continue
-        elif test_marker.match(line):
-            current_block = []
-            blocks.append((current_file, line[1:].strip(), current_block))
-        elif current_block is not None and line.startswith("+") and not line.startswith("+++"):
-            current_block.append(line[1:])
-
-    for filepath, trigger, added_lines in blocks:
-        missing = fehlende_gwt(added_lines)
+    for filepath, start in _ausgeloeste_tests(_worktree_diff(_LAYER_PATHS[layer], 0), marker):
+        zeilen = Path(filepath).read_bytes().decode().splitlines()   # CWD == Repo-Root; decode(): UTF-8
+        missing = fehlende_gwt(_rumpf(zeilen, start, marker))
         if missing:
-            findings.append((filepath, f"{trigger}  →  fehlt: {', '.join(missing)}"))
-
+            findings.append((filepath, f"{zeilen[start].strip()}  →  fehlt: {', '.join(missing)}"))
     return findings
+
+
+def _ausgeloeste_tests(diff: str, marker: re.Pattern[str]) -> list[tuple[str, int]]:
+    """(Datei, Zeilenindex im neuen Stand) je hinzugefügter Test-Kopfzeile; erwartet einen Diff mit -U0."""
+    return [(datei, index)
+            for datei, datei_diff in batched(_DATEI_RE.split(diff)[1:], 2) if _is_test_file(datei)
+            for index in _neue_kopfzeilen(datei_diff, marker)]
+
+
+def _neue_kopfzeilen(datei_diff: str, marker: re.Pattern[str]) -> list[int]:
+    """Zeilenindizes der hinzugefügten Test-Kopfzeilen einer Datei: Hunk-Start plus Rang unter den `+`-Zeilen.
+
+    Mit -U0 stehen in einem Hunk nur `+`- und `-`-Zeilen; nur die `+`-Zeilen rücken im neuen Stand vor.
+    """
+    return [int(start) - 1 + rang
+            for start, hunk in batched(_HUNK_RE.split(datei_diff)[1:], 2)
+            for rang, zeile in enumerate(z[1:] for z in hunk.splitlines() if z.startswith("+"))
+            if marker.match(zeile)]
+
+
+def _rumpf(zeilen: list[str], start: int, marker: re.Pattern[str]) -> list[str]:
+    """Die Zeilen nach der Kopfzeile bis zum Schließen ihrer Klammern, spätestens bis zum nächsten Test."""
+    depth, opened = _klammern(zeilen[start])
+    rumpf: list[str] = []
+    for zeile in zeilen[start + 1:]:
+        if (opened and depth <= 0) or marker.match(zeile):
+            break
+        rumpf.append(zeile)
+        depth, opened = _klammern(zeile, depth, opened)
+    return rumpf
+
+
+def _klammern(zeile: str, depth: int = 0, opened: bool = False) -> tuple[int, bool]:
+    """Klammertiefe nach dieser Zeile und ob der Block seine erste `{` schon gesehen hat."""
+    oeffnend = zeile.count("{")
+    return depth + oeffnend - zeile.count("}"), opened or oeffnend > 0
 
 
 def structure_fast_fail(layer: str) -> str | None:

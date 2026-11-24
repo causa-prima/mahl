@@ -38,14 +38,10 @@ Feature: Rezepte vormerken
   #
   # Querschnitts-Verträge (ADR-S112-5 – geteilte Implementierung und parametrisierte Suite,
   # keine wiederholten Szenarien hier). Die Vorgemerkt-Seite ist nach der Zutaten-Seite die
-  # zweite Seite mit Rückgängig-Toast. Ein eigener Lauf vor dem Entfernen zieht deshalb nach
-  # ADR-S112-5 (Schritte 4–6) Toast und Löschen-mit-Rückgängig aus der Zutaten-Seite in eine
-  # geteilte Umsetzung und verschiebt alle Szenarien, die Client/e2e/interaction.spec.ts heute je
-  # Seite ausführt – Löschen, Rückgängig, Toast-Lebensdauer, mehrere Toasts, Sperre beim Löschen
-  # (US-904) – nach features/interaction.feature (dort als SKELETON und umgesetzt vermerkt). Die
-  # Seiten-Schnittstelle der Suite (Client/e2e/pages/listPage.ts) wird dabei in Fähigkeiten
-  # aufgeteilt, wie touchTargetPage.ts es schon tut; die Vorgemerkt-Seite wird in
-  # Client/e2e/pages/listPages.ts angemeldet und deklariert:
+  # zweite Seite mit Rückgängig-Toast. Beide teilen die Umsetzung (useDeleteWithUndo, UndoToast);
+  # die Szenarien, die Client/e2e/interaction.spec.ts je Seite ausführt – Löschen, Rückgängig,
+  # Toast-Lebensdauer, mehrere Toasts, Sperre beim Löschen –, stehen in features/interaction.feature.
+  # Die Vorgemerkt-Seite ist in Client/e2e/pages/interactionPages.ts angemeldet und deklariert:
   #   - Rückgängig-Toast und Sperre von „Entfernen“, solange die Anfrage läuft – ja; das Verb
   #     des Toasts („entfernt“ statt „gelöscht“) ist eine Eigenschaft der Seite. Anlege-Dialog:
   #     nicht anwendbar.

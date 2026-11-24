@@ -12,15 +12,13 @@ import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemText from '@mui/material/ListItemText'
 import IconButton from '@mui/material/IconButton'
-import Snackbar from '@mui/material/Snackbar'
-import type { SnackbarCloseReason } from '@mui/material/Snackbar'
 import DeleteIcon from '@mui/icons-material/Delete'
+import UndoToast from '../components/UndoToast'
+import ReactivationConflictToast from '../components/ReactivationConflictToast'
 import { useResultQuery } from '../hooks/useResultQuery'
-import { useDeleteIngredientWithUndo } from '../hooks/useDeleteIngredientWithUndo'
-import type { DeletedIngredient } from '../hooks/useDeleteIngredientWithUndo'
+import { useDeleteWithUndo } from '../hooks/useDeleteWithUndo'
 import { useCreateIngredientWithReactivation } from '../hooks/useCreateIngredientWithReactivation'
-import type { ReactivationConflictNotice } from '../hooks/useCreateIngredientWithReactivation'
-import { fetchIngredients } from '../services/ingredientsApi'
+import { fetchIngredients, deleteIngredient, restoreIngredient } from '../services/ingredientsApi'
 import { asIngredientName, asUnit } from '../domain/ingredient'
 import type { Ingredient, IngredientId, NewIngredient } from '../domain/ingredient'
 
@@ -173,8 +171,8 @@ type IngredientListProps = {
 
 // UX-Prinzip „Least Surprise": die destruktive Aktion steht am Zeilenende (secondaryAction). Das aria-label
 // nennt die Zutat, damit die Aktion auch ohne visuellen Kontext eindeutig ist ("Mehl löschen").
-// run-9: nur die Zeile, deren DELETE gerade läuft, ist deaktiviert (deletingId) – kein globales
-// Sperren der übrigen Zeilen (Scope-Grenze run-9).
+// Nur die Zeile, deren DELETE gerade läuft, ist deaktiviert (deletingId) – kein globales Sperren der
+// übrigen Zeilen (CROSS-interaction run-3 „Löschen·Pending").
 // Leerzustand hier statt als Ternary in IngredientsPage – Muster wie ReactivationConflictToast.
 function IngredientList({ ingredients, deletingId, onDelete }: Readonly<IngredientListProps>) {
   if (!ingredients || ingredients.length === 0) return <Typography gutterBottom>Noch keine Zutaten angelegt.</Typography>
@@ -202,95 +200,6 @@ function IngredientList({ ingredients, deletingId, onDelete }: Readonly<Ingredie
   )
 }
 
-type ReactivationConflictToastProps = {
-  readonly conflict: ReactivationConflictNotice | null
-  readonly onDismiss: () => void
-}
-
-// ADR-S111-3: Reaktivierungs-Konflikt (Restore antwortet 409 "bereits aktiv", abweichende
-// Werte). Der Anlege-Dialog ist zu diesem Zeitpunkt bereits geschlossen (der Vorgang gilt als
-// abgeschlossen) – diese Snackbar informiert nur noch. Anders als UndoToast ohne Aktions-Button
-// und ohne clickaway-Schutz: kein Szenario verlangt hier einen "Rückgängig"-Pfad, der MUI-
-// Default (jeder Schließen-Grund dismisst) genügt. Der Null-Check liegt hier (statt als `&&` in
-// IngredientsPage), damit dieser Zweig nicht in deren Komplexität einzahlt.
-// run-11-Nachbesserung F2: autoHideDuration 10000ms – bewusst EIGENES Literal, nicht dieselbe
-// Konstante wie UndoToast (6000ms): der Text ist rund zehnmal so lang, besteht aus zwei Sätzen
-// und MUIs Pause-bei-Hover greift auf Touch nicht (ADR-S111-3).
-// run-11-Nachbesserung F4: `key` aus den drei ANGEZEIGTEN Feldern (nicht aus einer id) – erzwingt
-// genau dann einen Remount (und damit einen frischen Auto-Hide-Timer, s. UndoToast-Kommentar
-// unten für den Mechanismus), wenn sich der sichtbare Text ändert. Eine id-basierte Alternative
-// (z.B. savedIngredient.id) würde zwei aufeinanderfolgende Konflikte zur SELBEN Zutat mit
-// UNTERSCHIEDLICHEM gespeichertem Stand fälschlich als identisch behandeln – kein Remount, obwohl
-// der Nutzer einen neuen Text sieht und der Timer neu laufen müsste. Sind alle drei Felder
-// zwischen zwei Konflikten identisch, ist auch der Text identisch – ein ausbleibender Remount ist
-// dann folgenlos.
-function ReactivationConflictToast({ conflict, onDismiss }: Readonly<ReactivationConflictToastProps>) {
-  if (!conflict) return null
-  return (
-    <Snackbar
-      // Kein Test erzwingt den konkreten Aufbau des Remount-`key` (Team-Lead-Review, F4):
-      // die Race-Condition, die einen fehlenden/falschen Remount sichtbar machen würde
-      // (zwei Konflikte direkt hintereinander, zweiter erbt Restlaufzeit des ersten), ist
-      // im Komponenten-Test praktisch nicht mit vertretbarem Aufwand deterministisch
-      // herstellbar (kein Fake-Timer-Muster wie bei UndoToast, weil der zweite Konflikt
-      // selbst einen Restore-Roundtrip braucht statt eines einzelnen Klicks). Analog zum
-      // bereits etablierten `key={deleted.id}` bei UndoToast, dort mit Test.
-      // Stryker disable next-line StringLiteral: kein Test für den Remount-key (s. o.; Einzelfall, vom User freigegeben S136)
-      key={`${conflict.requestedName}|${conflict.savedName}|${conflict.savedUnit}`}
-      open
-      autoHideDuration={10000}
-      onClose={onDismiss}
-      message={
-        `'${conflict.requestedName}' wurde zwischenzeitlich an anderer Stelle wiederhergestellt `
-        + `(z. B. auf einem anderen Gerät). Gespeichert ist '${conflict.savedName}' mit der Einheit `
-        + `'${conflict.savedUnit}'.`
-      }
-    />
-  )
-}
-
-type UndoToastProps = {
-  readonly deleted: DeletedIngredient | null
-  readonly onUndo: (deleted: DeletedIngredient) => void
-  readonly onDismiss: () => void
-}
-
-// UX-Guideline „Destructive Actions schützen" ("Destructive Actions schützen"): Soft-Delete + Undo-Toast ersetzt
-// den Bestätigungsdialog. Nicht-blockierende Snackbar; autoHideDuration großzügig, damit
-// "Rückgängig" klickbar bleibt. Null-Check hier statt in IngredientsPage – Muster wie ReactivationConflictToast.
-function UndoToast({ deleted, onUndo, onDismiss }: Readonly<UndoToastProps>) {
-  // clickaway (Klick irgendwo auf der Seite) darf den Toast NICHT schließen: sonst wäre die
-  // bewusst großzügige autoHideDuration wertlos, sobald der Nutzer nach dem Löschen woanders
-  // hinklickt – der Undo-Weg für eine destruktive Aktion muss die volle Dauer erreichbar
-  // bleiben (UX-Guideline „Destructive Actions schützen"). timeout/escapeKeyDown sind bewusste Schließen-Gesten
-  // und schließen weiterhin regulär.
-  const handleClose = (_event: unknown, reason: SnackbarCloseReason) => {
-    if (reason === 'clickaway') return
-    onDismiss()
-  }
-  if (!deleted) return null
-
-  // `key={deleted.id}`: erzwingt einen Remount pro Löschvorgang. Ohne key behält React beim
-  // Wechsel von einer gelöschten Zutat zur nächsten (deleted-Objekt ändert sich, open/
-  // autoHideDuration bleiben literal unverändert) dieselbe Snackbar-Instanz bei – MUIs
-  // Auto-Hide-Timer-Effect (useSnackbar.js, deps [open, autoHideDuration, setAutoHideTimer,
-  // timerAutoHide]) läuft dann NICHT erneut, weil keine dieser Deps sich ändert (open/
-  // autoHideDuration sind Literale, die beiden Callbacks referenzstabil via useEventCallback).
-  // Der neue Toast erbt so die Restlaufzeit des alten statt der vollen autoHideDuration
-  // (US904_EdgeCase_SecondDelete_RestartsUndoWindow). Der Remount startet den Timer frisch.
-  return (
-    <Snackbar
-      key={deleted.id}
-      open
-      autoHideDuration={6000}
-      onClose={handleClose}
-      message={`${deleted.name} gelöscht`}
-      // color="inherit": Primärblau auf dem dunklen Snackbar-Grund ist zu kontrastarm (nfr.md, Accessibility).
-      action={<Button color="inherit" onClick={() => { onUndo(deleted) }}>Rückgängig</Button>}
-    />
-  )
-}
-
 export default function IngredientsPage() {
   const [newIngredient, setNewIngredient] = useState<NewIngredient | null>(null)
   const queryClient = useQueryClient()
@@ -306,7 +215,13 @@ export default function IngredientsPage() {
 
   const closeDialog = () => { setNewIngredient(null) }
 
-  const { deleted, deletingId, requestDelete, undoDelete, dismissUndo } = useDeleteIngredientWithUndo(invalidateIngredients)
+  // ADR-S108-1/-2: DELETE mit dem per-Zeile-xmin-ETag als If-Match; Undo = Restore ohne If-Match,
+  // aber mit Name und Einheit im Body (ADR-S111-1-Addendum).
+  const { deleted, deletingId, requestDelete, undoDelete, dismissUndo } = useDeleteWithUndo<Ingredient>({
+    remove: (ingredient) => deleteIngredient(ingredient.id, ingredient.etag),
+    restore: (ingredient) => restoreIngredient(ingredient.id, ingredient.name, ingredient.baseUnit),
+    onChanged: invalidateIngredients,
+  })
 
   // run-11-Nachbesserung F1: `dismissUndo()` verwirft einen noch sichtbaren Undo-Toast einer
   // vorangegangenen Löschung. Ohne das kann eine Reaktivierung (409 soft-deleted -> transparenter
@@ -339,7 +254,12 @@ export default function IngredientsPage() {
         onClose={handleCancel}
         onSubmit={save}
       />
-      <UndoToast deleted={deleted} onUndo={undoDelete} onDismiss={dismissUndo} />
+      <UndoToast
+        deleted={deleted}
+        message={(ingredient) => `${ingredient.name} gelöscht`}
+        onUndo={undoDelete}
+        onDismiss={dismissUndo}
+      />
       <ReactivationConflictToast
         conflict={conflictNotice}
         onDismiss={dismissConflictNotice}

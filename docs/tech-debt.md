@@ -415,10 +415,26 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 
 ---
 
-## TD-S153-1 — Rückgängig-Toast: geteilte Umsetzung fehlt vor der zweiten Seite (ADR-S112-5 Schritte 4–6)
-**Fällig:** Szenario:„Eine Vormerkung auf der Vorgemerkt-Seite entfernen" – die Vorgemerkt-Seite ist die zweite Seite mit Rückgängig-Toast; vorher als eigener Durchlauf
-**Problem:** Löschen mit Rückgängig-Toast lebt nur in der Zutaten-Seite. Die parametrisierte Suite Client/e2e/interaction.spec.ts trägt noch US-904-Testnamen und `// Szenario:`-Verweise, die Szenarien stehen in features/ingredients.feature, und Client/e2e/pages/listPage.ts verlangt von jeder Seite alle Fähigkeiten (Anlege-Dialog inklusive). Ohne die Schritte 4–6 aus ADR-S112-5 baute die Vorgemerkt-Seite das Verhalten nach, statt es zu teilen.
-**Behebung:** Eigener Durchlauf vor US-803 run-5: (4) Toast und Löschen-mit-Rückgängig aus der Zutaten-Seite in eine geteilte Umsetzung ziehen (useDeleteWithUndo<T>; Wiederherstellen als Parameter, weil Vormerkungen per PUT statt POST …/restore zurückkommen; Verb des Toasts je Seite). (5) Alle Szenarien, die interaction.spec.ts je Seite ausführt, nach features/interaction.feature umziehen (als SKELETON und umgesetzt), umtaggen, Tests umbenennen; Testnamens-Konvention für @CROSS-Szenarien entscheiden. (6) Import-Guard (ESLint no-restricted-imports) setzen. Dazu listPage.ts in Fähigkeiten aufteilen wie touchTargetPage.ts. Die Anmeldung der Vorgemerkt-Seite in listPages.ts gehört zu run-5.
-**Aufschubgrund:** User – im Workshop von US-803 entschieden: der Umbau läuft als eigener Durchlauf unmittelbar vor dem Entfernen, nicht jetzt
+---
+
+## TD-S154-1 — Rückgängig-Toast verdeckt bei 375 px die letzte Listenzeile
+**Fällig:** Phase:MVP – Bedienbarkeit am Handy; vorher stört es nur bis zum Ausblenden des Toasts (6 s)
+**Problem:** Ist eine Liste länger als der Bildschirm und bis ganz nach unten gescrollt, liegt der Rückgängig-Toast (geteilte Komponente Client/src/components/UndoToast.tsx, unten angedockt) bei 375 px Breite vollständig über der letzten Zeile samt ihrem Entfernen-/Löschen-Knopf. Beleg S154 (Wegwerf-Probe, 25 vorgemerkte Rezepte, Viewport 375×800, nach dem Entfernen bis zum Seitenende gescrollt): Toast-Knopf „Rückgängig“ bei y 742–786, ×-Knopf der letzten Zeile bei y 738–782, beide rechtsbündig – deckungsgleich. Die Zeile ist erst nach Ablauf des Toasts oder nach „Rückgängig“ erreichbar. Kein Seiten-Container hat unten einen Abstand für den Toast; betroffen ist damit jede Seite mit UndoToast (Zutaten ebenso, dort ungeprüft).
+**Behebung:** Unten einen Abstand in Toast-Höhe schaffen, sodass die letzte Zeile über den Toast scrollbar ist – entweder dauerhaft im Seiten-Layout oder nur, solange ein Toast offen ist. Welche Variante, ist eine kleine UX-Entscheidung; danach eine Touch-Target-/Sichtprüfung bei 375 px mit langer Liste und offenem Toast.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-803 run-5 (S154) entschieden: Toast-Lage sichten, verdeckt er etwas, als TD vermerken
 
 ---
+
+## TD-S154-2 — Listen: nachrückende Zeile unter dem Finger nach Entfernen/Löschen
+**Fällig:** Phase:MVP – Bedienbarkeit am Handy
+**Problem:** Nach einem Entfernen (Vorgemerkt-Seite) oder Löschen (Zutaten-Seite) verschwindet die Zeile sofort, die nächste rückt nach oben – ihr ×-/Löschen-Knopf liegt dann genau unter dem Finger. Ein versehentlicher Doppeltipp entfernt so einen zweiten Eintrag. Der Rückgängig-Toast hält nur einen Vorgang (ADR-S108-3); der erste wäre danach nicht mehr rückgängig zu machen. Beobachtet in S154 an den Bildern bei 375 px (der Hover-Zustand liegt nach dem Klick auf dem ×-Knopf der nachgerückten Zeile).
+**Behebung:** UX-Entwurf nötig: z.B. Zeile kurz als „entfernt“ stehen lassen oder ausblenden statt sofort entfernen, oder Knöpfe nach dem Entfernen kurz gegen Eingaben sperren. Danach als geteilte Umsetzung im Hook useDeleteWithUndo bzw. in der Listen-Darstellung (ADR-S112-5), mit Szenario in features/interaction.feature.
+**Aufschubgrund:** User – in der Abschluss-Triage von US-803 run-5 (S154) als TD entschieden; braucht einen UX-Entwurf
+
+---
+
+## TD-S154-3 — E2E: Vorgemerkt-Seite zeigt geseedete Vormerkung gelegentlich nicht
+**Fällig:** Phase:MVP – spätestens, wenn E2E in einer CI-Kette als Gate läuft; tritt es vorher erneut auf, sofort
+**Problem:** In S154 schlug in 1 von 13 Wiederholungen der Undo-/Pending-Tests (Filter „Undo-Toast|Vormerkung entfernen“, je Lauf 13 Tests) CROSS_Interaction_Undo_ClickBesideToast_ToastRemainsVisible für die Vorgemerkt-Seite im Given fehl: Nach parallelem Seed (je Eintrag Zutat, Rezept, PUT /api/planned-recipes/{id}, alle abgewartet) und goto('/planned') war die Zeile „Kartoffelsuppe“ 5 s lang nicht da (Client/e2e/interaction.spec.ts, givenEntriesShown). Die übrigen 12 Läufe und zwei volle Suiten (188 bzw. 190) waren grün. Ursache ungeklärt; der Trace dieses Laufs ist nicht mehr vorhanden.
+**Behebung:** Mit Wiederholungen reproduzieren (Filter auf den Vorgemerkt-Undo-Block), dann Trace und Netzwerk-Log ansehen: Liefert das GET /api/planned-recipes den Eintrag schon (Seed-/Serverseite) oder fehlt er nur in der Anzeige (Client-Cache)? Je nach Befund Seed oder Client korrigieren – nicht mit längerem Timeout überdecken.
+**Aufschubgrund:** Recherche – Ursache ungeklärt, braucht Reproduktion über viele Läufe und Trace-Analyse; in der Triage von US-803 run-5 (S154) vom User als TD entschieden

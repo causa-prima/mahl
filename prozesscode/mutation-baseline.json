@@ -360,8 +360,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.qa-check": {
-    "beurteilbar": 1118,
-    "getoetet": 1016,
+    "beurteilbar": 1150,
+    "getoetet": 1052,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.read-breakdown": {
