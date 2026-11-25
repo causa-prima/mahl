@@ -27,6 +27,11 @@ export default defineConfig([
       parserOptions: {
         projectService: {
           allowDefaultProject: ['src/test/*.{ts,tsx}'],
+          // src/test ist aus tsconfig.app.json ausgeschlossen und läuft über das Default-Projekt. Ohne diese
+          // Angabe nimmt es tsconfig.json, das nur Referenzen trägt – also TypeScripts Standardoptionen (kein
+          // jsx, keine Bundler-Auflösung). Dann gilt ein Import aus src (z.B. appRoutes) beim Lint der
+          // einzelnen Datei als error-typed, und der Edit-Hook meldet no-unsafe-argument.
+          defaultProject: 'tsconfig.app.json',
         },
         tsconfigRootDir: import.meta.dirname,
       },
