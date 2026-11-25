@@ -74,7 +74,8 @@ Feature: Rezepte vormerken
   # Für den Workshop der MVP-Stufe dieser Story:
   #   - Tage in derselben Ansicht (Kalender-/Wochendarstellung, Zuordnen per Drag & Drop) und
   #     Planungs-Portion je Vormerkung – ändert Darstellung, Sortierung und Leerzustand der
-  #     Vorgemerkt-Seite.
+  #     Vorgemerkt-Seite. Wertebereich des Tags (ADR-S154-1, vom User genannt): höchstens vier
+  #     Wochen im Voraus, nicht in der Vergangenheit.
   #   - Ausschalten per Umschalter braucht einen Rückweg, sobald dabei Informationen verloren
   #     gehen (Tag, Portion); „Rückgängig“ muss sie wiederherstellen.
   #   - Vormerken auf einem zweiten Gerät mit abweichendem Tag: Idempotenz ist dann kein stiller

@@ -21,6 +21,7 @@
         *   Liste zeigt alle Zutaten aus dem Plan (außer solche mit Flag "Immer vorrätig").
         *   Abhaken markiert das Item als "gekauft" (setzt BoughtAt-Timestamp). Item wird nicht gelöscht, sondern in Bereich "Zuletzt gekauft" verschoben (siehe US-303).
     *   **Implementierungshinweis:** Teilt die Listenkomponente mit US-303. Beim Implementieren: Tests für den "zuhause vor dem Einkauf"-Kontext schreiben.
+    *   **Stufen:** Im SKELETON übernimmt ein Button auf der Vorgemerkt-Seite die Zutaten und ersetzt die Liste; Abhaken spezifiziert US-303. Der Ausschluss von „Immer vorrätig" kommt mit US-906 (MVP). Spezifikation: `features/shopping-lists.feature`.
 
 *   **US-202 (Mengen-Anpassung) [V1]:** Als *Feierabend-Planer* möchte ich die Menge von Artikeln auf der Liste reduzieren (z.B. "brauche nur noch die Hälfte"), um Reste zu berücksichtigen.
     *   **Akzeptanzkriterien:**

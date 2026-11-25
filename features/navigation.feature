@@ -1,8 +1,8 @@
 @CROSS-navigation
 Feature: Navigation zwischen Seiten
 
-  Jede Hauptseite (Zutaten, Rezepte, Vorgemerkt) ist über die Navigationsleiste erreichbar – nicht
-  nur per Direktlink.
+  Jede Hauptseite (Zutaten, Rezepte, Vorgemerkt, Einkaufsliste) ist über die Navigationsleiste
+  erreichbar – nicht nur per Direktlink.
 
   # @phase: SKELETON
   #
@@ -50,6 +50,13 @@ Feature: Navigation zwischen Seiten
     Given ich navigiere zur Rezepte-Seite
     When ich in der Navigationsleiste auf "Vorgemerkt" klicke
     Then sehe ich die Vorgemerkt-Seite
+
+  # @run-6 · Navigationsleiste·Einkaufsliste · Frontend-only · Singleton · braucht:US-201/run-1
+  @CROSS-navigation-planned-to-shopping-list
+  Scenario: Von der Vorgemerkt-Seite zur Einkaufsliste navigieren
+    Given ich navigiere zur Vorgemerkt-Seite
+    When ich in der Navigationsleiste auf "Einkaufsliste" klicke
+    Then sehe ich die Einkaufsliste
 
   # @run-5 · Navigationsleiste·Markierung · Frontend-only · Singleton · braucht:US-602/run-2,US-602/run-4
   @CROSS-navigation-active-entry-on-subpage

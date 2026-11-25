@@ -28,6 +28,7 @@
         *   **Mengen-Parsing:** Enthält die Eingabe eine Menge und Einheit (z.B. "300g Tomaten"), wird die Menge beim Hinzufügen automatisch übernommen.
         *   **Neuen Artikel anlegen:** Die letzte Kachel in der Vorschlagsliste ist immer "Neu anlegen: [Eingabe]" – für Artikel die noch nicht in den Stammdaten existieren.
         *   **Menge anpassen (langer Druck):** Langer Druck auf einen Listeneintrag öffnet eine Detail-Ansicht mit editierbarer Menge und der Liste der zugehörigen Rezepte mit Teilmengen (Kontext für Substitutionsentscheidungen).
+    *   **Für den Workshop (mit US-307):** Übernehmen auf der Vorgemerkt-Seite (US-201) ersetzt im SKELETON die ganze Einkaufsliste – sobald eigene Artikel darauf stehen, darf es sie nicht löschen. Die offenen Punkte dazu stehen im Kopf von `features/shopping-lists.feature`.
 
 *   **US-302 (Laufweg-Sortierung) [V1]:** Als *eiliger Einkäufer* möchte ich, dass die Liste nach Tags sortiert ist, die meinem Weg durch den Laden entsprechen (Gemüse -> Milch -> TK), damit ich nicht zurücklaufen muss.
     *   **Akzeptanzkriterien:**
@@ -41,6 +42,7 @@
         *   Gekaufte Artikel werden ans Ende der Liste in einen eigenen Bereich "Zuletzt gekauft" verschoben.
         *   Gekaufte Artikel lassen sich einfach von noch nicht gekauften Artikeln unterscheiden
     *   **Implementierungshinweis:** Teilt die Listenkomponente mit US-201. Beim Implementieren: Tests für den "im Laden"-Kontext schreiben.
+    *   **Für den Workshop:** Erneutes Übernehmen auf der Vorgemerkt-Seite (US-201) ersetzt die ganze Liste, auch Einträge in „Zuletzt gekauft" – entscheiden, ob das so bleibt (`features/shopping-lists.feature`).
 
 *   **US-304 (Visuelle Darstellung & Varianten) [OBSOLET]:** Aufgelöst – drei Bedenken wurden getrennt behandelt:
     *   **Kachel-Design (Layout):** Designprinzip ab SKELETON – in `docs/history/adr.md` (Abschnitt "Einkaufsliste UX-Referenz: Bring!") dokumentiert.

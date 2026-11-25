@@ -15,8 +15,8 @@ Feature: Querschnittliche Fehlerbehandlung
   # kein Lauf, den man referenzieren könnte (SKELETON hat kein Auth-Gate).
   #
   # Für den Workshop der MVP-Stufe: Änderungen in Listen (Umschalten und Entfernen der
-  # Vormerkungen, US-803) und das Laden der Vormerkungen in Rezept-Liste und Detailansicht haben
-  # im SKELETON keine Fehlermeldung.
+  # Vormerkungen, US-803), das Laden der Vormerkungen in Rezept-Liste und Detailansicht und das
+  # Übernehmen der Zutaten auf die Einkaufsliste (US-201) haben im SKELETON keine Fehlermeldung.
   #
   # BEWUSST NICHT hier als Szenario geführt – „die UI zeigt keine technischen Fehlerdetails an,
   # falls der Server doch welche sendet". Diese Vorbedingung ist in Produktion realistisch

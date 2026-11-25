@@ -347,6 +347,23 @@ Die Zeilen `unit` leer bei gesetzter `quantity` und `ingredientId` nicht gefunde
 
 **Grenze / offen:** Das „Log", in das der Stack-Trace wandern soll, **existiert als gestaltete Senke noch nicht**: `appsettings.json` hat keine `Logging`-Sektion, im Backend gibt es keine `ILogger`-Nutzung, und `nfr.md` kennt keine Observability-Anforderung. Vorhanden ist allein der Framework-Default (Console-/Debug-Provider) – flüchtig, unkonfiguriert. Ein Logging-/Observability-Konzept ist Voraussetzung dafür, dass diese Entscheidung ihren Zweck erfüllt, und muss vor der Umsetzung geklärt sein. – Die Reihenfolge-Semantik (expliziter Handler schlägt Developer Page) ist aus der MS-Doku **abgeleitet, nicht empirisch geprüft** – beim Umsetzen mit einem Integrationstest verifizieren. Der Test soll die Zusicherung über **alle** registrierten Umgebungen fahren (`WebApplicationFactory.UseEnvironment(...)`, Umgebungsliste aus ADR-S112-2); er ist dabei kein Vollständigkeitsbeweis, sondern Regressionswächter gegen ein später eingeführtes `if (IsDevelopment())`. Umsetzung ab MVP, weil der tragende Security-NFR ab MVP gilt.
 
+### ADR-S154-1: Wertebereiche aus dem Anwendungszweck – auch für berechnete Werte und Sammlungen
+
+**Status:** Accepted
+**Tags:** scope:cross-cutting, arch:validation, arch:domain-type, db:constraint
+
+**Entscheidung:** Jeder Zahlwert und jede Sammlung bekommt einen Wertebereich, der aus dem Anwendungszweck folgt – eingegebene Werte ebenso wie berechnete (eine Summe, eine Anzahl, ein Datum). Vorgehen:
+1. Realistische Grenzen für den Zweck ermitteln: ein Haushalt ambitionierter Hobbyköche, keine Großküche oder Bäckerei (etwa „eine Einkaufsliste reicht höchstens vier Wochen“, „größte Menge einer Zutat auf der Einkaufsliste ~10 kg“). **Der User bestätigt sie** – es ist seine Anwendung, und seine Grenzen können von einer Schätzung abweichen.
+2. Die DB-Spalte bekommt die erste Größe, die diese Grenze für den jeweiligen Zweck abdeckt. Ausmultiplizierte Obergrenzen (Höchstzahl × Höchstwert) sind kein Maßstab – sie sind unrealistisch.
+3. Der Domänentyp setzt die Grenze durch. Bei einer Eingabe bekommt der Nutzer eine Meldung. Bei einem berechneten Wert ist eine Verletzung ein Logikfehler (etwa doppelt gezählt): Der Vorgang scheitert und wird protokolliert, statt einen unplausiblen Wert anzuzeigen.
+4. Die Überlegungen zu jeder Grenze stehen in der ADR des Features, damit sie später nachvollziehbar sind.
+
+**Begründung:** Ein Wert außerhalb des realistischen Bereichs ist fast sicher ein Fehler – bei einer Eingabe ein Tippfehler, bei einem berechneten Wert ein Fehler der Anwendungslogik. „1 t Mehl“ auf der Einkaufsliste ist falsch, auch wenn jede einzelne Rezeptmenge gültig war. Eine Grenze fängt beides ab; ohne sie erscheint der Fehler still als plausibel aussehende Zahl.
+
+**Verworfen:**
+- **Keine Grenze für berechnete Werte** (Invariante „durch die Herkunft begrenzt“) – fängt keine Logikfehler.
+- **Grenzen aus der Spaltengröße oder ausmultipliziert ableiten** – folgt der Technik statt dem Zweck und liegt weit über jedem realistischen Wert.
+
 ---
 
 ## Ingredients-Endpoints
@@ -914,6 +931,30 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 **Tags:** scope:feature, resource:planned-recipes, http:put, http:422, arch:validation
 
 **Entscheidung:** `PUT /api/planned-recipes/{recipeId}` antwortet mit `422`, wenn das Rezept nicht existiert oder soft-deleted ist – nicht mit `404`. Der Request ist semantisch ungültig (ungültige `recipeId`), nicht "Ressource nicht gefunden". Konsistent mit Collect-all-Validation-Konvention für referenzielle Integrität.
+
+---
+
+## Einkaufsliste-Endpoints
+
+### ADR-S154-2: Einkaufsliste: Übernehmen ersetzt die Liste, Gesamtmenge mit Plausibilitätsgrenze
+
+**Status:** Accepted
+**Tags:** scope:feature, arch:validation, arch:domain-type, db:constraint
+
+**Entscheidung (SKELETON-Stufe von US-201, Szenarien in `features/shopping-lists.feature`):**
+- **Übernehmen** (Button „Auf die Einkaufsliste“ auf der Vorgemerkt-Seite) liest die Vormerkungen auf dem Server zum Zeitpunkt des Klicks – der Client schickt keine Rezept-IDs – und ersetzt die Einkaufsliste vollständig. Findet es keine Vormerkung, wird die Liste leer. Die Vormerkungen bleiben unverändert.
+- Die Einkaufsliste ist eine **Momentaufnahme**: Spätere Änderungen an Vormerkungen wirken erst beim nächsten Übernehmen.
+- Je Zutat ein Eintrag mit der **Gesamtmenge** in der Basiseinheit; „ohne Menge“ zählt als 0, nur ohne Menge bleibt ohne Menge (ADR-S020-1). Gerechnet wird exakt dezimal; die Summe trägt die drei Nachkommastellen der Summanden.
+- Die Gesamtmenge hat die **Plausibilitätsgrenze 99 999,999** (Spalte `numeric(8,3)`), nach ADR-S154-1. Überschreitet eine Summe sie, scheitert das Übernehmen; die bisherige Liste bleibt unverändert.
+
+**Begründung der Grenze (vom User bestätigt):** Eine Einkaufsliste reicht typisch eine Woche, gelegentlich zwei; mehr als vier Wochen im Voraus wäre ein Fehler, für die Vergangenheit plant niemand. Größte realistische Gesamtmenge einer Zutat: ~10 kg (Kartoffeln; Mehl, wenn Brot gebacken wird), ~10 l (Milch), ~60 Stück (Eier); andere Einheiten (EL, Pck., Dose) höchstens ~50. Der größte Wert liegt damit bei etwa 10 000 in der Basiseinheit – über dem Maximum einer Rezeptmenge (9 999,999, `numeric(7,3)`, ADR-S135-2), deshalb die nächste Spaltengröße mit etwa zehnfachem Spielraum, der auch vier Wochen abdeckt.
+
+**Begründung Ersetzen und Momentaufnahme:** Im SKELETON stehen auf der Liste nur Rezept-Zutaten, und es wird nicht festgehalten, aus welcher Vormerkung ein Eintrag stammt. Ergänzen statt Ersetzen würde beim zweiten Übernehmen die Mengen verdoppeln. Der Button steht auf der Vorgemerkt-Seite, weil die Einkaufsliste später auch eigene Artikel trägt (US-301/US-307) – dort soll man Artikel hinzufügen, nicht die Liste neu erstellen.
+
+**Verworfen:**
+- **Liste live aus den Vormerkungen berechnen** (ohne Button) – braucht einen Zeitpunkt, an dem Abgehaktes zurückgesetzt wird (Einkaufs-Zyklus); sonst bliebe in der nächsten Woche abgehakt, was letzte Woche gekauft wurde.
+- **Beim Ersetzen die Haken behalten** – teurer, ohne Bedarf im SKELETON.
+- **Gesamtmenge ohne Grenze** bzw. **wie die Rezeptmenge auf 9 999,999** – siehe ADR-S154-1 bzw. die Begründung oben: Ohne Grenze bleiben Logikfehler unsichtbar; mit 9 999,999 scheiterte das Übernehmen schon bei realistischen Wochenmengen.
 
 ---
 

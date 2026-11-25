@@ -81,6 +81,11 @@ Welche Entscheidungen betreffen diese US?
 Welche Felder nimmt jede Operation als Eingabe?
 Pro Feld: Name, Typ (String / Zahl / Enum / Referenz), bekannte Constraints (NOT NULL, max. Länge, unique, etc.)
 
+**Wertebereiche:** Für jeden Zahlwert, jedes Datum und jede Sammlung der Story – eingegeben
+**oder berechnet** (Summe, Anzahl) – den realistischen Bereich nach
+[ADR-S154-1](../../../docs/history/adr.md) entwerfen und dem User zur Bestätigung vorlegen
+(Regelentdeckung). Die bestätigten Werte samt Überlegung gehören in die ADR des Features.
+
 <a id="GHW-ux-kontext"></a>
 ### UX-Kontext (für die [Scenario-Entdeckung](#GHW-scenario-entdeckung), alle Agents)
 

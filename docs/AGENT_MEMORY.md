@@ -1,7 +1,7 @@
 # Agent Memory – Mahl
 
 **Phase:** SKELETON 🔄
-**Aktuelle Story:** US-803 (Rezepte vormerken)
+**Aktuelle Story:** US-201 (Pantry-Check – Einkaufsliste aus den Vormerkungen)
 **Nächster Lauf:** {{NEXT_RUN}}
 
 ---

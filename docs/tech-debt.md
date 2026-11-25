@@ -438,3 +438,19 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** In S154 schlug in 1 von 13 Wiederholungen der Undo-/Pending-Tests (Filter „Undo-Toast|Vormerkung entfernen“, je Lauf 13 Tests) CROSS_Interaction_Undo_ClickBesideToast_ToastRemainsVisible für die Vorgemerkt-Seite im Given fehl: Nach parallelem Seed (je Eintrag Zutat, Rezept, PUT /api/planned-recipes/{id}, alle abgewartet) und goto('/planned') war die Zeile „Kartoffelsuppe“ 5 s lang nicht da (Client/e2e/interaction.spec.ts, givenEntriesShown). Die übrigen 12 Läufe und zwei volle Suiten (188 bzw. 190) waren grün. Ursache ungeklärt; der Trace dieses Laufs ist nicht mehr vorhanden.
 **Behebung:** Mit Wiederholungen reproduzieren (Filter auf den Vorgemerkt-Undo-Block), dann Trace und Netzwerk-Log ansehen: Liefert das GET /api/planned-recipes den Eintrag schon (Seed-/Serverseite) oder fehlt er nur in der Anzeige (Client-Cache)? Je nach Befund Seed oder Client korrigieren – nicht mit längerem Timeout überdecken.
 **Aufschubgrund:** Recherche – Ursache ungeklärt, braucht Reproduktion über viele Läufe und Trace-Analyse; in der Triage von US-803 run-5 (S154) vom User als TD entschieden
+
+---
+
+## TD-S154-4 — Vorgemerkt-Seite: während des Übernehmens Entfernen und Navigation sperren
+**Fällig:** Phase:MVP – im SKELETON vom User als nicht notwendig eingestuft, die Sperre selbst ist gewollt
+**Problem:** Während „Auf die Einkaufsliste“ (US-201) läuft, ist nur dieser Button gesperrt. „Entfernen“ und die Navigation bleiben bedienbar – Abweichung von der UX-Guideline „Sichtbares Feedback“ (Sperren während Pending). Wer in diesem Moment entfernt, findet das Rezept je nach Reihenfolge der Anfragen noch auf der Einkaufsliste; wer die Seite verlässt, wird trotzdem zur Einkaufsliste geführt.
+**Behebung:** Solange das Übernehmen läuft, „Entfernen“ (und „Rückgängig“ im Toast) auf der Vorgemerkt-Seite sperren; nach dem Verlassen der Seite die Erfolgsantwort nicht mehr zur Einkaufsliste navigieren lassen. Je ein Szenario in features/shopping-lists.feature.
+**Aufschubgrund:** User – im gherkin-workshop von US-201: „ich würde hier das UI schon sperren, aber im SKELETON ist das nicht notwendig“
+
+---
+
+## TD-S154-5 — Einkaufsliste: Grenzfall-Szenarien für die Gesamtmenge
+**Fällig:** Phase:MVP – zusammen mit den Fehlermeldungen aus features/resilience.feature; erst mit einer Meldung lässt sich das Überschreiten sinnvoll spezifizieren
+**Problem:** Die Gesamtmenge eines Einkaufslisten-Eintrags hat die Plausibilitätsgrenze 99999,999 in der Basiseinheit (ADR-S154-2). Überschreitet eine Summe sie, scheitert das Übernehmen; im SKELETON ohne Meldung und ohne Szenario – die genaue Grenze und das Verhalten darüber sind nicht spezifiziert.
+**Behebung:** In features/shopping-lists.feature Grenzfälle ergänzen: 99999,999 wird übernommen, 100000 lässt das Übernehmen mit einer Meldung scheitern, die bisherige Einkaufsliste bleibt unverändert.
+**Aufschubgrund:** User – im gherkin-workshop von US-201: Grenz-Tests für den SKELETON verzichtbar

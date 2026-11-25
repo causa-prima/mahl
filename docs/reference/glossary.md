@@ -205,6 +205,7 @@ Eine temporäre Regel, die nur für den aktuellen Lauf des Planungs-Wizards gilt
 <a id="GLO-einkaufsliste"></a>
 ### Einkaufsliste (Shopping List)
 Eine aggregierte Liste von *Einkaufslisten-Einträgen* für einen definierten Zeitraum.
+*   **Übernehmen:** Die Zutaten aller *Vormerkungen* auf die Einkaufsliste schreiben – je Zutat ein Eintrag mit der **Gesamtmenge** (Summe aller Bedarfe). Ausgelöst auf der Vorgemerkt-Seite (US-201).
 
 <a id="GLO-einkaufslisten-eintrag"></a>
 ### Einkaufslisten-Eintrag (Shopping List Item)
@@ -247,7 +248,7 @@ Begriffe, mit denen Gherkin-Szenarien die Oberfläche beschreiben. Sie benennen,
 
 <a id="GLO-seiten"></a>
 ### Seite, Liste, Detailansicht
-*   **Zutaten-Seite / Rezepte-Seite / Vorgemerkt-Seite:** Die Hauptseiten, erreichbar über die *Navigationsleiste*. Die Rezepte-Seite zeigt die **Rezept-Liste**, die Zutaten-Seite die **Zutaten-Liste** – „Liste" meint immer diese Bestandsliste, nie das *Zutatenfeld* eines Rezepts. Die Vorgemerkt-Seite zeigt die *Vormerkungen*.
+*   **Zutaten-Seite / Rezepte-Seite / Vorgemerkt-Seite / Einkaufsliste:** Die Hauptseiten, erreichbar über die *Navigationsleiste*. Die Rezepte-Seite zeigt die **Rezept-Liste**, die Zutaten-Seite die **Zutaten-Liste** – „Liste" meint immer diese Bestandsliste, nie das *Zutatenfeld* eines Rezepts. Die Vorgemerkt-Seite zeigt die *Vormerkungen*. Die Seite „Einkaufsliste" heißt wie die *Einkaufsliste*, die sie zeigt.
 *   **Detailansicht:** Die Ansicht eines einzelnen Rezepts mit Zutaten und nummerierten Schritten.
 *   **Direktlink:** Die eigene Adresse einer Ansicht, die sich direkt aufrufen lässt (Lesezeichen, neues Fenster). Nur Rezepte haben einen (ADR-S135-5).
 *   **Navigationsleiste:** Die immer sichtbare Leiste mit den Hauptseiten.
