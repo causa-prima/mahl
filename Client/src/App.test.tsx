@@ -6,7 +6,7 @@ import { http, HttpResponse } from 'msw'
 import { server } from './mocks/server'
 import { appRoutes } from './App'
 
-const pageNames = ['Zutaten', 'Rezepte', 'Vorgemerkt'] as const
+const pageNames = ['Zutaten', 'Rezepte', 'Vorgemerkt', 'Einkaufsliste'] as const
 type PageName = (typeof pageNames)[number]
 
 // Given (Background): die Anwendung ist gestartet, alle Listen sind leer.
@@ -15,6 +15,7 @@ function renderAppAt(initialPath: string) {
     http.get('/api/ingredients', () => HttpResponse.json([])),
     http.get('/api/recipes', () => HttpResponse.json([])),
     http.get('/api/planned-recipes', () => HttpResponse.json([])),
+    http.get('/api/shopping-list', () => HttpResponse.json([])),
   )
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -64,6 +65,19 @@ describe('CROSS_Navigation: Navigationsleiste', () => {
 
     // Then: sehe ich die Vorgemerkt-Seite
     await expectPageShown('Vorgemerkt')
+  })
+
+  // Szenario: Von der Vorgemerkt-Seite zur Einkaufsliste navigieren
+  it('CROSS_Navigation_PlannedToShoppingList_ClickNavigationEntry_ShowsShoppingList', async () => {
+    // Given: ich navigiere zur Vorgemerkt-Seite
+    renderAppAt('/planned')
+    await screen.findByRole('heading', { level: 1, name: 'Vorgemerkt' })
+
+    // When: ich in der Navigationsleiste auf "Einkaufsliste" klicke
+    fireEvent.click(navEntry('Einkaufsliste'))
+
+    // Then: sehe ich die Einkaufsliste
+    await expectPageShown('Einkaufsliste')
   })
 
   // Szenario: Von der Rezepte-Seite zur Zutaten-Seite navigieren

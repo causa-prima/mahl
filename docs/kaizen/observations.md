@@ -334,3 +334,14 @@ Drain-Mechanismus (Wert-/Alters-/Wiedervorlage-Lane), Quer-Bewegung LL↔OBS: do
 - Zusammen-erledigen: OBS-S154-2
 - Aufschubgrund: User – in der Abschluss-Triage von US-803 run-5 (S154) als Beobachtung entschieden
 - Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten
+
+## OBS-S154-4 – Navigationsszenario einer neuen Seite landet in einem eigenen Lauf, getrennt von der Seite
+- Quelle: User + Orchestrator
+- Status: NEU
+- Impact: GERING    Häufigkeit: gelegentlich
+- Kategorie: PROZESS    Kontext: Gherkin
+- Beobachtung: Führt eine Story eine neue Seite ein, legt der Workshop das Szenario „Von Seite X zur neuen Seite navigieren“ nach ADR-S103-1 in features/navigation.feature ab. Läufe werden je Feature-Datei nummeriert; über Dateigrenzen gibt es nur braucht:-Kanten (wartet auf), kein „wird zusammen umgesetzt“ (scenario-clustering.md, Run-Tag). implementing-scenario setzt einen Lauf pro Durchgang um. Folge: Seite und Weg dorthin entstehen in zwei Durchgängen, obwohl sie inhaltlich zusammengehören; dazwischen ist die Seite nur per Adresse erreichbar, und das Review meldet erwartbar den fehlenden Navigationseintrag (UX-Guideline: jede Route hat einen Eintrag). Aufgefallen bei US-201 run-1 (Einkaufsliste, Leerzustand) und CROSS-navigation run-6; der User hat beide in einem Durchgang umsetzen lassen.
+- Vorprägung: Im Gespräch erwogen: V1 – Regel in implementing-scenario (Architektur-Check, ATDD-Gate): offenen @CROSS-navigation-Lauf mit braucht: auf genau den Lauf, der die Seite einführt, im selben Durchgang mitnehmen, ohne Werkzeugänderung. V2 – neuer Kantentyp „· mit:<ref>“ (zusammen umsetzen), den next_run.py versteht (Parser, --check, Tests). V3 – Szenario in die Story-Datei: widerspricht ADR-S103-1. Der User wollte V2 als OBS gemerkt haben.
+- Zusammen-erledigen: keiner
+- Aufschubgrund: User – der User hat entschieden, die Workshop-/Werkzeugänderung jetzt nicht umzusetzen und V2 als OBS zu merken
+- Entscheidung/Maßnahme: offen - beim Drain Kandidaten erstellen und bewerten

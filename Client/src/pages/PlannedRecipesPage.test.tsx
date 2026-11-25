@@ -1,20 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
-import { appRoutes } from '../App'
-
-function renderApp(initialPath: string) {
-  const router = createMemoryRouter(appRoutes, { initialEntries: [initialPath] })
-  render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  )
-  return router
-}
+import { renderApp } from '../test/renderApp'
 
 const hint = 'Noch keine Rezepte vorgemerkt.'
 const potatoSoup = { id: '3f2b8c1e-0000-4000-8000-000000000503', title: 'Kartoffelsuppe' }
@@ -129,7 +117,7 @@ describe('Vorgemerkt-Seite', () => {
         return HttpResponse.json({ ...recipe, ingredients: [{ name: 'Mehl', quantity: 250, unit: 'g' }], steps: [{ instruction: 'Rühren.' }] })
       }),
     )
-    const router = renderApp('/planned')
+    const { router } = renderApp('/planned')
 
     // When: ich zur Vorgemerkt-Seite navigiere und auf "Pfannkuchen" klicke
     fireEvent.click(await screen.findByRole('link', { name: 'Pfannkuchen' }))

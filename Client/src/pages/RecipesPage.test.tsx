@@ -2,26 +2,14 @@ import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { delay, http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
-import { appRoutes } from '../App'
+import { renderApp } from '../test/renderApp'
 import RecipeDetailPage from './RecipeDetailPage'
 
 function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
-}
-
-// Die ganze Anwendung ab dem Pfad: Rezept anlegen ist eine Navigation über mehrere Seiten (ADR-S135-4).
-// Gibt den Router zurück: Browser-Zurück und die Adresse sind nur über ihn erreichbar (ADR-S151-1).
-function renderApp(initialPath: string) {
-  const router = createMemoryRouter(appRoutes, { initialEntries: [initialPath] })
-  render(
-    <QueryClientProvider client={createQueryClient()}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  )
-  return router
 }
 
 // API-Vertrag POST /api/recipes: Antwort 201 mit vollem Body (ADR-S068-1); die
@@ -96,7 +84,7 @@ function useOpenRecipeHandlers() {
   )
 }
 
-type AppRouter = ReturnType<typeof renderApp>
+type AppRouter = ReturnType<typeof renderApp>['router']
 
 // Der Browser-Zurück-Knopf: die Anwendung hat selbst keinen Weg von der Detailansicht zur Liste.
 async function goBack(router: Readonly<Pick<AppRouter, 'navigate'>>) {
@@ -304,7 +292,7 @@ describe('Rezepte erfassen', () => {
   it('US602_HappyPath_OpenRecipe_SecondRecipeAfterFirst_NeverShowsFirstRecipe', async () => {
     // Given: zwei Rezepte; ich habe "Pfannkuchen" geöffnet und bin per Browser-Zurück zur Liste gegangen
     useOpenRecipeHandlers()
-    const router = renderApp('/recipes')
+    const { router } = renderApp('/recipes')
     fireEvent.click(await screen.findByRole('link', { name: 'Pfannkuchen' }))
     await expectPancakesDetail()
     await goBack(router)
@@ -397,7 +385,7 @@ const ingredientsHint = 'Eine Zutat je Zeile: Menge, Einheit, Zutat – z. B. �
 // navigieren, "Rezept anlegen" klicken.
 async function openCreateFormFromEmptyList() {
   server.use(http.get('/api/recipes', () => HttpResponse.json([])))
-  const router = renderApp('/recipes')
+  const { router } = renderApp('/recipes')
   fireEvent.click(await screen.findByRole('button', { name: 'Rezept anlegen' }))
   await screen.findByLabelText(/^Titel/)
   return router

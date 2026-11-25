@@ -32,6 +32,7 @@ app.UseCollectionETag();
 app.MapIngredientsEndpoints();
 app.MapRecipesEndpoints();
 app.MapPlannedRecipesEndpoints();
+app.MapShoppingListEndpoints();
 app.MapSpaFallback();
 
 // E2E-Test-Isolation (ADR-S084-4 Addendum): NUR in der E2E-Umgebung. Die E2E läuft gegen eine eigene DB

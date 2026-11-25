@@ -1,21 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
-import { appRoutes } from '../App'
+import { renderApp } from '../test/renderApp'
 import type { RecipeId } from '../domain/recipe'
-
-function renderApp(initialPath: string) {
-  const router = createMemoryRouter(appRoutes, { initialEntries: [initialPath] })
-  render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  )
-  return router
-}
 
 type Summary = { readonly id: RecipeId; readonly title: string }
 
@@ -111,7 +99,7 @@ describe('Rezepte vormerken', () => {
   it.each(cases)('US803_HappyPath_PlanRecipe_ClickToggle_ShowsPlannedEverywhere ($ort)', async ({ path, expectPlanned }) => {
     // Given: die Rezepte existieren, kein Rezept ist vorgemerkt
     givenServer()
-    const router = renderApp(path)
+    const { router } = renderApp(path)
 
     // When: ich bei "Pfannkuchen" auf "Vormerken" klicke
     const toggle = await screen.findByRole('button', { name: 'Pfannkuchen vormerken' })
@@ -160,7 +148,7 @@ describe('Rezepte vormerken', () => {
   it.each(cases)('US803_HappyPath_UnplanRecipe_ClickToggle_ShowsUnplannedEverywhere ($ort)', async ({ path, expectUnplanned }) => {
     // Given: die Rezepte "Kartoffelsuppe" und "Pfannkuchen" sind vorgemerkt
     givenServer({ planned: [potatoSoup, pancakes] })
-    const router = renderApp(path)
+    const { router } = renderApp(path)
 
     // When: ich bei "Pfannkuchen" auf "Vorgemerkt" klicke
     const toggle = await screen.findByRole('button', { name: 'Pfannkuchen vorgemerkt' })

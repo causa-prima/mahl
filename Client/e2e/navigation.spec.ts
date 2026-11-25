@@ -12,6 +12,7 @@ const pages = {
   Zutaten: '/ingredients',
   Rezepte: '/recipes',
   Vorgemerkt: '/planned',
+  Einkaufsliste: '/shopping-list',
 } as const
 
 type PageName = keyof typeof pages
@@ -96,6 +97,18 @@ test.describe('CROSS_Navigation: Navigationsleiste', () => {
 
     // Then: sehe ich die Vorgemerkt-Seite
     await expectPageShown(page, 'Vorgemerkt')
+  })
+
+  // Szenario: Von der Vorgemerkt-Seite zur Einkaufsliste navigieren
+  test('CROSS_Navigation_PlannedToShoppingList_ClickNavigationEntry_ShowsShoppingList', async ({ page }) => {
+    // Given: ich navigiere zur Vorgemerkt-Seite
+    await gotoPage(page, 'Vorgemerkt')
+
+    // When: ich in der Navigationsleiste auf "Einkaufsliste" klicke
+    await navEntry(page, 'Einkaufsliste').click()
+
+    // Then: sehe ich die Einkaufsliste
+    await expectPageShown(page, 'Einkaufsliste')
   })
 })
 

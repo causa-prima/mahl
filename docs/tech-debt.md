@@ -373,11 +373,11 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 
 ---
 
-## TD-S150-2 — Navigationsleiste nicht bündig mit dem Seitenrumpf
+## TD-S150-2 — Navigationsleiste nicht bündig mit dem Seitenrumpf, bei Handybreite umgebrochen
 **Fällig:** Phase:MVP – visuelle Politur, wenn das Layout der Seiten ohnehin überarbeitet wird
-**Problem:** Client/src/components/AppLayout.tsx: Die Leiste ist vollbreit und linksbündig, der Seitenrumpf dagegen auf maxWidth="sm" zentriert. Gemessen (Wegwerf-Probe, Playwright-Desktop-Viewport, Breite nicht abgefragt): linke Kante von „Zutaten" x = 24 px, Seitentitel x = 364 px. Am Handy kommen laut UX-Review ca. 8 px Innenabstand des Text-Buttons hinzu (aus MUI-Defaults abgeleitet, nicht gemessen). Die Visuelle Baseline (CGU-visuelle-baseline) nennt gegeneinander versetzte Kanten ausdrücklich als Mangel.
-**Behebung:** Leiste in denselben Container wie der Seitenrumpf (Toolbar disableGutters, Container maxWidth="sm" ohne vertikalen Theme-Abstand), Innenabstand des ersten Buttons ausgleichen; Bündigkeit in der Visuellen Baseline festhalten. Messen lässt sie sich nur im Browser – ein E2E-Messtest braucht ein Szenario (E2E-Szenario-Mapping-Hook), also vorher klären, ob Layout-Bündigkeit per Szenario oder nur per Augenschein geprüft wird.
-**Aufschubgrund:** User – im Review-Loop von CROSS-navigation run-1 entschieden: Messung nur im Browser möglich, ein Szenario für ein Layout-Detail lohnt jetzt nicht
+**Problem:** Client/src/components/AppLayout.tsx: (1) Die Leiste ist vollbreit und linksbündig, der Seitenrumpf dagegen auf maxWidth="sm" zentriert. Gemessen (Wegwerf-Probe, Playwright-Desktop-Viewport, Breite nicht abgefragt): linke Kante von „Zutaten" x = 24 px, Seitentitel x = 364 px. Am Handy kommen laut UX-Review ca. 8 px Innenabstand des Text-Buttons hinzu (aus MUI-Defaults abgeleitet, nicht gemessen). Die Visuelle Baseline (CGU-visuelle-baseline) nennt gegeneinander versetzte Kanten ausdrücklich als Mangel. (2) Mit vier Einträgen passt die Leiste bei 375 px nicht in eine Zeile: „Einkaufsliste" steht allein in einer zweiten Zeile, die Leiste ist doppelt so hoch (Screenshot der Handybreiten-Sichtprüfung von CROSS_Navigation_PlannedToShoppingList_ClickNavigationEntry_ShowsShoppingList). Bedienbar bleibt sie; jede weitere Hauptseite verschärft es.
+**Behebung:** Navigation für Handybreite neu gestalten – Kandidat: untere Navigationsleiste mit Icons und Labels (neues UI-Muster: Entwurf und User-Freigabe vorher). Dabei die Bündigkeit mitlösen (Leiste im selben Container wie der Seitenrumpf, Innenabstand des ersten Eintrags ausgleichen) und beides in der Visuellen Baseline festhalten. Messen lässt sich beides nur im Browser – ein E2E-Messtest braucht ein Szenario (E2E-Szenario-Mapping-Hook), also vorher klären, ob Layout per Szenario oder nur per Augenschein geprüft wird.
+**Aufschubgrund:** User – Bündigkeit im Review-Loop von CROSS-navigation run-1 entschieden (Messung nur im Browser, ein Szenario für ein Layout-Detail lohnt jetzt nicht); Umbruch in der Abschluss-Triage von US-201 run-1 entschieden (neues Navigationsmuster braucht Entwurf, gehört nicht in diesen Lauf)
 
 ---
 
@@ -454,3 +454,11 @@ Keine der vier Lücken ist heute durch ein Szenario beobachtbar: Das treibende S
 **Problem:** Die Gesamtmenge eines Einkaufslisten-Eintrags hat die Plausibilitätsgrenze 99999,999 in der Basiseinheit (ADR-S154-2). Überschreitet eine Summe sie, scheitert das Übernehmen; im SKELETON ohne Meldung und ohne Szenario – die genaue Grenze und das Verhalten darüber sind nicht spezifiziert.
 **Behebung:** In features/shopping-lists.feature Grenzfälle ergänzen: 99999,999 wird übernommen, 100000 lässt das Übernehmen mit einer Meldung scheitern, die bisherige Einkaufsliste bleibt unverändert.
 **Aufschubgrund:** User – im gherkin-workshop von US-201: Grenz-Tests für den SKELETON verzichtbar
+
+---
+
+## TD-S154-6 — Komponententests: Ladeverhalten je Seite kopiert statt als gemeinsame Suite
+**Fällig:** Phase:MVP – spätestens, wenn eine dritte Seite denselben Ladevertrag bekommt
+**Problem:** Die Feature-Köpfe von features/planned-recipes.feature und features/shopping-lists.feature legen dasselbe Ladeverhalten fest (während des Ladens kein Leerzustand und kein Spinner; ein Ladefehler zeigt nie den Leerzustand), gesichert per Komponententest. Die Tests dazu stehen fast wortgleich zweimal da: PlannedRecipesLoading_ResponsePending_ShowsOnlyHeading / PlannedRecipesLoading_ServerError_NeverShowsEmptyState in Client/src/pages/PlannedRecipesPage.test.tsx und ShoppingListLoading_… in Client/src/pages/ShoppingListPage.test.tsx. Mit jeder weiteren Listenseite kommt eine Kopie hinzu, die unabhängig driften kann (sie unterscheiden sich schon: nur der Einkaufslisten-Test wartet nach dem Fehler auf isFetching() === 0).
+**Behebung:** Eine parametrisierte Komponententest-Suite über eine Seitendefinition (Pfad, Überschrift, Leerzustand-Hinweis, Link des Leerzustands, Endpoint) – analog zu den E2E-Registries nach ADR-S112-5 (Client/e2e/pages/touchTargetPages.ts). Der gemeinsame Helfer Client/src/test/renderApp.tsx existiert bereits. Die Tests ohne US-Tag behalten ihre Einordnung nach ADR-S106-3 (Vertrag aus dem Feature-Kopf).
+**Aufschubgrund:** User – in der Abschluss-Triage von US-201 run-1 entschieden: nur den Helfer jetzt extrahieren, die Suite beim nächsten Berühren

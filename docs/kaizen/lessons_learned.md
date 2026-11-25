@@ -113,3 +113,17 @@ KRITISCH-Findings werden sofort behandelt (Andon-Cord) – hier trotzdem dokumen
   Was: US-803 run-4, Review-Fix Runde 2: Im Auftrag an den Backend-Fix-Subagenten stand „Der PUT-Test … prüft ebenfalls nur DB-Zustand (geprüft: Datei gelesen)“ – als Konsistenzargument dafür, den GET-Teil nur aus dem DELETE-Test zu entfernen. Tatsächlich prüfte der PUT-Test ebenfalls über GET. Gelesen hatte ich nur das Testinventar und einen Diff-Ausschnitt, der den Edge-Case-Test zeigte. Dieselbe falsche Aussage stand in meiner Begründung an den User. Der Subagent fing es ab; der Fix wurde auf beide Tests ausgedehnt.
   Warum: Die Aussage stammte aus einer Erinnerung an einen ähnlich aussehenden Nachbartest, nicht aus dem Lesen der genannten Stelle; das „geprüft“ wurde aus Gewohnheit angehängt, weil die Datei in der Session schon einmal (teilweise) zu sehen war.
   Regel: Vor „(geprüft: …)“ in einem Auftrag oder einer Vorlage die genannte Stelle in diesem Zug lesen; „Datei gelesen“ heißt die konkrete Zeile, nicht die Datei irgendwann oder ihr Inventar. Sonst „(ungeprüft)“ schreiben.
+
+## Session 154 – 2026-11-25
+
+- **[GERING] [AGENT] [Agent-Prompt] LL-S154-1 – ADR-Text als Bauzustand an einen Subagenten weitergegeben**
+  Quelle: Orchestrator
+  Was: Im Spawn-Auftrag für den Frontend-Subagenten von US-201 run-1 stand als Tatsache, Ladefehler zeige der zentrale Toast aus QueryCache.onError an. Der Toast ist noch nicht gebaut (Kommentar in Client/src/hooks/useCreateIngredientWithReactivation.ts, Szenarien in features/resilience.feature offen). Der Subagent übernahm die Aussage in einen Testkommentar; im Test-Review fiel sie auf und wurde korrigiert.
+  Warum: Die Aussage stammte aus dem Text von ADR-S056-1, per decisions get gelesen. Eine ADR beschreibt eine Entscheidung, nicht, was davon gebaut ist – das habe ich gleichgesetzt und die Aussage ohne Prüfung im Code und ohne „(ungeprüft)" weitergegeben.
+  Regel: Eine ADR belegt die Entscheidung, nicht den Bauzustand. Wer aus einer ADR ableitet, dass etwas im Code existiert oder sich so verhält, prüft es im Code oder kennzeichnet es als (ungeprüft), bevor es an einen Subagenten geht.
+
+- **[GERING] [AGENT] [Agent-Prompt] LL-S154-2 – Subagent legte PLANUNG und Test-Review zusammen, weil er Warten für unmöglich hielt**
+  Quelle: Subagent
+  Was: Der Frontend-Subagent von US-201 run-1 schrieb seine PLANUNG nicht als eigene Rückgabe, sondern zusammen mit dem RED-Batch und dem TEST-REVIEW-Signal. Er entschied die offenen Punkte selbst. Folge hier gering: Die Entscheidungen passten, das Test-Review fing den einen Fehler.
+  Warum: Die Agent-Definition (.claude/agents/frontend-layer-implementer.md, Schritt PLANUNG) sagt „warte auf Antwort des Orchestrators“. Der Subagent schloss daraus, Warten sei unmöglich, weil sein einziger Rückkanal den Lauf beendet. Dass der Orchestrator ihn per SendMessage mit vollem Kontext fortsetzt, steht im Skill implementing-scenario, nicht in der Agent-Definition. Der Backend-Subagent bekam das im Auftrag ausdrücklich gesagt und hielt die Reihenfolge ein. Vom User als einmaliger Ausrutscher eingestuft: erst bei Wiederholung handeln.
+  Regel: Im Subagenten heißt Warten: den Lauf mit der PLANUNG beenden. Der Orchestrator setzt per SendMessage fort. PLANUNG und TEST-REVIEW nur dann zusammenlegen, wenn es keine Rückfragen gibt.
