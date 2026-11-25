@@ -130,3 +130,20 @@ def test_eine_offene_dom_ausgabe_am_ende_wird_gekuerzt_statt_verschluckt():
 def test_eine_kurze_offene_dom_ausgabe_am_ende_bleibt_ganz():
     zeilen = ["Fehler", *_dom(3)]
     assert vr.shorten_dom_dumps(zeilen) == zeilen
+
+
+# --- Aufruf von vitest --------------------------------------------------------
+
+def test_jede_datei_geht_als_eigener_filter_an_vitest_ab_client(monkeypatch):
+    # Zweimal --file heißt zwei Dateien: Ein einfaches argparse-Argument behielte nur die letzte, und der
+    # Lauf wäre trotzdem grün – mit der Hälfte der Tests.
+    argumente: list[list[str]] = []
+
+    def run_npm(npm_args: list[str]) -> tuple[str, int]:
+        argumente.append(npm_args)
+        return "      Tests  3 passed (3)\n", 0
+
+    monkeypatch.setattr(vr, "run_npm", run_npm)
+    assert cli_aufruf(monkeypatch, vr, "--file", "Client/src/a.test.tsx", "--file", "src/b.test.tsx",
+                      "--filter", "Titel") == 0
+    assert argumente == [["run", "test", "--", "run", "src/a.test.tsx", "src/b.test.tsx", "-t", "Titel"]]

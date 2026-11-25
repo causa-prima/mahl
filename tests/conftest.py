@@ -9,6 +9,7 @@ import itertools
 import subprocess
 import sys
 import os
+from pathlib import Path
 
 import pytest
 
@@ -18,6 +19,8 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from prozesscode._mutmut_ausnahmen import UNTER_MUTMUT_UEBERSPRUNGEN
+from prozesscode._run_lock import RunLock
+from prozesscode._util import REPO_ROOT
 from prozesscode.hooks.checks import guard_log
 from prozesscode.hooks.checks.common import HookInput, CS_FILE, TS_FILE, TEST_FILE, DOMAIN_EXCLUDED
 
@@ -59,6 +62,29 @@ def _guard_log_ins_leere(_guard_log_verzeichnis, monkeypatch):
     """
     monkeypatch.setattr(guard_log, "LOG",
                         _guard_log_verzeichnis / f"guard-{next(_LAUFENDE_NUMMER)}.jsonl")
+
+
+_ECHTE_LOCKS = REPO_ROOT / ".claude" / "tmp"
+_RUN_LOCK_INIT = RunLock.__init__
+
+
+@pytest.fixture(autouse=True)
+def _kein_echter_lauf_lock(tmp_path_factory, monkeypatch):
+    """Kein Test nimmt den Lock eines echten Laufs (E2E, Backend-Tests, Stryker).
+
+    Ruft ein Test einen Wrapper über main() auf, griffe er sonst nach dem Lock des Arbeitsbaums: Hält ein
+    echter Lauf ihn gerade, bricht der Test ab oder wartet. Unter mutmut kommt dazu, dass also_copy den
+    Lock eines laufenden Laufs in den Mutantenbaum kopiert. Tests mit eigenem Lock unter tmp_path bleiben
+    unberührt. Umgeleitet wird an der Klasse statt je Modulkonstante, damit es auch für künftige Wrapper gilt.
+    """
+    ersatz = tmp_path_factory.mktemp("run-locks")
+
+    def umgeleitet(self, target, *args, **kwargs):
+        if Path(target).is_relative_to(_ECHTE_LOCKS):
+            target = ersatz / Path(target).relative_to(_ECHTE_LOCKS)
+        _RUN_LOCK_INIT(self, target, *args, **kwargs)
+
+    monkeypatch.setattr(RunLock, "__init__", umgeleitet)
 
 
 def git_repo(verzeichnis, nachrichten: list[str]):

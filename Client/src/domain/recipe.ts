@@ -48,11 +48,18 @@ export type Recipe = RecipeSummary & {
 // keine Nullen am Ende.
 const quantityFormat = new Intl.NumberFormat('de-DE', { useGrouping: false, maximumFractionDigits: 3 })
 
+// Geschütztes Leerzeichen (U+00A0): Zahl und Einheit brechen nicht auseinander. Als Codepunkt-Ausdruck, weil ein
+// Literal vom normalen Leerzeichen nicht zu unterscheiden ist.
+const noBreakSpace = String.fromCodePoint(0xa0)
+
+// "<Menge>␣<Einheit>" mit geschütztem Leerzeichen, z.B. "0,5 l"; geteilt von Rezept-Detailansicht und Einkaufsliste.
+export const formatQuantity = (quantity: number, unit: Unit): string => `${quantityFormat.format(quantity)}${noBreakSpace}${unit}`
+
 // "<Menge> <Einheit> <Name>" bzw. nur "<Name>" ohne Menge (ADR-S020-1).
 export function formatIngredient(ingredient: RecipeIngredient): string {
   return ingredient.quantity === null
     ? ingredient.name
-    : `${quantityFormat.format(ingredient.quantity)} ${ingredient.unit} ${ingredient.name}`
+    : `${formatQuantity(ingredient.quantity, ingredient.unit)} ${ingredient.name}`
 }
 
 export type NewRecipe = {

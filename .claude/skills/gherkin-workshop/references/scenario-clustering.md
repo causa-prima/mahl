@@ -178,6 +178,38 @@ Story mit Feature-Datei unsichtbar. Fehlt die Direktive, gilt die Stufe aus `# @
 Teilweise spezifizierte Stufen werden nicht genannt; `next_run.py --check` blockt Stufen, die die
 Story gar nicht hat.
 
+<a id="CLU-kopf-regeln"></a>
+### Kopf-Regeln ohne Szenario: Absicherung und Lauf
+
+Was der Kopf der Feature-Datei über Verhalten festlegt, ohne dass ein Szenario es trägt – eine
+Regel, ein Querschnittsvertrag, eine bekannte Grenze, eine Invariante für den ADR-Check –, bekommt
+als letzte Zeile einen Vermerk, wie es abgesichert wird und in welchem Lauf:
+
+```gherkin
+  #   - Findet der Server beim Übernehmen keine Vormerkung, wird die Einkaufsliste leer.
+  #     → Integrationstest · run-2
+```
+
+Format: `→ <Absicherung> · run-<N>[, run-<M>]`
+
+- **Absicherung** – `Komponententest` oder `Integrationstest` (Kategorie „Vertrag aus dem
+  Feature-Kopf" in ADR-S106-3), oder `keine (unbestimmt erlaubt)` ohne Lauf, wenn das Verhalten
+  bewusst offen bleibt. Der Vermerk `keine` hält fest, dass das entschieden ist und nicht vergessen.
+- **Lauf** – der Lauf, der den Code baut, den die Aussage betrifft; bei einem Vertrag über mehrere
+  Seiten jeder dieser Läufe.
+- Deckt ein Szenario nur einen Teil eines Spiegelstrichs, wird der Rest ein eigener Spiegelstrich.
+  Keinen Vermerk tragen Aussagen, die ein Szenario trägt oder die aus einem folgen (etwa eine
+  bekannte Grenze als Folge einer Regel), die Liste der Übergangsregeln, Punkte für spätere
+  Workshops und Hinweise für die Step-Implementierung.
+
+Wirkung: `check-atdd-gate.py` gibt im Lauf-Modus nach den Szenarien die Kopf-Regeln des Laufs
+aus, mit ihrer Überschrift. So stehen sie im Architektur-Check und im Auftrag an die
+Schicht-Subagenten wie ein Szenario. Gelesen wird jede Laufnummer hinter dem letzten Pfeil der
+Aussage, auch über einen Zeilenumbruch. Nicht erscheint eine Aussage ohne Vermerk, mit einem
+Vermerk ohne Lauf (zwischen Workshop und Clustering) oder mit Formfehler (`->`, `run2`) – und
+ein Vermerk auf einen Lauf ohne Szenario, weil das Gate dort schon vorher anhält. Auf diese
+Fälle prüft nichts: Den Vermerk nach dem Clustering einmal mit der Gate-Ausgabe abgleichen.
+
 ## Beispiel
 
 `scenario-clustering-example.html` (in diesem Ordner) – interaktive Visualisierung des

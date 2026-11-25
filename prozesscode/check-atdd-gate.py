@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 ATDD-Gate: Prüft ob ein Gherkin-Szenario-Tag bzw. ein Implementierungs-Lauf in features/ existiert.
-Gibt bei Treffer den Background + alle passenden Szenario-Blöcke aus.
+Gibt bei Treffer den Background + alle passenden Szenario-Blöcke aus, im Lauf-Modus dazu die
+Kopf-Regeln, die ein Vermerk `→ <Absicherung> · run-N` dem Lauf zuordnet.
 
 Verwendung (Einzel-Szenario, Tag+optionaler Titel):
   python3 -m prozesscode.check-atdd-gate @US-904-happy-path
@@ -16,10 +17,12 @@ import re
 import sys
 from pathlib import Path
 
-from ._feature import parse_feature
+from ._feature import parse_feature, parse_header_rules
 
 _FEATURES_DIR = Path(__file__).parent.parent / "features"
 _RUN_ARG_RE = re.compile(r"^run-(\d+)$", re.IGNORECASE)
+_HEADER_RULES_TITLE = "─── {file} · Kopf-Regeln ohne Szenario, per Test abzusichern ───"
+_HEADER_RULES_COUNT = ", dazu {count} Kopf-Regel(n)"
 
 
 def _print_scenario(feature_file: Path, background: list[str], scenario: dict) -> None:
@@ -32,8 +35,22 @@ def _print_scenario(feature_file: Path, background: list[str], scenario: dict) -
     print()
 
 
+def _print_header_rules(feature_file: Path, rules: list[dict]) -> None:
+    """Die Kopf-Regeln des Laufs, die Überschrift einmal je Gruppe aufeinanderfolgender Regeln."""
+    print(_HEADER_RULES_TITLE.format(file=feature_file.name))
+    # Startwert gleichwertig zu jedem anderen Nicht-Listen-Wert: verglichen wird per Identität.
+    shown_heading: list[str] | None = None  # pragma: no mutate
+    for rule in rules:
+        if rule["heading"] is not None and rule["heading"] is not shown_heading:
+            print("\n".join(rule["heading"]))
+        shown_heading = rule["heading"]
+        print("\n".join(rule["lines"]))
+    print()
+
+
 def _run_mode(story_tag: str, run_number: int) -> None:
     matches: list[tuple[Path, list[str], dict]] = []
+    header_rules: list[tuple[Path, list[dict]]] = []
 
     for feature_file in sorted(_FEATURES_DIR.glob("**/*.feature")):
         text = feature_file.read_text(encoding="utf-8")
@@ -43,6 +60,9 @@ def _run_mode(story_tag: str, run_number: int) -> None:
         for scenario in scenarios:
             if scenario["run"] is not None and scenario["run"]["number"] == run_number:
                 matches.append((feature_file, background, scenario))
+        rules = [rule for rule in parse_header_rules(text) if run_number in rule["runs"]]
+        if rules:
+            header_rules.append((feature_file, rules))
 
     if not matches:
         print(f"❌  Kein Szenario mit run-{run_number} unter Feature-Tag {story_tag} in features/ gefunden.")
@@ -51,12 +71,16 @@ def _run_mode(story_tag: str, run_number: int) -> None:
 
     run_meta = matches[0][2]["run"]
     singleton_note = " · Singleton" if run_meta["singleton"] else ""
+    rule_count = sum(len(rules) for _file, rules in header_rules)
+    rule_note = _HEADER_RULES_COUNT.format(count=rule_count) if rule_count else ""
     print(
         f"✅  run-{run_number} „{run_meta['label']}\" ({run_meta['layer']}{singleton_note}) "
-        f"– {len(matches)} Szenario(s) gefunden:\n"
+        f"– {len(matches)} Szenario(s) gefunden{rule_note}:\n"
     )
     for feature_file, background, scenario in matches:
         _print_scenario(feature_file, background, scenario)
+    for feature_file, rules in header_rules:
+        _print_header_rules(feature_file, rules)
 
 
 def _tag_mode(tag: str, title_filter: str | None) -> None:

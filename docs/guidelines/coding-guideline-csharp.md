@@ -274,7 +274,7 @@ Domain-Typ    DbType    DTO
 
 - Domain-Typen kennen **weder** DbTypes **noch** externe Infrastruktur
 - `Create(...)` nimmt Domain-Typen oder Primitives als Input
-- Mapping-Code (DbType ↔ Domain, Domain → DTO) lebt in **`file static class`-Extension Methods** in der jeweiligen Endpoint-Datei (z.B. `IngredientsEndpoints.cs`). Nicht zwischen Endpoints geteilt – `file`-Sichtbarkeit erzwingt das und verhindert stilles Drift. Ausnahme: Liefern mehrere Endpoints ausdrücklich dieselbe Listenform, teilen sie eine Abfrage (`internal`, neben den Endpoints) – dort wäre gerade die Kopie die Drift-Quelle (Rezept-Listen, ADR-S142-1).
+- Mapping-Code (DbType ↔ Domain, Domain → DTO) lebt in **`file static class`-Extension Methods** in der jeweiligen Endpoint-Datei (z.B. `IngredientsEndpoints.cs`). Nicht zwischen Endpoints geteilt – `file`-Sichtbarkeit erzwingt das und verhindert stilles Drift. Ausnahme: Liefern mehrere Endpoints ausdrücklich dieselbe Listenform oder dieselbe Sortierung, teilen sie eine Abfrage (`internal`, neben den Endpoints) – dort wäre gerade die Kopie die Drift-Quelle (Rezept-Listen, Sortierung nach Zutatenname; ADR-S142-1).
 - **Kein `From()`**: DB-Rekonstruktion via `ToDomain()` → `OneOf<Domain, Error<string>>` im Mapping-Layer. Endpoints behandeln Fehler mit `Results.Problem(detail, statusCode: 500)` – kein `throw` im Endpoint-Body.
 
 <a id="CGC-typ-struktur"></a>

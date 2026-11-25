@@ -180,6 +180,13 @@ nicht an seinem schwächsten Teilargument. Dasselbe gilt für die Einstufung ein
 Hinweis sei ein Fehlalarm: übernehmen erst nach eigener Prüfung. Grund: Zwei Findings sollten
 schon mit dem Wortlaut verworfen werden, deren Kern gültig war – eins davon längst als Schuld erfasst.
 
+**Kehrt ein Finding einen Fix einer früheren Runde um** (dieselbe Stelle, Gegenrichtung: etwa ein
+Typ, den die Vorrunde flach gemacht hat, soll wieder abgeleitet werden), legt der Orchestrator beide
+Begründungen nebeneinander und entscheidet einmal. Umgesetzt wird es nur mit einem Argument, das die
+Vorrunde nicht kannte; sonst bleibt der Stand, und das Finding fällt mit kurzer Begründung als false
+positive heraus. Grund: Die Auditoren sind absichtlich ohne Vorwissen, den Widerspruch sieht nur, wer
+die Runden kennt – ohne diese Prüfung pendelt der Loop, und jede Runde kostet einen Subagenten.
+
 **Scope-Prüfung (Pflicht für jedes verbleibende Finding, in dieser Reihenfolge):**
 
 1. **Gehört das geforderte Verhalten in die aktuelle Phase?** Ist es erst in einer späteren

@@ -9,12 +9,14 @@ import ListItemText from '@mui/material/ListItemText'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import Close from '@mui/icons-material/Close'
-import { Link as RouterLink } from 'react-router'
+import { Link as RouterLink, useNavigate } from 'react-router'
 import UndoToast from '../components/UndoToast'
 import { useDeleteWithUndo } from '../hooks/useDeleteWithUndo'
 import { useInvalidatePlannedRecipes, usePlannedRecipes } from '../hooks/usePlannedRecipes'
+import { useGenerateShoppingList } from '../hooks/useShoppingList'
 import { planRecipe, unplanRecipe } from '../services/plannedRecipesApi'
 import type { RecipeSummary } from '../domain/recipe'
+import { shoppingListPath } from '../routes'
 
 type PlannedRecipeRowProps = {
   readonly recipe: RecipeSummary
@@ -42,15 +44,44 @@ function PlannedRecipeRow({ recipe, removing, onRemove }: Readonly<PlannedRecipe
   )
 }
 
-type PlannedRecipeListProps = {
-  readonly planned: readonly RecipeSummary[] | undefined
+type PlannedRecipeActions = {
   readonly deletingId: RecipeSummary['id'] | null
   readonly onRemove: (recipe: Readonly<RecipeSummary>) => void
+  readonly onGenerate: () => void
+}
+
+type PlannedRecipeListProps = PlannedRecipeActions & {
+  readonly planned: readonly RecipeSummary[] | undefined
+}
+
+type PlannedRecipesWithGenerateProps = PlannedRecipeActions & {
+  readonly planned: readonly RecipeSummary[]
+}
+
+// Die Liste der Vormerkungen mit der Hauptaktion darunter (CGU-visuelle-baseline: Stack spacing={2}).
+function PlannedRecipesWithGenerate({ planned, deletingId, onRemove, onGenerate }: Readonly<PlannedRecipesWithGenerateProps>) {
+  return (
+    <Stack spacing={2}>
+      <List aria-labelledby="planned-heading" disablePadding>
+        {planned.map((recipe) => (
+          <PlannedRecipeRow key={recipe.id} recipe={recipe} removing={recipe.id === deletingId} onRemove={onRemove} />
+        ))}
+      </List>
+      <Button
+        variant="contained"
+        fullWidth
+        aria-label="Zutaten aller vorgemerkten Rezepte auf die Einkaufsliste"
+        onClick={onGenerate}
+      >
+        Auf die Einkaufsliste
+      </Button>
+    </Stack>
+  )
 }
 
 // Solange die Antwort fehlt (Laden oder Fehler), steht unter der Überschrift nichts: kein Leerzustand, kein Spinner.
 // Leerzustand hier statt als Ternary in der Seite – Muster wie IngredientList.
-function PlannedRecipeList({ planned, deletingId, onRemove }: Readonly<PlannedRecipeListProps>) {
+function PlannedRecipeList({ planned, deletingId, onRemove, onGenerate }: Readonly<PlannedRecipeListProps>) {
   if (planned === undefined) return null
   if (planned.length === 0) {
     return (
@@ -62,13 +93,7 @@ function PlannedRecipeList({ planned, deletingId, onRemove }: Readonly<PlannedRe
       </Stack>
     )
   }
-  return (
-    <List aria-labelledby="planned-heading" disablePadding>
-      {planned.map((recipe) => (
-        <PlannedRecipeRow key={recipe.id} recipe={recipe} removing={recipe.id === deletingId} onRemove={onRemove} />
-      ))}
-    </List>
-  )
+  return <PlannedRecipesWithGenerate planned={planned} deletingId={deletingId} onRemove={onRemove} onGenerate={onGenerate} />
 }
 
 export default function PlannedRecipesPage() {
@@ -81,10 +106,14 @@ export default function PlannedRecipesPage() {
     onChanged: invalidatePlannedRecipes,
   })
 
+  const navigate = useNavigate()
+  // ADR-S154-3: POST /generate, danach öffnet sich die Einkaufsliste. Schlägt es fehl, bleibt die Seite ohne Meldung.
+  const generate = useGenerateShoppingList(() => { void navigate(shoppingListPath) })
+
   return (
     <Container component="main" maxWidth="sm">
       <Typography variant="h5" component="h1" id="planned-heading" gutterBottom>Vorgemerkt</Typography>
-      <PlannedRecipeList planned={planned} deletingId={deletingId} onRemove={requestDelete} />
+      <PlannedRecipeList planned={planned} deletingId={deletingId} onRemove={requestDelete} onGenerate={generate} />
       <UndoToast
         deleted={deleted}
         message={(recipe) => `${recipe.title} entfernt`}

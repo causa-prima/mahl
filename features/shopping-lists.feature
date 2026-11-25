@@ -24,10 +24,13 @@ Feature: Einkaufsliste aus den Vormerkungen
   # Regeln:
   #   - Übernehmen liest die Vormerkungen auf dem Server zum Zeitpunkt des Klicks und ERSETZT die
   #     Einkaufsliste vollständig – ohne Rückfrage. Danach öffnet sich die Einkaufsliste.
+  #   - Nach dem Übernehmen zeigt die Einkaufsliste nie, auch nicht kurz, die bisherige Liste.
+  #     → Komponententest · run-2
   #   - Die Einkaufsliste ist eine Momentaufnahme: Spätere Änderungen an den Vormerkungen wirken
-  #     erst beim nächsten Übernehmen. Übernehmen selbst ändert die Vormerkungen nicht. Findet
-  #     der Server beim Übernehmen keine Vormerkung (auf einem anderen Gerät alle entfernt), wird
-  #     die Einkaufsliste leer und zeigt ihren Leerzustand.
+  #     erst beim nächsten Übernehmen. Übernehmen selbst ändert die Vormerkungen nicht.
+  #   - Findet der Server beim Übernehmen keine Vormerkung (auf einem anderen Gerät alle
+  #     entfernt), wird die Einkaufsliste leer und zeigt ihren Leerzustand.
+  #     → Integrationstest · run-2
   #   - Eine Zeile je Zutat; die Mengen aller vorgemerkten Rezepte werden addiert. Eine
   #     Rezept-Zutat steht immer in der Einheit ihrer Zutat (ADR-S135-2), es wird nicht
   #     umgerechnet. „Ohne Menge" zählt als 0; steht eine Zutat in allen Rezepten ohne Menge,
@@ -37,14 +40,25 @@ Feature: Einkaufsliste aus den Vormerkungen
   #     Szenarien: TD-S154-5).
   #   - Anzeige: Name und Menge mit Einheit, Dezimalkomma, ohne Nullen am Ende und ohne
   #     Tausenderpunkt – wie die Mengen der Detailansicht eines Rezepts.
+  #   - Zahl und Einheit einer Menge brechen nicht auseinander (geschütztes Leerzeichen) – auf
+  #     der Einkaufsliste wie in der Detailansicht eines Rezepts.
+  #     → Komponententest · run-2
+  #   - Übernehmen lässt die anderen Seiten unberührt: Zurück auf der Vorgemerkt-Seite stehen die
+  #     Vormerkungen sofort da, ohne Ladezustand.
+  #     → Komponententest · run-2
   #   - Ohne Vormerkungen gibt es keinen Button; die Vorgemerkt-Seite zeigt nur ihren Leerzustand.
   #   - Ladeverhalten wie auf den übrigen Seiten (per Komponententest, nicht in der Suite):
   #     Während des Ladens erscheint nicht der Leerzustand; ein Ladefehler zeigt einen
   #     Fehlerhinweis, nie den Leerzustand.
-  # Offen für den ADR-Check der Umsetzung: Die Invarianten „scheitert Übernehmen, bleibt die
-  # bisherige Einkaufsliste unverändert" und „jede Zutat steht höchstens einmal auf der Liste"
-  # müssen auch bei zwei gleichzeitigen Übernehmen (zwei Geräte) halten – eine Transaktion allein
-  # genügt für die zweite nicht.
+  #     → Komponententest · run-1
+  #   - „Alphabetisch" heißt deutsche Sortierung wie bei allen Listen (ADR-S142-1): Umlaute beim
+  #     Grundbuchstaben, Klein- und Großschreibung ohne Vorrang.
+  #     → Integrationstest · run-2
+  # Invarianten, auch bei zwei gleichzeitigen Übernehmen (zwei Geräte; Umsetzung: ADR-S154-3):
+  #   - Scheitert Übernehmen, bleibt die bisherige Einkaufsliste unverändert.
+  #     → Integrationstest · run-2
+  #   - Jede Zutat steht höchstens einmal auf der Liste – Szenario „Dieselbe Zutat aus mehreren
+  #     Rezepten steht einmal mit der Gesamtmenge da"; gleichzeitig sichert es der Primärschlüssel.
   #
   # Übergangsregeln (gherkin-workshop, „Tiefe je Regel"; spezifiziert ist nur der Gutfall):
   #   - Ersetzen beim Übernehmen – löst US-301/US-307 (MVP) ab: Eigene Artikel auf der Liste
@@ -66,9 +80,11 @@ Feature: Einkaufsliste aus den Vormerkungen
   #   - Schlägt Übernehmen fehl (Netz, Server), bleibt man ohne Meldung auf der Vorgemerkt-Seite,
   #     der Button wird wieder frei. Den MVP-Workshop von features/resilience.feature erinnert
   #     dessen Kopf daran.
+  #     → Komponententest · run-2, run-3
   #   - Eine gelöschte Zutat hat kein spezifiziertes Verhalten – weder in einem vorgemerkten
   #     Rezept beim Übernehmen noch als Eintrag, der schon auf der Einkaufsliste steht (wie in
   #     features/recipes.feature; selten, Wegwerfdaten, erneutes Übernehmen korrigiert).
+  #     → keine (unbestimmt erlaubt)
   # Bekannte Grenzen (SKELETON, im Workshop abgeleitet):
   #   - Eine gefüllte Einkaufsliste lässt sich auf diesem Gerät nicht leeren: Ohne Vormerkung gibt
   #     es keinen Button.
@@ -78,6 +94,11 @@ Feature: Einkaufsliste aus den Vormerkungen
   #     das Übernehmen läuft, bleiben „Entfernen" und die Navigation bedienbar. Wer in diesem
   #     Moment entfernt, findet das Rezept je nach Reihenfolge noch auf der Liste; wer die Seite
   #     verlässt, landet trotzdem auf der Einkaufsliste (TD-S154-4).
+  #     → keine (unbestimmt erlaubt)
+  # Bekannte Grenzen (SKELETON, in der Umsetzung entstanden, vom User bestätigt):
+  #   - Momentaufnahme ist nur die Menge: Name und Einheit eines Eintrags kommen beim Anzeigen
+  #     von der Zutat. Wird sie danach umbenannt, zeigt die Einkaufsliste schon den neuen Namen.
+  #     → keine (unbestimmt erlaubt)
   #
   # Für den Workshop der MVP-Stufe (Einkaufsliste mit eigenen Artikeln, US-301/US-307):
   #   - Übernehmen ergänzt statt zu ersetzen; Zutaten, die schon auf der Liste stehen?
@@ -85,6 +106,8 @@ Feature: Einkaufsliste aus den Vormerkungen
   #     automatisch übernehmen, was noch nicht übernommen ist.
   #   - Einzelne Zutaten bewusst nicht übernehmen (noch vorrätig).
   #   - Name des Buttons überprüfen.
+  #   - Kachel-Raster responsive: auf größeren Bildschirmen mehr Kacheln je Zeile als drei, aber
+  #     begrenzt, damit die Liste bedienbar bleibt (Wunsch des Users; im MVP oder V1).
   #   - Akzeptanzkriterium „außer Zutaten mit Flag ‚Immer vorrätig'" (US-906): Das
   #     Ausschluss-Szenario hier oder in US-906 entscheiden.
   # Für den Workshop von US-303: Erneutes Übernehmen löscht auch Einträge in „Zuletzt gekauft" –

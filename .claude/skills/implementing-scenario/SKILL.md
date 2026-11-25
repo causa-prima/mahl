@@ -73,9 +73,11 @@ Fragen:
      Szenario-Satz fehlt die objektive Fertigstellungsbedingung – der Code kann nicht als
      "Done" gelten.
    - Exit 0: Der Script-Output enthält Background + Given/When/Then **aller** Szenarien
-     des Laufs (Lauf-Label, Schicht, Singleton-Flag im Kopf) – das ist die exakte Spec für
-     den gesamten Lauf. Bei einem Frontend-only-Lauf (Schicht-Label im Output) entfällt
-     der Backend-Subagent in [TDD-Zyklus](#IMP-tdd-zyklus) vollständig.
+     des Laufs (Lauf-Label, Schicht, Singleton-Flag im Kopf), dazu die Kopf-Regeln, die ein
+     [Vermerk](../gherkin-workshop/references/scenario-clustering.md#CLU-kopf-regeln) dem Lauf
+     zuordnet – das ist die exakte Spec für den gesamten Lauf. Jede dieser Kopf-Regeln bekommt
+     im Lauf den vermerkten Test, Kategorie „Vertrag aus dem Feature-Kopf" (ADR-S106-3). Bei
+     einem Frontend-only-Lauf (Schicht-Label im Output) entfällt der Backend-Subagent in [TDD-Zyklus](#IMP-tdd-zyklus) vollständig.
    - **Sibling-Läufe überfliegen (Titel, keine Details):** `python3 -m prozesscode.next_run --open --story <US-NNN>` zeigt nur für diese Story alle noch **offenen** Lauf-Labels **mit Szenario-Titeln** – mechanisch, günstig, ohne Given/When/Then anderer Läufe lesen zu müssen (das widerspräche der Lese-Sparsamkeits-Regel oben) und ohne Rauschen aus anderen Storys/NFR-Features. Bewusst nur `--open`: ein bereits `--done`-Lauf hat seine Capability schon gebaut, dort gibt es nichts vorwegzunehmen. Dient ausschließlich [YAGNI/KISS-Scope](#IMP-yagni-scope).
 2. <a id="IMP-yagni-scope"></a>**YAGNI/KISS-Scope:** Was ist das Minimal-Notwendige für genau diese Szenarien des Laufs?
    Was wäre Gold-Plating (= kein Test dafür existiert, kein Akzeptanzkriterium fordert es)?
@@ -212,6 +214,10 @@ für die `// Szenario: <Titel>`-Traceability-Kommentare je Test):
 <Given/When/Then von Szenario 2 aus dem Architektur-Check>
 ...
 
+Kopf-Regeln dieses Laufs (kein Szenario; je Regel der vermerkte Test, Kommentar nach Kategorie
+„Vertrag aus dem Feature-Kopf" in ADR-S106-3 – nur die deiner Schicht):
+<Kopf-Regeln aus der Ausgabe von check-atdd-gate, wörtlich – oder "keine">
+
 Scope-Grenzen (nicht implementieren):
 <YAGNI-Liste aus dem Architektur-Check>
 
@@ -235,7 +241,7 @@ sieht, ist keine.
 Spawn-Regeln:
 - EINE Schicht pro Subagent – keine Mehrfach-Schichten im selben Aufruf (sonst verschwimmt TDD-Disziplin). Der Frontend-Subagent implementiert Komponente und Service-Client in einem Aufruf, weil beide vom selben Komponenten-Test getrieben werden (siehe Schicht-Reihenfolge oben).
 - **Modellwahl vor Spawn:** Die im Architektur-Check unter [Modell-Eignung](#IMP-modell-eignung) festgehaltene Einschätzung bestätigen. Default ist `sonnet` (Frontmatter); nur eine klar überdurchschnittlich anspruchsvolle Schicht per `model`-Parameter auf Opus eskalieren. Im Zweifel beim `sonnet`-Default bleiben.
-- **Subagent benennen:** `name: "backend-<schicht>"` bzw. `"frontend-<schicht>"` – nötig damit der Haupt-Thread via `SendMessage` für das Test-Review antworten kann.
+- **Subagent benennen:** `name: "backend-<schicht>"` bzw. `"frontend-<schicht>"` – nötig damit der Haupt-Thread via `SendMessage` für das Test-Review antworten kann. Jeder neu gestartete Subagent bekommt einen in der Session noch unbenutzten Namen (Fix-Runde: Suffix wie `-fix-r2`): Teilen sich zwei den Namen, landet eine `SendMessage` an den bloßen Namen beim falschen.
 - **Subagent-Lebenszyklus:** Subagenten laufen im Hintergrund. Rückfragen (PLANUNG), das Test-Review-Signal und den Return liefert ein Subagent, indem er seinen Lauf mit dieser Ausgabe beendet – sie kommt automatisch beim Orchestrator an. Der Orchestrator antwortet per `SendMessage`, und der Subagent macht mit vollem Kontext weiter. Seine Berechtigungsabfragen erscheinen beim User und werden nicht automatisch abgelehnt. Datei-Edits blockt nichts: Im Auto-Modus übernimmt der Subagent den Modus der Hauptsession, und das `permissionMode: acceptEdits` seiner Definition wird ignoriert; es greift nur bei einer Hauptsession im Modus `default` ([Anknüpfung an Claude Code](../../../docs/process/claude-code-anknuepfung.md#CCA-liste), gemessen 2.1.318). (Der Rest belegt im Harness-Test 2026-10-09.)
 - **Wiederaufnehmen oder neu starten:** Lässt sich eine Folgeaufgabe gut ohne den bisherigen Kontext des Subagenten erledigen (z.B. ein eng umrissener Fix nach dem Review), starte einen **neuen** Subagenten mit knapper Übergabe (Szenario, freigegebene Tests samt Blob-Anker, Befund), statt den alten wieder aufzunehmen. Grund: Subagenten haben nur 5 Minuten Cache-Lebensdauer; nach einer längeren Pause wird ihr gesamtes Transkript neu in den Cache geschrieben (bis 2026-10 knapp die Hälfte aller Cache-Writes der Layer-Implementer, je 100–340k Tokens). Mitten im TDD-Ablauf (nach PLANUNG oder TEST-REVIEW) trägt der Kontext den Zustand – dort wieder aufnehmen.
 - **Arbeitende Subagenten nicht pollen:** Auf den Bericht warten, keine Status-Nachfragen per `SendMessage` („bist du fertig?") – das verschwendet Tokens und stört. Lange Läufe fahren die Schicht-Subagenten im Vordergrund mit `timeout: 600000` (Agent-Definition, REFACTOR) – das Ergebnis steht dann im selben Zug. Endet ein Lauf doch im Hintergrund, weckt seine Benachrichtigung den Subagenten wieder (Testvermerk oben). Meldet ein Subagent „Warte auf qa-check (Hintergrund …)" und kommt danach über längere Zeit kein Bericht, den Lauf selbst fahren (im Vordergrund mit `timeout: 600000`) und den Subagenten mit dem Ergebnis wieder aufnehmen. Kommt über längere Zeit kein Bericht (Absturz, Session-Limit), den Fortschritt **mechanisch am Arbeitsbaum** prüfen (`git status`, `git diff`, gezieltes `grep` auf die erwartete Änderung); ist die Arbeit erkennbar abgeschlossen, den Verifikationslauf (`qa-check.py`) selbst fahren, statt ihn nachzufordern.

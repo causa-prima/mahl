@@ -282,6 +282,15 @@ ergänzt – nicht als Einzelwert in der Komponente gesetzt.
   mit `alignItems: 'center'`, `justifyContent: 'space-between'`, `minHeight` in Touch-Target-Höhe und `mb: 1`;
   der Titel selbst ohne `gutterBottom`. Sonst verschiebt der Titelabstand die Mitte, und die Seite springt, wenn
   die Aktion erst nach dem Laden erscheint.
+- **Kachel-Raster** (Einkaufsliste, ADR-S067-1): eine `List` mit `display: 'grid'`, drei Spalten
+  `repeat(3, minmax(0, 1fr))` und `gap: 1`. Jede Kachel ist ein `ListItem disablePadding` mit Rahmen
+  (`border: 1`, `borderColor: 'divider'`, `borderRadius: 1`) und Innenabstand `p: 1`. Oben steht der Name
+  (`body1`), darunter die Menge (`body2`, `text.secondary`). Ohne Menge steht nur der Name. Anders als die
+  Bring!-Kachel in ADR-S067-1 hat sie kein Icon und ist nicht anklickbar (UI-Entwurf mit dem User). Lange Wörter
+  brechen per `hyphens: 'auto'` und notfalls per `overflowWrap: 'anywhere'` um, `minmax(0, …)` hält die Spalten
+  gleich breit. Bei 375 px bleiben so etwa 90 px Text je Kachel (gerechnet, nicht gemessen).
+- **Hauptaktion unter einer Liste** (Vorgemerkt-Seite, „Auf die Einkaufsliste"): `contained`, `fullWidth`,
+  per `Stack spacing={2}` von der Liste abgesetzt – derselbe Abstand wie die Hauptaktion über einer Liste.
 - **Fließtext und Leerzustand:** `Typography` mit `gutterBottom`, damit der Abstand zum folgenden
   Button dem einer Liste entspricht.
 - **Formularfelder im Dialog:** `fullWidth` und `margin="dense"`.

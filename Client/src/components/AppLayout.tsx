@@ -1,5 +1,6 @@
 import { AppBar, Box, Button, Toolbar } from '@mui/material'
 import { NavLink, Outlet } from 'react-router'
+import { shoppingListPath } from '../routes'
 
 // ADR-S103-1, ADR-S112-5: eine geteilte Layout-Komponente um alle Routen statt einer Leiste je Seite.
 // NavLink setzt aria-current="page" am aktiven Eintrag (Default end=false: /recipes/new und /recipes/:id
@@ -8,7 +9,7 @@ const entries = [
   { label: 'Zutaten', to: '/ingredients' },
   { label: 'Rezepte', to: '/recipes' },
   { label: 'Vorgemerkt', to: '/planned' },
-  { label: 'Einkaufsliste', to: '/shopping-list' },
+  { label: 'Einkaufsliste', to: shoppingListPath },
 ] as const
 
 export default function AppLayout() {

@@ -40,6 +40,24 @@ namespace mahl.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ShoppingListItems",
+                columns: table => new
+                {
+                    IngredientId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Quantity = table.Column<decimal>(type: "numeric(8,3)", precision: 8, scale: 3, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ShoppingListItems", x => x.IngredientId);
+                    table.ForeignKey(
+                        name: "FK_ShoppingListItems_Ingredients_IngredientId",
+                        column: x => x.IngredientId,
+                        principalTable: "Ingredients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PlannedRecipes",
                 columns: table => new
                 {
@@ -129,6 +147,9 @@ namespace mahl.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "RecipeIngredients");
+
+            migrationBuilder.DropTable(
+                name: "ShoppingListItems");
 
             migrationBuilder.DropTable(
                 name: "Steps");

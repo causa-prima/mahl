@@ -10,6 +10,7 @@ public class MahlDbContext(DbContextOptions<MahlDbContext> options) : DbContext(
     public DbSet<RecipeIngredientDbType> RecipeIngredients => Set<RecipeIngredientDbType>();
     public DbSet<StepDbType> Steps => Set<StepDbType>();
     public DbSet<PlannedRecipeDbType> PlannedRecipes => Set<PlannedRecipeDbType>();
+    public DbSet<ShoppingListItemDbType> ShoppingListItems => Set<ShoppingListItemDbType>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +29,13 @@ public class MahlDbContext(DbContextOptions<MahlDbContext> options) : DbContext(
         var planned = modelBuilder.Entity<PlannedRecipeDbType>();
         planned.HasKey(p => p.RecipeId);
         planned.HasOne<RecipeDbType>().WithMany().HasForeignKey(p => p.RecipeId);
+
+        // ADR-S154-3: Zutat-Id als Primär- und Fremdschlüssel – ein Eintrag je Zutat, auch bei gleichzeitigem Übernehmen.
+        // ADR-S154-2: numeric(8,3) setzt die Plausibilitätsgrenze 99999,999 durch.
+        var item = modelBuilder.Entity<ShoppingListItemDbType>();
+        item.HasKey(i => i.IngredientId);
+        item.HasOne<IngredientDbType>().WithMany().HasForeignKey(i => i.IngredientId);
+        item.Property(i => i.Quantity).HasPrecision(8, 3);
     }
 
     // Rezept-Aggregat: Kind-Tabellen ohne Navigation-Properties, nur FK-Skalare – EF sortiert die

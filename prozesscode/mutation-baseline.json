@@ -5,8 +5,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._feature": {
-    "beurteilbar": 255,
-    "getoetet": 226,
+    "beurteilbar": 346,
+    "getoetet": 312,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode._run_lock": {
@@ -55,8 +55,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.check-atdd-gate": {
-    "beurteilbar": 160,
-    "getoetet": 156,
+    "beurteilbar": 200,
+    "getoetet": 196,
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.cm": {
@@ -460,8 +460,8 @@
     "messung": "mutmut 3.8.1, Wertung 3"
   },
   "prozesscode.vitest-run": {
-    "beurteilbar": 254,
-    "getoetet": 227,
+    "beurteilbar": 257,
+    "getoetet": 233,
     "messung": "mutmut 3.8.1, Wertung 3"
   }
 }

@@ -205,7 +205,7 @@ Eine temporäre Regel, die nur für den aktuellen Lauf des Planungs-Wizards gilt
 <a id="GLO-einkaufsliste"></a>
 ### Einkaufsliste (Shopping List)
 Eine aggregierte Liste von *Einkaufslisten-Einträgen* für einen definierten Zeitraum.
-*   **Übernehmen:** Die Zutaten aller *Vormerkungen* auf die Einkaufsliste schreiben – je Zutat ein Eintrag mit der **Gesamtmenge** (Summe aller Bedarfe). Ausgelöst auf der Vorgemerkt-Seite (US-201).
+*   **Übernehmen (generate):** Die Zutaten aller *Vormerkungen* auf die Einkaufsliste schreiben – je Zutat ein Eintrag mit der **Gesamtmenge** (Summe aller Bedarfe). Ausgelöst auf der Vorgemerkt-Seite (US-201).
 
 <a id="GLO-einkaufslisten-eintrag"></a>
 ### Einkaufslisten-Eintrag (Shopping List Item)

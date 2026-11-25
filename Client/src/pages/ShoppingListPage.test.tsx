@@ -3,6 +3,8 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
 import { renderApp } from '../test/renderApp'
+import { listedItems } from '../test/shoppingListItems'
+import { nbsp } from '../test/nbsp'
 
 const hint = 'Die Einkaufsliste ist leer.'
 const linkName = 'Zu den vorgemerkten Rezepten'
@@ -90,5 +92,60 @@ describe('Einkaufsliste-Seite', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Einkaufsliste' })).toBeInTheDocument()
     expect(screen.queryByText(hint)).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: linkName })).not.toBeInTheDocument()
+  })
+})
+
+// @US-201-edge-case
+describe('Einkaufsliste-Seite: Mengen', () => {
+  // Szenario: Zutaten ohne Menge auf der Einkaufsliste
+  // Beispiel: Salz | Salz | Salz | –
+  it('US201_EdgeCase_ShoppingListPage_ItemWithoutQuantity_ShowsOnlyName', async () => {
+    // Given: der Server liefert "Salz" ohne Menge
+    server.use(http.get('/api/shopping-list', () => HttpResponse.json([{ name: 'Salz', quantity: null, unit: null }])))
+
+    // When: ich zur Einkaufsliste navigiere
+    renderApp('/shopping-list')
+
+    // Then: die Liste "Einkaufsliste" zeigt genau einen Eintrag, nur mit dem Namen "Salz"
+    await screen.findByRole('list', { name: 'Einkaufsliste' })
+    expect(listedItems()).toEqual([['Salz']])
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
+  })
+
+  // ADR-S106-3
+  // Vertrag aus dem Kopf von features/shopping-lists.feature, Abschnitt „Regeln“: „Zahl und Einheit einer Menge
+  // brechen nicht auseinander (geschütztes Leerzeichen) – auf der Einkaufsliste wie in der Detailansicht eines
+  // Rezepts.“ Kein Szenario treibt den Test.
+  it('ShoppingListPage_Quantity_NumberAndUnitSeparatedByNoBreakSpace', async () => {
+    // Given: der Server liefert "Mehl" mit 250 g
+    server.use(http.get('/api/shopping-list', () => HttpResponse.json([{ name: 'Mehl', quantity: 250, unit: 'g' }])))
+
+    // When: ich zur Einkaufsliste navigiere
+    renderApp('/shopping-list')
+
+    // Then: zwischen "250" und "g" steht genau ein geschütztes Leerzeichen
+    await screen.findByRole('list', { name: 'Einkaufsliste' })
+    expect(listedItems()).toEqual([['Mehl', `250${nbsp}g`]])
+  })
+
+  // Szenario: Gesamtmengen stehen in deutscher Schreibweise da
+  // Beispiel: alle
+  it.each([
+    { name: 'Milch', quantity: 0.3, unit: 'l', shown: `0,3${nbsp}l` },
+    { name: 'Milch', quantity: 0.5, unit: 'l', shown: `0,5${nbsp}l` },
+    { name: 'Milch', quantity: 1, unit: 'l', shown: `1${nbsp}l` },
+    { name: 'Milch', quantity: 0.375, unit: 'l', shown: `0,375${nbsp}l` },
+    { name: 'Mehl', quantity: 11000, unit: 'g', shown: `11000${nbsp}g` },
+  ])('US201_EdgeCase_ShoppingListPage_Quantity_ShownGerman_$shown', async ({ name, quantity, unit, shown }) => {
+    // Given: der Server liefert die Zutat mit der Gesamtmenge
+    server.use(http.get('/api/shopping-list', () => HttpResponse.json([{ name, quantity, unit }])))
+
+    // When: ich zur Einkaufsliste navigiere
+    renderApp('/shopping-list')
+
+    // Then: die Liste zeigt genau einen Eintrag: den Namen der Zutat und darunter die Menge in deutscher Schreibweise
+    await screen.findByRole('list', { name: 'Einkaufsliste' })
+    expect(listedItems()).toEqual([[name, shown]])
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
   })
 })

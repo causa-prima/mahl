@@ -6,6 +6,15 @@ import time
 import pytest
 
 from prozesscode import _run_lock as rl
+from prozesscode._util import REPO_ROOT
+
+
+def test_kein_test_nimmt_den_lock_des_echten_arbeitsbaums():
+    # Die autouse-Fixture in conftest.py leitet ihn um. Ohne sie wird jeder Test, der einen Wrapper über
+    # main() aufruft, rot, sobald nebenher ein echter Lauf den Lock hält – unter mutmut als „failed to
+    # collect stats", denn also_copy kopiert den Lock eines laufenden Laufs mit in den Mutantenbaum.
+    echter_lock = REPO_ROOT / ".claude" / "tmp" / "playwright_run"
+    assert not rl.RunLock(echter_lock)._lock_path.is_relative_to(REPO_ROOT)
 
 
 def test_acquire_and_release(tmp_path):

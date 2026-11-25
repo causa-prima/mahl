@@ -12,7 +12,7 @@ using mahl.Infrastructure;
 namespace mahl.Infrastructure.Migrations
 {
     [DbContext(typeof(MahlDbContext))]
-    [Migration("20261123190635_InitialCreate")]
+    [Migration("20261125143308_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -106,6 +106,20 @@ namespace mahl.Infrastructure.Migrations
                     b.ToTable("RecipeIngredients");
                 });
 
+            modelBuilder.Entity("mahl.Infrastructure.DatabaseTypes.ShoppingListItemDbType", b =>
+                {
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(8, 3)
+                        .HasColumnType("numeric(8,3)");
+
+                    b.HasKey("IngredientId");
+
+                    b.ToTable("ShoppingListItems");
+                });
+
             modelBuilder.Entity("mahl.Infrastructure.DatabaseTypes.StepDbType", b =>
                 {
                     b.Property<Guid>("RecipeId")
@@ -143,6 +157,15 @@ namespace mahl.Infrastructure.Migrations
                     b.HasOne("mahl.Infrastructure.DatabaseTypes.RecipeDbType", null)
                         .WithMany()
                         .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("mahl.Infrastructure.DatabaseTypes.ShoppingListItemDbType", b =>
+                {
+                    b.HasOne("mahl.Infrastructure.DatabaseTypes.IngredientDbType", null)
+                        .WithMany()
+                        .HasForeignKey("IngredientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -21,6 +21,12 @@ export function removeButton(page: Readonly<Page>, title: string) {
   return page.getByRole('button', { name: `${title} entfernen`, exact: true })
 }
 
+// „Auf die Einkaufsliste“ – der Name für Screenreader steht im Kopf von features/shopping-lists.feature. Klick und
+// die Prüfung, dass der Button fehlt, nutzen diesen einen Locator (Step-Hinweis dort).
+export function toShoppingListButton(page: Readonly<Page>) {
+  return page.getByRole('button', { name: 'Zutaten aller vorgemerkten Rezepte auf die Einkaufsliste', exact: true })
+}
+
 // Der Leerzustand-Hinweis der Vorgemerkt-Seite.
 export function noPlannedRecipesHint(page: Readonly<Page>) {
   return page.getByText('Noch keine Rezepte vorgemerkt.')

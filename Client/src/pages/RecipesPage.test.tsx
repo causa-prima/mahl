@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { delay, http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
 import { renderApp } from '../test/renderApp'
+import { nbsp } from '../test/nbsp'
 import RecipeDetailPage from './RecipeDetailPage'
 
 function createQueryClient() {
@@ -95,7 +96,7 @@ async function goBack(router: Readonly<Pick<AppRouter, 'navigate'>>) {
 async function expectPancakesDetail() {
   await screen.findByRole('heading', { level: 1, name: 'Pfannkuchen' })
   const ingredients = within(screen.getByRole('list', { name: 'Zutaten' })).getAllByRole('listitem')
-  expect(ingredients.map((item) => item.textContent)).toEqual(['250 g Mehl'])
+  expect(ingredients.map((item) => item.textContent)).toEqual([`250${nbsp}g Mehl`])
   expect(screen.queryByText(/Weizenmehl/)).not.toBeInTheDocument()
 }
 
@@ -218,7 +219,7 @@ describe('Rezepte erfassen', () => {
     // Rezepts – die Adresse ist damit mitgeprüft.)
     expect(await screen.findByRole('heading', { name: 'Pfannkuchen' })).toBeInTheDocument()
     const ingredients = within(screen.getByRole('list', { name: 'Zutaten' })).getAllByRole('listitem')
-    expect(ingredients.map((item) => item.textContent)).toEqual(['Salz', '250 g Mehl', '500 ml Milch'])
+    expect(ingredients.map((item) => item.textContent)).toEqual(['Salz', `250${nbsp}g Mehl`, `500${nbsp}ml Milch`])
     const steps = within(screen.getByRole('list', { name: 'Zubereitung' })).getAllByRole('listitem')
     // Nummer + Anweisung als ein Eintrag; Trennzeichen/Darstellung der Nummer sind nicht Teil des Vertrags
     const stepTexts = steps.map((item) => item.textContent)
@@ -232,11 +233,11 @@ describe('Rezepte erfassen', () => {
   // Der Server liefert die Menge als JSON-Zahl; die Nullen am Ende aus Beispiel 3 und 4 normalisiert JSON.parse
   // schon, am Client sind sie von Beispiel 1 und 2 nicht unterscheidbar – die Zeilen stehen der Zuordnung wegen da.
   it.each([
-    { zeile: '0,001 g Mehl', menge: '0.001', anzeige: '0,001 g Mehl' },
-    { zeile: '9999,999 g Mehl', menge: '9999.999', anzeige: '9999,999 g Mehl' },
-    { zeile: '0,0010 g Mehl', menge: '0.0010', anzeige: '0,001 g Mehl' },
-    { zeile: '9999,9990 g Mehl', menge: '9999.9990', anzeige: '9999,999 g Mehl' },
-    { zeile: '1,5 g Mehl', menge: '1.5', anzeige: '1,5 g Mehl' },
+    { zeile: '0,001 g Mehl', menge: '0.001', anzeige: `0,001${nbsp}g Mehl` },
+    { zeile: '9999,999 g Mehl', menge: '9999.999', anzeige: `9999,999${nbsp}g Mehl` },
+    { zeile: '0,0010 g Mehl', menge: '0.0010', anzeige: `0,001${nbsp}g Mehl` },
+    { zeile: '9999,9990 g Mehl', menge: '9999.9990', anzeige: `9999,999${nbsp}g Mehl` },
+    { zeile: '1,5 g Mehl', menge: '1.5', anzeige: `1,5${nbsp}g Mehl` },
   ])('US602_EdgeCase_CreateRecipe_QuantityAtLimit_ShowsGermanNotation ($zeile)',
     async ({ zeile, menge, anzeige }) => {
       // Given: der Server legt das Rezept an und liefert die Menge als JSON-Zahl
@@ -286,6 +287,23 @@ describe('Rezepte erfassen', () => {
     expect(steps[0]).toMatch(/^1\D+Teig rühren\.$/)
   })
 
+  // ADR-S106-3
+  // Vertrag aus dem Kopf von features/shopping-lists.feature, Abschnitt „Regeln“: „Zahl und Einheit einer Menge
+  // brechen nicht auseinander (geschütztes Leerzeichen) – auf der Einkaufsliste wie in der Detailansicht eines
+  // Rezepts.“ Kein Szenario treibt den Test.
+  it('RecipeDetail_IngredientQuantity_NumberAndUnitSeparatedByNoBreakSpace', async () => {
+    // Given: "Pfannkuchen" mit "250 g Mehl" existiert
+    useOpenRecipeHandlers()
+
+    // When: ich "Pfannkuchen" öffne
+    renderApp(`/recipes/${pancakes.id}`)
+
+    // Then: zwischen "250" und "g" steht ein geschütztes Leerzeichen, zwischen "g" und "Mehl" ein gewöhnliches
+    await screen.findByRole('heading', { level: 1, name: 'Pfannkuchen' })
+    const ingredients = within(screen.getByRole('list', { name: 'Zutaten' })).getAllByRole('listitem')
+    expect(ingredients.map((item) => item.textContent)).toEqual([`250${nbsp}g Mehl`])
+  })
+
   // Szenario: Rezept aus der Rezept-Liste öffnen
   // Survivor-Test (nach Freigabe): Der Abruf-Schlüssel enthält die Kennung. Ohne sie zeigte das zweite Rezept
   // sofort die gecachte Detailansicht des ersten, bis dessen Abruf nachlädt.
@@ -304,7 +322,7 @@ describe('Rezepte erfassen', () => {
     expect(screen.queryByRole('heading', { level: 1, name: 'Pfannkuchen' })).not.toBeInTheDocument()
     expect(await screen.findByRole('heading', { level: 1, name: 'Brot' })).toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Zutaten' })).getAllByRole('listitem').map((item) => item.textContent))
-      .toEqual(['500 g Weizenmehl'])
+      .toEqual([`500${nbsp}g Weizenmehl`])
   })
 
   // Szenario: Rezept per Direktlink aufrufen

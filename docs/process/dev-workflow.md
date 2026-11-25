@@ -437,7 +437,7 @@ docker rm -f -v $(docker ps -aq --filter label=reuse-id=mahl-server-tests)
 
 ```bash
 dotnet ef database drop --force --project Infrastructure --startup-project Server   # drop ist deny → # --allow-once anhängen
-dotnet ef migrations remove --project Infrastructure --startup-project Server
+dotnet ef migrations remove --project Infrastructure --startup-project Server   # ohne DB: fehlgeschlagener DbCommand im Log, entfernt trotzdem
 dotnet ef migrations add InitialCreate --project Infrastructure --startup-project Server
 dotnet ef database update --project Infrastructure --startup-project Server
 ```

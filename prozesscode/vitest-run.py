@@ -6,7 +6,8 @@ Verwendung:
   python3 -m prozesscode.vitest-run                   # alle Tests (einmalig, kein Watch)
   python3 -m prozesscode.vitest-run --filter Pattern  # nach TESTname filtern (vitest -t)
   python3 -m prozesscode.vitest-run --file Pattern    # nach DATEIname filtern (vitest positional;
-                                                      #  Pfad relativ zu Client/ oder ab Repo-Wurzel)
+                                                      #  Pfad relativ zu Client/ oder ab Repo-Wurzel;
+                                                      #  mehrfach angebbar)
   python3 -m prozesscode.vitest-run --verbose         # vollständiger Output inkl. npm-Header
 
 --filter und --file sind jeweils unabhängig optional und beliebig kombinierbar.
@@ -26,6 +27,9 @@ from ._wrapper_output import emit, strip_noise
 
 # Verzeichnis, in dem run_npm vitest startet (Default von run_npm), als Pfadpräfix ab Repo-Wurzel.
 _CLIENT_PREFIX = "Client/"
+
+_FILE_HELP = ("Dateiname-Filter (vitest positional) – grenzt auf Testdateien mit passendem Pfad ein; "
+              "mehrfach angegeben läuft jede passende Datei")
 
 # vitest-Banner und Zeitstempel – kein Aussagewert für „sind die Tests grün?".
 _VITEST_CHROME = re.compile(r"^\s*RUN\s+v[\d.]|^\s*Start at\s|^\s*Duration\s")
@@ -110,8 +114,8 @@ def main() -> None:
     )
     parser.add_argument("--filter", dest="filter_name", metavar="PATTERN",
                         help="Testname-Filter via vitest -t (Substring/Regex gegen Testnamen)")
-    parser.add_argument("--file", dest="file_name", metavar="PATTERN",
-                        help="Dateiname-Filter (vitest positional) – grenzt auf Testdateien mit passendem Pfad ein")
+    parser.add_argument("--file", dest="file_names", metavar="PATTERN", action="append", default=[],
+                        help=_FILE_HELP)
     parser.add_argument("--verbose", action="store_true",
                         help="Vollständiger Output ohne Filterung")
     args = parser.parse_args()
@@ -120,8 +124,7 @@ def main() -> None:
     npm_args = ["run", "test", "--", "run"]
     # Positional (Datei) muss vor den Optionen stehen. vitest läuft in Client/ und matcht relativ dazu –
     # ein Pfad ab Repo-Wurzel, wie git ihn nennt, fände sonst keine Datei.
-    if args.file_name:
-        npm_args.append(args.file_name.removeprefix(_CLIENT_PREFIX))
+    npm_args.extend(name.removeprefix(_CLIENT_PREFIX) for name in args.file_names)
     if args.filter_name:
         npm_args.extend(["-t", args.filter_name])
 

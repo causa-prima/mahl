@@ -850,7 +850,7 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 **Status:** Accepted
 **Tags:** scope:feature, resource:recipes, resource:ingredients, resource:planned-recipes, http:get, db:ef-core
 
-**Entscheidung:** `GET /api/recipes`, `GET /api/ingredients` und `GET /api/planned-recipes` (nach dem Rezepttitel) sortieren in der Abfrage per `EF.Functions.Collate(<titel|name>, "de-x-icu")` – deutsches Locale; die Schreibweise entscheidet nur bei sonst gleichem Wort, dann klein vor groß (S142 gemessen: `brot, Brot, BROT, Brötchen`); ein Umlaut zählt wie sein Grundbuchstabe (Szenarien „Mehrere Rezepte erscheinen alphabetisch sortiert" und „Zutaten mit Umlaut oder Kleinbuchstaben erscheinen alphabetisch einsortiert"). Der Collation-Name lebt als eine Konstante, die alle Endpoints nutzen. Die beiden Rezept-Listen (`/api/recipes`, `/api/planned-recipes`) teilen zudem eine Abfrage für Sortierung und Projektion, damit ein Test mit trennscharfen Titeln die Collation für beide festhält. Das Frontend zeigt die gelieferte Reihenfolge unverändert und sortiert nicht selbst.
+**Entscheidung:** `GET /api/recipes`, `GET /api/ingredients` und `GET /api/planned-recipes` (nach dem Rezepttitel) sortieren in der Abfrage per `EF.Functions.Collate(<titel|name>, "de-x-icu")` – deutsches Locale; die Schreibweise entscheidet nur bei sonst gleichem Wort, dann klein vor groß (S142 gemessen: `brot, Brot, BROT, Brötchen`); ein Umlaut zählt wie sein Grundbuchstabe (Szenarien „Mehrere Rezepte erscheinen alphabetisch sortiert" und „Zutaten mit Umlaut oder Kleinbuchstaben erscheinen alphabetisch einsortiert"). Der Collation-Name lebt als eine Konstante, die alle Endpoints nutzen. Die beiden Rezept-Listen (`/api/recipes`, `/api/planned-recipes`) teilen zudem eine Abfrage für Sortierung und Projektion, damit ein Test mit trennscharfen Titeln die Collation für beide festhält. Aus demselben Grund teilen `GET /api/ingredients` und `GET /api/shopping-list` die Sortierung nach dem Zutatennamen (`IngredientQueries.OrderedByName`); die Einkaufsliste sortiert damit nach dem Namen ihrer Zutat. Das Frontend zeigt die gelieferte Reihenfolge unverändert und sortiert nicht selbst.
 
 **Begründung:** Die DB-Default-Collation (`en_US.utf8`, Provider `libc`) sortiert auf dem musl-basierten `postgres:18-alpine` nach Bytes: `Brot, Zwiebelkuchen, apfelstrudel, Ölkuchen` (S142 an der Dev-DB per `psql` gemessen; mit `COLLATE "de-x-icu"` dort: `apfelstrudel, Brot, Ölkuchen, Zwiebelkuchen`). Der Testcontainer nutzt dasselbe Image (ADR-S105-1), die Collation verhält sich in Test und Prod gleich. Die Sortierung in der DB liefert zugleich die deterministische Reihenfolge, die der Collection-ETag voraussetzt (ADR-S084-1). Eine einzige Stelle sortiert – eine zweite Sortierung im Client könnte von der DB-Collation abweichen.
 
@@ -955,6 +955,26 @@ Jede fehlerhafte Zeile bekommt genau eine Meldung, die die Zeile zitiert (Texte:
 - **Liste live aus den Vormerkungen berechnen** (ohne Button) – braucht einen Zeitpunkt, an dem Abgehaktes zurückgesetzt wird (Einkaufs-Zyklus); sonst bliebe in der nächsten Woche abgehakt, was letzte Woche gekauft wurde.
 - **Beim Ersetzen die Haken behalten** – teurer, ohne Bedarf im SKELETON.
 - **Gesamtmenge ohne Grenze** bzw. **wie die Rezeptmenge auf 9 999,999** – siehe ADR-S154-1 bzw. die Begründung oben: Ohne Grenze bleiben Logikfehler unsichtbar; mit 9 999,999 scheiterte das Übernehmen schon bei realistischen Wochenmengen.
+
+### ADR-S154-3: Einkaufsliste: `POST /generate` ersetzt in einer Transaktion, ein Eintrag je Zutat per Primärschlüssel
+
+**Status:** Accepted
+**Tags:** scope:feature, http:post, http:204, http:get, db:constraint
+
+**Entscheidung:**
+- **Übernehmen** ist `POST /api/shopping-list/generate` ohne Body und antwortet `204`. Der Client lädt danach die Einkaufsliste neu und öffnet sie.
+- **`GET /api/shopping-list`** liefert je Eintrag `{ name, quantity, unit }` – `quantity` und `unit` beide `null` ohne Menge (ADR-S020-1) –, sortiert in der Abfrage nach dem Namen der Zutat mit der Collation-Konstante aus ADR-S142-1.
+- **Speicherung:** eine Tabelle der Einträge mit der Zutat-Id als Primärschlüssel (zugleich Fremdschlüssel) und der Gesamtmenge als `numeric(8,3)` (`NULL` = ohne Menge, ADR-S154-2). Name und Einheit kommen beim Lesen aus der Zutat.
+- **Gesamtmenge in der Datenbank:** Übernehmen summiert per `SUM` über `numeric` in einem `INSERT … SELECT … GROUP BY`. `SUM` überspringt `NULL` und liefert `NULL`, wenn alle Vorkommen `NULL` sind – genau die Regel von ADR-S020-1, ohne eigenen Zweig.
+- **Ersetzen** (alle Einträge löschen, die neuen einfügen) läuft in **einer Transaktion**. Gleichzeitiges Übernehmen von zwei Geräten sichert der Primärschlüssel ab: Fügt das zweite eine Zutat ein, die das erste schon eingefügt hat, scheitert es am Primärschlüssel, wird zurückgerollt, und die Liste des ersten bleibt. Kein Anwendungszweig behandelt diesen Fall (ADR-S105-2).
+
+**Begründung:** Die Route steht so in `docs/reference/skeleton-spec.md`. `204` statt der neuen Liste im Body: Die Einkaufsliste-Seite lädt ohnehin per `GET` mit Conditional Request (ADR-S084-3); eine zweite Darstellung der Liste in der POST-Antwort wäre eine zweite Quelle. Bei READ COMMITTED löscht eine zweite, gleichzeitige Transaktion die frisch eingefügten Zeilen der ersten nicht – ohne Eindeutigkeit in der DB stünde eine Zutat doppelt da. Der Primärschlüssel macht „ein Eintrag je Zutat" zur DB-Invariante, ohne Zweig, den nur ein Wettlauf erreicht.
+
+**Grenze (vom User hingenommen):** Lesen zwei gleichzeitige Übernehmen völlig verschiedene Vormerkungen (dazwischen auf einem Gerät geändert), kollidiert kein Primärschlüssel, und die Liste enthält die Zutaten beider – ohne Doppel. Im SKELETON bleibt das zweite, gescheiterte Übernehmen ohne Meldung auf der Vorgemerkt-Seite (Kopf von `features/shopping-lists.feature`).
+
+**Verworfen:**
+- **Tabellensperre** (`LOCK TABLE … IN EXCLUSIVE MODE`) – beide Übernehmen gelängen nacheinander, aber das Weglassen der Sperre deckt kein Test auf.
+- **Isolationsstufe SERIALIZABLE** – schlösse auch den Mischfall aus, ist aber eine weitere Einstellung, die kein Szenario prüft.
 
 ---
 
@@ -1825,7 +1845,7 @@ Technisch: `XminETag.TryParse(string, out uint)` statt einer werfenden `Parse`-V
 **Entscheidung:** Backend-Integrationstests und Frontend-Komponententests, die NICHT von einem Gherkin-Szenario getrieben sind, tragen bewusst KEINEN `USxxx_`-Tag. Drei Kategorien:
 1. **Protokoll-/Infrastruktur-Mechanik** – HTTP-Precondition-Verhalten aus einer Querschnitts-ADR (ETag-Format, `If-Match`-Pflicht 428/400/412, POST-liefert-ETag; ADR-S058-1/-3, ADR-S106-1/-2). Präzedenz: die `ETagMiddleware`-Tests (Collection-ETag) tragen ebenfalls keinen US-Tag.
 2. **Stryker-blinde Invarianten** – Tests, die eine bewusste Reihenfolge-/Prioritäts-Invariante gegen Refactoring-Regression pinnen, die Stryker strukturell nicht fangen kann (Statement-Reorder ist kein Mutant; z.B. die 404-vor-If-Match-Dominanz, ADR-S000-5-Addendum). Dieselbe Klasse wie ein Fokus-Prioritäts-Pin, den ein 100 %-Mutation-Score über Einzelfälle allein nicht absichert.
-3. **Vertrag aus dem Feature-Kopf** – eine Regel, die der Kopf einer Feature-Datei festlegt und ausdrücklich nicht als Szenario, sondern per Komponententest sichert (etwa „während des Ladens kein Leerzustand", „der Umschalter zeigt den neuen Zustand erst mit der Antwort des Servers"). Der Kommentar nennt die Feature-Datei und die Regel.
+3. **Vertrag aus dem Feature-Kopf** – eine Regel, die der Kopf einer Feature-Datei festlegt und ausdrücklich nicht als Szenario, sondern per Komponenten- oder Integrationstest sichert – ausdrücklich heißt: mit dem [Vermerk der Absicherung und des Laufs](../../.claude/skills/gherkin-workshop/references/scenario-clustering.md#CLU-kopf-regeln) an der Regel (etwa „während des Ladens kein Leerzustand", „der Umschalter zeigt den neuen Zustand erst mit der Antwort des Servers"). Der Kommentar nennt die Feature-Datei und die Regel.
 
 **Begründung:** `docs/process/e2e-testing.md` verlangt US-Tag + ScenarioType als Spec↔Test-Traceability für **szenario-getriebene** Tests. Ein Querschnitts-/Invarianten-Test hat per Definition kein einzelnes treibendes Szenario; ein erzwungener US-Tag wäre eine falsche Traceability-Behauptung. Zentral hier dokumentiert, statt in jedem betroffenen Test einzeln (vermeidet die Kommentar-Wiederholung über die betroffenen Tests und deren Drift).
 

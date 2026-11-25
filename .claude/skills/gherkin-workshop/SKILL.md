@@ -500,6 +500,12 @@ Akzeptanzkriterien jetzt vollständig spezifiziert sind; eine nur teilweise spez
 bleibt draußen, damit sie als „ohne Workshop" wieder vorgelegt wird. Format und Wirkung:
 [Datei-Direktiven](references/scenario-clustering.md#CLU-datei-direktiven).
 
+**Absicherung der Kopf-Regeln ohne Szenario vermerken:** Jede Aussage des Kopfs über Verhalten,
+die kein Szenario trägt, bekommt den Vermerk `→ <Absicherung>`; den Lauf trägt das
+[Szenario-Clustering](#GHW-szenario-clustering) nach. Ohne den Vermerk entsteht ihr Test nur,
+wenn die Umsetzung zufällig auf die Regel stößt. Format: [Kopf-Regeln ohne
+Szenario](references/scenario-clustering.md#CLU-kopf-regeln).
+
 **Entscheidungen dokumentieren:**
 Wurden im Workshop explizite Entscheidungen getroffen (z.B. Fehlermeldungstext,
 Grenzfall-Verhalten), die noch nicht in adr.md stehen?
@@ -531,7 +537,9 @@ Erst möglich, wenn die Szenarien vollständig und freigegeben sind ([Feature-Fi
 Die freigegebenen Szenarien in Implementierungs-Läufe gruppieren – ein Lauf bündelt die
 Szenarien, die zusammen umgesetzt werden. Folge dem [Algorithmus](references/scenario-clustering.md#CLU-algorithmus) in
 `references/scenario-clustering.md` und schreibe für jedes Szenario den dort beschriebenen
-[Lauf-Kommentar-Tag](references/scenario-clustering.md#CLU-output) in die Feature-Datei.
+[Lauf-Kommentar-Tag](references/scenario-clustering.md#CLU-output) in die Feature-Datei. Jedem
+Vermerk einer Kopf-Regel mit Absicherung fügst du den Lauf an, der den betroffenen Code baut
+([Kopf-Regeln ohne Szenario](references/scenario-clustering.md#CLU-kopf-regeln)).
 
 Dem User das Ergebnis kurz vorlegen (Anzahl Läufe, grobe Gruppierung) und freigeben lassen.
 Kommt später doch ein Szenario hinzu, diesen Schritt für die betroffenen Läufe erneut anwenden.

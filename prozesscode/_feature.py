@@ -162,6 +162,72 @@ def find_malformed_run_comments(text: str) -> list[str]:
     return violations
 
 
+# Vermerk einer Kopf-Regel ohne Szenario (scenario-clustering.md, CLU-kopf-regeln):
+# `→ <Absicherung> · run-<N>[, run-<M>]` als letzte Zeile der Regel. Gelesen werden die
+# Laufnummern hinter dem letzten Pfeil – auch über einen Zeilenumbruch und bei abweichendem
+# Absicherungswort. Ein Vermerk ohne „→" oder ohne „run-<N>" fällt dagegen still heraus.
+_RULE_MARKER = "→"
+_RUN_REF_RE = re.compile(r"\brun-(\d+)\b")
+
+
+def _header_comment_units(text: str) -> list[dict]:
+    """Die Kommentar-Einträge des Feature-Headers: je Spiegelstrich samt tiefer eingerückter
+    Folgezeilen oder je Absatz ohne Spiegelstrich ein Eintrag
+    {"lines", "heading", "bullet_indent"}.
+
+    "heading" sind die Zeilen des Absatzes, der auf ":" endet und den Spiegelstrichen direkt
+    vorausgeht ("# Regeln:"), sonst None. "bullet_indent" ist die Einrückung des Spiegelstrichs,
+    bei einem Absatz None. Leerkommentar und Nicht-Kommentarzeile trennen.
+    """
+    units: list[dict] = []
+    current: dict | None
+    heading: list[str] | None
+    current = heading = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if _HEADER_END_RE.match(stripped):
+            break
+        rest = stripped.removeprefix("#")
+        content = rest.lstrip() if stripped.startswith("#") else ""
+        if not content:
+            current, heading = None, None
+            continue
+        indent = len(rest) - len(content)
+        if content.startswith("- "):
+            current = {"lines": [line], "heading": heading, "bullet_indent": indent}
+            units.append(current)
+            continue
+        continues_unit = current is not None and (
+            current["bullet_indent"] is None or indent > current["bullet_indent"])
+        if continues_unit:
+            current["lines"].append(line)
+        else:
+            current = {"lines": [line], "heading": None, "bullet_indent": None}
+            units.append(current)
+        if current["bullet_indent"] is None:
+            heading = current["lines"] if content.endswith(":") else None
+    return units
+
+
+def parse_header_rules(text: str) -> list[dict]:
+    """Die Einträge des Feature-Headers, die ein Vermerk Läufen zuordnet.
+
+    Je Treffer {"lines": list[str], "heading": list[str] | None, "runs": set[int]} – "runs" sind
+    die Laufnummern hinter dem letzten Pfeil des Eintrags, dem Vermerk; Pfeile und Nummern davor
+    gehören zum Regeltext.
+    """
+    rules: list[dict] = []
+    for unit in _header_comment_units(text):
+        joined = "\n".join(unit["lines"])
+        marker = joined.rfind(_RULE_MARKER)
+        if marker == -1:
+            continue
+        runs = {int(number) for number in _RUN_REF_RE.findall(joined[marker:])}
+        if runs:
+            rules.append({"lines": unit["lines"], "heading": unit["heading"], "runs": runs})
+    return rules
+
+
 def parse_feature(text: str) -> tuple[set[str], list[str], list[dict]]:
     """Parst eine Gherkin-Feature-Datei.
 

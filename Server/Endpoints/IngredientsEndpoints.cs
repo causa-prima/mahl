@@ -36,7 +36,7 @@ internal static class IngredientsEndpoints
             async (MahlDbContext db) =>
                 Results.Ok(await db.Ingredients
                     .Where(i => i.DeletedAt == null)
-                    .OrderBy(i => EF.Functions.Collate(i.Name, Collations.German))
+                    .OrderedByName()
                     // ADR-S108-1: per-Zeile xmin-ETag im Body – If-Match-Quelle für ein DELETE aus der Liste.
                     .Select(i => new IngredientDto(i.Id, i.Name, i.BaseUnit, XminETag.Format(EF.Property<uint>(i, XminExtensions.ColumnName))))
                     .ToListAsync()));
